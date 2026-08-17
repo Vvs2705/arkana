@@ -29,7 +29,13 @@ lá antes de virar código.
 
 ---
 
-## Rodar o protótipo
+## Jogar
+
+**Modo mais simples — clique duplo em `JOGAR.bat`.** Ele encontra o Node, instala as
+dependências na primeira vez, sobe o servidor e abre o jogo no navegador sozinho. Para
+encerrar, feche a janela preta do terminal.
+
+### Pela linha de comando
 
 Requisitos: Node.js 18+ e npm.
 
