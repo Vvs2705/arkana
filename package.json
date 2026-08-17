@@ -1,0 +1,20 @@
+{
+  "name": "arkana",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Arkana: Magos Battle Royale — protótipo v0.1 'Campo de Provas' (Fase 1 do GDD)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
