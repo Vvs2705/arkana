@@ -90,7 +90,10 @@ Grid.STATE_COLORS = {
 --- altura do bloco por material (o relevo que dá volume ao mundo blocky)
 Grid.HEIGHTS = {
 	Grass = 1,
-	TallGrass = 1,
+	--- 3 studs: alto o bastante para ESCONDER um personagem (~5 studs) — sem
+	--- isso a contra-jogada do GDD §14 ("Fogo em grama alta REVELA quem estava
+	--- escondido") não tem o que revelar. Achado da raia A na R1.
+	TallGrass = 3,
 	Tree = 12,
 	Water = 1,
 	Rock = 8,
