@@ -29,50 +29,6 @@ local GOLD_DIM = Color3.fromHex("#8A7336")
 local TEXT = Color3.fromHex("#E8E6F0")
 local TEXT_DIM = Color3.fromHex("#9A97AD")
 
--- PENDÊNCIA: migrar para Strings. `Shared/Strings.luau` é da raia de ONBOARDING
--- nesta leva e esta raia não pode editá-lo. Quando as chaves `a11y.*` existirem,
--- este bloco vira Strings.t() e some — nada mais muda.
-local L10N = {
-	pt = {
-		title = "ACESSIBILIDADE E CONFORTO",
-		close = "FECHAR",
-		uiSize = "TAMANHO DA UI",
-		leftHanded = "HUD CANHOTO",
-		contrast = "ALTO CONTRASTE",
-		shake = "TREMOR DE TELA",
-		flash = "FLASHES",
-		vfx = "INTENSIDADE DE VFX",
-		blur = "DESFOQUE (BLUR/DOF)",
-		captions = "LEGENDAS DOS AVISOS",
-		readyCue = "AVISO DE SINTONIA",
-		off = "NÃO",
-		on = "SIM",
-		half = "MÉDIO",
-		full = "CHEIO",
-		sizes = { "P", "M", "G", "GG" },
-		hint = "O tamanho do texto e a vibração seguem as opções do seu Roblox.",
-	},
-	en = {
-		title = "ACCESSIBILITY & COMFORT",
-		close = "CLOSE",
-		uiSize = "UI SIZE",
-		leftHanded = "LEFT-HANDED HUD",
-		contrast = "HIGH CONTRAST",
-		shake = "SCREEN SHAKE",
-		flash = "FLASHES",
-		vfx = "VFX INTENSITY",
-		blur = "BLUR / DOF",
-		captions = "CUE CAPTIONS",
-		readyCue = "ATTUNEMENT CUE",
-		off = "OFF",
-		on = "ON",
-		half = "HALF",
-		full = "FULL",
-		sizes = { "S", "M", "L", "XL" },
-		hint = "Text size and vibration follow your Roblox settings.",
-	},
-}
-
 local L = {
 	--- 48dp é o MÍNIMO do GDD §10 que o cabeçalho deste arquivo cita — e este
 	--- botão estava em 34, o único alvo de dedo do cliente abaixo da régua.
@@ -110,7 +66,6 @@ local gui: ScreenGui? = nil
 local conns: { RBXScriptConnection } = {}
 local refreshers: { () -> () } = {}
 local backdrop: Frame
-local tr: any = L10N.pt
 
 type Option = { label: string, value: any }
 
@@ -192,16 +147,16 @@ end
 
 local function toggle(parent: Instance, order: number, key: string, name: string)
 	choiceRow(parent, order, key, name, {
-		{ label = tr.off, value = false },
-		{ label = tr.on, value = true },
+		{ label = Strings.t("a11y.off"), value = false },
+		{ label = Strings.t("a11y.on"), value = true },
 	})
 end
 
 local function amount(parent: Instance, order: number, key: string, name: string)
 	choiceRow(parent, order, key, name, {
-		{ label = tr.off, value = 0 },
-		{ label = tr.half, value = 0.5 },
-		{ label = tr.full, value = 1 },
+		{ label = Strings.t("a11y.off"), value = 0 },
+		{ label = Strings.t("a11y.half"), value = 0.5 },
+		{ label = Strings.t("a11y.full"), value = 1 },
 	})
 end
 
@@ -268,7 +223,7 @@ local function buildPanel(root: ScreenGui)
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, -56, 0, 20),
 		Font = Enum.Font.GothamBold,
-		Text = tr.title,
+		Text = Strings.t("a11y.title"),
 		TextColor3 = GOLD,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -299,7 +254,7 @@ local function buildPanel(root: ScreenGui)
 		Position = UDim2.new(0, 0, 1, 0),
 		Size = UDim2.new(1, 0, 0, 14),
 		Font = Enum.Font.Gotham,
-		Text = tr.hint,
+		Text = Strings.t("a11y.hint"),
 		TextColor3 = TEXT_DIM,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -325,18 +280,18 @@ local function buildPanel(root: ScreenGui)
 
 	local sizes: { Option } = {}
 	for i, value in ipairs({ 0.9, 1, 1.15, 1.3 }) do
-		sizes[i] = { label = tr.sizes[i], value = value }
+		sizes[i] = { label = Strings.t("a11y.size." .. i), value = value }
 	end
 
-	choiceRow(list, 1, "uiSize", tr.uiSize, sizes)
-	toggle(list, 2, "leftHanded", tr.leftHanded)
-	toggle(list, 3, "contrast", tr.contrast)
-	amount(list, 4, "shake", tr.shake)
-	amount(list, 5, "flash", tr.flash)
-	amount(list, 6, "vfx", tr.vfx)
-	toggle(list, 7, "blur", tr.blur)
-	toggle(list, 8, "captions", tr.captions)
-	toggle(list, 9, "readyCue", tr.readyCue)
+	choiceRow(list, 1, "uiSize", Strings.t("a11y.uisize"), sizes)
+	toggle(list, 2, "leftHanded", Strings.t("a11y.lefthanded"))
+	toggle(list, 3, "contrast", Strings.t("a11y.contrast"))
+	amount(list, 4, "shake", Strings.t("a11y.shake"))
+	amount(list, 5, "flash", Strings.t("a11y.flash"))
+	amount(list, 6, "vfx", Strings.t("a11y.vfx"))
+	toggle(list, 7, "blur", Strings.t("a11y.blur"))
+	toggle(list, 8, "captions", Strings.t("a11y.captions"))
+	toggle(list, 9, "readyCue", Strings.t("a11y.readycue"))
 end
 
 -- ------------------------------------------------------------------ API
@@ -345,7 +300,6 @@ function Settings.init(player: Player)
 		return
 	end
 	Strings.followPlayerLocale()
-	tr = L10N[Strings.getLang()] or L10N.pt
 
 	local playerGui = player:WaitForChild("PlayerGui")
 	local root = mk("ScreenGui", {

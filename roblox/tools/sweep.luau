@@ -15,6 +15,10 @@
 
 local S = ...
 local N = math.max(1, math.floor(tonumber(S.__sweepN) or 12))
+--- deslocamento da base de sementes (3o argumento do run.sh): duas varreduras
+--- do MESMO build com bases diferentes sao amostras INDEPENDENTES — e' assim
+--- que se separa sinal de ruido antes de recomendar um nerf.
+local SEED_OFF = math.floor(tonumber(S.__sweepSeed) or 0)
 
 local DT = 1 / 20
 --- teto por partida: agenda inteira da zona + folga. Partida que nao acabou
@@ -144,6 +148,98 @@ local function runMatch(seed, variant)
 		table.insert(players, p)
 	end
 
+	-- ------------------------------------------------------- SONDA DE PROVENIENCIA
+	--- POR QUE EXISTE: a coluna "dano" da dominancia mistura tudo que tem autor
+	--- com Player — projetil, fusao de Sintonia — e o balde `ambiente` mistura
+	--- terreno com zona e com tiro de bot. Assim nao da' para responder "o Fogo
+	--- domina porque a MAGIA e' forte ou porque o INCENDIO cobra aluguel?".
+	---
+	--- A sonda nao toca src/: envelopa `Combat.applyDamage` (todas as chamadas
+	--- passam pelo campo da tabela) e classifica pelo CHUNK de quem chamou
+	--- (debug.info) + a assinatura do autor. Sem numero de linha: linha muda,
+	--- arquivo nao.
+	local prov = {
+		dmg = {}, -- [fonte][elemento] = dano
+		knocks = {}, -- [fonte] = quedas
+		killMatrix = {}, -- [elemento creditado][fonte do golpe] = eliminacoes
+		dealt = {}, -- [userHash] = dano CAUSADO por jogador (a moeda do escudo)
+		hits = {}, -- [elemento][basic|tactic] = acertos (elemento VERDADEIRO)
+		--- "o bot foge do fogo, mas foge BEM?" — exposicao (tempo de bot em cada
+		--- estado da FSM) contra rendimento (em que estado o alvo estava quando
+		--- o tiro acertou). Se um elemento acerta muito mais em FLEE_FIRE do que
+		--- a exposicao a FLEE_FIRE explicaria, a vantagem dele e' do PILOTO
+		--- AUTOMATICO, nao da magia.
+		stateTime = {}, -- [estado] = segundos-bot
+		hitState = {}, -- [elemento][estado do alvo] = acertos
+		casts = {}, -- [elemento][basic|tactic] = conjuracoes (Telemetry soma os dois)
+		travel = {}, -- [elemento][d|n] = distancia percorrida ate' acertar
+	}
+	local curSource = "?"
+	local lastHazard = "?"
+
+	--- kind vem do proprio Terrain ("Burning"/"Electrified"): o tick de perigo
+	--- chama hazardAt e aplica dano na linha seguinte, entao o ultimo kind com
+	--- dps > 0 e' o do dano que esta' entrando.
+	local realHazardAt = Terrain.hazardAt
+	Terrain.hazardAt = function(pos)
+		local dps, kind = realHazardAt(pos)
+		if dps and dps > 0 then
+			lastHazard = if kind == "Burning" then "terreno-fogo" else "terreno-raio"
+		end
+		return dps, kind
+	end
+
+	local realApply = Combat.applyDamage
+	Combat.applyDamage = function(target, amount, fromPlayer, strong, fromNpc)
+		local chunk = debug.info(2, "s") or "?"
+		if chunk:find("Match") then
+			curSource = "zona"
+		elseif chunk:find("Sintonia") then
+			curSource = "sintonia"
+		elseif fromPlayer == nil and fromNpc == nil then
+			curSource = lastHazard -- Combat:tick de perigo ou Bots:tick de perigo
+		elseif chunk:find("Bots") then
+			curSource = "tiro-bot"
+		else
+			curSource = "projetil"
+		end
+		realApply(target, amount, fromPlayer, strong, fromNpc)
+		curSource = "?"
+	end
+
+	local function bump(tbl, a, b, n)
+		local row = tbl[a]
+		if not row then
+			row = {}
+			tbl[a] = row
+		end
+		row[b] = (row[b] or 0) + n
+	end
+	local function isPlayer(x)
+		return x ~= nil and H.typeof(x) == "Instance" and x:IsA("Player")
+	end
+	--- MESMA resolucao do `elementOf` do Telemetry: override do payload, senao o
+	--- elemento ATUAL do autor. Reproduzida aqui de proposito — e' justamente
+	--- esta regra que a sonda esta' auditando.
+	local function elementOf(subject, payload)
+		if payload.environmental == true then
+			return "ambiente"
+		elseif typeof(payload.element) == "string" then
+			return payload.element
+		elseif isPlayer(subject) then
+			return Combat.getElement(subject) or "?"
+		end
+		return "?"
+	end
+	local humOf = function(x)
+		if isPlayer(x) then
+			local char = x.Character
+			return if char then char:FindFirstChildOfClass("Humanoid") else nil
+		end
+		return x
+	end
+	local knockSource = {}
+
 	-- quem venceu? o MatchEnd sai com o campeao como SUJEITO — e' o unico lugar
 	-- de onde da' para ler isso sem pedir API nova ao Match (arquivo de outra raia)
 	local championKey = nil
@@ -155,6 +251,53 @@ local function runMatch(seed, variant)
 			else
 				championKey = "nao-humano"
 			end
+		elseif name == Events.Name.Damage and H.typeof(payload) == "table" and payload.nullified ~= true then
+			local amount = tonumber(payload.amount) or 0
+			if amount > 0 then
+				bump(prov.dmg, curSource, elementOf(subject, payload), amount)
+				--- moeda do Escudo Evolutivo (GDD §5): dano CAUSADO por quem tem
+				--- Player. Mesma regra do Combat menos o filtro de aliado — os
+				--- pilotos so' atiram em bot, entao a diferenca e' zero aqui.
+				if payload.environmental ~= true and isPlayer(subject) then
+					local k = Events.userHash(subject.UserId)
+					prov.dealt[k] = (prov.dealt[k] or 0) + amount
+				end
+			end
+		elseif name == Events.Name.SpellHit and H.typeof(payload) == "table" then
+			--- o SpellHit carrega o elemento VERDADEIRO do projetil (p.element),
+			--- nao o elemento atual do dono: e' a testemunha limpa contra a
+			--- atribuicao do evento Damage.
+			if typeof(payload.element) == "string" then
+				bump(prov.hits, payload.element, if payload.strong == true then "tactic" else "basic", 1)
+				local st = "humano/?"
+				for _, bot in ipairs(Bots.list()) do
+					if bot.humanoid == payload.target then
+						st = bot.state
+						break
+					end
+				end
+				bump(prov.hitState, payload.element, st, 1)
+				bump(prov.travel, payload.element, "d", tonumber(payload.traveled) or 0)
+				bump(prov.travel, payload.element, "n", 1)
+			end
+		elseif (name == Events.Name.SpellCast or name == Events.Name.TacticCast)
+			and H.typeof(payload) == "table" and typeof(payload.element) == "string" then
+			bump(prov.casts, payload.element, if name == Events.Name.TacticCast then "tactic" else "basic", 1)
+		elseif name == Events.Name.Knock then
+			prov.knocks[curSource] = (prov.knocks[curSource] or 0) + 1
+			local hum = humOf(subject)
+			if hum ~= nil then
+				knockSource[hum] = curSource
+			end
+		elseif name == Events.Name.Elimination and H.typeof(payload) == "table" then
+			--- o Died do Humanoid dispara DENTRO da escrita de Health, ou seja
+			--- ANTES do emit do Knock — entao para o alvo que morre agora o mapa
+			--- ainda esta' vazio e quem vale e' a fonte da pilha atual.
+			local hum = humOf(subject)
+			local src = (hum and knockSource[hum]) or (if curSource ~= "?" then curSource else "sem-queda")
+			local killer = payload.by
+			local el = if isPlayer(killer) then (Combat.getElement(killer) or "?") else "?"
+			bump(prov.killMatrix, el, src, 1)
 		end
 		return realEmit(name, subject, payload)
 	end
@@ -247,8 +390,20 @@ local function runMatch(seed, variant)
 		end
 	end
 
+	local sampleAcc = 0
 	while simulated < cap do
 		simulated += DT
+		--- amostragem da FSM a 2 Hz: e' o DENOMINADOR de exposicao do bloco de
+		--- estados. Mais fino nao muda a conta e custa 20x mais laco.
+		sampleAcc += DT
+		if sampleAcc >= 0.5 then
+			for _, bot in ipairs(Bots.list()) do
+				if bot.humanoid.Health > 0 then
+					prov.stateTime[bot.state] = (prov.stateTime[bot.state] or 0) + sampleAcc
+				end
+			end
+			sampleAcc = 0
+		end
 		H.tick(DT)
 		H.physics(DT)
 		guard("pilotos", driveHumans, DT)
@@ -275,6 +430,7 @@ local function runMatch(seed, variant)
 		duration = snap.duration,
 		snap = snap,
 		championKey = championKey,
+		prov = prov,
 		stepErrors = stepErrors,
 		harnessErrors = #H.errors,
 		balance = Balance, -- so' leitura: dados para o TTK teorico e a agenda da zona
@@ -305,14 +461,14 @@ end
 
 -- =========================================================== laco da varredura
 print("== ARKANA - VARREDURA DE BALANCEAMENTO ==")
-print(string.format("   %d partidas · seeds distintas · variantes de zona em ciclo (blitz/media/longa)", N))
+print(string.format("   %d partidas · seeds distintas (base %d) · zona em ciclo (blitz/media/longa)", N, SEED_OFF))
 print("")
 
 local records = {}
 local failures = {}
 for i = 1, N do
 	local variant = VARIANTS[(i - 1) % #VARIANTS + 1]
-	local seed = 100003 + i * 7919
+	local seed = 100003 + (i + SEED_OFF * N) * 7919
 	local ok, rec = pcall(runMatch, seed, variant)
 	if ok then
 		table.insert(records, rec)
@@ -338,6 +494,10 @@ local oppPinged, oppFused = 0, 0
 local fire = { fronts = 0, cells = 0, max = 0, exhausted = 0, burned = 0, flammable = 0 }
 local durations = {} -- por variante, so' partidas que TERMINARAM
 local notEnded = {}
+local provDmg, provKnocks, provKill, provHits = {}, {}, {}, {}
+local provStateTime, provHitState, provCasts, provTravel = {}, {}, {}, {}
+local dealtList = {} -- dano causado por JOGADOR por PARTIDA (amostra do escudo)
+local dealtRate = {} -- o mesmo, normalizado por minuto de partida
 local humansMeasured, humanLv3, humanLv4 = 0, 0, 0
 local champHuman, champPeakSum, champLv4 = 0, 0, 0
 local matchesHumanLv4, winsHumanLv4 = 0, 0
@@ -360,6 +520,43 @@ for _, rec in ipairs(records) do
 	pactChannels += snap.all.pactChannels
 	oppPinged += snap.all.oppPinged
 	oppFused += snap.all.oppFused
+
+	local pv = rec.prov
+	for src, row in pairs(pv.dmg) do
+		provDmg[src] = provDmg[src] or {}
+		addMap(provDmg[src], row)
+	end
+	addMap(provKnocks, pv.knocks)
+	for el, row in pairs(pv.killMatrix) do
+		provKill[el] = provKill[el] or {}
+		addMap(provKill[el], row)
+	end
+	for el, row in pairs(pv.hits) do
+		provHits[el] = provHits[el] or {}
+		addMap(provHits[el], row)
+	end
+	addMap(provStateTime, pv.stateTime)
+	for el, row in pairs(pv.casts) do
+		provCasts[el] = provCasts[el] or {}
+		addMap(provCasts[el], row)
+	end
+	for el, row in pairs(pv.travel) do
+		provTravel[el] = provTravel[el] or {}
+		addMap(provTravel[el], row)
+	end
+	for el, row in pairs(pv.hitState) do
+		provHitState[el] = provHitState[el] or {}
+		addMap(provHitState[el], row)
+	end
+	--- 2 amostras por partida (os 2 pilotos). Minuto de partida usa a duracao
+	--- MEDIDA, nao a agenda: partida de bot acaba por abate, nao por zona.
+	local mins = math.max(rec.duration, 1) / 60
+	for k, v in pairs(pv.dealt) do
+		if k:sub(1, 1) == "u" then
+			table.insert(dealtList, v)
+			table.insert(dealtRate, v / mins)
+		end
+	end
 
 	fire.fronts += snap.fire.fronts
 	fire.cells += snap.fire.cells
@@ -463,10 +660,50 @@ for _, el in ipairs({ "Fire", "Water", "Earth", "Wind", "Lightning" }) do
 	w("     %-10s %6.2fs   %s", el, t, flag)
 end
 
+local ELS = { "Fire", "Water", "Earth", "Wind", "Lightning" }
+
+w("")
+w("-- REGUA DE MESA: DANO POR MANA e DPS SUSTENTADO (so' Balance) -------")
+w("   POR QUE ESTA TABELA EXISTE: o indice dano/uso da V4 divide por CASTS.")
+w("   Num jogo com economia de mana isso nao e' adimensional — quem custa")
+w("   caro por disparo sobe e quem custa barato desce, mesmo com os dois")
+w("   rendendo o mesmo por ponto de mana. Aqui esta' a leitura sem esse vies.")
+w("   %-10s %6s %6s %11s %8s %13s %8s", "elemento", "dano", "mana", "dano/mana", "vs media", "dps sustent.", "vs media")
+local dpm, dps = {}, {}
+local dpmSum, dpsSum = 0, 0
+for _, el in ipairs(ELS) do
+	local b = Balance.elements[el].basic
+	dpm[el] = b.dmg / b.manaCost
+	--- ritmo sustentado = o menor entre a cadencia da arma e o que a mana paga
+	dps[el] = b.dmg * math.min(1 / b.fireRate, Balance.player.manaRegen / b.manaCost)
+	dpmSum += dpm[el]
+	dpsSum += dps[el]
+end
+local dpmAvg, dpsAvg = dpmSum / #ELS, dpsSum / #ELS
+for _, el in ipairs(ELS) do
+	local b = Balance.elements[el].basic
+	w("   %-10s %6d %6d %11.3f %7.2fx %12.1f %8.2fx", el, b.dmg, b.manaCost, dpm[el], dpm[el] / dpmAvg,
+		dps[el], dps[el] / dpsAvg)
+end
+w("   maior/menor: dano/mana %.2fx · dps sustentado %.2fx (regua: <= 1,25x)",
+	(function()
+		local lo, hi = math.huge, 0
+		for _, el in ipairs(ELS) do
+			lo, hi = math.min(lo, dpm[el]), math.max(hi, dpm[el])
+		end
+		return hi / lo
+	end)(),
+	(function()
+		local lo, hi = math.huge, 0
+		for _, el in ipairs(ELS) do
+			lo, hi = math.min(lo, dps[el]), math.max(hi, dps[el])
+		end
+		return hi / lo
+	end)())
+
 w("")
 w("-- V4: DOMINANCIA DE ELEMENTO (regua: indice dano/uso <= 1,25x) ------")
 w("   %-10s %6s %8s %7s %8s %8s", "elemento", "casts", "dano", "abates", "idx(h)", "idx(a)")
-local ELS = { "Fire", "Water", "Earth", "Wind", "Lightning" }
 local function usageIndex(casts, dmg, el)
 	local cSum, dSum = 0, 0
 	for _, e in ipairs(ELS) do
@@ -497,6 +734,169 @@ w("    a cada 6s: o indice mede rendimento POR DISPARO contra bots, nao a")
 w("    meta de escolha de jogadores. Dano de bot nao tem elemento — fora.)")
 
 w("")
+w("-- SONDA: DE ONDE VEM O DANO (fonte x elemento) ----------------------")
+w("   A dominancia acima le' o evento `damage`, que carimba o elemento ATUAL")
+w("   do autor. Esta tabela separa a MESMA soma por QUEM chamou applyDamage.")
+local SOURCES = { "projetil", "sintonia", "tiro-bot", "terreno-fogo", "terreno-raio", "zona" }
+local function rowTotal(row)
+	local t = 0
+	for _, v in pairs(row or {}) do
+		t += v
+	end
+	return t
+end
+local grand = 0
+for _, src in ipairs(SOURCES) do
+	grand += rowTotal(provDmg[src])
+end
+w("   %-13s %9s %7s   %s", "fonte", "dano", "share", "elemento carimbado (top)")
+for _, src in ipairs(SOURCES) do
+	local row = provDmg[src] or {}
+	local tot = rowTotal(row)
+	local names = {}
+	for el, v in pairs(row) do
+		table.insert(names, { el = el, v = v })
+	end
+	table.sort(names, function(a, b)
+		return a.v > b.v
+	end)
+	local parts = {}
+	for i = 1, math.min(3, #names) do
+		table.insert(parts, string.format("%s %.0f%%", names[i].el, names[i].v / math.max(tot, 1) * 100))
+	end
+	w("   %-13s %9d %6.1f%%   %s", src, math.floor(tot), tot / math.max(grand, 1) * 100,
+		if #parts > 0 then table.concat(parts, " · ") else "-")
+end
+w("")
+w("   dano ATRIBUIVEL a elemento (o que entra na regua de 1,25x):")
+w("   %-10s %10s %10s %10s   %s", "elemento", "projetil", "sintonia", "total", "share sintonia")
+local attribTotal, sintTotal = 0, 0
+for _, el in ipairs(ELS) do
+	local pj = (provDmg["projetil"] or {})[el] or 0
+	local sn = (provDmg["sintonia"] or {})[el] or 0
+	attribTotal += pj + sn
+	sintTotal += sn
+	w("   %-10s %10d %10d %10d   %9.0f%%", el, math.floor(pj), math.floor(sn), math.floor(pj + sn),
+		sn / math.max(pj + sn, 1) * 100)
+end
+w("   TOTAL      %10d %10d %10d   %9.0f%%", math.floor(attribTotal - sintTotal), math.floor(sintTotal),
+	math.floor(attribTotal), sintTotal / math.max(attribTotal, 1) * 100)
+w("   (a Sintonia NAO gera `spell_cast`: cada ponto de dano dela entra no")
+w("    NUMERADOR da dominancia sem entrar no DENOMINADOR de uso.)")
+w("")
+w("   INDICE CORRIGIDO — reconstruido do `spell_hit`, que carrega o elemento")
+w("   VERDADEIRO do projetil (o `damage` carrega o elemento atual do dono):")
+w("   %-10s %7s %7s %8s %10s %8s", "elemento", "casts", "acertos", "acerto%", "dano proj.", "idx")
+local trueDmg, trueCast = {}, {}
+local tdSum, tcSum = 0, 0
+for _, el in ipairs(ELS) do
+	local hb = (provHits[el] or {}).basic or 0
+	local ht = (provHits[el] or {}).tactic or 0
+	local d = hb * Balance.elements[el].basic.dmg + ht * Balance.elements[el].tactic.dmg
+	trueDmg[el], trueCast[el] = d, castsA[el] or 0
+	tdSum += d
+	tcSum += trueCast[el]
+end
+for _, el in ipairs(ELS) do
+	local hits = ((provHits[el] or {}).basic or 0) + ((provHits[el] or {}).tactic or 0)
+	local idx = if trueCast[el] > 0 and tdSum > 0 and tcSum > 0
+		then (trueDmg[el] / tdSum) / (trueCast[el] / tcSum)
+		else nil
+	w("   %-10s %7d %7d %7.0f%% %10d %8s", el, trueCast[el], hits, hits / math.max(trueCast[el], 1) * 100,
+		trueDmg[el], if idx then string.format("%.2fx", idx) else "-")
+end
+w("   (dano nominal do Balance x acertos: ignora escudo/overkill, entao e' o")
+w("    RENDIMENTO BRUTO por disparo — a leitura limpa de dominancia de MAGIA.)")
+w("")
+w("   INDICE A ACERTO IGUAL — a MESMA conta com a taxa de acerto zerada como")
+w("   variavel: so' o que o Balance controla (dano nominal x mistura de")
+w("   basico/tatico que a mana e o cooldown deixam o jogador conjurar).")
+w("   %-10s %8s %8s %11s %9s %9s", "elemento", "basicos", "taticos", "dano/cast", "idx=", "alcance")
+local nomSum, nomCast = 0, 0
+local nominal = {}
+for _, el in ipairs(ELS) do
+	local cb = (provCasts[el] or {}).basic or 0
+	local ct = (provCasts[el] or {}).tactic or 0
+	nominal[el] = cb * Balance.elements[el].basic.dmg + ct * Balance.elements[el].tactic.dmg
+	nomSum += nominal[el]
+	nomCast += cb + ct
+end
+for _, el in ipairs(ELS) do
+	local cb = (provCasts[el] or {}).basic or 0
+	local ct = (provCasts[el] or {}).tactic or 0
+	local n = cb + ct
+	local perCast = nominal[el] / math.max(n, 1)
+	local idxEq = if n > 0 and nomCast > 0 then perCast / (nomSum / nomCast) else nil
+	local tr = provTravel[el] or {}
+	w("   %-10s %8d %8d %11.2f %8s %8.0f st", el, cb, ct, perCast,
+		if idxEq then string.format("%.2fx", idxEq) else "-", (tr.d or 0) / math.max(tr.n or 0, 1))
+end
+w("   ESTE e' o unico indice que um campo do Balance move. Se ele estiver")
+w("   dentro de 1,25x, dominancia observada acima da regua vem de MIRA /")
+w("   GEOMETRIA / PILOTO — e nerfar dano trata o sintoma no lugar errado.")
+w("")
+w("-- SONDA: O BOT FOGE DO FOGO — MAS FOGE BEM? -------------------------")
+w("   exposicao: em que estado da FSM os bots passam o tempo (amostra 2 Hz)")
+local BSTATES = { "WANDER", "CHASE", "ATTACK", "FLEE_FIRE", "TO_ZONE" }
+local stTotal = 0
+for _, v in pairs(provStateTime) do
+	stTotal += v
+end
+local expo = {}
+for _, st in ipairs(BSTATES) do
+	local v = provStateTime[st] or 0
+	expo[st] = v / math.max(stTotal, 1)
+	w("   %-10s %8.0f s-bot  (%.1f%% do tempo)", st, v, expo[st] * 100)
+end
+w("")
+w("   RENDIMENTO: %% dos acertos de cada elemento que cairam em alvo FUGINDO")
+w("   do fogo. Exposicao a FLEE_FIRE = %.1f%%: sobre isso e' vantagem de BOT.", (expo.FLEE_FIRE or 0) * 100)
+w("   %-10s %8s %10s %9s %12s", "elemento", "acertos", "em FLEE", "share", "vs exposicao")
+for _, el in ipairs(ELS) do
+	local row = provHitState[el] or {}
+	local tot = 0
+	for _, v in pairs(row) do
+		tot += v
+	end
+	local fl = row.FLEE_FIRE or 0
+	local share = fl / math.max(tot, 1)
+	w("   %-10s %8d %10d %8.0f%% %11.2fx", el, tot, fl, share * 100,
+		share / math.max(expo.FLEE_FIRE or 0, 1e-6))
+end
+w("   (>1x = o elemento colhe alvos que ELE mesmo poe em panico. Humano nao")
+w("    corre 1,0 s em linha reta e volta para WANDER: este multiplicador e'")
+w("    a parte da dominancia que NAO sobrevive ao playtest humano.)")
+
+w("")
+w("-- SONDA: QUEM DA' O GOLPE QUE DERRUBA -------------------------------")
+local knockTotal = 0
+for _, v in pairs(provKnocks) do
+	knockTotal += v
+end
+for _, src in ipairs(SOURCES) do
+	local v = provKnocks[src] or 0
+	if v > 0 then
+		w("   %-13s %5d quedas (%.0f%%)", src, v, v / math.max(knockTotal, 1) * 100)
+	end
+end
+w("")
+w("   eliminacoes creditadas a UM ELEMENTO x fonte REAL do golpe final:")
+w("   %-10s %7s %9s %9s %9s %9s %9s", "elemento", "total", "projetil", "sintonia", "terr-fogo", "tiro-bot", "zona/outro")
+for _, el in ipairs(ELS) do
+	local row = provKill[el] or {}
+	local tot = rowTotal(row)
+	if tot > 0 then
+		local outro = tot - (row["projetil"] or 0) - (row["sintonia"] or 0) - (row["terreno-fogo"] or 0)
+			- (row["tiro-bot"] or 0)
+		w("   %-10s %7d %9d %9d %9d %9d %9d", el, tot, row["projetil"] or 0, row["sintonia"] or 0,
+			row["terreno-fogo"] or 0, row["tiro-bot"] or 0, outro)
+	end
+end
+w("   (credito de abate = ultimo Player que causou dano em <=10s. Fogo de")
+w("    terreno NAO credita ninguem: ele MATA e o abate fica com quem atirou")
+w("    por ultimo — e com o elemento que esse jogador segura NA HORA.)")
+
+w("")
 w("-- ESCUDO EVOLUTIVO (frequencia do nivel 4 e efeito no resultado) ----")
 w("   humanos medidos (2 por partida) .... %d", humansMeasured)
 w("   chegaram ao nivel 3+ ............... %d (%.0f%%)", humanLv3, humanLv3 / math.max(humansMeasured, 1) * 100)
@@ -513,6 +913,35 @@ else
 	w("    neste regime — 900 de dano causado esta' longe do ritmo dos pilotos)")
 end
 w("   (bots nao tem escudo evolutivo: a leitura vale so' para os 2 pilotos)")
+w("")
+w("   SONDA: DANO CAUSADO por piloto por partida (a moeda dos limiares).")
+table.sort(dealtList)
+table.sort(dealtRate)
+w("   limiares do Balance: nv2=%d · nv3=%d · nv4=%d",
+	Balance.shield.thresholds[2], Balance.shield.thresholds[3], Balance.shield.thresholds[4])
+w("   n=%d amostras   p10 %5.0f   p50 %5.0f   p90 %5.0f   max %5.0f",
+	#dealtList, percentile(dealtList, 0.1), percentile(dealtList, 0.5), percentile(dealtList, 0.9),
+	if #dealtList > 0 then dealtList[#dealtList] else 0)
+w("   por minuto de partida        p50 %5.0f/min   p90 %5.0f/min   max %5.0f/min",
+	percentile(dealtRate, 0.5), percentile(dealtRate, 0.9),
+	if #dealtRate > 0 then dealtRate[#dealtRate] else 0)
+local function reach(th)
+	local n = 0
+	for _, v in ipairs(dealtList) do
+		if v >= th then
+			n += 1
+		end
+	end
+	return n
+end
+for lv = 2, #Balance.shield.thresholds do
+	local th = Balance.shield.thresholds[lv]
+	w("   alcancaram nv%d (>=%4d de dano) ... %3d de %3d (%.0f%%)", lv, th, reach(th), #dealtList,
+		reach(th) / math.max(#dealtList, 1) * 100)
+end
+w("   (ESTE e' o teste do limiar: nao 'quantos chegaram ao nv4', e sim quanto")
+w("    dano um piloto CONSEGUE causar. Piloto atira a cada 0,4s sem lead nem")
+w("    recuo: e' PISO de habilidade humana, nunca teto.)")
 
 w("")
 w("-- FOGO (orcamento de PROPAGACAO: fuelBudget = %d celulas) -----------", Balance.terrain.fuelBudget)

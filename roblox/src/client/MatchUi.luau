@@ -32,55 +32,6 @@ local TEXT_DIM = Color3.fromHex("#9A97AD")
 local DANGER = Color3.fromHex("#E04040")
 local ZONE_VIOLET = Color3.fromHex("#8A5CF0")
 
--- PENDÊNCIA: migrar para Strings. Estes rótulos são locais porque
--- `Shared/Strings.luau` é da raia de ONBOARDING nesta leva e esta raia não pode
--- editá-lo. Quando as chaves `match.*` existirem lá, este bloco vira
--- Strings.t() e some — nada mais neste arquivo muda.
-local L10N = {
-	pt = {
-		alive = "VIVOS",
-		teams = "TIMES",
-		waiting = "AGUARDANDO MAGOS",
-		starting = "COMEÇA EM",
-		hold = "A ZONA FECHA EM",
-		shrink = "ZONA FECHANDO",
-		phase = "FASE %d/%d",
-		outside = "FORA DA ZONA",
-		outsideSub = "corra para dentro do círculo",
-		sealTitle = "SELO DO CAMPEÃO",
-		champion = "CAMPEÃO",
-		noChampion = "NINGUÉM SOBROU",
-		kills = "ABATES",
-		damage = "DANO",
-		combos = "SINTONIAS",
-		duration = "DURAÇÃO",
-		elements = "ELEMENTOS",
-		spectating = "ESPECTADOR",
-		none = "—",
-	},
-	en = {
-		alive = "ALIVE",
-		teams = "TEAMS",
-		waiting = "WAITING FOR MAGES",
-		starting = "STARTS IN",
-		hold = "ZONE CLOSES IN",
-		shrink = "ZONE CLOSING",
-		phase = "PHASE %d/%d",
-		outside = "OUTSIDE THE ZONE",
-		outsideSub = "run into the circle",
-		sealTitle = "CHAMPION'S SEAL",
-		champion = "CHAMPION",
-		noChampion = "NO ONE LEFT",
-		kills = "KILLS",
-		damage = "DAMAGE",
-		combos = "ATTUNEMENTS",
-		duration = "TIME",
-		elements = "ELEMENTS",
-		spectating = "SPECTATING",
-		none = "—",
-	},
-}
-
 local L = {
 	barTop = 12,
 	barRight = 12,
@@ -114,7 +65,6 @@ local MatchUi = {}
 
 local gui: ScreenGui? = nil
 local conns: { RBXScriptConnection } = {}
-local tr: { [string]: string } = L10N.pt
 local localPlayer: Player? = nil
 
 -- widgets
@@ -376,9 +326,9 @@ end
 local function showSeal()
 	local seal = st.seal
 	overlay.Visible = true
-	sealTitle.Text = tr.sealTitle
+	sealTitle.Text = Strings.t("match.seal.title")
 	if not seal then
-		sealName.Text = tr.noChampion
+		sealName.Text = Strings.t("match.seal.nochampion")
 		sealRows.Text = ""
 		fillElements({})
 		return
@@ -386,13 +336,13 @@ local function showSeal()
 	sealName.Text = string.upper(tostring(seal.champion))
 	sealRows.Text = string.format(
 		"%s %d    %s %d    %s %d\n%s %s    %s",
-		tr.kills,
+		Strings.t("match.kills"),
 		tonumber(seal.kills) or 0,
-		tr.damage,
+		Strings.t("match.damage"),
 		tonumber(seal.damage) or 0,
-		tr.combos,
+		Strings.t("match.combos"),
 		#(seal.combos or {}),
-		tr.duration,
+		Strings.t("match.duration"),
 		clock(tonumber(seal.duration) or 0),
 		string.format("1/%d", tonumber(seal.total) or 1)
 	)
@@ -412,7 +362,6 @@ function MatchUi.init(player: Player)
 	end
 	localPlayer = player
 	Strings.followPlayerLocale()
-	tr = L10N[Strings.getLang()] or L10N.pt
 
 	local playerGui = player:WaitForChild("PlayerGui")
 	local root = mk("ScreenGui", {
@@ -434,8 +383,8 @@ function MatchUi.init(player: Player)
 	buildWarning(root)
 	buildOverlay(root)
 	A11y.attach(root)
-	warnText.Text = tr.outside
-	warnSub.Text = tr.outsideSub
+	warnText.Text = Strings.t("match.outside")
+	warnSub.Text = Strings.t("match.outside.sub")
 
 	table.insert(
 		conns,
@@ -476,7 +425,7 @@ function MatchUi.init(player: Player)
 			-- LEGENDA: "a zona começou a fechar" é um cue que hoje só existe na
 			-- cor do relógio. Quem joga sem som (ou sem reparar no canto) lê aqui.
 			if st.shrinking and not wasShrinking then
-				A11y.caption(tr.shrink, ZONE_VIOLET, 2.2)
+				A11y.caption(Strings.t("match.shrink"), ZONE_VIOLET, 2.2)
 			end
 		end)
 	)
@@ -494,24 +443,24 @@ function MatchUi.update(dt: number)
 	--- que "4/8" com o 8 inventado aqui.
 	if st.teamsAlive then
 		aliveLabel.Text = if st.teamsTotal
-			then string.format("%s %d/%d", tr.teams, st.teamsAlive, st.teamsTotal)
-			else string.format("%s %d", tr.teams, st.teamsAlive)
+			then string.format("%s %d/%d", Strings.t("match.teams"), st.teamsAlive, st.teamsTotal)
+			else string.format("%s %d", Strings.t("match.teams"), st.teamsAlive)
 	else
-		aliveLabel.Text = string.format("%s %d/%d", tr.alive, st.alive, st.total)
+		aliveLabel.Text = string.format("%s %d/%d", Strings.t("match.alive"), st.alive, st.total)
 	end
 	if st.state == "Lobby" then
-		zoneLabel.Text = string.format("%s %s", tr.starting, clock(st.timeLeft))
+		zoneLabel.Text = string.format("%s %s", Strings.t("match.starting"), clock(st.timeLeft))
 		zoneLabel.TextColor3 = TEXT
-		phaseLabel.Text = tr.waiting
+		phaseLabel.Text = Strings.t("match.waiting")
 	elseif st.state == "Ended" then
 		zoneLabel.Text = clock(st.timeLeft)
 		zoneLabel.TextColor3 = TEXT_DIM
 		phaseLabel.Text = ""
 	else
-		local head = if st.shrinking then tr.shrink else tr.hold
+		local head = if st.shrinking then Strings.t("match.shrink") else Strings.t("match.hold")
 		zoneLabel.Text = string.format("%s %s", head, clock(st.timeLeft))
 		zoneLabel.TextColor3 = if st.shrinking then ZONE_VIOLET else TEXT
-		phaseLabel.Text = string.format(tr.phase, st.phase, st.phases)
+		phaseLabel.Text = Strings.t("match.phase", st.phase, st.phases)
 	end
 
 	-- ----------------------------------------------- fora da zona (só aviso)
@@ -532,7 +481,7 @@ function MatchUi.update(dt: number)
 		-- LEGENDA só na ENTRADA: fora da zona é estado contínuo e a faixa é para
 		-- "aconteceu isto agora" — repetir por frame viraria ruído.
 		if not wasOutside then
-			A11y.caption(tr.outside, DANGER, 2.0)
+			A11y.caption(Strings.t("match.outside"), DANGER, 2.0)
 		end
 		pulse = (pulse + dt * L.warnHz) % 1
 		--- "reduzir flashes": com o pulso em 0 o aviso fica ACESO e fixo em vez

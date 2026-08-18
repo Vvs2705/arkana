@@ -910,6 +910,20 @@ function Tutorial.step(dt: number)
 	if next(sessions) == nil then
 		return
 	end
+	-- A PARTIDA COMEÇOU POR CIMA DO ONBOARDING (alpha público). `Tutorial.start`
+	-- já se recusa a abrir sessão durante a prova, mas isso não cobre o caminho
+	-- inverso: o lobby SEGURA pelo tutorial só até o teto dele, e `forceStart`
+	-- (Playtest/harness) não segura nada. Uma sessão que sobrevive à largada fica
+	-- com alvos ANCORADOS e VÁLIDOS (`Combat.registerTarget`) dentro da arena
+	-- viva, um pilar de luz no meio do mapa e passos que apontam para células de
+	-- um terreno que o `startMatch` já reconstruiu. Fechar aqui é fechar no único
+	-- lugar que é dono das sessões — vale para toda porta de entrada de partida.
+	if matchRunning() then
+		for _, s in pairs(sessions) do
+			finish(s, s.index >= #ORDER, "match")
+		end
+		return
+	end
 	local now = os.clock()
 	for player, s in pairs(sessions) do
 		if not player.Parent or not rootOf(player) then
@@ -1030,6 +1044,16 @@ function Tutorial.selfTest(): boolean
 			scripted
 		)
 	)
+
+	-- ------------------------------------- SESSÃO NÃO ATRAVESSA A LARGADA
+	-- `Tutorial.step` fecha toda sessão aberta quando a prova começa: alvo
+	-- ancorado e VÁLIDO dentro da arena viva, pilar de luz no meio do mapa e
+	-- passos apontando para células de um terreno que o `startMatch` já
+	-- reconstruiu. O que dá para conferir sem Studio é justamente o que
+	-- quebraria o laço mestre: esta consulta roda a cada quadro com sessão
+	-- aberta e tem de devolver booleano SEMPRE — com ou sem Match na árvore.
+	assert(typeof(matchRunning()) == "boolean", "a consulta de partida em andamento tem de devolver booleano sempre")
+	assert(not Tutorial.active(nil :: any), "sem sessão ninguém está no Campo de Provas (nem chave inválida)")
 	print(string.format("[Tutorial] selfTest %s — %d passos", if ok then "OK" else "FALHOU", #ORDER))
 	return ok
 end

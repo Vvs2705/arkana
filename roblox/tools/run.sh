@@ -51,6 +51,9 @@ printf -- '-- GERADO POR roblox/tools/run.sh — NÃO EDITAR\nlocal S = {}\n' >>
 if [ "${1:-}" = "sweep" ]; then
   printf 'S.__mode = "sweep"\n' >> "$BUNDLE"
   printf 'S.__sweepN = "%s"\n' "${2:-12}" >> "$BUNDLE"
+  # 3o argumento: DESLOCAMENTO DA SEMENTE. Rodar a mesma varredura com outra
+  # base de sementes e' o teste de "isto e' sinal ou sao 30 amostras de ruido?".
+  printf 'S.__sweepSeed = "%s"\n' "${3:-0}" >> "$BUNDLE"
 else
   printf 'S.__maxSeconds = "%s"\n' "${1:-600}" >> "$BUNDLE"
 fi

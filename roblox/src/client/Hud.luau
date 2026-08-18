@@ -274,14 +274,23 @@ local statusAcc = 0
 local statusFx: { [Instance]: { [string]: Highlight } } = setmetatable({}, { __mode = "k" }) :: any
 
 --- REVELAÇÃO É PARA O INIMIGO VER: o único realce que este cliente ESCONDE é o
---- Reveal do próprio PARCEIRO — eu já sei onde ele está. O alvo continua vendo
---- o próprio realce (é o aviso de "estou marcado") e inimigo/neutro veem — que
---- é o efeito. Pura de propósito: o selfTest cobre a regra.
---- ponytail: TETO CONHECIDO — parceiro BOT não chega em Net.MatchState.mate
---- (bot não tem UserId), então bot aliado revelado ainda acende para o dono; o
---- upgrade é o servidor publicar o time junto do status.
-local function revealVisible(char: Instance?, mateChar: Instance?): boolean
-	return char ~= nil and char ~= mateChar
+--- de ALIADO — eu já sei onde meu time está. O alvo continua vendo o próprio
+--- realce (é o aviso de "estou marcado") e inimigo/neutro veem — que é o efeito.
+--- Pura de propósito: o selfTest cobre a regra.
+--- ALIADO = mesmo `Status_Team` publicado pelo servidor junto do status. Era
+--- `Net.MatchState.mate` sozinho, e bot NÃO TEM UserId: parceiro bot revelado
+--- acendia para o dono (débito 1, quitado em 18/08). O `mateChar` fica como
+--- rede de segurança para o que roda SEM times montados (tutorial, lobby).
+local TEAM_ATTR = "Status_Team"
+
+local function revealVisible(char: Instance?, mateChar: Instance?, myChar: Instance?, myTeam: any): boolean
+	if char == nil or char == mateChar then
+		return false
+	end
+	if char == myChar then
+		return true -- "estou marcado" é aviso, não vazamento
+	end
+	return myTeam == nil or char:GetAttribute(TEAM_ATTR) ~= myTeam
 end
 
 --- corpos que podem carregar status: personagens dos jogadores + bots
@@ -304,11 +313,14 @@ end
 local function scanStatuses()
 	local mp = matePlayer()
 	local mateChar: Instance? = if mp then mp.Character else nil
+	--- meu corpo e meu lado, os dois publicados pelo servidor (Combat.step)
+	local myChar: Instance? = if localPlayer then (localPlayer :: Player).Character else nil
+	local myTeam: any = if myChar then myChar:GetAttribute(TEAM_ATTR) else nil
 	for _, char in ipairs(statusModels()) do
 		local entry = statusFx[char]
 		for _, kind in ipairs(STATUS_KINDS) do
 			local active = char:GetAttribute("Status_" .. kind) ~= nil
-			local want = active and (kind ~= "Reveal" or revealVisible(char, mateChar))
+			local want = active and (kind ~= "Reveal" or revealVisible(char, mateChar, myChar, myTeam))
 			local fx = if entry then entry[kind] else nil
 			if want and not fx then
 				if not entry then
@@ -983,20 +995,37 @@ function Hud.selfTest()
 	assert(oy > 0, "caso degenerado tem de apontar para baixo")
 
 	-- FILTRO DO STATUS PUBLICADO (débito 1): o único Reveal que este cliente
-	-- esconde é o do PARCEIRO — o meu e o do inimigo aparecem.
+	-- esconde é o de ALIADO — o meu e o do inimigo aparecem.
 	local me = Instance.new("Model")
 	local mate = Instance.new("Model")
 	local foe = Instance.new("Model")
-	assert(revealVisible(me, mate), "o MEU Reveal aparece (aviso de 'estou marcado')")
-	assert(revealVisible(foe, mate), "Reveal de INIMIGO aparece — é o efeito")
-	assert(revealVisible(foe, nil), "sem parceiro, todo Reveal aparece")
-	assert(not revealVisible(mate, mate), "Reveal do PARCEIRO não aparece para mim (já sei onde ele está)")
-	assert(not revealVisible(nil, mate), "sem corpo não há realce")
+	assert(revealVisible(me, mate, me, nil), "o MEU Reveal aparece (aviso de 'estou marcado')")
+	assert(revealVisible(foe, mate, me, nil), "Reveal de INIMIGO aparece — é o efeito")
+	assert(revealVisible(foe, nil, me, nil), "sem parceiro, todo Reveal aparece")
+	assert(not revealVisible(mate, mate, me, nil), "Reveal do PARCEIRO não aparece para mim (já sei onde ele está)")
+	assert(not revealVisible(nil, mate, me, nil), "sem corpo não há realce")
+
+	-- POR TIME (o conserto do débito): o parceiro BOT não tem UserId e NUNCA
+	-- chega em `Net.MatchState.mate` — sem o lado publicado ele acendia para o
+	-- dono. Aqui ele entra como corpo desconhecido, só com `Status_Team`.
+	local botMate = Instance.new("Model")
+	me:SetAttribute(TEAM_ATTR, 1)
+	botMate:SetAttribute(TEAM_ATTR, 1)
+	foe:SetAttribute(TEAM_ATTR, 2)
+	assert(not revealVisible(botMate, nil, me, 1), "parceiro BOT (mesmo time) NÃO pode acender para o dono")
+	assert(revealVisible(foe, nil, me, 1), "inimigo de outro time continua acendendo")
+	assert(revealVisible(me, nil, me, 1), "meu próprio Reveal aparece mesmo no meu time")
+	local neutral = Instance.new("Model") -- corpo sem time publicado (lobby/tutorial)
+	assert(revealVisible(neutral, nil, me, 1), "corpo SEM time publicado não é aliado por omissão")
+	assert(revealVisible(botMate, nil, me, nil), "sem MEU time o filtro cai no parceiro conhecido, como antes")
+
 	me:Destroy()
 	mate:Destroy()
 	foe:Destroy()
+	botMate:Destroy()
+	neutral:Destroy()
 
-	print("[Hud] autoteste OK — seta do parceiro + filtro de Reveal")
+	print("[Hud] autoteste OK — seta do parceiro + filtro de Reveal por time")
 	return true
 end
 

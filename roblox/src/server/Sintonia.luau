@@ -543,10 +543,16 @@ local function fireChannel(ch: Channel)
 		--- escudo do bot não evolui (bot não tem escudo — regra do Combat).
 		local creditPlayer: Player? = if isPlayer(credit) then credit :: Player else nil
 		if combat then
+			-- ATRIBUIÇÃO DA FUSÃO (correção de medição, 18/08): o dano do combo
+			-- entrava no NUMERADOR da dominância por elemento sem gerar
+			-- `spell_cast` para o denominador — 4,6–5,6% de todo o dano do jogo
+			-- distorcendo o índice (concentrado em Terra e Vento). A fusão não
+			-- é elemento nenhum: carimba `"Combo"`, que o índice (que itera os
+			-- 5 elementos) ignora, e a telemetria contabiliza à parte.
 			if creditPlayer then
-				combat.applyDamage(hum, dmg, creditPlayer, true)
+				combat.applyDamage(hum, dmg, creditPlayer, true, nil, "Combo")
 			else
-				combat.applyDamage(hum, dmg, nil, true, credit)
+				combat.applyDamage(hum, dmg, nil, true, credit, "Combo")
 			end
 			-- STATUS pelo KERNEL (P1): o Combat é o único que guarda efeito e o
 			-- único que escreve WalkSpeed. Daqui não dá para furar o teto de

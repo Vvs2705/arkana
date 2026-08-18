@@ -73,6 +73,23 @@ local TUNE = {
 	--- (GDD §19.2) nunca foi medido. O preenchimento vai até `maxPlayers` mas
 	--- para neste teto. Sobe para `M.maxPlayers - 1` quando o playtest medir.
 	maxBots = 11,
+	--- TETO DURO DE DURAÇÃO (alpha público). A fase final da zona NÃO fecha até
+	--- zero: ela para em `Z.endRadius` e segura com `dur = math.huge`. Duas duplas
+	--- paradas dentro desse círculo — AFK, cliente travado, griefer parado de
+	--- propósito — deixam a máquina de estados em `Playing` PARA SEMPRE. Medido
+	--- no cenário de robustez: 900 s simulados, 4 AFK colados no centro, ainda
+	--- `Playing` com teamsAlive=2, e nenhuma partida nova nunca mais naquele
+	--- servidor. Estes dois números NÃO são balanceamento: multiplicam o
+	--- cronograma que o Balance já define (fator + folga), então mudam junto com
+	--- a variante de ritmo e no jogo normal nunca são alcançados (partida cheia
+	--- ~330 s contra teto de ~490 s).
+	overtimeFactor = 1.35,
+	overtimeSlack = 45,
+	--- ARREPIO — janela mínima entre dois pedidos do MESMO espírito. O gasto do
+	--- arrepio só acontece quando ele ACHA alguém: sem esta janela um cliente
+	--- hostil pede sem parar de um lugar vazio e cada pedido varre a lista
+	--- inteira de vivos de graça (é remote C→S, logo é fronteira de confiança).
+	pingCooldown = 0.5,
 } :: { [string]: number }
 
 -- --- RITUAL DE RESSURREIÇÃO (GDD §16.6 + §18.6) -----------------------------
@@ -132,6 +149,8 @@ type Spirit = {
 	channel: number,
 	--- arrepios restantes (GDD §18.6: UM)
 	ping: number,
+	--- `os.clock()` mínimo do próximo pedido de arrepio (anti-spam do remote)
+	nextPingAt: number,
 }
 
 type Altar = { pos: Vector3, pad: BasePart, beam: BasePart, hot: boolean }
@@ -163,17 +182,28 @@ local zone = {
 }
 local zonePart: BasePart? = nil
 
+--- Tabela NOVA com chaves fracas (mesmo padrão do Teams: nasce com o metatable
+--- em vez de depender de `table.clear` conviver com ele).
+local function weakKeyed(): any
+	return setmetatable({}, { __mode = "k" })
+end
+
 local matchId = ""
 local eliminated: { [Player]: boolean } = {}
 local stats: { [Player]: PlayerStat } = {}
---- último jogador a acertar cada humanoid (crédito de abate)
-local lastHit: { [Humanoid]: { player: Player, at: number } } = {}
+--- último jogador a acertar cada humanoid (crédito de abate).
+--- CHAVES FRACAS (mesmo motivo do `deathWired`): quem leva um tiro e depois SAI
+--- do servidor — ou é um bot que o `Bots.clear` destrói sem morrer — deixava o
+--- Humanoid preso aqui até o próximo reset, e segurar um Humanoid segura o Model
+--- inteiro junto. Num servidor de alpha que roda por horas, isso é lixo vivo
+--- entre a eliminação e o fim da partida por gente que só passou pelo servidor.
+local lastHit: { [Humanoid]: { player: Player, at: number } } = weakKeyed()
 --- CHAVES FRACAS (mesmo motivo do Teams): a marca de "já liguei o Died deste
 --- humanoid" só some quando ele morre. Corpo que a partida trocou sem morrer —
 --- todo jogador a cada `startMatch`, todo bot que o `Bots.clear` destrói —
 --- ficava aqui para sempre, e segurar um Humanoid segura o Model inteiro junto:
 --- ~20 personagens vazando por partida num servidor que nunca reinicia.
-local deathWired: { [Humanoid]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local deathWired: { [Humanoid]: boolean } = weakKeyed()
 local champion: any = nil
 local seal: any = nil
 
@@ -349,6 +379,24 @@ end
 local function radiusForPhase(i: number): number
 	local t = math.clamp(i / Z.phases, 0, 1)
 	return Z.startRadius + (Z.endRadius - Z.startRadius) * t
+end
+
+--- Teto DURO de duração da partida (ver `TUNE.overtimeFactor`). DERIVADO do
+--- cronograma que o Balance já define: muda junto com a variante de ritmo e não
+--- cria número novo para alguém manter em dois lugares.
+local function matchTimeLimit(): number
+	return Z.phases * (Z.holdTime + Z.shrinkTime) * TUNE.overtimeFactor + TUNE.overtimeSlack
+end
+
+--- A partida tem de acabar AGORA, sem esperar a zona resolver? As duas causas
+--- são de servidor público, e nenhuma delas o BR resolve sozinho:
+---   · servidor VAZIO — não se simula battle royale para ninguém, e quem entrar
+---     depois nasceria espectador de uma partida de bots;
+---   · TETO DE TEMPO — a fase final da zona segura para sempre; sem teto, gente
+---     parada dentro do círculo final trava `Playing` e o servidor inteiro junto.
+--- PURA de propósito: é assim que o autoteste cobre as duas regras sem partida.
+local function mustEndNow(humans: number, elapsed: number): boolean
+	return humans <= 0 or elapsed >= matchTimeLimit()
 end
 
 --- Novo centro sorteado DENTRO do círculo anterior, com folga suficiente para
@@ -659,7 +707,7 @@ local function makeSpirit(player: Player, at: Vector3)
 	local orb = neonPart("EssenciaArcana", Vector3.new(2.5, 2.5, 2.5), CFrame.new(at + Vector3.new(0, 3, 0)), 0.15)
 	orb.Shape = Enum.PartType.Ball
 	orb.Color = ESSENCE_COLOR
-	spirits[player] = { team = team, orb = orb, carrier = nil, channel = 0, ping = 1 }
+	spirits[player] = { team = team, orb = orb, carrier = nil, channel = 0, ping = 1, nextPingAt = 0 }
 	announceTo(player, "announce.revive.spirit")
 end
 
@@ -997,18 +1045,50 @@ local function wireDeath(hum: Humanoid)
 end
 
 -- --------------------------------------------------------- ciclo da partida
+--- O QUE NUNCA ATRAVESSA UMA PARTIDA: o progresso do Escudo Evolutivo (GDD §5) e
+--- o cooldown compartilhado da Sintonia. Os dois vazamentos foram fechados na
+--- revisão de 18/08 — mas a correção morava só no `toLobby`, e existem DUAS
+--- portas para uma partida nova: o ciclo normal (Ended → Lobby → startMatch) e o
+--- `Match.forceStart` chamado direto da tela de fim (Playtest/harness), que pula
+--- o lobby inteiro. Pela segunda porta os dois vazamentos voltavam: quem
+--- terminou no nível 4 começava a próxima já dourado, e quem fundiu no fim
+--- entrava travado por 24 s. Uma função, chamada nas duas portas.
+local function resetCrossMatchState()
+	-- Vem ANTES de qualquer `LoadCharacter`: o `onCharacterAdded` do Combat enche
+	-- o escudo no cap do nível ATUAL, que depois deste reset já é o nível 1.
+	if combat and combat.resetProgress then
+		for _, player in ipairs(Players:GetPlayers()) do
+			combat.resetProgress(player)
+		end
+	end
+	-- Require preguiçoso e protegido (padrão do projeto): se a raia R2 ainda não
+	-- expôs `resetMatch`, isto vira no-op. FindFirstChild (não WaitForChild):
+	-- roda dentro do Heartbeat e módulo ausente não pode travar o loop mestre.
+	local okS, S = pcall(require, ServerModules:FindFirstChild("Sintonia") :: ModuleScript)
+	if okS and S and (S :: any).resetMatch then
+		pcall((S :: any).resetMatch)
+	end
+end
+
 local function startMatch()
 	state = "Playing"
 	stateT = 0
 	matchStartedAt = os.clock()
+	-- o acumulador do dano da zona pode ter sobrado da partida anterior (o laço
+	-- para no meio quando alguém vence): zerado aqui, senão a partida NOVA
+	-- começaria descontando ticks de zona atrasados no primeiro quadro.
+	zoneAcc = 0
 	table.clear(stats)
-	table.clear(lastHit)
+	lastHit = weakKeyed()
 	clearEliminated() -- todo mundo volta a poder agir
 	clearAllSpirits()
 	table.clear(revivesUsed) -- o teto de retorno é POR PARTIDA
 	champion = nil
 	seal = nil
 	Bots.clear()
+	-- idempotente: no ciclo normal o `toLobby` já rodou isto. Existe aqui para a
+	-- porta do `forceStart` direto da tela de fim — ver `resetCrossMatchState`.
+	resetCrossMatchState()
 
 	-- terreno novo a cada partida: a floresta queimada da rodada anterior não
 	-- pode nascer carbonizada (mataria a pergunta de validação V3).
@@ -1109,18 +1189,12 @@ local function toLobby()
 		zonePart:Destroy()
 		zonePart = nil
 	end
-	-- PROGRESSO NÃO ATRAVESSA PARTIDA (achado da revisão de combate, 18/08). O
-	-- Escudo Evolutivo é conquistado DENTRO de uma prova: sem este reset, quem
-	-- terminou a partida 1 no nível 4 começava a 2 já dourado, e o snowball que a
-	-- auditoria apontou virava vantagem acumulada de sessão — envenenando a
-	-- leitura de TTK justamente no formato do playtest (partidas em sequência).
-	-- Vem ANTES do `LoadCharacter`: o `onCharacterAdded` do Combat enche o escudo
-	-- no cap do nível ATUAL, que depois deste reset já é o nível 1.
-	if combat and combat.resetProgress then
-		for _, player in ipairs(Players:GetPlayers()) do
-			combat.resetProgress(player)
-		end
-	end
+	-- PROGRESSO E COOLDOWN NÃO ATRAVESSAM PARTIDA (achado da revisão de combate,
+	-- 18/08): o Escudo Evolutivo é conquistado DENTRO de uma prova e o cooldown
+	-- compartilhado da Sintonia é de 24 s. Vem ANTES do `LoadCharacter` de baixo
+	-- — ver `resetCrossMatchState`, que é o mesmo reset que o `startMatch` chama
+	-- para a porta do `forceStart`.
+	resetCrossMatchState()
 
 	for player in pairs(eliminated) do
 		-- tira o espectador do poleiro com um corpo NOVO (soltar a âncora o faria
@@ -1132,22 +1206,10 @@ local function toLobby()
 		end
 	end
 	clearEliminated()
-	table.clear(lastHit)
+	lastHit = weakKeyed()
 	-- no lobby ninguém tem time: sem aliado, a Sintonia não dispara enquanto a
 	-- próxima partida não montar os duos (lado seguro do erro).
 	Teams.clear()
-	-- O COOLDOWN COMPARTILHADO DA SINTONIA TAMBÉM NÃO ATRAVESSA (achado da mesma
-	-- revisão): são 24 s, e quem fundiu no fim da partida entrava na próxima
-	-- ainda travado — a dupla perdia o pilar do jogo nos primeiros segundos e o
-	-- funil de Sintonia media um bloqueio herdado. Require preguiçoso e protegido
-	-- (padrão do projeto): se a raia R2 ainda não expôs `resetMatch`, isto vira
-	-- no-op e o lobby segue igual.
-	-- FindFirstChild (não WaitForChild): isto roda dentro do Heartbeat e um
-	-- módulo ausente não pode fazer o loop mestre ficar esperando.
-	local okS, S = pcall(require, ServerModules:FindFirstChild("Sintonia") :: ModuleScript)
-	if okS and S and (S :: any).resetMatch then
-		pcall((S :: any).resetMatch)
-	end
 	announceAll("announce.match.waiting")
 end
 
@@ -1223,6 +1285,13 @@ local function broadcast()
 		end
 		payload.mate = mate
 		payload.spirit = spirits[player] ~= nil
+		--- ESPECTADOR: quem entrou NO MEIO da prova (nasce eliminado) e quem já
+		--- caiu de vez. Sem este bit o cliente não tem como distinguir "estou
+		--- jogando" de "estou no poleiro esperando a próxima" — e alguém que entra
+		--- num alpha público no minuto 3 fica olhando o mapa de cima sem nenhuma
+		--- explicação na tela. PENDÊNCIA para o COORDENADOR: falta a string
+		--- `announce.match.spectating` em Shared/Strings para o aviso sair escrito.
+		payload.spectating = eliminated[player] == true
 		payload.reviveChannel = channelOf[player] or 0
 		evState:FireClient(player, payload)
 	end
@@ -1314,6 +1383,16 @@ function Match.spiritPing(player: Player, rawPos: any)
 	if not (orb and orb.Parent) or flatDist(rawPos, orb.Position) > REVIVE.pingRange then
 		return
 	end
+	-- JANELA MÍNIMA (alpha público): o arrepio só é GASTO quando acha alguém, e
+	-- pedido sem alvo saía de graça. Um cliente hostil pedindo a 1 kHz de um
+	-- canto vazio fazia o servidor remontar a lista inteira de vivos a cada
+	-- pedido — DoS barato por dentro de um remote legítimo. Cobra a janela ANTES
+	-- da varredura, e cobra mesmo quando não acha nada (é o caso do abuso).
+	local now = os.clock()
+	if now < sp.nextPingAt then
+		return
+	end
+	sp.nextPingAt = now + TUNE.pingCooldown
 
 	local best: Bots.Target? = nil
 	local bestD = REVIVE.pingRange
@@ -1472,15 +1551,36 @@ function Match.step(dt: number)
 			end
 		end
 	elseif state == "Playing" then
-		stepZone(dt)
-		zoneAcc += dt
-		while zoneAcc >= TUNE.zoneTick do
-			zoneAcc -= TUNE.zoneTick
-			applyZoneDamage()
-			-- rede de segurança a 2 Hz (o caso instantâneo já é tratado no
-			-- Died): cobre quem saiu do servidor ou sumiu sem morrer.
-			if stateT >= TUNE.startGrace and matchOver() then
-				finish()
+		-- DUAS SAÍDAS QUE O BR NÃO RESOLVE SOZINHO (ver `mustEndNow`). Medidas no
+		-- cenário de robustez ANTES da correção: (1) 20 s depois do último humano
+		-- sair, ainda `Playing` com 8 bots andando para plateia nenhuma — e quem
+		-- entrasse ali nascia espectador de uma partida de bots; (2) 900 s com
+		-- quatro AFK dentro do círculo final, `Playing` para sempre. Encerram pela
+		-- MESMA porta de sempre (`finish`), que é o que mantém uma saída só.
+		local humans = #Players:GetPlayers()
+		if mustEndNow(humans, stateT) then
+			print(
+				string.format(
+					"[Match] encerrando por segurança — %s",
+					if humans <= 0 then "servidor vazio" else string.format("teto de %ds", math.floor(matchTimeLimit()))
+				)
+			)
+			finish()
+		end
+		if state == "Playing" then
+			stepZone(dt)
+			zoneAcc += dt
+			-- `state == "Playing"` no laço: `applyZoneDamage` mata, `onDeath` pode
+			-- chamar `finish`, e sem esta condição a iteração seguinte continuava
+			-- queimando gente numa partida que já acabou.
+			while zoneAcc >= TUNE.zoneTick and state == "Playing" do
+				zoneAcc -= TUNE.zoneTick
+				applyZoneDamage()
+				-- rede de segurança a 2 Hz (o caso instantâneo já é tratado no
+				-- Died): cobre quem saiu do servidor ou sumiu sem morrer.
+				if stateT >= TUNE.startGrace and matchOver() then
+					finish()
+				end
 			end
 		end
 		if state == "Playing" then
@@ -1584,6 +1684,28 @@ function Match.selfTest()
 	-- Campo de Provas, mas segurar PARA SEMPRE trava o servidor inteiro (era o
 	-- comportamento antigo — sem teto, com jogador AFK ou entrando sem parar).
 	assert(TUNE.tutorialHoldMax < math.huge, "a espera pelo tutorial precisa de teto, senão o lobby nunca começa")
+
+	-- ========================= ROBUSTEZ DE SERVIDOR PÚBLICO =========================
+	-- Os dois caminhos que deixavam a máquina de estados presa em `Playing`. Os
+	-- dois foram MEDIDOS no cenário de robustez antes de existir esta regra:
+	--   · servidor esvaziou: 20 s depois do último humano sair, ainda `Playing`
+	--     com 8 bots andando — e quem entrasse virava espectador de bots;
+	--   · quatro AFK colados no centro: 900 s simulados, `teamsAlive=2`, sem fim.
+	--     A fase final da zona para em `endRadius` e SEGURA (`dur = math.huge`),
+	--     então "a zona resolve" é falso quando ninguém sai do círculo.
+	assert(mustEndNow(0, 1), "servidor vazio no meio da prova encerra na hora — não se simula BR para ninguém")
+	assert(not mustEndNow(1, 1), "com UM mago dentro a prova continua (bots são companhia, não motivo de fim)")
+	assert(matchTimeLimit() < math.huge, "sem teto de tempo a partida pode ficar em Playing para sempre")
+	assert(
+		not mustEndNow(2, total),
+		string.format("o teto (%ds) não pode cortar partida ainda dentro do cronograma da zona (%ds)", matchTimeLimit(), total)
+	)
+	assert(mustEndNow(2, matchTimeLimit()), "passado o teto a prova termina mesmo com todo mundo parado")
+
+	-- ARREPIO: fronteira de confiança C→S. O gasto só acontece quando ACHA
+	-- alguém, então sem janela mínima um pedido vazio varria a lista de vivos de
+	-- graça, quantas vezes o cliente quisesse.
+	assert(TUNE.pingCooldown > 0, "o arrepio precisa de janela mínima entre pedidos, senão vira DoS barato")
 
 	Teams.clear()
 	assert(Teams.teamOf(roster[1]) == nil, "clear apaga os times")

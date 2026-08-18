@@ -58,6 +58,10 @@ local PT: { [string]: string } = {
 
 	-- Anúncios do servidor (Net.Announce → { key = "...", ... })
 	["announce.match.waiting"] = "Aguardando magos...",
+	--- quem entra com a partida em andamento: sem este texto a pessoa fica
+	--- olhando o mapa de cima sem entender que está assistindo (achado da raia
+	--- de robustez para o alpha, 18/08)
+	["announce.match.spectating"] = "Partida em andamento — você entra na próxima. Assista daqui.",
 	["announce.match.start"] = "A prova começou!",
 	["announce.match.end"] = "Fim da prova",
 	["announce.zone.closing"] = "A tempestade arcana se fecha",
@@ -79,6 +83,50 @@ local PT: { [string]: string } = {
 	["announce.revive.done"] = "%s retornou com o kit base.",
 	--- o arrepio é CONTRA-JOGADA: quem é visto pelo espírito sabe que foi visto
 	["announce.spirit.chill"] = "Um arrepio percorre sua espinha — você foi visto.",
+
+	-- ---------------------------------------------------------- PARTIDA (UI)
+	-- Vieram do bloco `L10N` local do MatchUi (débito 2). Rótulos de HUD: caixa
+	-- alta e curtos porque moram numa barra de 190px no alto à direita.
+	["match.alive"] = "VIVOS",
+	["match.teams"] = "TIMES",
+	["match.waiting"] = "AGUARDANDO MAGOS",
+	["match.starting"] = "COMEÇA EM",
+	["match.hold"] = "A ZONA FECHA EM",
+	["match.shrink"] = "ZONA FECHANDO",
+	["match.phase"] = "FASE %d/%d",
+	["match.outside"] = "FORA DA ZONA",
+	["match.outside.sub"] = "corra para dentro do círculo",
+	["match.seal.title"] = "SELO DO CAMPEÃO",
+	["match.seal.nochampion"] = "NINGUÉM SOBROU",
+	["match.kills"] = "ABATES",
+	["match.damage"] = "DANO",
+	["match.combos"] = "SINTONIAS",
+	["match.duration"] = "DURAÇÃO",
+
+	-- ------------------------------------------------- ACESSIBILIDADE (menu)
+	-- Vieram do bloco `L10N` local do Settings (débito 2). O menu é o do
+	-- `Accessibility.luau`; aqui só existe o que o jogador LÊ.
+	["a11y.title"] = "ACESSIBILIDADE E CONFORTO",
+	["a11y.uisize"] = "TAMANHO DA UI",
+	["a11y.lefthanded"] = "HUD CANHOTO",
+	["a11y.contrast"] = "ALTO CONTRASTE",
+	["a11y.shake"] = "TREMOR DE TELA",
+	["a11y.flash"] = "FLASHES",
+	["a11y.vfx"] = "INTENSIDADE DE VFX",
+	["a11y.blur"] = "DESFOQUE (BLUR/DOF)",
+	["a11y.captions"] = "LEGENDAS DOS AVISOS",
+	["a11y.readycue"] = "AVISO DE SINTONIA",
+	["a11y.off"] = "NÃO",
+	["a11y.on"] = "SIM",
+	["a11y.half"] = "MÉDIO",
+	["a11y.full"] = "CHEIO",
+	--- uma chave por degrau (era uma lista dentro do L10N): chave solta é o que
+	--- o teste de consistência PT/EN consegue conferir.
+	["a11y.size.1"] = "P",
+	["a11y.size.2"] = "M",
+	["a11y.size.3"] = "G",
+	["a11y.size.4"] = "GG",
+	["a11y.hint"] = "O tamanho do texto e a vibração seguem as opções do seu Roblox.",
 
 	-- ------------------------------------------------------------ GRIMÓRIO
 	-- (GDD §18.3) Progressão por EXPERIMENTAÇÃO, não por poder: cada página é
@@ -153,6 +201,7 @@ local EN: { [string]: string } = {
 	["tutorial.lead"] = "LEAD THE TARGET",
 
 	["announce.match.waiting"] = "Waiting for mages...",
+	["announce.match.spectating"] = "Match in progress — you're in the next one. Watch from here.",
 	["announce.match.start"] = "The trial has begun!",
 	["announce.match.end"] = "Trial over",
 	["announce.zone.closing"] = "The arcane storm is closing in",
@@ -170,6 +219,42 @@ local EN: { [string]: string } = {
 	["announce.revive.channel"] = "A summoning ritual has begun!",
 	["announce.revive.done"] = "%s came back with the base kit.",
 	["announce.spirit.chill"] = "A chill runs down your spine — you have been seen.",
+
+	["match.alive"] = "ALIVE",
+	["match.teams"] = "TEAMS",
+	["match.waiting"] = "WAITING FOR MAGES",
+	["match.starting"] = "STARTS IN",
+	["match.hold"] = "ZONE CLOSES IN",
+	["match.shrink"] = "ZONE CLOSING",
+	["match.phase"] = "PHASE %d/%d",
+	["match.outside"] = "OUTSIDE THE ZONE",
+	["match.outside.sub"] = "run into the circle",
+	["match.seal.title"] = "CHAMPION'S SEAL",
+	["match.seal.nochampion"] = "NO ONE LEFT",
+	["match.kills"] = "KILLS",
+	["match.damage"] = "DAMAGE",
+	["match.combos"] = "ATTUNEMENTS",
+	["match.duration"] = "TIME",
+
+	["a11y.title"] = "ACCESSIBILITY & COMFORT",
+	["a11y.uisize"] = "UI SIZE",
+	["a11y.lefthanded"] = "LEFT-HANDED HUD",
+	["a11y.contrast"] = "HIGH CONTRAST",
+	["a11y.shake"] = "SCREEN SHAKE",
+	["a11y.flash"] = "FLASHES",
+	["a11y.vfx"] = "VFX INTENSITY",
+	["a11y.blur"] = "BLUR / DOF",
+	["a11y.captions"] = "CUE CAPTIONS",
+	["a11y.readycue"] = "ATTUNEMENT CUE",
+	["a11y.off"] = "OFF",
+	["a11y.on"] = "ON",
+	["a11y.half"] = "HALF",
+	["a11y.full"] = "FULL",
+	["a11y.size.1"] = "S",
+	["a11y.size.2"] = "M",
+	["a11y.size.3"] = "L",
+	["a11y.size.4"] = "XL",
+	["a11y.hint"] = "Text size and vibration follow your Roblox settings.",
 
 	-- GRIMOIRE (GDD §18.3) — see the PT block for the writing rule.
 	["grimoire.title"] = "BOOK OF DISCOVERIES",
@@ -239,6 +324,41 @@ function Strings.t(key: string, ...): string
 	end
 	local ok, formatted = pcall(string.format, s, ...)
 	return ok and formatted or s
+end
+
+-- ============================================================================
+-- AUTOTESTE — cole no Command Bar do Studio:
+--   require(game.ReplicatedStorage.Shared.Strings).selfTest()
+-- CONSISTÊNCIA PT/EN (débito 3). Chave que existe num idioma e falta no outro
+-- não estoura nada: o `t()` devolve o fallback e o jogador do idioma faltante lê
+-- a CHAVE CRUA na tela ("match.alive"). É o tipo de erro que só o playtest
+-- encontra — e que custa este laço para barrar antes.
+-- ============================================================================
+function Strings.selfTest()
+	local missing: { string } = {}
+	for key in pairs(PT) do
+		if EN[key] == nil then
+			table.insert(missing, "EN falta " .. key)
+		end
+	end
+	for key in pairs(EN) do
+		if PT[key] == nil then
+			table.insert(missing, "PT falta " .. key)
+		end
+	end
+	table.sort(missing) -- `pairs` não tem ordem: sem isto a mensagem dança
+	assert(#missing == 0, "i18n desemparelhado (o jogador veria a chave crua): " .. table.concat(missing, " · "))
+
+	--- contrato do fallback: chave desconhecida VOLTA como a chave, em vez de
+	--- sumir. É o que torna a falha acima visível no playtest.
+	assert(Strings.t("chave.que.nao.existe") == "chave.que.nao.existe", "chave desconhecida tem de voltar crua")
+
+	local n = 0
+	for _ in pairs(PT) do
+		n += 1
+	end
+	print(string.format("[Strings] autoteste OK — %d chaves emparelhadas PT/EN", n))
+	return true
 end
 
 return Strings

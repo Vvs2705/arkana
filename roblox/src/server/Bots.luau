@@ -61,6 +61,14 @@ local TUNE = {
 	zoneMargin = 0.9,
 	--- altura do olho/cano (o tiro nasce na altura do peito, como o do jogador)
 	muzzleY = 1.5,
+	--- ANTITRAVAMENTO. `Humanoid:MoveTo` anda em LINHA RETA e não desvia de
+	--- nada: em CHASE (ou TO_ZONE) o bot encosta numa rocha e fica moendo contra
+	--- a geometria até a zona matá-lo. Em playtest com roteiro isso passa; num
+	--- alpha público é a primeira coisa que alguém filma. A evidência que o
+	--- servidor tem é só uma — "tentou andar e não saiu do lugar":
+	stuckCheck = 0.8, -- janela de observação (s)
+	stuckMin = 1.5, -- studs andados na janela abaixo dos quais é travamento
+	detourTime = 1.2, -- quanto tempo contorna de lado antes de voltar à FSM
 } :: { [string]: number }
 
 -- ------------------------------------------------------------------- tipos
@@ -82,6 +90,13 @@ export type Bot = {
 	scanAcc: number,
 	hazardAcc: number,
 	moveAcc: number,
+	--- antitravamento: posição da última janela, tempo acumulado nela, e se o
+	--- bot chegou a PEDIR movimento (parado de propósito não é bot travado)
+	lastPos: Vector3,
+	stuckAcc: number,
+	wantsMove: boolean,
+	detourDir: Vector3,
+	detourUntil: number,
 	--- números do Selo do Campeão (GDD §18.6) quando quem vence é um bot
 	kills: number,
 	damage: number,
@@ -384,7 +399,16 @@ local function stepShots(dt: number)
 end
 
 -- --------------------------------------------------------------------- FSM
+--- Travou na geometria? PURA de propósito (o autoteste chama sem arena): a
+--- única evidência que o servidor tem é "PEDIU para andar e não saiu do lugar".
+--- Bot que está parado porque quis (a pausa de 15% do WANDER, atordoamento) não
+--- pediu movimento e por isso nunca cai aqui.
+local function isStuck(wantsMove: boolean, moved: number): boolean
+	return wantsMove and moved < TUNE.stuckMin
+end
+
 local function move(bot: Bot, dir: Vector3, speedMult: number)
+	bot.wantsMove = true
 	--- MESMO produto do jogador (Combat.step): base × terreno × status. O bot é o
 	--- inimigo que o playtest tem de sobra — se a lentidão dos combos não valesse
 	--- aqui, ela seria invisível na maior parte das partidas.
@@ -421,6 +445,25 @@ local function stepBot(bot: Bot, dt: number, now: number)
 	-- Dura no máximo 0,8 s pelo teto da auditoria, então nem a zona perde muito.
 	if combat.getStatus(hum, "Stun") > 0 then
 		hum.WalkSpeed = 0
+		return
+	end
+
+	-- PRIORIDADE 0.5: ANTITRAVAMENTO. Vem ANTES da zona de propósito — o bot
+	-- travado numa rocha entre ele e o centro é justamente o que fica moendo em
+	-- TO_ZONE até morrer. Contorna de lado por `detourTime` e devolve o controle
+	-- para a FSM: se ainda estiver preso, a próxima janela sorteia outro lado.
+	bot.stuckAcc += dt
+	if bot.stuckAcc >= TUNE.stuckCheck then
+		if isStuck(bot.wantsMove, flatDist(pos, bot.lastPos)) and now >= bot.detourUntil then
+			local d = randomDir()
+			bot.detourDir = Vector3.new(-d.Z, 0, d.X) -- lateral: sai da quina
+			bot.detourUntil = now + TUNE.detourTime
+		end
+		bot.stuckAcc, bot.lastPos, bot.wantsMove = 0, pos, false
+	end
+	if now < bot.detourUntil then
+		bot.state = "UNSTICK"
+		move(bot, bot.detourDir, 1)
 		return
 	end
 
@@ -568,6 +611,11 @@ function Bots.spawn(count: number, points: { Vector3 }): { Bot }
 			scanAcc = 0,
 			hazardAcc = 0,
 			moveAcc = TUNE.moveRefresh,
+			lastPos = root.Position,
+			stuckAcc = 0,
+			wantsMove = false,
+			detourDir = Vector3.zero,
+			detourUntil = 0,
 			kills = 0,
 			damage = 0,
 		}
@@ -589,10 +637,14 @@ function Bots.list(): { Bot }
 	return bots
 end
 
+--- MESMA REGRA de `Match.aliveEntities` (`Health > 0` E corpo ainda na árvore).
+--- Antes só a vida contava, e as duas contagens podiam discordar: o número da
+--- HUD ("vivos") vinha daqui e o fim da partida vinha de lá. Uma regra só é o
+--- que impede a contagem de desandar em partida longa.
 function Bots.aliveCount(): number
 	local n = 0
 	for _, bot in ipairs(bots) do
-		if bot.humanoid.Health > 0 then
+		if bot.humanoid.Health > 0 and bot.root.Parent then
 			n += 1
 		end
 	end
@@ -613,6 +665,12 @@ function Bots.clear()
 	end
 	table.clear(bots)
 	table.clear(shots)
+	--- a fotografia de alvos do último quadro segura Humanoid + HumanoidRootPart
+	--- de TODO MUNDO que estava vivo — e ela sobrevivia ao lobby inteiro, porque
+	--- `Bots.step` sai cedo quando não há bot nem tiro. Segurar um Humanoid segura
+	--- o Model junto: eram ~20 personagens da partida anterior presos entre uma
+	--- prova e outra, num servidor que roda por horas.
+	table.clear(frameTargets)
 end
 
 function Bots.step(dt: number)
@@ -656,7 +714,22 @@ function Bots.selfTest()
 		h:Destroy()
 	end
 
-	print("[Bots] autoteste OK — alvo filtrado por time")
+	-- ANTITRAVAMENTO (alpha público): `MoveTo` não desvia de nada, então bot em
+	-- CHASE/TO_ZONE encosta numa rocha e mói contra ela até a zona matá-lo. A
+	-- regra é PEDIU-e-não-saiu: quem está parado porque quis (pausa do WANDER,
+	-- atordoamento) nunca pede movimento e por isso nunca é contornado à toa.
+	assert(isStuck(true, 0), "pediu para andar e não saiu do lugar = travado")
+	assert(isStuck(true, TUNE.stuckMin - 0.01), "andar quase nada na janela ainda é travamento")
+	assert(not isStuck(true, TUNE.stuckMin), "andou o mínimo da janela: está andando, não travado")
+	assert(not isStuck(false, 0), "parado DE PROPÓSITO (pausa do WANDER / atordoado) não é travamento")
+	assert(TUNE.detourTime > 0 and TUNE.stuckCheck > 0, "o contorno precisa de janela e de duração")
+
+	-- CONTAGEM DE VIVOS: uma regra só. Sem bot na lista o número é 0 — e é o
+	-- mesmo predicado (`vida > 0` E corpo na árvore) que o Match usa para decidir
+	-- o fim da partida. Duas regras diferentes = HUD e fim de prova discordando.
+	assert(Bots.aliveCount() == 0, "sem bots a contagem de vivos é ZERO (lobby limpo)")
+
+	print("[Bots] autoteste OK — alvo filtrado por time · antitravamento · contagem de vivos")
 	return true
 end
 

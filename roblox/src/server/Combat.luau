@@ -308,10 +308,37 @@ local statuses: { [Humanoid]: { [string]: Status } } = setmetatable({}, { __mode
 --- `nil` escrito por este módulo (`Combat.step`) — o cliente não decide status.
 local STATUS_ATTR = "Status_"
 
+--- LADO PUBLICADO JUNTO DO STATUS (débito 1 da revisão cruzada de 18/08). O
+--- cliente escondia o Reveal do parceiro comparando `Net.MatchState.mate.userId`
+--- — e BOT NÃO TEM UserId. Resultado: bot parceiro revelado acendia para o
+--- próprio dono, que é o oposto do que a Revelação existe para fazer.
+--- Quem sabe de time é o servidor, então ele publica o lado no MESMO canal do
+--- status: atributo no personagem, que replica sozinho e some com o corpo.
+--- `Teams` aceita Player OU Humanoid como membro — gente entra pelo Player (é
+--- assim que o Match monta o roster), bot entra pelo próprio Humanoid.
+--- Isto NÃO é informação secreta: quem está com quem já aparece no HUD da dupla
+--- e no placar de times. O que continua sendo do servidor é o STATUS.
+local TEAM_ATTR = "Status_Team"
+
+--- Escreve só quando MUDA: no laço de 10 Hz, reescrever o mesmo número seria
+--- replicação à toa para a sala inteira.
+local function publishTeam(char: Instance, humanoid: Humanoid)
+	local member: any = Players:GetPlayerFromCharacter(char :: any) or humanoid
+	local id = Teams.teamOf(member)
+	if char:GetAttribute(TEAM_ATTR) ~= id then
+		char:SetAttribute(TEAM_ATTR, id)
+	end
+end
+
 local function publishStatus(humanoid: Humanoid, kind: string, secondsLeft: number?)
 	local char = humanoid.Parent
 	if char then
 		char:SetAttribute(STATUS_ATTR .. kind, secondsLeft)
+		--- o lado vai junto de TODO status que ACENDE — inclusive o de bot, que
+		--- não passa pelo laço de jogadores lá do `step`.
+		if secondsLeft then
+			publishTeam(char, humanoid)
+		end
 	end
 end
 
@@ -792,7 +819,17 @@ function Combat.applyDamage(
 	amount: number,
 	fromPlayer: Player?,
 	strong: boolean?,
-	fromNpc: Humanoid?
+	fromNpc: Humanoid?,
+	--- ELEMENTO DA FONTE DO DANO (correção de atribuição, 18/08). Sem ele o
+	--- evento carimbava o elemento ATUAL do autor — mas o projétil viaja, e
+	--- quem troca de elemento no meio do voo fazia o dano ser creditado ao
+	--- elemento errado. A investigação de dominância mediu o estrago: Fogo
+	--- aparecia 1,34x pelo evento contra 1,64x pela verdade do `spell_hit`.
+	--- Ia contaminar o playtest humano do mesmo jeito. `"Combo"` = fusão de
+	--- Sintonia: não é elemento nenhum, e o índice de dominância (que itera os
+	--- 5 elementos) simplesmente não a conta — que é o correto, porque a fusão
+	--- não gera `spell_cast` para o denominador.
+	srcElement: string?
 )
 	--- `not (amount > 0)` e não `amount <= 0`: NaN falha TODA comparação, então
 	--- `NaN <= 0` é falso e o dano passava direto. Depois disso
@@ -809,7 +846,10 @@ function Combat.applyDamage(
 	--- então o dado sai de onde já existe em vez de virar mais um parâmetro.
 	local npcElement = if fromNpc then extraTargets[fromNpc] else nil
 	local author: any = fromPlayer or fromNpc
-	local authorElement = if typeof(npcElement) == "string" then npcElement else nil
+	local authorElement = if typeof(srcElement) == "string"
+		then srcElement
+		elseif typeof(npcElement) == "string" then npcElement
+		else nil
 
 	if tState and os.clock() < tState.iframesUntil then
 		-- ESQUIVA PERFEITA. Emitir aqui é o que torna a esquiva MENSURÁVEL: sem
@@ -968,7 +1008,7 @@ end
 -- -------------------------------------------------------------------- impacto
 local function impact(p: Projectile, hitHumanoid: Humanoid?)
 	if hitHumanoid then
-		Combat.applyDamage(hitHumanoid, p.dmg, p.owner, p.strong)
+		Combat.applyDamage(hitHumanoid, p.dmg, p.owner, p.strong, nil, p.element)
 		-- ACERTO ≠ dano aplicado (i-frames podem ter comido tudo): é o par
 		-- SpellCast/SpellHit que dá a taxa de acerto por elemento.
 		emit(Events.Name.SpellHit, p.owner or hitHumanoid, {
@@ -1006,7 +1046,19 @@ local function findHit(p: Projectile): Humanoid?
 		-- eliminado não é alvo: o corpo do espectador/espírito continua existindo,
 		-- e sem esta guarda um projétil perdido "acerta" quem já saiu da partida
 		-- (achado da revisão cruzada, 18/08 — hoje só a altura salvava)
+		-- FOGO AMIGO DESLIGADO ENTRE ALIADOS (decisão do coordenador, 18/08).
+		-- Projétil DIRETO não acerta parceiro. Razão: a hipótese do produto é
+		-- "dois desconhecidos cooperam"; com fogo amigo ligado, um estranho
+		-- arruína a sessão do outro em 2 segundos, e a medição de V1 fica
+		-- impossível de ler — não daria para separar "a Sintonia não é
+		-- divertida" de "meu parceiro me matou". O `Bots.shotHit` já filtrava
+		-- por time; o projétil de jogador era o vetor de griefing que sobrou.
+		-- O TERRENO continua atingindo todo mundo de propósito: fogo é "arma de
+		-- dois gumes" no GDD §14, é ambiente e não é ação mirada em alguém.
 		if player == p.owner or cannotAct[player] or not isAlive(st) then
+			continue
+		end
+		if p.owner and Teams.areAllies(p.owner, player) then
 			continue
 		end
 		local root = st.root
@@ -1179,6 +1231,13 @@ function Combat.step(dt: number)
 		for _, st in pairs(states) do
 			if st.player.Parent then
 				sendStats(st)
+				--- MEU lado no MEU personagem: é daqui que o cliente descobre o
+				--- próprio time para filtrar o Reveal de aliado (débito 1). Não dá
+				--- para publicar só no respawn — o Match monta os times DEPOIS que
+				--- todo mundo já nasceu.
+				if st.character and st.humanoid then
+					publishTeam(st.character :: Instance, st.humanoid :: Humanoid)
+				end
 			end
 		end
 	end
@@ -1303,6 +1362,13 @@ function Combat.selfTest()
 	-- SINAL PUBLICADO (débito 1): o estado vira ATRIBUTO no personagem — é o que
 	-- o cliente lê para desenhar; o Highlight do servidor morreu com o débito.
 	assert(body:GetAttribute("Status_Stun") == pub, "status ativo tem de ser PUBLICADO no personagem (duração)")
+	-- LADO PUBLICADO JUNTO (débito 1): sem time montado não há atributo — e o
+	-- cliente trata "sem time" como neutro, nunca como aliado.
+	assert(body:GetAttribute(TEAM_ATTR) == nil, "fora de partida não existe time para publicar")
+	Teams.build({ reborn :: any }, 1) -- bot: o membro é o próprio Humanoid
+	Combat.applyStatus(reborn, "Reveal", 1)
+	assert(body:GetAttribute(TEAM_ATTR) == Teams.teamOf(reborn), "o TIME tem de sair junto do status (bot não tem UserId)")
+	Teams.clear()
 	Combat.onCharacterAdded(ghost2, body, reborn)
 	assert(Combat.getStatus(reborn, "Stun") == 0, "RESPAWN tem de limpar o status (senão vaza entre partidas)")
 	assert(body:GetAttribute("Status_Stun") == nil, "limpar o status tem de APAGAR o sinal publicado")
