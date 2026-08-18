@@ -127,8 +127,9 @@ A avaliação de engine e o gatilho para reconsiderar Godot estão em
 - [x] **Fase 2** — APK Android via Capacitor + controles de toque *(código completo;
       compilar o APK exige Android Studio/JDK 17 — ver [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md))*
 - [ ] **Fase 3** — v0.2: Sintonia com bot aliado, tela de queda, Selo do Campeão, Presságios
-- [ ] **Projeto Prisma** — salto de qualidade gráfica (iluminação dinâmica, autotiling,
-      pós-processamento, personagens animados)
+- [x] **Projeto Prisma — PRISMA-1** — fundação de render: iluminação dinâmica, autotiling,
+      pós-processamento (bloom/vinheta/grading), personagens animados e VFX/juice
+      *(PRISMA-2 a 4 — arte autoral, animação esqueletal e otimização mobile — pendentes)*
 
 ---
 

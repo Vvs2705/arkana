@@ -25,6 +25,11 @@ import { HUD } from '../ui/HUD';
 import { TouchControls } from '../ui/TouchControls';
 import { Player } from '../entities/Player';
 import { ProjectilePool } from '../entities/Projectile';
+import { RenderModule } from '../render/contract';
+import { TerrainSkin } from '../render/terrainSkin';
+import { LightingFx } from '../render/lighting';
+import { CharacterFx } from '../render/characters';
+import { CombatVfx } from '../render/vfx';
 
 /** suavização da câmera ao seguir o player (briefing: ~0.12) */
 const CAM_LERP = 0.12;
@@ -64,6 +69,8 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
   private bots: Bot[] = [];
   private pool!: ProjectilePool;
   private hud!: HUD;
+  /** PRISMA-1: módulos de apresentação, na ordem de init/update */
+  private fx: RenderModule[] = [];
 
   /** morte congela novos spawns (projéteis em voo terminam o trajeto) */
   private playerDead = false;
@@ -128,6 +135,11 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
       });
     }
 
+    // PRISMA-1: módulos de apresentação (4 raias de render — só visual).
+    // Ordem: pele do terreno → luz → personagens → vfx.
+    this.fx = [new TerrainSkin(), new LightingFx(), new CharacterFx(), new CombatVfx()];
+    for (const m of this.fx) m.init(this);
+
     // pausa (a PauseScene de outra raia cuida do resto)
     this.input.keyboard?.on('keydown-ESC', this.onEsc, this);
     this.events.on(Phaser.Scenes.Events.RESUME, this.onResume, this);
@@ -149,6 +161,7 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
     this.pool.update(time, delta);
     this.hud.update(time, delta);
     this.touch?.update();
+    for (const m of this.fx) m.update(time, delta);
   }
 
   // --------------------------------------------------------------- ArenaApi
@@ -224,6 +237,8 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
 
   private onShutdown(): void {
     this.ready = false;
+    for (const m of this.fx) m.destroy();
+    this.fx = [];
     this.events.off(EVT.PLAYER_DIED, this.onPlayerDied, this);
     this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this);
     // teclado limpa os próprios listeners no shutdown do Phaser

@@ -102,7 +102,14 @@ qualidade, luzes limitadas por distância, "Modo Névoa" (GDD 19.2) desligando p
 
 ## 5. Estado de execução
 
-- [x] PRISMA-1 despachado em 17/08/2026 (4 raias paralelas)
+- [x] PRISMA-1 — **CONCLUÍDO em 17/08/2026** (4 raias paralelas: luz+pós-FX,
+      pele do terreno, personagens vivos, VFX/juice — módulos em `src/render/`,
+      contrato `RenderModule` fiado na ArenaScene; validado em runtime: WebGL,
+      10 luzes, bloom/vinheta/grading, zero texturas ausentes, zero erros).
+      *Nota: um despacho anterior registrado nesta seção não aterrissou em
+      nenhuma branch; esta é a execução que vale.*
 - [ ] PRISMA-2 — arte autoral por IA
 - [ ] PRISMA-3 — animação esqueletal
-- [ ] PRISMA-4 — otimização mobile
+- [ ] PRISMA-4 — otimização mobile (atenção: RT do terreno a 3840px exige
+      `MAX_TEXTURE_SIZE ≥ 4096` — prever fallback 1× em GPUs antigas; subir
+      `render.maxLights` se o pool de luzes precisar crescer)

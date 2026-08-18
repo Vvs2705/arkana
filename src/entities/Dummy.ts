@@ -5,9 +5,10 @@
 // ============================================================================
 import Phaser from 'phaser';
 import { type ArenaApi, type EntityRef, EVT } from '../core/types';
-import { TEX, DEPTH, COLORS, FONTS } from '../core/config';
+import { DEPTH, COLORS, FONTS } from '../core/config';
 import { BAL } from '../core/balance';
 import { t } from '../core/strings';
+import { ensureCharacterTextures, CHAR_TEX } from '../render/characterTextures';
 
 /** parâmetros visuais fixos da spec da raia D */
 const TUNE = {
@@ -16,6 +17,9 @@ const TUNE = {
   dpsOffsetY: -10,
   wobbleDeg: 10,
   wobbleMs: 70,
+  /** sombra elíptica projetada (PRISMA-1 raia 3) */
+  shadowOffsetY: 14,
+  shadowAlpha: 0.5,
 } as const;
 
 export class Dummy {
@@ -23,6 +27,7 @@ export class Dummy {
 
   private api: ArenaApi;
   private sprite: Phaser.GameObjects.Image;
+  private shadow: Phaser.GameObjects.Image;
   private label: Phaser.GameObjects.Text;
   private dpsText: Phaser.GameObjects.Text;
 
@@ -37,7 +42,14 @@ export class Dummy {
     this.api = api;
     this.ref = { x, y, hp: BAL.dummy.hp, alive: true, isPlayer: false, id: 'dummy' };
 
-    this.sprite = api.scene.add.image(x, y, TEX.DUMMY).setDepth(DEPTH.ENTITY);
+    // PRISMA-1: textura 64px exibida no tamanho lógico (28×30) + sombra
+    ensureCharacterTextures(api.scene);
+    this.shadow = api.scene.add.image(x, y + TUNE.shadowOffsetY, CHAR_TEX.SHADOW)
+      .setDepth(DEPTH.ENTITY - 1)
+      .setAlpha(TUNE.shadowAlpha);
+    this.sprite = api.scene.add.image(x, y, CHAR_TEX.DUMMY)
+      .setDisplaySize(28, 30)
+      .setDepth(DEPTH.ENTITY);
 
     // rótulo pequeno acima
     this.label = api.scene.add.text(x, y - TUNE.labelOffsetY, t('hud.dummy'), {
@@ -108,6 +120,7 @@ export class Dummy {
     this.wobbleTween = null;
     this.api.scene.tweens.killTweensOf(this.sprite);
     this.sprite.destroy();
+    this.shadow.destroy();
     this.label.destroy();
     this.dpsText.destroy();
   }

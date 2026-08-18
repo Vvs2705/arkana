@@ -24,6 +24,7 @@ import { BAL } from '../core/balance';
 import { Audio } from '../core/audio';
 import type { SfxName } from '../core/audio';
 import { generateLayout } from './layout';
+import { VIS, drawTerrainCell, generateTerrainTextures } from '../render/terrainTextures';
 
 /** atalho: TODOS os números do terreno vêm daqui (fonte única: balance.ts) */
 const T = BAL.terrain;
@@ -39,16 +40,6 @@ const ELECTRIFY_FLOOD_LIMIT = 200;
 const NEI4: ReadonlyArray<readonly [number, number]> = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
 ];
-
-/** tile base por material (NORMAL/BURNING/ELECTRIFIED mantêm o tile do material) */
-const MAT_TEX: Record<TerrainMaterial, string> = {
-  [TerrainMaterial.GRASS]: TEX.TILE_GRASS,
-  [TerrainMaterial.TALL_GRASS]: TEX.TILE_TALL_GRASS,
-  [TerrainMaterial.DIRT]: TEX.TILE_DIRT,
-  [TerrainMaterial.ROCK]: TEX.TILE_ROCK,
-  [TerrainMaterial.WATER]: TEX.TILE_WATER,
-  [TerrainMaterial.TREE]: TEX.TILE_TREE,
-};
 
 /** cor de minimapa por material em estado NORMAL (estados sobrepõem — ver getCellColor) */
 const MAT_COLOR: Record<TerrainMaterial, number> = {
@@ -79,11 +70,19 @@ export class TerrainGrid implements ITerrainGrid {
   /** acumulador de delta → ticks de simulação em passo fixo */
   private acc = 0;
 
+  /** ponte p/ o desenho da célula (PRISMA-1 raia 2) — só leitura do grid */
+  private readonly cellAt = (x: number, y: number): TerrainCell | null => this.getCell(x, y);
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    // PRISMA-1 raia 2: resolução visual DOBRADA — a RT é desenhada a 64px por
+    // célula (VIS) e exibida a 0.5×; o mundo lógico (TILE=32) fica intacto.
+    generateTerrainTextures(scene); // idempotente
+    const vs = VIS / this.tileSize; // 2
     this.rt = scene.add
-      .renderTexture(0, 0, this.cols * this.tileSize, this.rows * this.tileSize)
+      .renderTexture(0, 0, this.cols * this.tileSize * vs, this.rows * this.tileSize * vs)
       .setOrigin(0, 0)
+      .setScale(1 / vs)
       .setDepth(DEPTH.TERRAIN);
   }
 
@@ -105,8 +104,7 @@ export class TerrainGrid implements ITerrainGrid {
     this.rt.beginDraw();
     for (let cy = 0; cy < this.rows; cy++) {
       for (let cx = 0; cx < this.cols; cx++) {
-        const cell = this.cells[cy * this.cols + cx];
-        this.rt.batchDraw(MAT_TEX[cell.material], cx * this.tileSize, cy * this.tileSize);
+        drawTerrainCell(this.rt, cx, cy, this.cellAt); // autotiling + variantes + decals
       }
     }
     this.rt.endDraw();
@@ -587,21 +585,12 @@ export class TerrainGrid implements ITerrainGrid {
     for (const idx of this.dirtyCells) {
       const cx = idx % this.cols;
       const cy = (idx - cx) / this.cols;
-      this.rt.batchDraw(this.texFor(this.cells[idx]), cx * this.tileSize, cy * this.tileSize);
+      // estados sobrepõem o material; BURNING/ELECTRIFIED mantêm o tile.
+      // O autotiling só consulta MATERIAIS (imutáveis) → redraw autocontido.
+      drawTerrainCell(this.rt, cx, cy, this.cellAt);
     }
     this.rt.endDraw();
     this.dirtyCells.clear();
-  }
-
-  /** tile atual da célula: estados sobrepõem o material; BURNING/ELECTRIFIED mantêm o tile */
-  private texFor(cell: TerrainCell): string {
-    switch (cell.state) {
-      case TerrainState.BURNED: return TEX.TILE_BURNED;
-      case TerrainState.FROZEN: return TEX.TILE_FROZEN;
-      case TerrainState.MUD: return TEX.TILE_MUD;
-      case TerrainState.WALL: return TEX.TILE_WALL;
-      default: return MAT_TEX[cell.material];
-    }
   }
 
   // ------------------------------------------------------------- overlays animados

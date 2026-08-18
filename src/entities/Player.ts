@@ -11,6 +11,8 @@ import { BAL } from '../core/balance';
 import { Settings, type KeyAction } from '../core/settings';
 import { Audio } from '../core/audio';
 import type { ArenaScene } from '../scenes/ArenaScene';
+import { ensureCharacterTextures, CHAR_TEX, CHAR_BASE_SCALE } from '../render/characterTextures';
+import { CharacterRig } from '../render/characterRig';
 
 // --- constantes de sensação da raia C (briefing) ----------------------------
 // Números de BALANCEAMENTO vêm SEMPRE de BAL — aqui só game feel/varredura.
@@ -37,6 +39,10 @@ const RECOIL_TACTIC_PX = 5;
 const RECOIL_DECAY = 0.05;
 /** clamp de delta p/ aba inativa */
 const MAX_STEP_MS = 100;
+/** tint do manto (roxo do robe escurecido) — PRISMA-1 raia 3 */
+const CLOAK_TINT = 0x2a2050;
+/** pulso de escala do rig na evolução do escudo */
+const SHIELD_PULSE_SCALE = 1.2;
 
 export class Player {
   /** referência leve consumida por bots/HUD/pool (contrato EntityRef) */
@@ -46,6 +52,8 @@ export class Player {
 
   private readonly scene: ArenaScene;
   private readonly staff: Phaser.GameObjects.Image;
+  /** animação procedural (PRISMA-1 raia 3): respiração, bob, tilt, manto, sombra */
+  private readonly rig: CharacterRig;
 
   private x: number;
   private y: number;
@@ -109,7 +117,12 @@ export class Player {
     this.x = x;
     this.y = y;
 
-    this.sprite = scene.add.image(x, y, TEX.PLAYER).setDepth(DEPTH.PLAYER);
+    // PRISMA-1: sprite 64px exibido no tamanho lógico (28px) — hitbox intacta
+    ensureCharacterTextures(scene);
+    this.sprite = scene.add.image(x, y, CHAR_TEX.PLAYER)
+      .setScale(CHAR_BASE_SCALE)
+      .setDepth(DEPTH.PLAYER);
+    this.rig = new CharacterRig(scene, this.sprite, CLOAK_TINT);
     // cajado: linha curta que aponta p/ o mouse; o tint dobra como
     // indicador do elemento atual (acessibilidade: cor + HUD)
     this.staff = scene.add.image(x, y, TEX.PIXEL)
@@ -183,7 +196,7 @@ export class Player {
       if (p.rightButtonDown()) this.tryTactic();
     }
 
-    this.updateVisuals();
+    this.updateVisuals(dtMs);
     this.syncRef();
   }
 
@@ -382,14 +395,10 @@ export class Player {
       this.shield = BAL.shield.caps[this.shieldLevel - 1]; // ENCHE no novo cap
       Audio.playSfx('shield_up');
       this.scene.events.emit(EVT.SHIELD_EVOLVED, this.shieldLevel);
-      // pulso visual curto — o momento precisa ser sentido (GDD §5)
-      this.scene.tweens.add({
-        targets: this.sprite,
-        scale: 1.18,
-        duration: 120,
-        yoyo: true,
-        ease: 'Quad.easeOut',
-      });
+      // pulso visual curto — o momento precisa ser sentido (GDD §5).
+      // Via rig (a escala do sprite agora é animada por frame — um tween
+      // de scale absoluto brigaria com a respiração/bob).
+      this.rig.punch(SHIELD_PULSE_SCALE);
     }
   }
 
@@ -423,6 +432,7 @@ export class Player {
     this.keysDown.clear();
     this.staff.setVisible(false);
     this.sprite.clearTint();
+    this.rig.setDead();
     // tomba: gira e apaga — o overlay de morte é responsabilidade do HUD
     this.scene.tweens.add({
       targets: this.sprite,
@@ -436,11 +446,10 @@ export class Player {
   }
 
   // ------------------------------------------------------------------ visual
-  private updateVisuals(): void {
+  private updateVisuals(dtMs: number): void {
     // recuo sutil oposto à mira ao disparar
     const ox = -Math.cos(this.aimAngle) * this.recoil;
     const oy = -Math.sin(this.aimAngle) * this.recoil;
-    this.sprite.setPosition(this.x + ox, this.y + oy);
     this.staff.setPosition(this.x, this.y);
     this.staff.setRotation(this.aimAngle);
 
@@ -449,11 +458,17 @@ export class Player {
     else this.sprite.clearTint();
 
     // pisca de alpha durante i-frames
+    let alpha = 1;
     if (this.iframesLeft > 0) {
-      this.sprite.setAlpha(Math.floor(this.iframesLeft / BLINK_MS) % 2 === 0 ? 0.35 : 0.9);
-    } else {
-      this.sprite.setAlpha(1);
+      alpha = Math.floor(this.iframesLeft / BLINK_MS) % 2 === 0 ? 0.35 : 0.9;
     }
+    this.sprite.setAlpha(alpha);
+
+    // rig: posição (com recuo), respiração/bob/tilt, squash do dash, manto, sombra
+    this.rig.update(dtMs, this.x + ox, this.y + oy, {
+      dashing: this.dashLeft > 0,
+      alpha,
+    });
   }
 
   private syncRef(): void {
@@ -497,6 +512,7 @@ export class Player {
     this.scene.game.events.off(Phaser.Core.Events.BLUR, this.onBlur);
     this.unsubSettings();
     this.scene.tweens.killTweensOf(this.sprite);
+    this.rig.destroy();
     this.sprite.destroy();
     this.staff.destroy();
   }

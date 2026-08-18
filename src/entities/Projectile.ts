@@ -10,6 +10,7 @@ import { DEPTH, ELEMENT_COLORS, PROJ_TEX, TEX } from '../core/config';
 import { BAL } from '../core/balance';
 import { Audio, type SfxName } from '../core/audio';
 import { Settings } from '../core/settings';
+import { projectileVfx } from '../render/vfx';
 import type { ArenaScene } from '../scenes/ArenaScene';
 
 // --- constantes de sensação/física da raia C (briefing) ---------------------
@@ -34,6 +35,13 @@ const FIRE_FALLOFF = 0.4;
 /** clamp de delta p/ aba inativa — nunca simular mais que isso de uma vez */
 const MAX_STEP_MS = 100;
 
+// --- trilha dos projéteis (PRISMA-1 raia 4 — SÓ visual) ---------------------
+// Acessibilidade: a trilha usa a PRÓPRIA textura do elemento (cor + forma).
+/** px percorridos entre partículas de trilha, por qualidade (Baixa = curta) */
+const TRAIL_SPACING: Record<'low' | 'medium' | 'high', number> = { low: 22, medium: 14, high: 9 };
+/** vida da partícula de trilha em ms, por qualidade */
+const TRAIL_LIFE: Record<'low' | 'medium' | 'high', number> = { low: 120, medium: 200, high: 260 };
+
 /** estado de um projétil do pool (a colisão usa a posição "na linha";
  *  o wobble do vento é aplicado apenas ao sprite) */
 interface Slot {
@@ -51,6 +59,8 @@ interface Slot {
   lineY: number;
   traveled: number;
   wobblePhase: number;
+  /** acumulador de distância p/ cadência da trilha (visual, raia 4) */
+  trailAcc: number;
 }
 
 export class ProjectilePool {
@@ -58,10 +68,18 @@ export class ProjectilePool {
   private slots: Slot[] = [];
   /** um emitter por elemento (tint fixo no config — barato e compatível) */
   private emitters = new Map<Element, Phaser.GameObjects.Particles.ParticleEmitter>();
+  /** trilhas por elemento (visual — usam a textura do próprio projétil) */
+  private trailEmitters = new Map<Element, Phaser.GameObjects.Particles.ParticleEmitter>();
+  private readonly unsubSettings: () => void;
 
   constructor(scene: ArenaScene) {
     this.scene = scene;
     for (let i = 0; i < PREWARM; i++) this.makeSlot();
+    // qualidade pode mudar em jogo: trilhas são recriadas lazy c/ a vida nova
+    this.unsubSettings = Settings.onChange(() => {
+      for (const e of this.trailEmitters.values()) e.destroy();
+      this.trailEmitters.clear();
+    });
   }
 
   // ------------------------------------------------------------------ spawn
@@ -80,6 +98,7 @@ export class ProjectilePool {
     s.lineY = opts.y;
     s.traveled = 0;
     s.wobblePhase = Math.random() * Math.PI * 2;
+    s.trailAcc = 0;
 
     s.img.setTexture(PROJ_TEX[opts.element]);
     // as texturas de projétil "apontam para cima" → alinhar = ângulo + 90°
@@ -91,6 +110,8 @@ export class ProjectilePool {
 
     // som de conjuração apenas para o jogador (bots cuidam do próprio áudio)
     if (opts.fromPlayer) Audio.playSfx(('cast_' + opts.element) as SfxName);
+    // anel de conjuração (visual — raia 4)
+    projectileVfx.current?.projectileSpawned(opts.x, opts.y, opts.element, s.strong);
   }
 
   // ----------------------------------------------------------------- update
@@ -111,6 +132,7 @@ export class ProjectilePool {
       if (!s.active) continue;
 
       // varredura em sub-passos: terreno primeiro, depois entidades
+      const beforeTraveled = s.traveled;
       let remaining = s.speed * dt;
       let impacted = false;
       const targets = s.fromPlayer ? vsHostiles : vsPlayer;
@@ -167,6 +189,13 @@ export class ProjectilePool {
         const base = s.strong ? STRONG_SCALE : 1;
         s.img.setScale(base * (1 - FIRE_FALLOFF * (s.traveled / MAX_RANGE_PX)));
       }
+
+      // ---- trilha do elemento (visual) — cadência por distância percorrida
+      s.trailAcc += s.traveled - beforeTraveled;
+      if (s.trailAcc >= TRAIL_SPACING[Settings.get().video.quality]) {
+        s.trailAcc = 0; // no máx. 1 partícula por frame por projétil
+        this.trailFor(s.element).emitParticleAt(vx, vy);
+      }
     }
   }
 
@@ -188,6 +217,10 @@ export class ProjectilePool {
     // reação elemental do terreno no ponto de impacto (GDD seção 14)
     this.scene.terrain.applyElement(s.lineX, s.lineY, s.element, spec.terrainRadius, s.strong);
     this.burst(s.lineX, s.lineY, s.element, s.strong);
+    // juice do impacto (visual — raia 4): onda de choque, flash, hitstop, recuo
+    projectileVfx.current?.projectileImpact(
+      s.lineX, s.lineY, s.dirX, s.dirY, s.element, s.strong, hitRef !== null,
+    );
     this.release(s);
   }
 
@@ -212,6 +245,25 @@ export class ProjectilePool {
         emitting: false,
       }).setDepth(DEPTH.VFX);
       this.emitters.set(el, e);
+    }
+    return e;
+  }
+
+  /** trilha lazy por elemento — textura do PRÓPRIO projétil (cor + forma) */
+  private trailFor(el: Element): Phaser.GameObjects.Particles.ParticleEmitter {
+    let e = this.trailEmitters.get(el);
+    if (!e) {
+      e = this.scene.add.particles(0, 0, PROJ_TEX[el], {
+        speed: { min: 0, max: 12 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.55, end: 0.1 },
+        alpha: { start: 0.45, end: 0 },
+        lifespan: TRAIL_LIFE[Settings.get().video.quality],
+        // aditivo brilha bem em fogo/raio/vento/água; terra fica opaca (pedra)
+        blendMode: el === Element.EARTH ? Phaser.BlendModes.NORMAL : Phaser.BlendModes.ADD,
+        emitting: false,
+      }).setDepth(DEPTH.PROJECTILE - 1);
+      this.trailEmitters.set(el, e);
     }
     return e;
   }
@@ -242,6 +294,7 @@ export class ProjectilePool {
       lineY: 0,
       traveled: 0,
       wobblePhase: 0,
+      trailAcc: 0,
     };
     this.slots.push(s);
     return s;
@@ -257,5 +310,8 @@ export class ProjectilePool {
     this.slots = [];
     for (const e of this.emitters.values()) e.destroy();
     this.emitters.clear();
+    this.unsubSettings();
+    for (const e of this.trailEmitters.values()) e.destroy();
+    this.trailEmitters.clear();
   }
 }

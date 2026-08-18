@@ -7,9 +7,11 @@
 // ============================================================================
 import Phaser from 'phaser';
 import { type ArenaApi, type EntityRef, Element, EVT } from '../core/types';
-import { TEX, DEPTH, ELEMENT_COLORS, TILE, ARENA_COLS, ARENA_ROWS } from '../core/config';
+import { DEPTH, ELEMENT_COLORS, TILE, ARENA_COLS, ARENA_ROWS } from '../core/config';
 import { BAL } from '../core/balance';
 import { Audio } from '../core/audio';
+import { ensureCharacterTextures, CHAR_TEX, CHAR_BASE_SCALE } from '../render/characterTextures';
+import { CharacterRig } from '../render/characterRig';
 
 type BotState = 'WANDER' | 'CHASE' | 'ATTACK' | 'FLEE_FIRE';
 
@@ -64,6 +66,8 @@ export class Bot {
   private state: BotState = 'WANDER';
 
   private sprite: Phaser.GameObjects.Image;
+  /** animação procedural (PRISMA-1 raia 3): respiração, bob, tilt, manto, sombra */
+  private rig: CharacterRig;
   private barBg: Phaser.GameObjects.Rectangle;
   private barFill: Phaser.GameObjects.Rectangle;
   /** tint sutil (elemento lavado com branco) — restaurado após flash de dano */
@@ -97,12 +101,18 @@ export class Bot {
 
     this.ref = { x, y, hp: BAL.bots.hp, alive: true, isPlayer: false, id };
 
-    // sprite com tint sutil da cor do elemento (mistura 40% elemento / 60% branco)
+    // sprite 64px exibido no tamanho lógico (28px) — hitbox intacta.
+    // Tint sutil da cor do elemento (mistura 40% elemento / 60% branco)
+    // sobre base neutra: a identidade de elemento continua vindo do tint.
+    ensureCharacterTextures(api.scene);
     const c = ELEMENT_COLORS[element];
     this.baseTint = lerpColor(0xffffff, c, 0.4);
-    this.sprite = api.scene.add.image(x, y, TEX.BOT)
+    this.sprite = api.scene.add.image(x, y, CHAR_TEX.BOT)
+      .setScale(CHAR_BASE_SCALE)
       .setDepth(DEPTH.ENTITY)
       .setTint(this.baseTint);
+    // manto na cor cheia do elemento (escurecida) — reforça a identidade
+    this.rig = new CharacterRig(api.scene, this.sprite, lerpColor(c, 0x0b1026, 0.45));
 
     // barrinha de vida flutuante: fundo escuro + preenchimento colorido
     this.barBg = api.scene.add.rectangle(
@@ -146,7 +156,7 @@ export class Bot {
       if (dps > 0) this.takeDamage(dps * (TUNE.hazardTickMs / 1000));
     }
 
-    this.syncVisuals();
+    this.syncVisuals(delta);
   }
 
   // ------------------------------------------------------------------ estados
@@ -352,7 +362,7 @@ export class Bot {
     this.api.scene.events.emit(EVT.BOT_DIED, this.ref.id);
 
     this.api.scene.tweens.add({
-      targets: [this.sprite, this.barBg, this.barFill],
+      targets: [this.sprite, this.barBg, this.barFill, ...this.rig.parts()],
       alpha: 0,
       duration: 400,
       ease: 'Cubic.easeOut',
@@ -398,17 +408,20 @@ export class Bot {
     this.fireScanAccum = 0;
 
     this.sprite.setTint(this.baseTint);
-    this.syncVisuals();
+    this.rig.snap(this.ref.x, this.ref.y); // manto/sombra não voam pelo mapa
+    this.syncVisuals(16);
     this.api.scene.tweens.add({
-      targets: [this.sprite, this.barBg, this.barFill],
+      targets: [this.sprite, this.barBg, this.barFill, ...this.rig.parts()],
       alpha: 1,
       duration: 300,
     });
   }
 
   // ------------------------------------------------------------------ visual
-  private syncVisuals(): void {
-    this.sprite.setPosition(this.ref.x, this.ref.y);
+  private syncVisuals(delta: number): void {
+    // rig cuida de posição + respiração/bob/tilt/manto/sombra (deriva o
+    // movimento do delta de posição — a FSM não precisa informar nada)
+    this.rig.update(delta, this.ref.x, this.ref.y);
     const frac = Phaser.Math.Clamp(this.ref.hp / BAL.bots.hp, 0, 1);
     this.barBg.setPosition(this.ref.x, this.ref.y - TUNE.barOffsetY);
     this.barFill.setPosition(this.ref.x - TUNE.barW / 2 + 1, this.ref.y - TUNE.barOffsetY);
@@ -425,7 +438,8 @@ export class Bot {
     this.respawnTimer = null;
     this.flashTimer?.remove(false);
     this.flashTimer = null;
-    this.api.scene.tweens.killTweensOf([this.sprite, this.barBg, this.barFill]);
+    this.api.scene.tweens.killTweensOf([this.sprite, this.barBg, this.barFill, ...this.rig.parts()]);
+    this.rig.destroy();
     this.sprite.destroy();
     this.barBg.destroy();
     this.barFill.destroy();

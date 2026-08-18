@@ -2,6 +2,46 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.1.2 — 2026-08-17 — PRISMA-1: fundação de render
+
+Primeira leva do Projeto Prisma (docs/PROJETO_PRISMA.md §3), executada em
+4 raias paralelas sobre o contrato `RenderModule` (`src/render/contract.ts`),
+fiado na ArenaScene. Só a camada de apresentação mudou — simulação,
+balanceamento e contratos intactos.
+
+1. **Luz & pós-processamento** (`src/render/lighting.ts`) — entardecer arcano
+   (Light2D + luz ambiente), luzes dinâmicas com pool por distância (projéteis
+   na cor do elemento, fogo/eletricidade pulsantes, cajado dourado com
+   flicker), Bloom + vinheta + color grading na câmera. No-op gracioso em
+   Canvas; reage à mudança de qualidade ao vivo.
+2. **Pele do terreno** (`src/render/terrainTextures.ts` + `terrainSkin.ts` +
+   TerrainGrid visual) — autotiling por bitmask com bordas onduladas
+   (água>areia>terra>grama), 4 variantes por tile a 64px (RT 2×, mundo lógico
+   intacto), decals determinísticos, água com ondulação e espuma na borda
+   (gelo congela a animação — estado legível), praia em terra vizinha de água.
+3. **Personagens vivos** (`src/render/characterRig.ts` + `characterTextures.ts`
+   + entidades) — sprites 64px, idle respirando, bob de passo, inclinação na
+   direção do movimento, manto em 2 segmentos com inércia, sombra elíptica,
+   squash & stretch na esquiva; identidade de elemento dos bots preservada.
+4. **VFX & juice** (`src/render/vfx.ts` + `vfxTextures.ts` + Projectile
+   visual) — trilhas por elemento (cor+forma), impacto com onda de choque +
+   flash + hitstop (40–60ms com cooldown) + recuo de câmera, fogo do terreno
+   em 3 camadas (chama + brasas + fumaça), pólen ambiental, screen shake por
+   trauma decaindo.
+
+Tudo com gate pela config de Qualidade (Baixa/Média/Alta) — antecipando o
+PRISMA-4 (mobile). Validado em runtime: WebGL, 10 luzes ativas, 3
+post-pipelines, zero texturas ausentes, zero erros de console.
+
+### Limitações conhecidas
+
+- RT do terreno usa 3840×3840px — GPUs com `MAX_TEXTURE_SIZE < 4096`
+  precisarão de fallback 1× (PRISMA-4).
+- Teto de 10 luzes simultâneas (default do Phaser) — subir exige config em
+  `main.ts` (PRISMA-4).
+- Feel do hitstop/shake e densidade do fogo merecem ajuste fino com controle
+  humano (sondas validam presença e orçamento, não gosto).
+
 ## v0.1.1 — 2026-08-17 — Fase 2: pipeline Android + controles de toque
 
 Entrega o escopo da Fase 2 (GDD seções 19.3–19.5), executada em 2 raias paralelas:
