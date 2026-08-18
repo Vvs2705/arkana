@@ -28,9 +28,10 @@
 --   direto pelo impacto são sementes e não cobram dele (senão uma tática de
 --   raio 3 gastaria o orçamento inteiro no próprio impacto e nada propagaria).
 --
--- ORÇAMENTO DE PARTS (mobile, GDD §19.2 — teto ~4000): ≈2650 no boot —
---   piso 994 (runs horizontais com teto de 4 células, para cada laje ter o
---   próprio tom) + borda 4 + água 205 + árvore 389×3 + rocha 51×2 + grama 176.
+-- ORÇAMENTO DE PARTS (mobile, GDD §19.2 — teto ~4000): ≈2676 no boot —
+--   piso ~1100 (runs horizontais com teto de 4 células, para cada laje ter o
+--   próprio tom) + borda 4 + água 232 + árvore 307×3 + rocha ~80×2 + grama 219
+--   + 23 dos marcos verticais dos POIs (`buildMark`).
 --   Estados em células de piso (Mud, Wall) criam part PREGUIÇOSAMENTE e a
 --   destroem ao expirar — o mapa nunca acumula geometria morta.
 --   Se precisar cortar: GROUND_RUN_MAX 4 → 6 devolve ~140 parts.
@@ -164,6 +165,18 @@ local function shade(c: Color3, f: number): Color3
 	return Color3.new(math.min(c.R * f, 1), math.min(c.G * f, 1), math.min(c.B * f, 1))
 end
 
+--- HIERARQUIA VISUAL (auditoria P2, 18/08): o CENÁRIO cede saturação para os
+--- 5 elementais (saturados, GDD §10) dominarem a leitura do combate. Puxa a
+--- cor na direção do próprio cinza de luminância — mesma claridade, menos
+--- croma (dessaturado ≠ escuro: a iluminação global já foi corrigida à parte).
+--- Aplica-se a chão, borda, rocha e tronco — NUNCA a cor de ESTADO (fogo,
+--- gelo, raio, lama: isso é gameplay e continua saturado).
+local DESAT = 0.24
+local function desat(c: Color3): Color3
+	local g = (c.R + c.G + c.B) / 3
+	return Color3.new(c.R + (g - c.R) * DESAT, c.G + (g - c.G) * DESAT, c.B + (g - c.B) * DESAT)
+end
+
 --- Água de MARGEM: faz fronteira (8-vizinhança) com algo que não é água. É o
 --- degrau raso pelo qual se sai do lago andando. Puro do layout — não guarda
 --- tabela nem depende de ordem de construção.
@@ -189,6 +202,8 @@ local function baseColor(cell: Grid.Cell): Color3
 	local c = Grid.COLORS[cell.material]
 	if cell.material == "Water" and isShoreWater(cell.cx, cell.cy) then
 		c = shade(c, 1.22) -- o raso lê mais claro: a margem se anuncia sozinha
+	elseif cell.material == "Rock" then
+		c = desat(c) -- rocha é cenário: cede saturação para a magia (auditoria P2)
 	end
 	return shade(c, 0.93 + Arena.hash01(cell.cx, cell.cy, SALT_CELL) * 0.14)
 end
@@ -466,7 +481,8 @@ local function emitGroundRun(x0: number, x1: number, cy: number, base: Color3)
 		"Ground",
 		Vector3.new((x1 - x0 + 1) * CELL, GROUND_THICK, CELL),
 		Vector3.new((a.X + b.X) / 2, FLOOR_Y - GROUND_THICK / 2, a.Z),
-		shade(base, 0.94 + Arena.hash01(x0, cy, SALT_GROUND) * 0.12),
+		-- chão dessaturado (auditoria P2): o projétil elemental domina a leitura
+		shade(desat(base), 0.94 + Arena.hash01(x0, cy, SALT_GROUND) * 0.12),
 		true
 	)
 end
@@ -527,11 +543,73 @@ local function buildBorder()
 	local w, d = Grid.WIDTH_STUDS, Grid.DEPTH_STUDS
 	local half = (w - CELL) / 2
 	local y = FLOOR_Y + BORDER_H / 2 - GROUND_THICK
-	local rock = Grid.COLORS.Rock
+	local rock = desat(Grid.COLORS.Rock)
 	newPart("BorderN", Vector3.new(w, BORDER_H, CELL), Vector3.new(0, y, -half), rock, true)
 	newPart("BorderS", Vector3.new(w, BORDER_H, CELL), Vector3.new(0, y, half), rock, true)
 	newPart("BorderW", Vector3.new(CELL, BORDER_H, d), Vector3.new(-half, y, 0), rock, true)
 	newPart("BorderE", Vector3.new(CELL, BORDER_H, d), Vector3.new(half, y, 0), rock, true)
+end
+
+-- ------------------------------------------------------------------- marcos
+--- DOURADO ARCANO (GDD §10) no topo dos 4 marcos: o MESMO acento em todos —
+--- a família visual que faz os POIs lerem como "o mesmo jogo" na thumbnail.
+--- SmoothPlastic de propósito, NÃO Neon: neon é o vocabulário dos altares de
+--- revive (sinal de gameplay); marco é orientação, não objetivo.
+local GOLD = Color3.fromHex("#F0C75E")
+
+--- célula de pegada → marco (preenchido no build a partir de Arena.MARKS)
+local markAt: { [number]: Arena.Mark } = {}
+
+--- Silhuetas dos marcos verticais (auditoria P2: "reconhecível de longe").
+--- Geometria própria em células de ROCHA — as regras (bloqueia andar e tiro,
+--- não queima, não aceita muro) já vêm do material; aqui é SÓ forma. Tudo
+--- axis-aligned: o look blocky nem quer rotação, e o harness de QA não a
+--- simula. Peças acima da cabeça vão SEM colisão (silhueta não pode travar
+--- movimento que o layout declara livre). Alturas escalonadas de propósito
+--- (47/44/39/24): quatro assinaturas distintas contra o céu.
+local function buildMark(m: Arena.Mark)
+	local w = (m.w or 1) * CELL
+	local c0 = Grid.cellToWorld(m.cx, m.cy)
+	-- centro da PEGADA (marcos 2×2 ficam entre células)
+	local x = c0.X + (w - CELL) / 2
+	local z = c0.Z + (w - CELL) / 2
+	local stone = desat(Grid.COLORS.Rock)
+	local kind = m.kind
+
+	if kind == "TempleTower" then
+		-- o marco-mestre do mapa: pé no píer (a laje de chão sob a célula de
+		-- rocha aflora no nível do piso, rente ao gelo quando o lago congela)
+		newPart("MarcoTorreBase", Vector3.new(6.4, 3, 6.4), Vector3.new(x, FLOOR_Y + 1.5, z), shade(stone, 0.92), true)
+		newPart("MarcoTorre", Vector3.new(3.6, 30, 3.6), Vector3.new(x, FLOOR_Y + 18, z), stone, true)
+		newPart("MarcoTorreTopo", Vector3.new(5.4, 6, 5.4), Vector3.new(x, FLOOR_Y + 36, z), shade(stone, 1.08), false)
+		newPart("MarcoTorreCoroa", Vector3.new(1.8, 8, 1.8), Vector3.new(x, FLOOR_Y + 43, z), GOLD, false)
+	elseif kind == "TempleColumn" then
+		-- colunas do templo: em cima do gelo são COBERTURA (altura de rocha)
+		newPart("MarcoColuna", Vector3.new(2.4, 13, 2.4), Vector3.new(x, FLOOR_Y + 6.5, z), stone, true)
+		newPart("MarcoCapitel", Vector3.new(3.6, 1.8, 3.6), Vector3.new(x, FLOOR_Y + 13.9, z), shade(stone, 1.1), false)
+	elseif kind == "MotherTree" then
+		local bark = desat(shade(Grid.COLORS.Dirt, 0.8))
+		newPart("MarcoArvoreMae", Vector3.new(6, 30, 6), Vector3.new(x, FLOOR_Y + 15, z), bark, true)
+		local leaf = Grid.COLORS.Tree
+		newPart("MarcoCopa1", Vector3.new(15, 7, 15), Vector3.new(x, FLOOR_Y + 30.5, z), shade(leaf, 1.06), false)
+		newPart("MarcoCopa2", Vector3.new(10, 6, 10), Vector3.new(x, FLOOR_Y + 37, z), shade(leaf, 1.14), false)
+		newPart("MarcoFlor", Vector3.new(5, 4.5, 5), Vector3.new(x, FLOOR_Y + 42.25, z), GOLD, false)
+	elseif kind == "Obelisk" then
+		newPart("MarcoObeliscoBase", Vector3.new(5, 2.5, 5), Vector3.new(x, FLOOR_Y + 1.25, z), shade(stone, 0.9), true)
+		newPart("MarcoObelisco", Vector3.new(3, 18, 3), Vector3.new(x, FLOOR_Y + 11.5, z), stone, true)
+		-- a RACHADURA é deslocamento, não rotação: o tramo de cima sai 0.9 stud
+		-- do eixo — lê como quebrado a qualquer distância, custa zero física
+		newPart("MarcoObeliscoAlto", Vector3.new(2.4, 14, 2.4), Vector3.new(x + 0.9, FLOOR_Y + 27.5, z), shade(stone, 1.05), false)
+		newPart("MarcoObeliscoPonta", Vector3.new(1.6, 4.5, 1.6), Vector3.new(x + 0.9, FLOOR_Y + 36.75, z), GOLD, false)
+	elseif kind == "Menhir" then
+		newPart("MarcoMenir", Vector3.new(3, 24, 3), Vector3.new(x, FLOOR_Y + 12, z), stone, true)
+		newPart("MarcoMenirRuna", Vector3.new(3.3, 1.6, 3.3), Vector3.new(x, FLOOR_Y + 19, z), GOLD, false)
+		-- a laje caída aponta para LESTE e morre dentro do canal: 1.9 de altura
+		-- fica abaixo do step-up (~2) — sobe andando, vira ponte improvisada.
+		-- Colisão LIGADA de propósito: só ADICIONA rota, nunca tira (nenhuma
+		-- célula que o layout diz livre fica bloqueada por uma peça de 1.9).
+		newPart("MarcoMenirLaje", Vector3.new(11, 1.9, 2.4), Vector3.new(x + 7, FLOOR_Y + 0.95, z), shade(stone, 0.85), true)
+	end
 end
 
 local function buildCellPart(idx: number, cell: Grid.Cell)
@@ -555,7 +633,7 @@ local function buildCellPart(idx: number, cell: Grid.Cell)
 			"Trunk",
 			Vector3.new(TRUNK_W, TRUNK_H, TRUNK_W),
 			Vector3.new(c.X, FLOOR_Y + TRUNK_H / 2, c.Z),
-			shade(Grid.COLORS.Dirt, 0.86),
+			desat(shade(Grid.COLORS.Dirt, 0.86)),
 			true
 		)
 		local canopy = newPart(
@@ -577,6 +655,9 @@ local function buildCellPart(idx: number, cell: Grid.Cell)
 		crown.Parent = canopy
 		cell.part = canopy
 	elseif mat == "Rock" then
+		if markAt[idx] then
+			return -- pegada de marco: a silhueta é do buildMark, não o bloco padrão
+		end
 		local v = Arena.hash01(cell.cx, cell.cy, SALT_ROCK)
 		-- varia SÓ PARA CIMA: Grid.HEIGHTS.Rock é a altura que faz da rocha
 		-- COBERTURA (esconde o mago inteiro). Encolher afloramento = furar cobertura.
@@ -622,6 +703,13 @@ function Terrain.build(layout: { { Grid.Material } })
 	pendingSpread = {}
 	acc = 0
 
+	table.clear(markAt)
+	for _, m in ipairs(Arena.MARKS) do
+		Arena.forMarkCells(m, function(mcx, mcy)
+			markAt[idxOf(mcx, mcy)] = m
+		end)
+	end
+
 	for cy = 0, Grid.ROWS - 1 do
 		for cx = 0, Grid.COLS - 1 do
 			cells[idxOf(cx, cy)] = {
@@ -642,6 +730,10 @@ function Terrain.build(layout: { { Grid.Material } })
 			local i = idxOf(cx, cy)
 			buildCellPart(i, cells[i])
 		end
+	end
+	-- marcos verticais dos POIs (a pegada já é rocha; aqui entra a silhueta)
+	for _, m in ipairs(Arena.MARKS) do
+		buildMark(m)
 	end
 
 	-- sem SpawnLocation o Roblox larga o jogador em (0,0,0) e ele cai do mundo

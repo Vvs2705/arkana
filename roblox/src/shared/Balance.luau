@@ -202,6 +202,27 @@ Balance.match = {
 	minPlayersToStart = 2,
 	--- preenche a partida com bots (GDD §19.6 — retenção de dia 1)
 	fillWithBots = true,
+	--- RETORNO CONTESTÁVEL (GDD §16.6 + §18.6). Estes números moravam no
+	--- Match.luau esperando o campo existir aqui — regra do projeto: "números
+	--- viram dados". O ritual traz de volta o JOGADOR, nunca o poder.
+	revive = {
+		--- canalização no altar: longa o bastante para ser contestada, curta o
+		--- bastante para valer a tentativa (GDD §16.6 diz 7s; auditoria pediu ~6)
+		channel = 6.0,
+		--- sair do raio ZERA a canalização (não pausa) — o ritual tem de doer
+		radius = 12,
+		pickup = 10,
+		--- pontos FIXOS: o inimigo sabe onde o revive acontece. É isso que
+		--- transforma o ritual em disputa em vez de menu de espera.
+		altars = 4,
+		ringFrac = 0.45,
+		hoverY = 12,
+		--- alcance do arrepio, medido do PRÓPRIO espírito (senão o morto vira
+		--- radar do mapa inteiro)
+		pingRange = 70,
+		pingHold = 2.0,
+	},
+
 	zone = {
 		--- raios em studs: começa cobrindo a arena e fecha em etapas
 		startRadius = 170,

@@ -313,7 +313,10 @@ local function driveHumans(dt)
 		local ra = rootOf(a)
 		if ra and b then
 			evPropose.OnServerEvent:Fire(a, { pos = ra.Position })
-			evAccept.OnServerEvent:Fire(b, { fromUserId = a.UserId })
+			-- aceite 0,3s DEPOIS: no mesmo frame a latência do funil sai -0,00s
+			H.task.delay(0.3, function()
+				evAccept.OnServerEvent:Fire(b, { fromUserId = a.UserId })
+			end)
 		end
 	end
 end

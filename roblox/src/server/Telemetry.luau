@@ -85,6 +85,14 @@ type Agg = {
 	events: { [string]: number },
 	dmgByElement: { [string]: number },
 	killsByElement: { [string]: number },
+	--- CONJURAÇÕES por elemento (basic + tactic). É o DENOMINADOR DE USO: sem ele
+	--- "Fogo causou 28% do dano" não diz nada — pode ser dominância ou pode ser
+	--- que Fogo foi 28% dos disparos. A régua da auditoria (dano/uso <= 1,25x) só
+	--- existe porque este número existe.
+	castsByElement: { [string]: number },
+	--- dano CAUSADO por nível de escudo de quem causou (0 = sem dado). É a
+	--- medida direta do risco de bola de neve do Escudo Evolutivo (GDD §5).
+	dmgByTier: { [number]: number },
 	dmgTotal: number,
 	absorbed: number,
 	kills: number,
@@ -96,6 +104,11 @@ type Agg = {
 	--- canalizações que nasceram de um PACTO de ping (coordenação intencional)
 	--- contra as que foram coincidência de tiro
 	pactChannels: number,
+	--- ENGAJAMENTOS (não eventos): quantas oportunidades tiveram AO MENOS um ping
+	--- e quantas terminaram em fusão. São razões que NÃO PODEM passar de 100% —
+	--- ver o bloco `oppOpen` abaixo para o porquê de não dividir evento por evento.
+	oppPinged: number,
+	oppFused: number,
 	acceptLatSum: number,
 	acceptLatN: number,
 	terrainByActor: { [string]: number },
@@ -109,6 +122,8 @@ local function newAgg(): Agg
 		events = {},
 		dmgByElement = {},
 		killsByElement = {},
+		castsByElement = {},
+		dmgByTier = {},
 		dmgTotal = 0,
 		absorbed = 0,
 		kills = 0,
@@ -117,6 +132,8 @@ local function newAgg(): Agg
 		dodges = 0,
 		nullified = 0,
 		pactChannels = 0,
+		oppPinged = 0,
+		oppFused = 0,
 		acceptLatSum = 0,
 		acceptLatN = 0,
 		terrainByActor = {},
@@ -157,6 +174,36 @@ local firstHitCount = 0
 --- eliminados que a telemetria viu (o Match não expõe estado; isto é o que
 --- permite contar vivos sem depender dele)
 local eliminatedKeys: { [string]: boolean } = {}
+
+--- ENGAJAMENTOS DE SINTONIA — o conserto do funil que passava de 100%.
+---
+--- MEDIDO NO HARNESS (18/08): `conversao oportunidade -> ping = 400%`. Não era
+--- bug de código, era RÓTULO MENTINDO: o Sintonia emite `sintonia_opportunity`
+--- na BORDA DE SUBIDA (uma vez por engajamento, e a janela fica aberta), mas
+--- ping/aceite/fusão podem repetir VÁRIAS vezes dentro do mesmo engajamento.
+--- Dividir contagem de evento por contagem de evento produzia número impossível
+--- — e o único motivo desta telemetria existir é a leitura do playtest.
+---
+--- CONSERTO: a oportunidade continua sendo "engajamento em que o combo era
+--- possível", e o relatório publica `% de oportunidades que viraram >= 1 ping` e
+--- `% que viraram fusão` — cada engajamento é marcado NO MÁXIMO UMA VEZ, logo
+--- as razões são <= 100% por construção. As contagens brutas saem ao lado, e o
+--- excesso vira `pings por oportunidade`, rotulado como RAZÃO (pode passar de
+--- 1,0 — e aí quer dizer "a dupla pingou de novo dentro da mesma janela").
+---
+--- ponytail: TETO CONHECIDO — o evento de ping não diz COM QUEM era o pacto
+--- (`sintonia_ping` só carrega `allies_reached`), então um ping credita todo
+--- engajamento ABERTO que envolva quem pingou. Isso pode creditar um
+--- engajamento a mais numa esquadra grande, nunca a menos, e NUNCA passa de 1
+--- por engajamento. Upgrade, se um dia importar: pedir `with_user_id` no ping.
+type Engagement = { a: string, b: string, isBot: boolean, pinged: boolean, fused: boolean }
+--- chaveado por par de aliados: o Sintonia só reabre a oportunidade do par
+--- depois que a anterior fechou, então existe no máximo uma viva por par.
+local oppOpen: { [string]: Engagement } = {}
+
+--- maior nível de Escudo Evolutivo visto por sujeito (GDD §5). Responde "com que
+--- frequência alguém chega ao nível 4" sem log cru: é um número por jogador.
+local shieldPeak: { [string]: number } = {}
 
 --- curva de vivos: { t, humanos, total }
 local curve: { { number } } = {}
@@ -302,6 +349,18 @@ local function elementOf(player: Player?, override: any): string
 	return "?"
 end
 
+--- Nível do Escudo Evolutivo de quem é o sujeito. O Combat expõe
+--- `getShieldLevel` (pendência atendida pela raia B): sem ler daqui o campo
+--- `shield_tier` saía 0 em TODO evento mesmo com a API pronta, e a pergunta do
+--- snowball ficava sem denominador.
+local function shieldLevelOf(player: Player?): number
+	if not player or not combat or not combat.getShieldLevel then
+		return 0
+	end
+	local ok, lv = pcall(combat.getShieldLevel, player)
+	return if ok and typeof(lv) == "number" then lv :: number else 0
+end
+
 --- `member` é Player ou o Humanoid do bot (Teams.Member). Sem times montados
 --- (lobby) `teamOf` devolve nil e o campo vai neutro — não é erro.
 local function teamOf(member: Instance?): number
@@ -385,7 +444,7 @@ local function buildContext(name: string, subject: any, payload: any): { [string
 		timestamp = os.clock(),
 		element = elementOf(player, p.element),
 		position_bucket = if pos then Events.positionBucket(pos) else "?",
-		shield_tier = if typeof(p.shield_tier) == "number" then p.shield_tier else 0,
+		shield_tier = if typeof(p.shield_tier) == "number" then p.shield_tier else shieldLevelOf(player),
 		alive_count = if typeof(p.alive_count) == "number" then p.alive_count else aliveTotal,
 		zone_phase = if typeof(p.zone_phase) == "number" then p.zone_phase else zonePhase(),
 	}
@@ -408,6 +467,31 @@ local function takeTtk(victimKey: string, now: number, cohorts: { Agg })
 	firstHitCount = math.max(0, firstHitCount - 1)
 end
 
+--- Chave estável do par de aliados (ordenada: o par A-B é o mesmo que B-A).
+local function pairKeyOf(a: string, b: string): string
+	return if a < b then a .. "|" .. b else b .. "|" .. a
+end
+
+--- Marca o engajamento ABERTO de quem agiu. Cada engajamento conta no máximo
+--- UMA vez em cada marca — é isto que impede a razão de passar de 100%.
+local function markEngagement(who: string, fused: boolean)
+	for _, e in pairs(oppOpen) do
+		if e.a == who or e.b == who then
+			if fused and not e.fused then
+				e.fused = true
+				for _, g in ipairs(cohortsFor(e.isBot)) do
+					g.oppFused += 1
+				end
+			elseif not fused and not e.pinged then
+				e.pinged = true
+				for _, g in ipairs(cohortsFor(e.isBot)) do
+					g.oppPinged += 1
+				end
+			end
+		end
+	end
+end
+
 --- Núcleo do coletor. Recebe já resolvido (por isso o autoteste consegue provar
 --- a separação human_only/all_entities sem fabricar Player nenhum).
 local function record(name: string, isBot: boolean, ctx: { [string]: any }, payload: any)
@@ -417,6 +501,13 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 
 	for _, g in ipairs(cohorts) do
 		g.events[name] = (g.events[name] or 0) + 1
+	end
+
+	--- pico de escudo do sujeito: qualquer evento dele serve de amostra (o nível
+	--- só sobe, então o maior visto É o que ele alcançou na partida)
+	local tier = tonumber(ctx.shield_tier) or 0
+	if tier > (shieldPeak[ctx.user_id_hash] or 0) then
+		shieldPeak[ctx.user_id_hash] = tier
 	end
 
 	if name == N.Damage then
@@ -434,6 +525,7 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 				g.dmgTotal += amount
 				g.absorbed += absorbed
 				g.dmgByElement[element] = (g.dmgByElement[element] or 0) + amount
+				g.dmgByTier[tier] = (g.dmgByTier[tier] or 0) + amount
 			end
 		end
 		if not nullified and amount > 0 then
@@ -483,6 +575,23 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		for _, g in ipairs(cohorts) do
 			g.dodges += 1
 		end
+	elseif name == N.SpellCast or name == N.TacticCast then
+		--- USO por elemento. Sem este denominador não existe "ajustado por uso" e
+		--- a régua de dominância da auditoria (<= 1,25x) não tem como ser aplicada.
+		local el = ctx.element or "?"
+		for _, g in ipairs(cohorts) do
+			g.castsByElement[el] = (g.castsByElement[el] or 0) + 1
+		end
+	elseif name == N.SintoniaOpportunity then
+		--- abre (ou reabre) o engajamento do par. Ver o bloco `oppOpen` no topo.
+		local other = tonumber(p.with_user_id)
+		local otherKey = if other then Events.userHash(other) else "?"
+		oppOpen[pairKeyOf(ctx.user_id_hash, otherKey)] =
+			{ a = ctx.user_id_hash, b = otherKey, isBot = isBot, pinged = false, fused = false }
+	elseif name == N.SintoniaPing then
+		markEngagement(ctx.user_id_hash, false)
+	elseif name == N.SintoniaFired then
+		markEngagement(ctx.user_id_hash, true)
 	elseif name == N.SintoniaChannelStart then
 		if p.by_pact == true then
 			for _, g in ipairs(cohorts) do
@@ -712,6 +821,8 @@ function Telemetry.matchStart(id: string?)
 	table.clear(eliminatedKeys)
 	table.clear(burnedCells)
 	table.clear(curve)
+	table.clear(oppOpen)
+	table.clear(shieldPeak)
 	firstHitCount = 0
 	burnedCount = 0
 	fireFronts, fireCells, fireCellsMax, fireExhausted = 0, 0, 0, 0
@@ -765,6 +876,20 @@ local function convRow(out: { string }, label: string, num: (Agg) -> number, den
 	row(out, label, pct(num(human), den(human)), pct(num(all), den(all)))
 end
 
+--- RAZÃO CRUA, não porcentagem: pode passar de 1,0 de forma legítima (o mesmo
+--- engajamento aceita vários pings). Rótulo separado de propósito — foi
+--- exatamente misturar os dois que produziu "conversão de 400%" no relatório.
+local function ratio(num: number, den: number): string
+	if den <= 0 then
+		return "-"
+	end
+	return string.format("%.2fx", num / den)
+end
+
+local function ratioRow(out: { string }, label: string, num: (Agg) -> number, den: (Agg) -> number)
+	row(out, label, ratio(num(human), den(human)), ratio(num(all), den(all)))
+end
+
 local function ev(name: string): (Agg) -> number
 	return function(g: Agg): number
 		return g.events[name] or 0
@@ -779,6 +904,33 @@ end
 
 local function secs(v: number): string
 	return string.format("%.2fs", v)
+end
+
+--- Os 5 elementos jogáveis. `ambiente` e `?` NÃO entram na dominância: são
+--- dano sem autor com elemento (zona, terreno, tiro de bot) e inflariam o
+--- denominador de quem tem elemento.
+local ELEMENTS = { "Fire", "Water", "Earth", "Wind", "Lightning" }
+
+--- ÍNDICE DE DOMINÂNCIA AJUSTADO POR USO (régua da auditoria: <= 1,25x).
+--- share do dano / share das conjurações. 1,00x = o elemento causa exatamente
+--- o dano que o uso dele explica. Devolve nil quando não há amostra — número
+--- ausente é honesto, número inventado não.
+local function usageIndex(g: Agg, el: string): number?
+	local casts, dmg = 0, 0
+	for _, e in ipairs(ELEMENTS) do
+		casts += g.castsByElement[e] or 0
+		dmg += g.dmgByElement[e] or 0
+	end
+	local use = g.castsByElement[el] or 0
+	if use <= 0 or casts <= 0 or dmg <= 0 then
+		return nil
+	end
+	return ((g.dmgByElement[el] or 0) / dmg) / (use / casts)
+end
+
+local function idx(g: Agg, el: string): string
+	local v = usageIndex(g, el)
+	return if v then string.format("%.2fx", v) else "-"
 end
 
 --- Relatório LEGÍVEL na saída do servidor, em duas colunas.
@@ -810,16 +962,27 @@ function Telemetry.report(): string
 
 	-- ---------------------------------------------------------------- funil
 	table.insert(out, "-- FUNIL DA SINTONIA (pergunta V1: duplas coordenam?) ----------------")
-	table.insert(out, "   (oportunidade e' contada na BORDA: uma por situacao aberta,")
-	table.insert(out, "    nao uma por frame — nao normalize por tempo)")
-	countRow(out, "oportunidades", ev(N.SintoniaOpportunity))
+	table.insert(out, "   OPORTUNIDADE = ENGAJAMENTO em que o combo era possivel. E' contada na")
+	table.insert(out, "   BORDA DE SUBIDA (uma por janela aberta) enquanto ping/aceite/fusao")
+	table.insert(out, "   podem REPETIR dentro da mesma janela — dividir evento por evento dava")
+	table.insert(out, "   `conversao de 400%`, numero impossivel. As linhas em MAIUSCULA sao")
+	table.insert(out, "   por ENGAJAMENTO (<=100% por construcao); o excesso sai como RAZAO.")
+	table.insert(out, "   Nada disto se normaliza por tempo.")
+	countRow(out, "oportunidades (engajamentos)", ev(N.SintoniaOpportunity))
 	countRow(out, "pings", ev(N.SintoniaPing))
-	convRow(out, "  conversao oportunidade -> ping", ev(N.SintoniaPing), ev(N.SintoniaOpportunity))
+	ratioRow(out, "  pings por oportunidade (razao)", ev(N.SintoniaPing), ev(N.SintoniaOpportunity))
+	convRow(out, "  OPORTUNIDADES COM >=1 PING", function(g)
+		return g.oppPinged
+	end, ev(N.SintoniaOpportunity))
 	countRow(out, "aceites", ev(N.SintoniaAccept))
 	convRow(out, "  conversao ping -> aceite", ev(N.SintoniaAccept), ev(N.SintoniaPing))
 	row(out, "  latencia media do aceite", if human.acceptLatN > 0 then secs(human.acceptLatSum / human.acceptLatN) else "-", if all.acceptLatN > 0 then secs(all.acceptLatSum / all.acceptLatN) else "-")
 	countRow(out, "canalizacoes", ev(N.SintoniaChannelStart))
-	convRow(out, "  conversao aceite -> canalizacao", ev(N.SintoniaChannelStart), ev(N.SintoniaAccept))
+	-- SAIU DO RELATORIO: `aceite -> canalizacao`. Canalizacao NASCE de duas
+	-- fontes (pacto de ping E coincidencia de tiro), entao a divisao pelo aceite
+	-- podia passar de 100% sem nada estar errado. A leitura honesta da mesma
+	-- pergunta e' a INTENCIONALIDADE, logo abaixo: ela e' subconjunto do proprio
+	-- denominador e por isso nao tem como estourar.
 	-- A PERGUNTA V1 EM UMA LINHA: canalizacao que nasceu de PACTO (ping aceito)
 	-- e coordenacao INTENCIONAL; o resto foi coincidencia de tiro.
 	countRow(out, "  ... por PACTO (ping aceito)", function(g)
@@ -835,7 +998,14 @@ function Telemetry.report(): string
 	convRow(out, "  taxa de interrupcao", ev(N.SintoniaInterrupted), ev(N.SintoniaChannelStart))
 	countRow(out, "fundidas", ev(N.SintoniaFired))
 	convRow(out, "  conversao canalizacao -> fusao", ev(N.SintoniaFired), ev(N.SintoniaChannelStart))
-	convRow(out, "  CONVERSAO TOTAL (oport. -> fusao)", ev(N.SintoniaFired), ev(N.SintoniaOpportunity))
+	convRow(out, "  OPORTUNIDADES QUE VIRARAM FUSAO", function(g)
+		return g.oppFused
+	end, ev(N.SintoniaOpportunity))
+	table.insert(out, "   (razao > 1,00x em `pings por oportunidade` = a dupla pingou de novo")
+	table.insert(out, "    DENTRO da mesma janela — e' repeticao, nao conversao)")
+	table.insert(out, "   (limite conhecido: `sintonia_ping` nao diz COM QUEM era o pacto, entao")
+	table.insert(out, "    um ping credita todo engajamento aberto de quem pingou — pode contar")
+	table.insert(out, "    um a mais em esquadra grande, nunca mais de 1 por engajamento)")
 
 	-- ------------------------------------------------------------------ TTK
 	table.insert(out, "-- TEMPO ATE A QUEDA (TTK: 1o dano sofrido -> knock) ------------------")
@@ -884,6 +1054,47 @@ function Telemetry.report(): string
 	countRow(out, "abates totais", function(g)
 		return g.kills
 	end)
+
+	-- ------------------------------------------- dominância AJUSTADA POR USO
+	--- "Fogo fez 28% do dano" não diz nada sozinho: pode ser dominância ou pode
+	--- ser que Fogo foi 28% dos disparos. A régua da auditoria (V4) é sobre a
+	--- RAZÃO entre as duas coisas.
+	table.insert(out, "-- DOMINANCIA AJUSTADA POR USO (regua V4: indice <= 1.25x) -----------")
+	table.insert(out, string.format("   %-10s %6s %9s %10s %8s %8s", "elemento", "casts", "shr uso", "shr dano", "idx(h)", "idx(a)"))
+	local castsAll = 0
+	for _, el in ipairs(ELEMENTS) do
+		castsAll += all.castsByElement[el] or 0
+	end
+	local dmgAttributed = 0
+	for _, el in ipairs(ELEMENTS) do
+		dmgAttributed += all.dmgByElement[el] or 0
+	end
+	for _, el in ipairs(ELEMENTS) do
+		local c = all.castsByElement[el] or 0
+		table.insert(out, string.format("   %-10s %6d %9s %10s %8s %8s", el, c, pct(c, castsAll), pct(all.dmgByElement[el] or 0, dmgAttributed), idx(human, el), idx(all, el)))
+	end
+	table.insert(out, "   (`casts` = basic + tactic. `ambiente` e `?` ficam FORA: dano sem autor")
+	table.insert(out, "    com elemento nao pode entrar em dominancia de elemento)")
+
+	-- ------------------------------------------------------ escudo evolutivo
+	table.insert(out, "-- ESCUDO EVOLUTIVO (GDD 5 — risco de bola de neve) ------------------")
+	local maxLv = #Balance.shield.caps
+	local tracked, reachedTop, peakSum = 0, 0, 0
+	for _, lv in pairs(shieldPeak) do
+		tracked += 1
+		peakSum += lv
+		if lv >= maxLv then
+			reachedTop += 1
+		end
+	end
+	table.insert(out, string.format("sujeitos com nivel medido ...... %d (pico medio %.2f)", tracked, if tracked > 0 then peakSum / tracked else 0))
+	table.insert(out, string.format("chegaram ao nivel %d ............ %d (%s dos medidos)", maxLv, reachedTop, pct(reachedTop, tracked)))
+	local tiers: { string } = {}
+	for lv = 1, maxLv do
+		table.insert(tiers, string.format("lv%d %s", lv, pct(all.dmgByTier[lv] or 0, all.dmgTotal)))
+	end
+	table.insert(out, "dano CAUSADO por nivel ......... " .. table.concat(tiers, "  "))
+	table.insert(out, string.format("   (nivel 0 = %s do dano: sujeito sem escudo — zona, terreno ou bot)", pct(all.dmgByTier[0] or 0, all.dmgTotal)))
 
 	-- -------------------------------------------------------------- esquiva
 	table.insert(out, "-- ESQUIVA (i-frames 0.18s / cd 2.6s) --------------------------------")
@@ -963,6 +1174,32 @@ function Telemetry.report(): string
 	return table.concat(out, "\n")
 end
 
+--- NÚMEROS CRUS da partida, para quem AGREGA várias partidas (a varredura de
+--- balanceamento em `roblox/tools/sweep.luau`). O relatório acima é texto para
+--- humano — parsear texto para somar 30 partidas seria frágil e mentiria no dia
+--- em que alguém mudasse uma legenda.
+--- Devolve as tabelas VIVAS (sem cópia): quem chamar lê, não escreve. Só
+--- números e strings — nenhuma referência a Instance, para o coletor não segurar
+--- personagem destruído na memória de quem guardar o snapshot.
+function Telemetry.snapshot(): { [string]: any }
+	return {
+		match_id = matchId,
+		ended = ended,
+		duration = (if matchEndedAt > 0 then matchEndedAt else os.clock()) - matchStartedAt,
+		human = human,
+		all = all,
+		shield_peak = shieldPeak,
+		fire = {
+			fronts = fireFronts,
+			cells = fireCells,
+			max_cells = fireCellsMax,
+			exhausted = fireExhausted,
+			burned = burnedCount,
+			flammable = flammableAtStart,
+		},
+	}
+end
+
 -- ============================================================================
 -- AUTOTESTE — cole no Command Bar do Studio (contexto SERVIDOR):
 --   require(game.ServerScriptService.Server.Telemetry).selfTest()
@@ -997,6 +1234,7 @@ function Telemetry.selfTest()
 	local saveH, saveA, saveHC, saveBC = human, all, HUMAN_COHORTS, BOT_COHORTS
 	local saveMatch, saveRunning = matchId, running
 	local saveFirst, saveCount, saveHits = firstDamageAt, firstHitCount, table.clone(firstHitAt)
+	local saveOpp = table.clone(oppOpen)
 	human, all = newAgg(), newAgg()
 	HUMAN_COHORTS, BOT_COHORTS = { all, human }, { all }
 	local function fake(name: string, isBot: boolean, element: string, payload: any)
@@ -1041,6 +1279,37 @@ function Telemetry.selfTest()
 	assert(human.pactChannels == 1, "so a canalizacao com pacto conta como intencional")
 	assert((human.events[N.SintoniaChannelStart] or 0) == 2, "as duas canalizacoes contam no funil")
 
+	-- 4c) FUNIL QUE NAO PODE PASSAR DE 100% — a regressao que este teste guarda e'
+	--     a medida real do harness: `conversao oportunidade -> ping = 400%`.
+	--     A oportunidade e' UM engajamento; os pings dentro dela sao varios.
+	table.clear(oppOpen)
+	fake(N.SintoniaOpportunity, false, "Fire", { with_user_id = 4242 })
+	for _ = 1, 4 do
+		fake(N.SintoniaPing, false, "Fire", {})
+	end
+	fake(N.SintoniaFired, false, "Fire", {})
+	fake(N.SintoniaFired, false, "Fire", {})
+	local opps = human.events[N.SintoniaOpportunity] or 0
+	assert(opps == 1, "oportunidade e' contada uma vez por engajamento")
+	assert((human.events[N.SintoniaPing] or 0) >= 4, "os pings BRUTOS continuam contados")
+	assert(human.oppPinged == 1, "4 pings na MESMA janela = 1 oportunidade convertida, nao 4")
+	assert(human.oppFused == 1, "duas fusoes na mesma janela nao contam duas vezes")
+	assert(human.oppPinged <= opps and human.oppFused <= opps, "razao do funil NAO pode passar de 100%")
+	-- janela NOVA do mesmo par tem de poder converter de novo (senao o
+	-- denominador congela e o funil passa a subestimar a coordenacao)
+	fake(N.SintoniaOpportunity, false, "Fire", { with_user_id = 4242 })
+	fake(N.SintoniaPing, false, "Fire", {})
+	assert(human.oppPinged == 2, "engajamento novo do mesmo par converte de novo")
+
+	-- 4d) INDICE DE DOMINANCIA (V4): dano proporcional ao uso da' exatamente 1,00x
+	local u = newAgg()
+	u.castsByElement.Fire, u.castsByElement.Water = 10, 30
+	u.dmgByElement.Fire, u.dmgByElement.Water = 100, 300
+	assert(math.abs((usageIndex(u, "Fire") or 0) - 1) < 1e-9, "dano proporcional ao uso = 1,00x")
+	u.dmgByElement.Fire = 200
+	assert((usageIndex(u, "Fire") or 0) > 1.25, "dano acima do uso tem de estourar a regua de 1,25x")
+	assert(usageIndex(u, "Earth") == nil, "elemento sem uso nao inventa indice")
+
 	-- 5) CONTRATO: os 11 campos de Events.CONTEXT_FIELDS existem no contexto
 	local ctx = buildContext(N.SpellCast, nil, nil)
 	for _, field in ipairs(Events.CONTEXT_FIELDS) do
@@ -1061,7 +1330,11 @@ function Telemetry.selfTest()
 	for k, v in pairs(saveHits) do
 		firstHitAt[k] = v
 	end
-	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao e separacao human/bot")
+	table.clear(oppOpen)
+	for k, v in pairs(saveOpp) do
+		oppOpen[k] = v
+	end
+	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao, funil <=100% e separacao human/bot")
 	return true
 end
 

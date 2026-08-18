@@ -53,6 +53,11 @@ Events.Name = {
 	-- social / revive
 	ReviveStart = "revive_start",
 	ReviveComplete = "revive_complete",
+
+	--- GRIMÓRIO (GDD §18.3): o jogador descobriu uma interação pela primeira
+	--- vez. É progressão por EXPERIMENTAÇÃO, não por poder — e é o que mede se
+	--- a química do jogo está sendo descoberta sozinha ou só quando mandam.
+	Discovery = "discovery",
 }
 
 --- Campos que TODO evento de combate deve carregar (o Telemetry preenche).

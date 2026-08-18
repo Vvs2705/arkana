@@ -60,6 +60,17 @@ if Tutorial then
 	end)
 end
 
+-- GRIMÓRIO DE DESCOBERTAS (GDD §18.3) — progressão por experimentação.
+-- Opcional e protegido: sem ele, o jogo segue; só as páginas não acendem.
+local okGrimoire, Grimoire = pcall(require, ServerModules:WaitForChild("Grimoire") :: ModuleScript)
+if not okGrimoire then
+	warn("[ARKANA] grimório indisponível: " .. tostring(Grimoire))
+	Grimoire = nil
+end
+if Grimoire and Grimoire.init then
+	pcall(Grimoire.init, Terrain, Combat)
+end
+
 -- Telemetria por último: observa todos os outros, não é observada por ninguém.
 -- Protegida por pcall — se o coletor quebrar, a partida continua de pé.
 local okTelemetry, Telemetry = pcall(require, ServerModules:WaitForChild("Telemetry") :: ModuleScript)
@@ -158,6 +169,9 @@ end
 
 local function onPlayer(player: Player)
 	Combat.onPlayerAdded(player)
+	if Grimoire and Grimoire.onPlayerAdded then
+		pcall(Grimoire.onPlayerAdded, player)
+	end
 	player.CharacterAdded:Connect(function(char)
 		onCharacter(player, char)
 	end)
@@ -177,6 +191,9 @@ Players.PlayerRemoving:Connect(function(player)
 	if Tutorial and Tutorial.onPlayerRemoving then
 		pcall(Tutorial.onPlayerRemoving, player)
 	end
+	if Grimoire and Grimoire.onPlayerRemoving then
+		pcall(Grimoire.onPlayerRemoving, player)
+	end
 	Match.onPlayerRemoving(player)
 end)
 
@@ -188,6 +205,9 @@ RunService.Heartbeat:Connect(function(dt)
 	Match.step(dt)
 	if Tutorial then
 		Tutorial.step(dt)
+	end
+	if Grimoire and Grimoire.step then
+		Grimoire.step(dt)
 	end
 end)
 

@@ -253,6 +253,91 @@ local function bodyOf(p: Player?): (any, any)
 	return char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
 end
 
+-- ------------------------------------------- status publicado (débito 1, 18/08)
+--- O servidor PUBLICA o estado do status como ATRIBUTO no personagem
+--- (`Status_Stun` / `Status_Reveal` / `Status_Slow`, kernel do Combat) e QUEM
+--- DESENHA é este cliente — é o que permite filtrar por time, coisa que o
+--- Highlight replicado do servidor nunca conseguiu. Cores do kernel:
+--- Stun = âmbar, Reveal = ciano, Slow = terra.
+local STATUS_KINDS = { "Stun", "Reveal", "Slow" }
+local STATUS_COLOR: { [string]: Color3 } = {
+	Stun = Color3.fromHex("#FFE066"),
+	Reveal = Color3.fromHex("#8AE9FF"),
+	Slow = Color3.fromHex("#B98A4A"),
+}
+--- cadência da varredura: ≤ 31 corpos × 3 atributos é barato a 10 Hz, e 100 ms
+--- de atraso não se percebe num efeito que dura 0,6–3,0 s
+local STATUS_SCAN = 0.1
+local statusAcc = 0
+--- CHAVES FRACAS (mesmo padrão do servidor): corpo destruído leva o Highlight
+--- junto (é filho dele) e a entrada some sozinha da tabela.
+local statusFx: { [Instance]: { [string]: Highlight } } = setmetatable({}, { __mode = "k" }) :: any
+
+--- REVELAÇÃO É PARA O INIMIGO VER: o único realce que este cliente ESCONDE é o
+--- Reveal do próprio PARCEIRO — eu já sei onde ele está. O alvo continua vendo
+--- o próprio realce (é o aviso de "estou marcado") e inimigo/neutro veem — que
+--- é o efeito. Pura de propósito: o selfTest cobre a regra.
+--- ponytail: TETO CONHECIDO — parceiro BOT não chega em Net.MatchState.mate
+--- (bot não tem UserId), então bot aliado revelado ainda acende para o dono; o
+--- upgrade é o servidor publicar o time junto do status.
+local function revealVisible(char: Instance?, mateChar: Instance?): boolean
+	return char ~= nil and char ~= mateChar
+end
+
+--- corpos que podem carregar status: personagens dos jogadores + bots
+local function statusModels(): { Instance }
+	local out: { Instance } = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then
+			table.insert(out, p.Character :: Instance)
+		end
+	end
+	local bots = Workspace:FindFirstChild("Bots")
+	if bots then
+		for _, m in ipairs(bots:GetChildren()) do
+			table.insert(out, m)
+		end
+	end
+	return out
+end
+
+local function scanStatuses()
+	local mp = matePlayer()
+	local mateChar: Instance? = if mp then mp.Character else nil
+	for _, char in ipairs(statusModels()) do
+		local entry = statusFx[char]
+		for _, kind in ipairs(STATUS_KINDS) do
+			local active = char:GetAttribute("Status_" .. kind) ~= nil
+			local want = active and (kind ~= "Reveal" or revealVisible(char, mateChar))
+			local fx = if entry then entry[kind] else nil
+			if want and not fx then
+				if not entry then
+					entry = {}
+					statusFx[char] = entry
+				end
+				local hl = Instance.new("Highlight")
+				hl.Name = "LocalStatus_" .. kind
+				hl.FillColor = STATUS_COLOR[kind]
+				hl.OutlineColor = STATUS_COLOR[kind]
+				hl.FillTransparency = 0.6
+				--- só o Reveal atravessa parede — é literalmente o efeito dele.
+				--- Stun e Slow marcam quem já está à vista: não viram wallhack.
+				hl.DepthMode = if kind == "Reveal"
+					then Enum.HighlightDepthMode.AlwaysOnTop
+					else Enum.HighlightDepthMode.Occluded
+				hl.Adornee = char
+				hl.Parent = char
+				entry[kind] = hl
+			elseif fx and not want then
+				fx:Destroy()
+				if entry then
+					entry[kind] = nil
+				end
+			end
+		end
+	end
+end
+
 --- progresso 0..1 rumo ao próximo nível do escudo (GDD §5, thresholds do Balance)
 local function evoProgress(): number
 	local th = Balance.shield.thresholds
@@ -586,20 +671,6 @@ local function updatePartner()
 		Badge.paint(partnerBadge, element)
 	end
 
-	--- REVELAÇÃO É PARA O INIMIGO VER (kernel de status, 18/08). O `Highlight` do
-	--- servidor REPLICA para todos, então hoje o meu parceiro revelado aparece
-	--- em ciano para MIM — que já sei onde ele está. Apagar aqui é local (mudar
-	--- instância replicada no cliente não volta para o servidor) e resolve o
-	--- caso inteiro em duos: o único aliado que eu tenho é ele. O alvo continua
-	--- vendo o próprio realce, e os inimigos também — que é o efeito.
-	--- Ver RELATÓRIO: o Highlight do servidor NÃO pode ser removido antes de
-	--- existir um sinal S→C de status; ele é hoje o único aviso de "Reveal ativo".
-	local mateChar = mp.Character
-	local revealFx = if mateChar then mateChar:FindFirstChild("Status_Reveal") else nil
-	if revealFx and revealFx:IsA("Highlight") and revealFx.Enabled then
-		revealFx.Enabled = false
-	end
-
 	local mateRoot, hum = bodyOf(mp)
 	--- O SERVIDOR MANDA, o HUD mostra — inclusive aqui. Ver o comentário de
 	--- `mateAliveSrv`: o corpo do espírito mente, o pacote da partida não.
@@ -841,6 +912,13 @@ function Hud.update(dt: number)
 	updatePartner()
 	refreshGems(dt)
 
+	--- status publicado pelo servidor → realce decidido AQUI (débito 1)
+	statusAcc += dt
+	if statusAcc >= STATUS_SCAN then
+		statusAcc = 0
+		scanStatuses()
+	end
+
 	if announceLeft > 0 then
 		announceLeft -= dt
 		local a = clamp01(1 - announceLeft / L.announceFade)
@@ -855,6 +933,14 @@ function Hud.destroy()
 		c:Disconnect()
 	end
 	table.clear(conns)
+	--- realces locais de status moram nos personagens, não nesta ScreenGui
+	for _, entry in pairs(statusFx) do
+		for _, fx in pairs(entry) do
+			fx:Destroy()
+		end
+	end
+	statusFx = setmetatable({}, { __mode = "k" }) :: any
+	statusAcc = 0
 	table.clear(pips)
 	table.clear(gems)
 	table.clear(elementSeen)
@@ -896,7 +982,21 @@ function Hud.selfTest()
 	assert(ox == ox and oy == oy, "caso degenerado virou NaN")
 	assert(oy > 0, "caso degenerado tem de apontar para baixo")
 
-	print("[Hud] autoteste OK — seta do parceiro")
+	-- FILTRO DO STATUS PUBLICADO (débito 1): o único Reveal que este cliente
+	-- esconde é o do PARCEIRO — o meu e o do inimigo aparecem.
+	local me = Instance.new("Model")
+	local mate = Instance.new("Model")
+	local foe = Instance.new("Model")
+	assert(revealVisible(me, mate), "o MEU Reveal aparece (aviso de 'estou marcado')")
+	assert(revealVisible(foe, mate), "Reveal de INIMIGO aparece — é o efeito")
+	assert(revealVisible(foe, nil), "sem parceiro, todo Reveal aparece")
+	assert(not revealVisible(mate, mate), "Reveal do PARCEIRO não aparece para mim (já sei onde ele está)")
+	assert(not revealVisible(nil, mate), "sem corpo não há realce")
+	me:Destroy()
+	mate:Destroy()
+	foe:Destroy()
+
+	print("[Hud] autoteste OK — seta do parceiro + filtro de Reveal")
 	return true
 end
 

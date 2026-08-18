@@ -344,7 +344,10 @@ end
 function RND.Clone(self)
 	return setmetatable({ s = self.s }, RND)
 end
-local RANDOM_SEED = 20260818
+--- Semente base do LCG. Fixa por padrão (mesma partida toda vez); a VARREDURA
+--- (tools/sweep.luau) troca `SOURCES.__seed` antes de instanciar cada harness,
+--- que é o único jeito de N partidas não serem N cópias da mesma partida.
+local RANDOM_SEED = tonumber(SOURCES.__seed) or 20260818
 local Random = {
 	new = function(seed)
 		RANDOM_SEED += 7919

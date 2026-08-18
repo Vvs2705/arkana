@@ -33,7 +33,7 @@ local function optional(name: string): any?
 end
 
 local extras = {}
-for _, name in ipairs({ "Accessibility", "CameraRig", "Atmosphere", "Settings", "Device", "SintoniaUi", "MatchUi", "TutorialUi" }) do
+for _, name in ipairs({ "Accessibility", "CameraRig", "Atmosphere", "Settings", "Device", "SintoniaUi", "MatchUi", "TutorialUi", "GrimoireUi" }) do
 	local m = optional(name)
 	if m then
 		table.insert(extras, m)

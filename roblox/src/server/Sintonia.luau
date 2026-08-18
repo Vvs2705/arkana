@@ -56,6 +56,9 @@ local PING_COOLDOWN = 2.0
 --- proposta sem resposta morre sozinha; aceita, o alvo marcado dura mais
 local PROPOSAL_TTL = 6.0
 local PACT_TTL = 12.0
+--- resposta do parceiro BOT ao ping (débito 2): um instante de "reação" para o
+--- aceite não sair no mesmo frame do ping. Game feel, não balanceamento.
+local BOT_ACCEPT_DELAY = 0.5
 --- altura em que o combo acontece (peito): o impacto pode ter sido na copa de
 --- uma árvore, e a explosão tem de pegar quem está no chão
 local COMBO_Y = Grid.FLOOR_Y + 3
@@ -132,16 +135,18 @@ local EFFECTS: { [string]: Recipe } = {
 }
 
 -- ---------------------------------------------------------------------- tipos
+--- PARTICIPANTE (débito 2): a Sintonia aceita `Teams.Member` (jogador OU
+--- Humanoid de bot) — o parceiro bot do roster ímpar também vive o pilar.
 type Cast = {
-	player: Player,
+	player: Teams.Member,
 	element: Elements.Id,
 	pos: Vector3,
 	t: number,
 }
 
 type Channel = {
-	a: Player,
-	b: Player,
+	a: Teams.Member,
+	b: Teams.Member,
 	elA: Elements.Id,
 	elB: Elements.Id,
 	combo: Elements.Combo,
@@ -152,7 +157,7 @@ type Channel = {
 --- Ping de Sintonia (GDD §18.7). `withUserId` preenchido = pacto selado: os
 --- DOIS veem o mesmo alvo marcado.
 type Proposal = {
-	player: Player,
+	player: Teams.Member,
 	element: Elements.Id,
 	pos: Vector3,
 	expires: number,
@@ -199,38 +204,83 @@ local function emit(name: string, subject: any, payload: any?)
 end
 
 -- -------------------------------------------------------------------- helpers
-local function rootOf(player: Player): BasePart?
-	local char = player.Character
+local function isPlayer(m: any): boolean
+	return typeof(m) == "Instance" and m:IsA("Player")
+end
+
+--- personagem/corpo de um participante: Character do jogador, Model do bot
+local function charOf(m: Teams.Member): Instance?
+	if isPlayer(m) then
+		return (m :: Player).Character
+	end
+	return (m :: Humanoid).Parent
+end
+
+local function rootOf(m: Teams.Member): BasePart?
+	local char = charOf(m)
 	if not char or not char.Parent then
 		return nil
 	end
 	return char:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function humanoidOf(player: Player): Humanoid?
-	local char = player.Character
-	if not char or not char.Parent then
-		return nil
+local function isAlive(m: Teams.Member): boolean
+	if typeof(m) ~= "Instance" or not m.Parent then
+		return false -- saiu do jogo / bot destruído
 	end
-	return char:FindFirstChildOfClass("Humanoid")
-end
-
-local function isAlive(player: Player): boolean
-	if not player.Parent then
-		return false -- saiu do jogo
+	if m:IsA("Humanoid") then
+		return (m :: Humanoid).Health > 0
 	end
-	local hum = humanoidOf(player)
+	local char = charOf(m)
+	local hum = if char and char.Parent then char:FindFirstChildOfClass("Humanoid") else nil
 	return hum ~= nil and hum.Health > 0
 end
 
-local function onCooldown(player: Player): boolean
-	return os.clock() < (readyAt[player.UserId] or 0)
+--- Chave numérica estável de um participante nas tabelas de cooldown/pacto.
+--- Jogador = UserId; bot = id sintético NEGATIVO (nunca colide com UserId real
+--- e o cliente, que resolve por `GetPlayerByUserId`, ignora sem erro nenhum).
+--- CHAVES/VALORES FRACOS: bot destruído solta o par sozinho.
+local nextBotUid = 0
+local botUids: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
+local botByUid: { [number]: Humanoid } = setmetatable({}, { __mode = "v" }) :: any
+local function uidOf(m: Teams.Member): number
+	if isPlayer(m) then
+		return (m :: Player).UserId
+	end
+	local hum = m :: Humanoid
+	local uid = botUids[hum]
+	if not uid then
+		nextBotUid -= 1
+		uid = nextBotUid
+		botUids[hum] = uid
+		botByUid[uid] = hum
+	end
+	return uid
+end
+
+--- elemento ativo do participante (bot tem elemento fixo, via Combat)
+local function elementOf(m: Teams.Member): string?
+	if not combat then
+		return nil
+	end
+	if isPlayer(m) then
+		return combat.getElement(m)
+	end
+	return if combat.getNpcElement then combat.getNpcElement(m :: Humanoid) else nil
+end
+
+local function onCooldown(m: Teams.Member): boolean
+	return os.clock() < (readyAt[uidOf(m)] or 0)
 end
 
 --- ELIMINADO NÃO AGE (P0): a trava é do Combat (quem o Match avisa), inclusive
---- para o PING — espectador não propõe nem aceita Sintonia.
-local function blocked(player: Player): boolean
-	return combat ~= nil and combat.canAct ~= nil and combat.canAct(player) == false
+--- para o PING — espectador não propõe nem aceita Sintonia. Bot não passa pela
+--- trava (bot morto já falha o isAlive).
+local function blocked(m: Teams.Member): boolean
+	if isPlayer(m) then
+		return combat ~= nil and combat.canAct ~= nil and combat.canAct(m) == false
+	end
+	return false
 end
 
 --- chave comutativa de um par de jogadores (funil de oportunidade)
@@ -251,8 +301,8 @@ local function markBetween(from: number, to: number): Vector3?
 	return nil
 end
 
-local function pactMark(a: Player, b: Player): Vector3?
-	return markBetween(a.UserId, b.UserId) or markBetween(b.UserId, a.UserId)
+local function pactMark(a: Teams.Member, b: Teams.Member): Vector3?
+	return markBetween(uidOf(a), uidOf(b)) or markBetween(uidOf(b), uidOf(a))
 end
 
 --- Sela o pacto. O PRIMEIRO aceite vale e mais nenhum: reaceitar a mesma
@@ -276,7 +326,7 @@ end
 --- conjurações valem se as duas caírem perto do ALVO COMBINADO, ainda que
 --- longe uma da outra. Sem isso o ping seria só enfeite; com isso, combinar
 --- com um desconhecido pelo botão compensa.
-local function epicenter(a: Cast, bPlayer: Player, bPos: Vector3): Vector3?
+local function epicenter(a: Cast, bPlayer: Teams.Member, bPos: Vector3): Vector3?
 	-- P0 (auditoria 18/08): SÓ ENTRE ALIADOS. Este é o funil único por onde
 	-- TODA fusão passa — proximidade e pacto de ping incluídos —, então a regra
 	-- vive aqui e em lugar nenhum mais. Inimigo perto conjurando outro elemento
@@ -297,14 +347,14 @@ end
 --- Humanoides dentro do raio, menos os participantes. Usa a consulta espacial
 --- NATIVA: pega bots (R3) e qualquer coisa com Humanoid de graça, e o filtro
 --- exclui a pasta Arena (senão a esfera devolveria centenas de parts de piso).
-local function humanoidsIn(pos: Vector3, radius: number, skip: { Player }): { Humanoid }
+local function humanoidsIn(pos: Vector3, radius: number, skip: { Teams.Member }): { Humanoid }
 	local exclude: { Instance } = {}
 	local arena = Workspace:FindFirstChild("Arena")
 	if arena then
 		table.insert(exclude, arena)
 	end
 	for _, p in ipairs(skip) do
-		local char = p.Character
+		local char = charOf(p)
 		if char then
 			table.insert(exclude, char)
 		end
@@ -329,11 +379,12 @@ end
 
 -- ------------------------------------------------------------------ broadcast
 --- Fato decidido pelo servidor. O cliente SÓ APRESENTA (Net.SintoniaState).
-local function announceState(payload: { [string]: any }, only: { Player }?)
+local function announceState(payload: { [string]: any }, only: { Teams.Member }?)
 	if only then
 		for _, p in ipairs(only) do
-			if p.Parent then
-				evState:FireClient(p, payload)
+			-- bot na audiência não tem cliente: só Player recebe FireClient
+			if isPlayer(p) and p.Parent then
+				evState:FireClient(p :: Player, payload)
 			end
 		end
 	else
@@ -358,7 +409,10 @@ end
 --- §18.6). Require preguiçoso e protegido, o mesmo padrão que o Combat usa
 --- para falar com este módulo: se o Match sumir, a Sintonia continua de pé.
 local match: any = nil
-local function noteCombo(player: Player, comboKey: string)
+local function noteCombo(player: Teams.Member, comboKey: string)
+	if not isPlayer(player) then
+		return -- bot não entra no Selo do Campeão por aqui (crédito é do Match)
+	end
 	if match == nil then
 		local mod = script.Parent and script.Parent:FindFirstChild("Match")
 		local ok, m = pcall(function()
@@ -374,27 +428,31 @@ end
 -- ----------------------------------------------------------------- canalização
 --- Cobra o custo dos DOIS e abre a canalização. Ponto único onde a Sintonia
 --- "gasta" — chamado antes de qualquer efeito, de propósito.
-local function beginChannel(a: Cast, b: Player, elB: Elements.Id, pos: Vector3)
+local function beginChannel(a: Cast, b: Teams.Member, elB: Elements.Id, pos: Vector3)
 	local combo = Elements.getCombo(a.element, elB)
 	if not combo then
 		return -- mesmo elemento (ou par inexistente): não funde
 	end
 	local now = os.clock()
 
-	busy[a.player.UserId] = true
-	busy[b.UserId] = true
+	busy[uidOf(a.player)] = true
+	busy[uidOf(b)] = true
 	-- CUSTO COBRADO JÁ (GDD §9): interromper NÃO devolve o cooldown. É o que
-	-- torna o combo errado punitivo e o spam impossível.
-	readyAt[a.player.UserId] = now + S.sharedCooldown
-	readyAt[b.UserId] = now + S.sharedCooldown
+	-- torna o combo errado punitivo e o spam impossível. Vale IGUAL para o bot:
+	-- o cooldown compartilhado é o custo dele (bot não tem mana).
+	readyAt[uidOf(a.player)] = now + S.sharedCooldown
+	readyAt[uidOf(b)] = now + S.sharedCooldown
 
 	-- "Consome a magia dos DOIS": o cooldown compartilhado acima é a parte que
-	-- vive nesta raia. A mana pertence ao Combat (raia B) e ainda não tem API
-	-- pública — chamada opcional, no mesmo padrão que o Combat usa para falar
-	-- com este módulo. Quando `Combat.drainMana` existir, passa a valer sozinha.
+	-- vive nesta raia. A mana é do Combat e só JOGADOR tem mana — o custo do
+	-- bot é o cooldown acima.
 	if combat and combat.drainMana then
-		pcall(combat.drainMana, a.player)
-		pcall(combat.drainMana, b)
+		if isPlayer(a.player) then
+			pcall(combat.drainMana, a.player)
+		end
+		if isPlayer(b) then
+			pcall(combat.drainMana, b)
+		end
 	end
 
 	table.insert(channels, {
@@ -415,12 +473,12 @@ local function beginChannel(a: Cast, b: Player, elB: Elements.Id, pos: Vector3)
 		pos = pos,
 		radius = combo.radius,
 		duration = S.channel,
-		byUserId = a.player.UserId,
-		withUserId = b.UserId,
+		byUserId = uidOf(a.player),
+		withUserId = uidOf(b),
 	})
 	emit(Events.Name.SintoniaChannelStart, a.player, {
 		combo_key = combo.key,
-		with_user_id = b.UserId,
+		with_user_id = uidOf(b),
 		element = a.element,
 		with_element = elB,
 		pos = pos,
@@ -432,8 +490,8 @@ local function beginChannel(a: Cast, b: Player, elB: Elements.Id, pos: Vector3)
 end
 
 local function releaseChannel(ch: Channel)
-	busy[ch.a.UserId] = nil
-	busy[ch.b.UserId] = nil
+	busy[uidOf(ch.a)] = nil
+	busy[uidOf(ch.b)] = nil
 end
 
 --- INTERROMPIDA (GDD §9): um dos dois morreu, saiu ou foi eliminado no meio. O
@@ -445,12 +503,12 @@ local function failChannel(ch: Channel, reason: string)
 		phase = "failed",
 		comboKey = ch.combo.key,
 		pos = ch.pos,
-		byUserId = ch.a.UserId,
-		withUserId = ch.b.UserId,
+		byUserId = uidOf(ch.a),
+		withUserId = uidOf(ch.b),
 	})
 	emit(Events.Name.SintoniaInterrupted, ch.a, {
 		combo_key = ch.combo.key,
-		with_user_id = ch.b.UserId,
+		with_user_id = uidOf(ch.b),
 		pos = ch.pos,
 		reason = reason,
 	})
@@ -480,20 +538,28 @@ local function fireChannel(ch: Channel)
 		-- crédito de evolução do Escudo alternado: o combo é dos DOIS e um só
 		-- número de dano por alvo continua legível na tela (GDD §5).
 		local credit = if i % 2 == 0 then ch.b else ch.a
+		--- crédito BOT vai pela via de autor-sem-Player do applyDamage (débito
+		--- 2): a telemetria não carimba o dano do combo como "ambiente" e o
+		--- escudo do bot não evolui (bot não tem escudo — regra do Combat).
+		local creditPlayer: Player? = if isPlayer(credit) then credit :: Player else nil
 		if combat then
-			combat.applyDamage(hum, dmg, credit, true)
+			if creditPlayer then
+				combat.applyDamage(hum, dmg, creditPlayer, true)
+			else
+				combat.applyDamage(hum, dmg, nil, true, credit)
+			end
 			-- STATUS pelo KERNEL (P1): o Combat é o único que guarda efeito e o
 			-- único que escreve WalkSpeed. Daqui não dá para furar o teto de
 			-- atordoamento — `applyStatus` clampa e devolve o que valeu.
 			if recipe then
 				if recipe.stun then
-					combat.applyStatus(hum, "Stun", recipe.stun, nil, credit)
+					combat.applyStatus(hum, "Stun", recipe.stun, nil, creditPlayer)
 				end
 				if recipe.slow then
-					combat.applyStatus(hum, "Slow", recipe.slow, recipe.slowMult, credit)
+					combat.applyStatus(hum, "Slow", recipe.slow, recipe.slowMult, creditPlayer)
 				end
 				if recipe.reveal then
-					combat.applyStatus(hum, "Reveal", recipe.reveal, nil, credit)
+					combat.applyStatus(hum, "Reveal", recipe.reveal, nil, creditPlayer)
 				end
 			end
 		end
@@ -517,8 +583,8 @@ local function fireChannel(ch: Channel)
 		pos = ch.pos,
 		radius = combo.radius,
 		duration = combo.duration,
-		byUserId = ch.a.UserId,
-		withUserId = ch.b.UserId,
+		byUserId = uidOf(ch.a),
+		withUserId = uidOf(ch.b),
 		hits = #victims,
 	})
 	announceCombo(combo)
@@ -526,7 +592,7 @@ local function fireChannel(ch: Channel)
 	noteCombo(ch.b, combo.key)
 	emit(Events.Name.SintoniaFired, ch.a, {
 		combo_key = combo.key,
-		with_user_id = ch.b.UserId,
+		with_user_id = uidOf(ch.b),
 		element = ch.elA,
 		with_element = ch.elB,
 		pos = ch.pos,
@@ -546,11 +612,13 @@ end
 
 --- Chamado pelo Combat a cada conjuração que impacta: alimenta a janela.
 --- Trata TUDO como hostil: elemento válido, vivo, sem cooldown, sem canalizar.
-function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
+--- Aceita `Teams.Member` (débito 2): o parceiro BOT entra pelo MESMO funil.
+function Sintonia.registerCast(player: Teams.Member, elementId: string, pos: Vector3)
 	if not evState or typeof(pos) ~= "Vector3" or not Elements.isValid(elementId) then
 		return
 	end
-	if not isAlive(player) or blocked(player) or busy[player.UserId] or onCooldown(player) then
+	local uid = uidOf(player)
+	if not isAlive(player) or blocked(player) or busy[uid] or onCooldown(player) then
 		return
 	end
 	local element = elementId :: Elements.Id
@@ -566,7 +634,7 @@ function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
 		if c.player == player or c.element == element then
 			continue
 		end
-		if busy[c.player.UserId] or onCooldown(c.player) or not isAlive(c.player) or blocked(c.player) then
+		if busy[uidOf(c.player)] or onCooldown(c.player) or not isAlive(c.player) or blocked(c.player) then
 			continue
 		end
 		local center = epicenter(c, player, pos)
@@ -589,19 +657,44 @@ function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
 	-- jogador. Cabe. Se o orçamento de rede no celular reclamar, o upgrade é
 	-- limitar a 1 envio por ~0,3 s por jogador — e NÃO mandar só na borda de
 	-- subida, senão a barra "fecha" enquanto a janela real ainda está renovando.
-	local audience: { Player } = { player }
+	local audience: { Teams.Member } = {}
+	if isPlayer(player) then
+		table.insert(audience, player)
+	end
 	for _, mate in ipairs(Teams.matesOf(player)) do
-		if typeof(mate) == "Instance" and mate:IsA("Player") then
+		if isPlayer(mate) then
 			table.insert(audience, mate)
 		end
 	end
 	announceState({
 		phase = "window",
 		windowLeft = S.window,
-		byUserId = player.UserId,
+		byUserId = uid,
 		element = element,
 		pos = pos,
 	}, audience)
+
+	-- PARCEIRO BOT RESPONDE (débito 2): com o PACTO selado com um bot, a magia
+	-- do humano caindo NA MARCA faz o bot conjurar a dele no mesmo alvo — e o
+	-- funil NORMAL acima decide o resto (janela, epicentro, canalização
+	-- interrompível, cooldown compartilhado cobrado no início: GDD §9 inteiro).
+	-- Só o PACTO dispara isto: sem ping aceito, bot não funde — coordenação
+	-- continua sendo um ATO, não um efeito colateral de atirar perto.
+	local prop = proposals[uid]
+	local botUid = if prop and now <= prop.expires then prop.withUserId else nil
+	local bot = if botUid then botByUid[botUid :: number] else nil
+	if bot and (pos - (prop :: Proposal).pos).Magnitude <= S.targetRadius then
+		local elBot = elementOf(bot)
+		if
+			Elements.isValid(elBot)
+			and Elements.getCombo(element, elBot :: Elements.Id) ~= nil
+			and not busy[uidOf(bot)]
+			and not onCooldown(bot)
+			and isAlive(bot)
+		then
+			Sintonia.registerCast(bot, elBot :: string, (prop :: Proposal).pos)
+		end
+	end
 end
 
 -- ------------------------------------------------- Ping de Sintonia (§18.7)
@@ -676,10 +769,28 @@ function Sintonia.propose(player: Player, rawPos: any)
 	end
 	announceState(payload, audience)
 	emit(Events.Name.SintoniaPing, player, { element = element, pos = pos, allies_reached = heard })
+
+	-- PARCEIRO BOT (débito 2): duo ímpar tem bot de parceiro, e o pilar do jogo
+	-- não pode ser exclusivo de dupla humana. O bot ALIADO ao alcance do ping
+	-- responde como um jogador responderia: aceita pelo MESMO `accept` (mesmas
+	-- validações), um instante depois. A fusão sai quando a magia do humano
+	-- cair na marca (hook no registerCast).
+	for _, m in ipairs(Teams.matesOf(player)) do
+		if typeof(m) == "Instance" and m:IsA("Humanoid") then
+			local r = rootOf(m)
+			if r and (r.Position - root.Position).Magnitude <= PING_HEAR then
+				task.delay(BOT_ACCEPT_DELAY, function()
+					Sintonia.accept(m, uid)
+				end)
+				break -- o pacto é de DOIS: um parceiro responde
+			end
+		end
+	end
 end
 
 --- 1 toque do aliado: o alvo passa a ser COMUM aos dois (GDD §18.7).
-function Sintonia.accept(player: Player, fromUserId: any)
+--- Aceita `Teams.Member` (débito 2): o bot aliado responde por este MESMO funil.
+function Sintonia.accept(player: Teams.Member, fromUserId: any)
 	if not evState or typeof(fromUserId) ~= "number" then
 		return
 	end
@@ -700,20 +811,20 @@ function Sintonia.accept(player: Player, fromUserId: any)
 
 	--- o `expires` vira PACT_TTL dentro do `sealPact`: mede antes de sobrescrever
 	local proposedAt = prop.expires - PROPOSAL_TTL
-	if not sealPact(prop, player.UserId, os.clock()) then
+	if not sealPact(prop, uidOf(player), os.clock()) then
 		return -- pacto já selado: nada a anunciar, nada a renovar
 	end
 	announceState({
 		phase = "proposed",
 		byUserId = fromUserId,
 		byName = prop.player.DisplayName,
-		withUserId = player.UserId,
+		withUserId = uidOf(player),
 		withName = player.DisplayName,
 		element = prop.element,
 		--- elemento de QUEM ACEITOU. Sem ele, o proponente não consegue mostrar
 		--- o nome do combo que vai sair — e o card fica dizendo menos do que
 		--- sabe. Costura do coordenador (pedido da raia de UI, 18/08).
-		withElement = if combat and combat.getElement then combat.getElement(player) else nil,
+		withElement = elementOf(player),
 		pos = prop.pos,
 		ttl = PACT_TTL,
 	}, { player, prop.player })
@@ -891,8 +1002,8 @@ end
 -- AUTOTESTE — cole no Command Bar do Studio (servidor):
 --   require(game.ServerScriptService.Server.Sintonia).selfTest()
 -- Cobre o que não dá para ver a olho: a matriz completa, a regra de "mesmo
--- elemento não funde", a de "inimigo não funde", a geometria da janela e a
--- conta do dano.
+-- elemento não funde", a de "inimigo não funde", a geometria da janela, a
+-- conta do dano e a FUSÃO COM PARCEIRO BOT (débito 2).
 -- ⚠ RODE NO LOBBY: o item 3.1 monta e limpa o Teams DE VERDADE — no meio de uma
 -- partida isto apagaria os duos e desligaria a Sintonia até a próxima.
 -- ============================================================================
@@ -984,6 +1095,76 @@ function Sintonia.selfTest()
 	assert(not sealPact(fakeProp, 8, os.clock() + 5), "PACTO JÁ SELADO não pode ser reselado (aceite spamado = marca eterna)")
 	assert(fakeProp.expires == sealedUntil, "reaceitar não pode esticar o TTL do pacto")
 	assert(fakeProp.withUserId == 7, "quem aceitou primeiro é quem fica no pacto")
+
+	-- 3.4) PARCEIRO BOT (débito 2): o bot aliado responde ao ping e completa a
+	--      fusão pelo funil REAL — pacto → magia do humano na marca → magia do
+	--      bot → canalização, com o cooldown compartilhado cobrado no início.
+	--      Os corpos ficam FORA da arena (1e5): a fusão de teste não toca
+	--      terreno nem acerta ninguém.
+	assert(evState, "3.4 precisa do init (rode depois do boot do servidor)")
+	Sintonia.resetMatch()
+	local function mkRig(name: string, pos: Vector3): (Model, Humanoid)
+		local m = Instance.new("Model")
+		m.Name = name
+		local root = Instance.new("Part")
+		root.Name = "HumanoidRootPart"
+		root.Anchored = true
+		root.Position = pos
+		root.Parent = m
+		local h = Instance.new("Humanoid")
+		h.Parent = m
+		m.Parent = Workspace
+		return m, h
+	end
+	local FAR = Vector3.new(1e5, Grid.FLOOR_Y + 3, 1e5)
+	local rigA, humA = mkRig("SintoniaTesteA", FAR)
+	local rigB, humB = mkRig("SintoniaTesteB", FAR + Vector3.new(4, 0, 0))
+	Teams.build({ humA :: any, humB :: any }, 2) -- dupla: "humano" A + bot B
+
+	local uidA, uidB = uidOf(humA), uidOf(humB)
+	assert(uidB < 0 and uidOf(humB) == uidB and uidA ~= uidB, "uid de bot é negativo, estável e único")
+
+	-- o elemento do bot vem do registro que o Bots já faz no Combat
+	combat.registerTarget(humB, "Water")
+
+	-- ping de A → aceite do BOT pelo MESMO accept (mesmas validações)
+	proposals[uidA] = {
+		player = humA,
+		element = "Fire" :: Elements.Id,
+		pos = flat(FAR),
+		expires = os.clock() + PROPOSAL_TTL,
+		withUserId = nil,
+	}
+	Sintonia.accept(humB, uidA)
+	assert(proposals[uidA].withUserId == uidB, "bot aliado TEM de conseguir aceitar o Ping de Sintonia")
+
+	-- magia do humano NA MARCA → o bot responde e a canalização abre
+	Sintonia.registerCast(humA, "Fire", flat(FAR))
+	assert(#channels == 1, "magia na marca do pacto TEM de abrir canalização com o parceiro bot")
+	assert(busy[uidA] == true and busy[uidB] == true, "os dois participantes ficam ocupados canalizando")
+	assert(onCooldown(humA) and onCooldown(humB), "cooldown compartilhado cobrado NO INÍCIO, nos dois (GDD §9)")
+
+	-- canalização INTERROMPÍVEL: bot morre no meio → failed, custo NÃO volta
+	humB.Health = 0
+	Sintonia.step(0)
+	assert(#channels == 0, "bot morto no meio INTERROMPE a canalização (GDD §9)")
+	assert(onCooldown(humA), "interromper NÃO devolve o cooldown compartilhado")
+	assert(not busy[uidA] and not busy[uidB], "canal interrompido solta os dois")
+
+	-- fusão completa: revive o bot, zera o cooldown e deixa o canal DISPARAR
+	humB.Health = 100
+	table.clear(readyAt)
+	Sintonia.registerCast(humA, "Fire", flat(FAR))
+	assert(#channels == 1, "com o pacto ainda de pé, a dupla com bot funde de novo")
+	channels[1].fireAt = 0 -- adianta o relógio do canal: dispara neste step
+	Sintonia.step(0)
+	assert(#channels == 0 and not busy[uidA] and not busy[uidB], "fusão com parceiro BOT dispara e libera os dois")
+
+	combat.unregisterTarget(humB)
+	Sintonia.resetMatch()
+	Teams.clear()
+	rigA:Destroy()
+	rigB:Destroy()
 
 	-- 4) "mais forte que a soma das partes" (GDD §9)
 	local a, b = Balance.elements.Fire.basic.dmg, Balance.elements.Lightning.basic.dmg

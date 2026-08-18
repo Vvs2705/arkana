@@ -4,6 +4,9 @@
 #
 #   ./roblox/tools/run.sh              # boot + todos os selfTest + partida
 #   ./roblox/tools/run.sh 900          # partida com teto de 900s simulados
+#   ./roblox/tools/run.sh sweep 30     # VARREDURA: 30 partidas com seeds
+#                                      # diferentes + relatorio agregado de
+#                                      # balanceamento (tools/sweep.luau)
 #
 # POR QUE UM BUNDLE: o CLI do luau dá um ambiente global SEPARADO e SOMENTE
 # LEITURA para cada arquivo requerido, e não tem `io` para ler fonte. Então o
@@ -45,7 +48,12 @@ emit() {  # emit <chave> <arquivo>
 
 : > "$BUNDLE"
 printf -- '-- GERADO POR roblox/tools/run.sh — NÃO EDITAR\nlocal S = {}\n' >> "$BUNDLE"
-printf 'S.__maxSeconds = "%s"\n' "${1:-600}" >> "$BUNDLE"
+if [ "${1:-}" = "sweep" ]; then
+  printf 'S.__mode = "sweep"\n' >> "$BUNDLE"
+  printf 'S.__sweepN = "%s"\n' "${2:-12}" >> "$BUNDLE"
+else
+  printf 'S.__maxSeconds = "%s"\n' "${1:-600}" >> "$BUNDLE"
+fi
 
 for area in shared server client; do
   for f in "$SRC/$area"/*.luau; do
@@ -55,10 +63,16 @@ for area in shared server client; do
 done
 emit "tools/harness.luau" "$HERE/harness.luau"
 emit "tools/run.luau" "$HERE/run.luau"
+emit "tools/sweep.luau" "$HERE/sweep.luau"
 
 cat >> "$BUNDLE" <<'LUA'
-local H = assert(loadstring(S["tools/harness.luau"], "@roblox/tools/harness.luau"))(S)
-assert(loadstring(S["tools/run.luau"], "@roblox/tools/run.luau"))(H, S)
+if S.__mode == "sweep" then
+	-- a varredura instancia UM harness NOVO por partida (seed propria) — ver sweep.luau
+	assert(loadstring(S["tools/sweep.luau"], "@roblox/tools/sweep.luau"))(S)
+else
+	local H = assert(loadstring(S["tools/harness.luau"], "@roblox/tools/harness.luau"))(S)
+	assert(loadstring(S["tools/run.luau"], "@roblox/tools/run.luau"))(H, S)
+end
 LUA
 
 exec "$LUAU" "$BUNDLE"

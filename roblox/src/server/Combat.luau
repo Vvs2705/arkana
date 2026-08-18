@@ -285,48 +285,34 @@ local SLOW_MAX = 3.0
 local SLOW_FLOOR = 0.35
 
 local STATUS_MAX: { [string]: number } = { Stun = STUN_MAX, Reveal = REVEAL_MAX, Slow = SLOW_MAX }
---- Cor do realce por tipo: efeito que o inimigo não enxerga é efeito que não
---- existe (a mesma auditoria). Stun = âmbar, Reveal = ciano, Slow = terra.
-local STATUS_COLOR: { [string]: Color3 } = {
-	Stun = Color3.fromHex("#FFE066"),
-	Reveal = Color3.fromHex("#8AE9FF"),
-	Slow = Color3.fromHex("#B98A4A"),
-}
 
-type Status = { expires: number, mag: number, fx: Instance? }
+type Status = { expires: number, mag: number }
 
 --- CHAVES FRACAS (mesmo motivo do Teams): corpo destruído no meio da partida
 --- some sozinho da tabela em vez de segurar a Instance até o fim do servidor —
 --- é a metade "não vaza entre partidas" do requisito.
 local statuses: { [Humanoid]: { [string]: Status } } = setmetatable({}, { __mode = "k" }) :: any
 
---- Realce replicado pelo servidor. É a fonte VISÍVEL do efeito.
---- ponytail: TETO CONHECIDO — Highlight replica para TODOS, então o `Reveal`
---- também aparece para o time de quem foi revelado. Mostrar só ao time inimigo
---- exige o CLIENTE criar o Highlight (raia de UI); quando ela existir, este é o
---- ponto único a trocar por um evento S→C. `pcall` porque Highlight é cosmético
---- e o kernel de status não pode cair por causa de enfeite.
-local function statusFx(humanoid: Humanoid, kind: string): Instance?
+-- ---------------------------------------------------------- SINAL S→C
+--- Até 18/08 o único aviso de status era um `Highlight` criado AQUI — e
+--- Highlight REPLICA: o inimigo revelado acendia até para os aliados dele, que
+--- é o oposto do que a Revelação existe para fazer. O servidor agora publica só
+--- o ESTADO, e quem decide o que DESENHAR é o cliente (Client/Hud), o único que
+--- sabe de que lado está.
+--- ATRIBUTO no personagem, e não um remote novo: ele já replica sozinho, chega
+--- inteiro para quem entra no meio da partida (sem handshake) e some junto com
+--- o corpo. Nome: `Status_Stun` / `Status_Reveal` / `Status_Slow`.
+--- O VALOR É DURAÇÃO, NUNCA TIMESTAMP: `os.clock()` aqui é uptime DESTE
+--- servidor e não existe no relógio do cliente. Publicamos os segundos que
+--- faltavam no instante da escrita, e quem manda no "acabou" continua sendo o
+--- `nil` escrito por este módulo (`Combat.step`) — o cliente não decide status.
+local STATUS_ATTR = "Status_"
+
+local function publishStatus(humanoid: Humanoid, kind: string, secondsLeft: number?)
 	local char = humanoid.Parent
-	if not char then
-		return nil
+	if char then
+		char:SetAttribute(STATUS_ATTR .. kind, secondsLeft)
 	end
-	local ok, fx = pcall(function()
-		local hl = Instance.new("Highlight")
-		hl.Name = "Status_" .. kind
-		hl.FillColor = STATUS_COLOR[kind] or Color3.new(1, 1, 1)
-		hl.OutlineColor = STATUS_COLOR[kind] or Color3.new(1, 1, 1)
-		hl.FillTransparency = 0.6
-		--- só o Reveal atravessa parede — é literalmente o efeito dele. Stun e
-		--- Slow marcam quem já está à vista, e não podem virar wallhack.
-		hl.DepthMode = if kind == "Reveal"
-			then Enum.HighlightDepthMode.AlwaysOnTop
-			else Enum.HighlightDepthMode.Occluded
-		hl.Adornee = char
-		hl.Parent = char
-		return hl
-	end)
-	return if ok then fx else nil
 end
 
 --- Aplica (ou renova) um status. Devolve a duração EFETIVA, já clampada — é
@@ -367,13 +353,12 @@ function Combat.applyStatus(humanoid: Humanoid, kind: string, duration: number, 
 		--- mais forte. Empilhar duração seria como burlar o teto por repetição.
 		cur.expires = math.max(cur.expires, expires)
 		cur.mag = math.min(cur.mag, mag)
+		publishStatus(humanoid, kind, cur.expires - now)
 	else
 		--- vencido (a varredura do `step` ainda não passou): entra efeito NOVO —
 		--- senão o alvo herdaria a magnitude do efeito anterior para sempre.
-		if cur and cur.fx then
-			cur.fx:Destroy()
-		end
-		entry[kind] = { expires = expires, mag = mag, fx = statusFx(humanoid, kind) }
+		entry[kind] = { expires = expires, mag = mag }
+		publishStatus(humanoid, kind, d)
 	end
 
 	-- TELEMETRIA: `Shared/Events` é do coordenador e não tem nome para status,
@@ -426,10 +411,8 @@ function Combat.clearStatus(humanoid: Humanoid?)
 	if not entry then
 		return
 	end
-	for _, s in pairs(entry) do
-		if s.fx then
-			s.fx:Destroy()
-		end
+	for kind in pairs(entry) do
+		publishStatus(humanoid :: Humanoid, kind, nil)
 	end
 	statuses[humanoid :: Humanoid] = nil
 end
@@ -969,6 +952,14 @@ function Combat.unregisterTarget(humanoid: Humanoid)
 	Combat.clearStatus(humanoid) -- bot morto não leva status para o próximo round
 end
 
+--- Elemento de um alvo NÃO-jogador registrado (bot). A Sintonia usa isto para o
+--- parceiro bot responder ao Ping com o elemento DELE (débito 2) — o dado já
+--- morava em `extraTargets`; isto só o torna legível.
+function Combat.getNpcElement(humanoid: Humanoid): string?
+	local e = extraTargets[humanoid]
+	return if typeof(e) == "string" then e else nil
+end
+
 --- Assina o fluxo de dano (leitura pura, pós-aplicação).
 function Combat.onDamage(fn: (Humanoid, number, Player?) -> ())
 	table.insert(damageListeners, fn)
@@ -1164,15 +1155,13 @@ function Combat.step(dt: number)
 
 	-- --------------------------------------------------------------- status
 	--- `getStatus` já expira sozinho pela conta do relógio; esta varredura existe
-	--- para APAGAR O REALCE e soltar a tabela. Roda sobre um mapa quase sempre
-	--- vazio (só quem está sob efeito aparece), inclusive bots.
+	--- para APAGAR O SINAL PUBLICADO (atributo) e soltar a tabela. Roda sobre um
+	--- mapa quase sempre vazio (só quem está sob efeito aparece), inclusive bots.
 	for hum, entry in pairs(statuses) do
 		local empty = true
 		for kind, s in pairs(entry) do
 			if now >= s.expires or hum.Health <= 0 then
-				if s.fx then
-					s.fx:Destroy()
-				end
+				publishStatus(hum, kind, nil)
 				entry[kind] = nil
 			else
 				empty = false
@@ -1309,10 +1298,14 @@ function Combat.selfTest()
 	local body = Instance.new("Model")
 	local reborn = Instance.new("Humanoid")
 	reborn.Parent = body
-	Combat.applyStatus(reborn, "Stun", 5)
+	local pub = Combat.applyStatus(reborn, "Stun", 5)
 	assert(Combat.getStatus(reborn, "Stun") > 0, "pré-condição: o corpo estava atordoado")
+	-- SINAL PUBLICADO (débito 1): o estado vira ATRIBUTO no personagem — é o que
+	-- o cliente lê para desenhar; o Highlight do servidor morreu com o débito.
+	assert(body:GetAttribute("Status_Stun") == pub, "status ativo tem de ser PUBLICADO no personagem (duração)")
 	Combat.onCharacterAdded(ghost2, body, reborn)
 	assert(Combat.getStatus(reborn, "Stun") == 0, "RESPAWN tem de limpar o status (senão vaza entre partidas)")
+	assert(body:GetAttribute("Status_Stun") == nil, "limpar o status tem de APAGAR o sinal publicado")
 	assert(Combat.statusSpeedMult(reborn) == 1, "corpo novo nasce com velocidade cheia")
 
 	-- POSTURA: agachar é intenção do cliente APLICADA AQUI (o quadril desce de
