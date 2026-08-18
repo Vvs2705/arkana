@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
+local Events = require(Shared:WaitForChild("Events"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
 
@@ -167,6 +168,45 @@ local function notifySintonia(player: Player, elementId: string, pos: Vector3)
 	end
 end
 
+-- ----------------------------------------------------------------- telemetria
+--- Mesmo require preguiçoso e protegido do notifySintonia acima, pela mesma
+--- razão: TELEMETRIA NUNCA DECIDE JOGO. Se o coletor quebrar ou sumir, o
+--- combate continua de pé e só o dashboard fica pobre.
+--- Convenção: `subject` é quem AGE (Player, ou Humanoid do bot); quando não há
+--- ator (dano da zona/terreno), o sujeito é quem SOFRE. O `payload` leva só o
+--- que é específico do evento — o contexto padrão (match_id, is_bot, team_id,
+--- zona, vivos) é o coletor que preenche (Shared/Events).
+local telemetry: any = nil
+local function emit(name: string, subject: any, payload: any?)
+	if telemetry == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Telemetry")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		telemetry = (ok and m) or false
+	end
+	if telemetry and telemetry.emit then
+		pcall(telemetry.emit, name, subject, payload)
+	end
+end
+
+-- ------------------------------------------------------- trava de ELIMINADO
+--- P0 da auditoria externa: eliminado continuava conjurando do poleiro de
+--- espectador (Match.perch), sujando TTK, funil de Sintonia e dano por
+--- elemento com tiros que não pertencem a nenhuma partida.
+--- Quem sabe quem foi eliminado é o Match; a trava mora aqui porque é aqui que
+--- toda intenção do cliente entra (`handleCast`/`handleDodge`/`handleSwitch`).
+local cannotAct: { [Player]: boolean } = {}
+
+--- Chamado pelo Match: `false` na eliminação, `true` no início da partida.
+function Combat.setCanAct(player: Player, canAct: boolean)
+	cannotAct[player] = if canAct then nil else true
+end
+
+function Combat.canAct(player: Player): boolean
+	return not cannotAct[player]
+end
+
 -- -------------------------------------------------------------------- terreno
 --- Perigos do terreno: o Terrain NUNCA aplica dano sozinho — quem aplica é o
 --- Combat. A raia A expõe `hazardAt`; enquanto não expõe, isto devolve 0.
@@ -217,6 +257,9 @@ local function shieldMax(st: State): number
 end
 
 local function sendStats(st: State)
+	if not st.player.Parent then
+		return -- saiu do jogo: não existe cliente para receber
+	end
 	local hum = st.humanoid
 	local now = os.clock()
 	local tacticTotal = Balance.elements[st.element].tactic.cooldown
@@ -289,6 +332,7 @@ end
 
 function Combat.onPlayerRemoving(player: Player)
 	states[player] = nil
+	cannotAct[player] = nil
 	for i = #projectiles, 1, -1 do
 		if projectiles[i].owner == player then
 			table.remove(projectiles, i)
@@ -392,8 +436,8 @@ end
 --- Aqui a intenção é tratada como HOSTIL: vivo? cadência? mana? Só então age.
 function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 	local st = states[player]
-	if not st or not isAlive(st) or not st.root or not st.root.Parent then
-		return
+	if not st or cannotAct[player] or not isAlive(st) or not st.root or not st.root.Parent then
+		return -- eliminado não conjura (nem do poleiro de espectador)
 	end
 	local now = os.clock()
 
@@ -409,6 +453,12 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 		st.mana -= spec.manaCost
 		st.nextBasic = now + spec.fireRate
 		spawnProjectile(st, false, dir)
+		emit(Events.Name.SpellCast, player, {
+			element = st.element,
+			kind = "basic",
+			pos = (st.root :: BasePart).Position,
+			mana_left = st.mana,
+		})
 	elseif kind == "tactic" then
 		-- GDD §4 regra 2: TÁTICA usa COOLDOWN, nunca mana
 		if now < st.nextTactic then
@@ -420,6 +470,12 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 		end
 		st.nextTactic = now + cd
 		spawnProjectile(st, true, dir)
+		emit(Events.Name.TacticCast, player, {
+			element = st.element,
+			kind = "tactic",
+			pos = (st.root :: BasePart).Position,
+			cooldown = cd,
+		})
 	end
 	sendStats(st)
 end
@@ -427,7 +483,7 @@ end
 --- Troca de elemento (Q / carrossel de toque). Valida o id.
 function Combat.handleSwitch(player: Player, elementId: any)
 	local st = states[player]
-	if not st or not Elements.isValid(elementId) then
+	if not st or cannotAct[player] or not Elements.isValid(elementId) then
 		return
 	end
 	st.element = elementId :: Elements.Id
@@ -437,7 +493,7 @@ end
 --- Esquiva com i-frames curtos (GDD §15 item 5).
 function Combat.handleDodge(player: Player, dir: Vector3?)
 	local st = states[player]
-	if not st or not isAlive(st) then
+	if not st or cannotAct[player] or not isAlive(st) then
 		return
 	end
 	local root = st.root
@@ -460,6 +516,12 @@ function Combat.handleDodge(player: Player, dir: Vector3?)
 	st.dashUntil = now + dodge.duration
 	st.iframesUntil = now + dodge.iframes
 	st.nextDodge = now + dodge.cooldown
+	emit(Events.Name.DodgeStart, player, {
+		pos = root.Position,
+		dir = st.dashDir,
+		iframes = dodge.iframes,
+		cooldown = dodge.cooldown,
+	})
 	sendStats(st)
 end
 
@@ -476,7 +538,21 @@ function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer
 	local tState = if target then states[target] else nil
 
 	if tState and os.clock() < tState.iframesUntil then
-		return -- esquiva perfeita
+		-- ESQUIVA PERFEITA. Emitir aqui é o que torna a esquiva MENSURÁVEL: sem
+		-- este evento, "quantos tiros o i-frame anula" fica invisível, e foi
+		-- exatamente esse número que motivou o corte de 0,28 s → 0,18 s
+		-- (auditoria externa 18/08). `nullified` marca dano que NÃO aconteceu —
+		-- o agregador não pode somá-lo ao dano real.
+		emit(Events.Name.Damage, fromPlayer or targetHumanoid, {
+			amount = 0,
+			absorbed = 0,
+			blocked = amount,
+			nullified = true,
+			target = targetHumanoid,
+			strong = strong == true,
+			environmental = fromPlayer == nil,
+		})
+		return
 	end
 
 	local rest = amount
@@ -496,6 +572,22 @@ function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer
 
 	for _, fn in ipairs(damageListeners) do
 		fn(targetHumanoid, dealt, fromPlayer)
+	end
+
+	-- sem ator (zona/terreno) o sujeito é quem SOFRE — senão o evento não teria
+	-- de quem falar. `absorbed` separa escudo de vida: é o número que diz se o
+	-- Escudo Evolutivo (GDD §5) está segurando demais ou de menos.
+	emit(Events.Name.Damage, fromPlayer or targetHumanoid, {
+		amount = dealt,
+		absorbed = amount - rest,
+		target = targetHumanoid,
+		strong = strong == true,
+		environmental = fromPlayer == nil,
+	})
+	if targetHumanoid.Health <= 0 then
+		-- KNOCK = o golpe que derrubou. A ELIMINAÇÃO é do Match (é ele que sabe
+		-- se ainda dá para voltar) — os dois eventos existem de propósito.
+		emit(Events.Name.Knock, targetHumanoid, { by = fromPlayer, amount = dealt })
 	end
 
 	local rootPart = targetHumanoid.RootPart
@@ -534,6 +626,14 @@ end
 --- deixar os dois SECOS. É o que faz "combo errado = dupla vulnerável" ser
 --- verdade mecânica, e não texto de design. Costura do coordenador na
 --- integração da R2/R3 — a Sintonia já chamava esta função de forma opcional.
+--- Nível do Escudo Evolutivo (1..4). Existe para a telemetria preencher o
+--- `shield_tier` do contexto padrão — sem ele o dashboard não consegue dizer
+--- se o snowball do escudo dourado (risco apontado na auditoria) é real.
+function Combat.getShieldLevel(player: Player): number
+	local st = states[player]
+	return if st then st.shieldLv else 0
+end
+
 function Combat.drainMana(player: Player)
 	local st = states[player]
 	if not st then
@@ -561,6 +661,15 @@ end
 local function impact(p: Projectile, hitHumanoid: Humanoid?)
 	if hitHumanoid then
 		Combat.applyDamage(hitHumanoid, p.dmg, p.owner, p.strong)
+		-- ACERTO ≠ dano aplicado (i-frames podem ter comido tudo): é o par
+		-- SpellCast/SpellHit que dá a taxa de acerto por elemento.
+		emit(Events.Name.SpellHit, p.owner or hitHumanoid, {
+			element = p.element,
+			strong = p.strong,
+			target = hitHumanoid,
+			pos = p.pos,
+			traveled = p.traveled,
+		})
 	end
 
 	local cx, cy = Grid.worldToCell(p.pos)
@@ -768,6 +877,25 @@ function Combat.selfTest()
 	assert(stanceMult(false, true) < 1, "agachado tem de ser mais lento")
 	assert(stanceMult(true, true) == stanceMult(false, true), "agachar vence correr")
 	assert(Balance.player.speed * stanceMult(false, true) > 1, "agachado ainda anda")
+
+	-- TRAVA DE ELIMINADO (P0): o sujeito falso não tem personagem, então a prova
+	-- roda na única intenção que não depende de corpo — a troca de elemento.
+	-- `sendStats` sai cedo por falta de `Parent`, então nada vai para a rede.
+	local ghost = ({} :: any) :: Player
+	Combat.onPlayerAdded(ghost)
+	Combat.setCanAct(ghost, false)
+	assert(not Combat.canAct(ghost), "eliminado não pode agir")
+	Combat.handleSwitch(ghost, "Water")
+	assert(Combat.getElement(ghost) == "Fire", "ELIMINADO NÃO AGE: troca de elemento tem de ser ignorada")
+	Combat.handleCast(ghost, "basic", Vector3.new(0, 0, -1))
+	Combat.handleDodge(ghost, nil)
+	assert(states[ghost].mana == Balance.player.manaMax, "eliminado não gasta mana conjurando")
+	assert(states[ghost].dashUntil == 0, "eliminado não esquiva")
+	Combat.setCanAct(ghost, true)
+	Combat.handleSwitch(ghost, "Water")
+	assert(Combat.getElement(ghost) == "Water", "reabilitado volta a agir")
+	Combat.onPlayerRemoving(ghost)
+	assert(Combat.canAct(ghost), "sair do jogo limpa a trava (o id pode voltar)")
 
 	print("[Combat] autoteste OK")
 	return true

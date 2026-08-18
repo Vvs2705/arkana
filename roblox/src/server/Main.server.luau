@@ -32,6 +32,15 @@ Combat.init(Terrain)
 Sintonia.init(Terrain, Combat)
 Match.init(Terrain, Combat)
 
+-- Telemetria por último: observa todos os outros, não é observada por ninguém.
+-- Protegida por pcall — se o coletor quebrar, a partida continua de pé.
+local okTelemetry, Telemetry = pcall(require, ServerModules:WaitForChild("Telemetry") :: ModuleScript)
+if okTelemetry and Telemetry and Telemetry.init then
+	pcall(Telemetry.init, Terrain, Combat, Match)
+else
+	warn("[ARKANA] telemetria indisponível — o jogo segue, os dados não")
+end
+
 -- ------------------------------------------------------------- intenções C→S
 -- Todo handler abaixo trata o payload como HOSTIL até validar (Net.sanitize*).
 Net.event(Net.Names.CastSpell).OnServerEvent:Connect(function(player, payload)

@@ -24,6 +24,22 @@ local PT: { [string]: string } = {
 	["hud.evolved"] = "ESCUDO EVOLUIU — Nv %d",
 	["hud.seal"] = "SINTONIA",
 
+	-- Presença da dupla (raia D). O parceiro é a metade do jogo que o jogador
+	-- não controla: nome, elemento e vida ficam na tela o tempo todo.
+	["hud.partner"] = "PARCEIRO",
+	["hud.partner.down"] = "CAÍDO",
+
+	-- Sintonia (raia D). Convite em 1 toque — GDD §18.7.
+	["sintonia.ask"] = "COMBO?",
+	["sintonia.accept"] = "ACEITAR",
+	["sintonia.decline"] = "×",
+	["sintonia.proposed"] = "%s QUER SINTONIA",
+	["sintonia.same"] = "TROQUE DE ELEMENTO",
+	["sintonia.marked"] = "ALVO MARCADO",
+	["sintonia.together"] = "CONJUREM JUNTOS",
+	["sintonia.channeling"] = "CANALIZANDO SINTONIA",
+	["sintonia.broken"] = "SINTONIA INTERROMPIDA",
+
 	-- Anúncios do servidor (Net.Announce → { key = "...", ... })
 	["announce.match.waiting"] = "Aguardando magos...",
 	["announce.match.start"] = "A prova começou!",
@@ -47,6 +63,19 @@ local EN: { [string]: string } = {
 	["hud.shield.max"] = "MAX",
 	["hud.evolved"] = "SHIELD EVOLVED — Lv %d",
 	["hud.seal"] = "ATTUNEMENT",
+
+	["hud.partner"] = "PARTNER",
+	["hud.partner.down"] = "DOWN",
+
+	["sintonia.ask"] = "COMBO?",
+	["sintonia.accept"] = "ACCEPT",
+	["sintonia.decline"] = "×",
+	["sintonia.proposed"] = "%s WANTS ATTUNEMENT",
+	["sintonia.same"] = "SWITCH ELEMENT",
+	["sintonia.marked"] = "TARGET MARKED",
+	["sintonia.together"] = "CAST TOGETHER",
+	["sintonia.channeling"] = "CHANNELING ATTUNEMENT",
+	["sintonia.broken"] = "ATTUNEMENT BROKEN",
 
 	["announce.match.waiting"] = "Waiting for mages...",
 	["announce.match.start"] = "The trial has begun!",

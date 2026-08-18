@@ -23,12 +23,14 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
+local Events = require(Shared:WaitForChild("Events"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local ServerModules = ServerScriptService:WaitForChild("Server")
 local Arena = require(ServerModules:WaitForChild("Arena"))
 local Bots = require(ServerModules:WaitForChild("Bots"))
+local Teams = require(ServerModules:WaitForChild("Teams"))
 
 local M = Balance.match
 local Z = M.zone
@@ -96,6 +98,7 @@ local zone = {
 }
 local zonePart: BasePart? = nil
 
+local matchId = ""
 local eliminated: { [Player]: boolean } = {}
 local stats: { [Player]: PlayerStat } = {}
 --- último jogador a acertar cada humanoid (crédito de abate)
@@ -123,6 +126,49 @@ end
 
 local function announceTo(player: Player, key: string, ...)
 	evAnnounce:FireClient(player, { key = key, args = { ... } })
+end
+
+-- ----------------------------------------------------------------- telemetria
+--- Require preguiçoso e protegido (mesmo padrão do Combat→Sintonia): se o
+--- coletor quebrar, a PARTIDA continua. Telemetria observa, nunca decide.
+local telemetry: any = nil
+local function tele(): any
+	if telemetry == nil then
+		local mod = ServerModules:FindFirstChild("Telemetry")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		telemetry = (ok and m) or false
+	end
+	return telemetry
+end
+
+local function emit(name: string, subject: any, payload: any?)
+	local t = tele()
+	if t and t.emit then
+		pcall(t.emit, name, subject, payload)
+	end
+end
+
+-- ------------------------------------------------- ELIMINADO (trava de ação)
+--- P0 da auditoria: eliminado conjurava do poleiro de espectador. Quem sabe
+--- quem foi eliminado é ESTE módulo; quem barra a intenção é o Combat. Toda
+--- escrita em `eliminated` passa por aqui — é o único jeito de os dois nunca
+--- discordarem.
+local function markEliminated(player: Player)
+	eliminated[player] = true
+	combat.setCanAct(player, false)
+end
+
+local function unmarkEliminated(player: Player)
+	eliminated[player] = nil
+	combat.setCanAct(player, true)
+end
+
+local function clearEliminated()
+	for player in pairs(eliminated) do
+		unmarkEliminated(player)
+	end
 end
 
 local function statOf(player: Player): PlayerStat
@@ -398,6 +444,16 @@ local function finish()
 		end
 	end
 	seal = buildSeal()
+	emit(Events.Name.MatchEnd, champion, {
+		match_id = matchId,
+		duration = os.clock() - matchStartedAt,
+		total = totalAtStart,
+		seal = seal,
+	})
+	local t = tele()
+	if t and t.matchEnd then
+		pcall(t.matchEnd) -- fecha o relatório DEPOIS do último evento
+	end
 	announceAll("announce.match.end")
 	local who = if seal then tostring(seal.champion) else "ninguém"
 	print(string.format("[Match] fim de partida — campeão: %s", who))
@@ -409,19 +465,29 @@ local function onDeath(hum: Humanoid)
 	end
 	local victim = hum.Parent and Players:GetPlayerFromCharacter(hum.Parent :: Instance)
 	if victim then
-		eliminated[victim] = true
+		markEliminated(victim) -- e a partir daqui ele não conjura mais
 		announceTo(victim, "announce.death")
 	end
 
 	local credit = lastHit[hum]
+	local killer: Player? = nil
 	if credit and os.clock() - credit.at <= TUNE.killWindow and credit.player ~= victim then
-		local killer = credit.player
-		if killer.Parent then
-			statOf(killer).kills += 1
-			announceTo(killer, "announce.kill", nameOf(hum))
+		killer = credit.player
+		if (killer :: Player).Parent then
+			statOf(killer :: Player).kills += 1
+			announceTo(killer :: Player, "announce.kill", nameOf(hum))
 		end
 	end
 	lastHit[hum] = nil
+
+	-- ELIMINAÇÃO ≠ KNOCK (que é do Combat): aqui é a saída definitiva da
+	-- partida, e `place` é a colocação — o dado que responde "quem sobrevive".
+	emit(Events.Name.Elimination, victim or hum, {
+		by = killer,
+		place = aliveCount() + 1,
+		alive = aliveCount(),
+		zone_phase = zone.phase,
+	})
 
 	if stateT >= TUNE.startGrace and aliveCount() <= 1 then
 		finish()
@@ -447,7 +513,7 @@ local function startMatch()
 	matchStartedAt = os.clock()
 	table.clear(stats)
 	table.clear(lastHit)
-	table.clear(eliminated)
+	clearEliminated() -- todo mundo volta a poder agir
 	champion = nil
 	seal = nil
 	Bots.clear()
@@ -489,14 +555,46 @@ local function startMatch()
 	for i = slot + 1, #points do
 		table.insert(botPoints, points[i])
 	end
+
+	-- TIMES (P0): a ordem do roster decide as duplas e HUMANO VEM PRIMEIRO — é
+	-- dupla de humanos que a pergunta V1 mede. Bot entra de parceiro só quando
+	-- sobra humano ímpar, e o Humanoid dele é membro de time como qualquer um
+	-- (senão a Sintonia não teria como saber de que lado ele está).
+	local roster: { Teams.Member } = {}
+	for _, player in ipairs(humans) do
+		table.insert(roster, player)
+	end
 	if botCount > 0 then
 		for _, bot in ipairs(Bots.spawn(botCount, botPoints)) do
 			wireDeath(bot.humanoid)
+			table.insert(roster, bot.humanoid)
 		end
 	end
+	local teamCount = Teams.build(roster, Teams.DEFAULT_SIZE)
+
+	matchId = string.format("m%x-%04x", os.time(), rng:NextInteger(0, 0xFFFF))
+	local t = tele()
+	if t and t.matchStart then
+		pcall(t.matchStart, matchId)
+	end
+	emit(Events.Name.MatchStart, nil, {
+		match_id = matchId,
+		humans = #humans,
+		bots = botCount,
+		teams = teamCount,
+		team_size = Teams.DEFAULT_SIZE,
+	})
 
 	announceAll("announce.match.start")
-	print(string.format("[Match] partida iniciada — %d magos (%d bots)", totalAtStart, botCount))
+	print(
+		string.format(
+			"[Match] partida iniciada — %d magos (%d bots) em %d times de %d",
+			totalAtStart,
+			botCount,
+			teamCount,
+			Teams.DEFAULT_SIZE
+		)
+	)
 end
 
 local function toLobby()
@@ -520,8 +618,11 @@ local function toLobby()
 			end)
 		end
 	end
-	table.clear(eliminated)
+	clearEliminated()
 	table.clear(lastHit)
+	-- no lobby ninguém tem time: sem aliado, a Sintonia não dispara enquanto a
+	-- próxima partida não montar os duos (lado seguro do erro).
+	Teams.clear()
 	announceAll("announce.match.waiting")
 end
 
@@ -533,7 +634,7 @@ local function broadcast()
 	elseif state == "Ended" then
 		timeLeft = math.max(0, TUNE.endedTime - stateT)
 	end
-	evState:FireAllClients({
+	local payload = {
 		state = state,
 		phase = zone.phase,
 		phases = Z.phases,
@@ -546,7 +647,34 @@ local function broadcast()
 		total = math.max(totalAtStart, 1),
 		timeLeft = timeLeft,
 		seal = seal,
-	})
+	}
+
+	-- PRESENÇA DA DUPLA (costura do coordenador, 18/08). Antes isto era um
+	-- FireAllClients cego e o cliente só descobria o parceiro DEPOIS do primeiro
+	-- pacto de Sintonia — o que enfraquece justamente a pergunta que o playtest
+	-- existe para responder ("dois desconhecidos coordenam?"). Agora cada
+	-- jogador recebe o SEU parceiro. É por jogador, então vai FireClient.
+	-- Parceiro bot não tem UserId: some do painel de propósito (o cliente
+	-- resolve por UserId), mas o duo continua valendo no servidor.
+	for _, player in ipairs(Players:GetPlayers()) do
+		local mate = nil
+		for _, m in ipairs(Teams.matesOf(player)) do
+			if typeof(m) == "Instance" and m:IsA("Player") then
+				local hum = livePlayer(m)
+				mate = {
+					userId = m.UserId,
+					name = m.DisplayName,
+					element = if combat and combat.getElement then combat.getElement(m) else nil,
+					hp = if hum then hum.Health else 0,
+					hpMax = if hum then hum.MaxHealth else 0,
+					alive = hum ~= nil and not eliminated[m],
+				}
+				break
+			end
+		end
+		payload.mate = mate
+		evState:FireClient(player, payload)
+	end
 end
 
 -- --------------------------------------------------------------------- API
@@ -584,7 +712,7 @@ function Match.init(terrainModule: any, combatModule: any)
 
 	local function onPlayer(player: Player)
 		if state == "Playing" then
-			eliminated[player] = true -- entrou no meio da prova: assiste esta
+			markEliminated(player) -- entrou no meio da prova: assiste esta
 		end
 		player.CharacterAdded:Connect(function(char)
 			onCharacter(player, char)
@@ -610,7 +738,7 @@ function Match.noteCombo(player: Player, comboName: string)
 end
 
 function Match.onPlayerRemoving(player: Player)
-	eliminated[player] = nil
+	unmarkEliminated(player)
 	stats[player] = nil
 	if state == "Playing" and stateT >= TUNE.startGrace and aliveCount() <= 1 then
 		finish()
@@ -666,6 +794,8 @@ end
 --   require(game.ServerScriptService.Server.Match).selfTest()
 -- Cobre a matemática que não dá para ver a olho: a escada de raios da zona e a
 -- garantia de que o círculo novo cabe dentro do anterior.
+-- ⚠ RODE NO LOBBY: a parte de times monta e limpa o Teams DE VERDADE — no meio
+-- de uma partida isto apagaria os duos e desligaria a Sintonia até a próxima.
 -- ============================================================================
 function Match.selfTest()
 	assert(radiusForPhase(0) == Z.startRadius, "fase 0 = raio inicial")
@@ -685,6 +815,26 @@ function Match.selfTest()
 
 	local total = Z.phases * (Z.holdTime + Z.shrinkTime)
 	assert(total >= 120 and total <= 480, "partida fora da janela de 2–8 min: " .. total)
+
+	-- TIMES (P0): o roster de partida é a mistura de jogadores e bots, então o
+	-- teste usa Humanoids de mentira — para o Teams os dois são membros iguais.
+	local roster: { Teams.Member } = {}
+	for _ = 1, 5 do
+		table.insert(roster, Instance.new("Humanoid"))
+	end
+	local teams = Teams.build(roster, Teams.DEFAULT_SIZE)
+	assert(teams == 3, "5 membros em duos = 3 times (o ímpar sobra sozinho), achei " .. teams)
+	assert(Teams.areAllies(roster[1], roster[2]), "os dois primeiros formam duo")
+	assert(not Teams.areAllies(roster[2], roster[3]), "duos vizinhos NÃO são aliados")
+	assert(#Teams.matesOf(roster[1]) == 1, "num duo cada um tem exatamente 1 parceiro")
+	assert(Teams.teamOf(roster[5]) ~= nil, "o ímpar tem time próprio (não fica sem time)")
+	assert(#Teams.matesOf(roster[5]) == 0, "o ímpar não tem com quem fundir — e é isso mesmo")
+	Teams.clear()
+	assert(Teams.teamOf(roster[1]) == nil, "clear apaga os times")
+	for _, d in ipairs(roster) do
+		local dummy = d :: Humanoid
+		dummy:Destroy()
+	end
 
 	print(string.format("[Match] autoteste OK — partida cheia dura ~%ds", total))
 	return true

@@ -6,8 +6,9 @@
 --
 -- COMO FUNCIONA (o fluxo inteiro em 5 linhas):
 --   1. todo projétil que impacta chama `registerCast` (Combat, raia B);
---   2. duas conjurações de JOGADORES DIFERENTES, de ELEMENTOS DIFERENTES,
---      dentro de `window` (1,5s) e a menos de `targetRadius` uma da outra →
+--   2. duas conjurações de DOIS ALIADOS (mesmo time — GDD §9: "dois magos do
+--      SQUAD"), de ELEMENTOS DIFERENTES, dentro de `window` (1,5s) e a menos de
+--      `targetRadius` uma da outra →
 --   3. começa a CANALIZAÇÃO (`channel` ≈ 1s), anunciada a TODOS (inclusive
 --      inimigos: o telegrama é o que permite interromper);
 --   4. se um dos dois morrer/sair no meio → "failed" (e o custo NÃO volta);
@@ -34,8 +35,13 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
+local Events = require(Shared:WaitForChild("Events"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
+
+--- Times (P0): a Sintonia é do SQUAD (GDD §9). Require direto — o Teams não
+--- depende de ninguém, então não há ciclo, e sem ele não existe "aliado".
+local Teams = require((script.Parent :: Instance):WaitForChild("Teams") :: ModuleScript)
 
 --- todos os números do combo saem daqui (GDD: "números viram dados")
 local S = Balance.sintonia
@@ -146,6 +152,28 @@ local proposals: { [number]: Proposal } = {}
 local readyAt: { [number]: number } = {}
 local busy: { [number]: boolean } = {}
 local pingReadyAt: { [number]: number } = {}
+--- FUNIL: pares de aliados com a janela de combo ABERTA agora (borda de subida)
+local oppOpen: { [string]: boolean } = {}
+local oppAcc = 0
+
+-- ----------------------------------------------------------------- telemetria
+--- Require preguiçoso e protegido (mesmo padrão do Combat→Sintonia): se o
+--- coletor cair, o PILAR do jogo continua funcionando. O funil desta raia é o
+--- que responde à pergunta V1 — oportunidade → ping → aceite → canalização →
+--- (interrompida | disparada).
+local telemetry: any = nil
+local function emit(name: string, subject: any, payload: any?)
+	if telemetry == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Telemetry")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		telemetry = (ok and m) or false
+	end
+	if telemetry and telemetry.emit then
+		pcall(telemetry.emit, name, subject, payload)
+	end
+end
 
 -- -------------------------------------------------------------------- helpers
 local function rootOf(player: Player): BasePart?
@@ -176,6 +204,17 @@ local function onCooldown(player: Player): boolean
 	return os.clock() < (readyAt[player.UserId] or 0)
 end
 
+--- ELIMINADO NÃO AGE (P0): a trava é do Combat (quem o Match avisa), inclusive
+--- para o PING — espectador não propõe nem aceita Sintonia.
+local function blocked(player: Player): boolean
+	return combat ~= nil and combat.canAct ~= nil and combat.canAct(player) == false
+end
+
+--- chave comutativa de um par de jogadores (funil de oportunidade)
+local function pairKey(a: number, b: number): string
+	return if a < b then a .. ":" .. b else b .. ":" .. a
+end
+
 local function flat(pos: Vector3): Vector3
 	return Vector3.new(pos.X, COMBO_Y, pos.Z)
 end
@@ -197,9 +236,15 @@ end
 --- ponytail: o pacto do Ping dá a única vantagem MECÂNICA do ping — as duas
 --- conjurações valem se as duas caírem perto do ALVO COMBINADO, ainda que
 --- longe uma da outra. Sem isso o ping seria só enfeite; com isso, combinar
---- com um desconhecido pelo botão compensa. Quando houver squads (R3), este é
---- o ponto exato de exigir "mesmo time".
+--- com um desconhecido pelo botão compensa.
 local function epicenter(a: Cast, bPlayer: Player, bPos: Vector3): Vector3?
+	-- P0 (auditoria 18/08): SÓ ENTRE ALIADOS. Este é o funil único por onde
+	-- TODA fusão passa — proximidade e pacto de ping incluídos —, então a regra
+	-- vive aqui e em lugar nenhum mais. Inimigo perto conjurando outro elemento
+	-- não funde, não queima cooldown de ninguém e não conta no funil da V1.
+	if not Teams.areAllies(a.player, bPlayer) then
+		return nil
+	end
 	if (a.pos - bPos).Magnitude <= S.targetRadius then
 		return flat((a.pos + bPos) / 2)
 	end
@@ -334,11 +379,42 @@ local function beginChannel(a: Cast, b: Player, elB: Elements.Id, pos: Vector3)
 		byUserId = a.player.UserId,
 		withUserId = b.UserId,
 	})
+	emit(Events.Name.SintoniaChannelStart, a.player, {
+		combo_key = combo.key,
+		with_user_id = b.UserId,
+		element = a.element,
+		with_element = elB,
+		pos = pos,
+		channel = S.channel,
+		--- o par saiu de um PACTO de ping ou foi coincidência de tiro? é a
+		--- diferença entre "coordenaram de propósito" e "aconteceu"
+		by_pact = pactMark(a.player, b) ~= nil,
+	})
 end
 
 local function releaseChannel(ch: Channel)
 	busy[ch.a.UserId] = nil
 	busy[ch.b.UserId] = nil
+end
+
+--- INTERROMPIDA (GDD §9): um dos dois morreu, saiu ou foi eliminado no meio. O
+--- custo já foi cobrado — a dupla fica seca. Ponto único para os dois caminhos
+--- (tick e saída do jogador) contarem a MESMA coisa no funil.
+local function failChannel(ch: Channel, reason: string)
+	releaseChannel(ch)
+	announceState({
+		phase = "failed",
+		comboKey = ch.combo.key,
+		pos = ch.pos,
+		byUserId = ch.a.UserId,
+		withUserId = ch.b.UserId,
+	})
+	emit(Events.Name.SintoniaInterrupted, ch.a, {
+		combo_key = ch.combo.key,
+		with_user_id = ch.b.UserId,
+		pos = ch.pos,
+		reason = reason,
+	})
 end
 
 --- A fusão acontece: dano em área ×dmgMult + a receita de terreno do combo.
@@ -395,6 +471,16 @@ local function fireChannel(ch: Channel)
 	announceCombo(combo)
 	noteCombo(ch.a, combo.key)
 	noteCombo(ch.b, combo.key)
+	emit(Events.Name.SintoniaFired, ch.a, {
+		combo_key = combo.key,
+		with_user_id = ch.b.UserId,
+		element = ch.elA,
+		with_element = ch.elB,
+		pos = ch.pos,
+		radius = combo.radius,
+		damage = dmg,
+		hits = #victims,
+	})
 end
 
 -- --------------------------------------------------------------------- API
@@ -411,7 +497,7 @@ function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
 	if not evState or typeof(pos) ~= "Vector3" or not Elements.isValid(elementId) then
 		return
 	end
-	if not isAlive(player) or busy[player.UserId] or onCooldown(player) then
+	if not isAlive(player) or blocked(player) or busy[player.UserId] or onCooldown(player) then
 		return
 	end
 	local element = elementId :: Elements.Id
@@ -427,7 +513,7 @@ function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
 		if c.player == player or c.element == element then
 			continue
 		end
-		if busy[c.player.UserId] or onCooldown(c.player) or not isAlive(c.player) then
+		if busy[c.player.UserId] or onCooldown(c.player) or not isAlive(c.player) or blocked(c.player) then
 			continue
 		end
 		local center = epicenter(c, player, pos)
@@ -459,9 +545,10 @@ local function sanitizePos(raw: any, from: Vector3): Vector3
 	return raw
 end
 
---- "COMBO?" — propõe Sintonia a quem estiver por perto, com o elemento ativo.
+--- "COMBO?" — propõe Sintonia ao ALIADO que estiver por perto, com o elemento
+--- ativo. Só aliado ouve: pingar inimigo não é combinar, é dar informação.
 function Sintonia.propose(player: Player, rawPos: any)
-	if not evState or not isAlive(player) then
+	if not evState or not isAlive(player) or blocked(player) then
 		return
 	end
 	local uid = player.UserId
@@ -496,12 +583,14 @@ function Sintonia.propose(player: Player, rawPos: any)
 		pos = pos,
 		ttl = PROPOSAL_TTL,
 	}
-	--- o proponente vê a própria marca; os vizinhos veem a proposta
+	--- o proponente vê a própria marca; os ALIADOS por perto veem a proposta
 	local audience: { Player } = { player }
+	local heard = 0
 	for _, other in ipairs(Players:GetPlayers()) do
-		local r = if other ~= player then rootOf(other) else nil
+		local r = if Teams.areAllies(player, other) then rootOf(other) else nil
 		if r and (r.Position - root.Position).Magnitude <= PING_HEAR then
 			table.insert(audience, other)
+			heard += 1
 			evAnnounce:FireClient(other, {
 				key = "announce.sintonia.proposed",
 				args = { player.DisplayName },
@@ -509,6 +598,7 @@ function Sintonia.propose(player: Player, rawPos: any)
 		end
 	end
 	announceState(payload, audience)
+	emit(Events.Name.SintoniaPing, player, { element = element, pos = pos, allies_reached = heard })
 end
 
 --- 1 toque do aliado: o alvo passa a ser COMUM aos dois (GDD §18.7).
@@ -520,14 +610,19 @@ function Sintonia.accept(player: Player, fromUserId: any)
 	if not prop or prop.player == player or os.clock() > prop.expires then
 		return
 	end
-	if not isAlive(player) or not isAlive(prop.player) then
+	if not isAlive(player) or not isAlive(prop.player) or blocked(player) then
 		return
+	end
+	if not Teams.areAllies(player, prop.player) then
+		return -- pacto é entre aliados: aceitar ping de inimigo não sela nada
 	end
 	local mine, theirs = rootOf(player), rootOf(prop.player)
 	if not mine or not theirs or (mine.Position - theirs.Position).Magnitude > PING_HEAR then
 		return -- aceitar do outro lado do mapa não é combinar
 	end
 
+	--- o `expires` vira PACT_TTL na linha seguinte: mede antes de sobrescrever
+	local proposedAt = prop.expires - PROPOSAL_TTL
 	prop.withUserId = player.UserId
 	prop.expires = os.clock() + PACT_TTL
 	announceState({
@@ -537,14 +632,110 @@ function Sintonia.accept(player: Player, fromUserId: any)
 		withUserId = player.UserId,
 		withName = player.DisplayName,
 		element = prop.element,
+		--- elemento de QUEM ACEITOU. Sem ele, o proponente não consegue mostrar
+		--- o nome do combo que vai sair — e o card fica dizendo menos do que
+		--- sabe. Costura do coordenador (pedido da raia de UI, 18/08).
+		withElement = if combat and combat.getElement then combat.getElement(player) else nil,
 		pos = prop.pos,
 		ttl = PACT_TTL,
 	}, { player, prop.player })
+	emit(Events.Name.SintoniaAccept, player, {
+		from_user_id = fromUserId,
+		element = prop.element,
+		pos = prop.pos,
+		--- quanto tempo o aliado levou para topar: é a leitura de "o ping é
+		--- entendido?" (aceite lento = a UI não está comunicando)
+		latency = os.clock() - proposedAt,
+	})
+end
+
+-- ------------------------------------------- FUNIL: o denominador (§V1)
+--- "Deu para combinar?" — sem este número, `sintonia_fired` não tem com o que
+--- ser dividido e a pergunta V1 fica sem resposta: 3 combos por partida é muito
+--- ou pouco? Só dá para saber contra quantas VEZES o combo esteve disponível.
+---
+--- OPORTUNIDADE = dois ALIADOS prontos (vivos, sem cooldown, sem canalizar, não
+--- eliminados), com ELEMENTOS DIFERENTES, perto um do outro, e um INIMIGO comum
+--- ao alcance do ponto entre eles.
+--- Emitido na BORDA DE SUBIDA (quando a janela abre), nunca a cada tick: assim
+--- o número conta OPORTUNIDADES, não segundos de dupla parada olhando o mesmo
+--- inimigo — que inflaria o denominador e faria a coordenação parecer rara.
+local OPP_SCAN = 0.5
+
+local function ready(player: Player): boolean
+	return isAlive(player) and not busy[player.UserId] and not onCooldown(player) and not blocked(player)
+end
+
+--- Existe alvo de OUTRO time ao alcance do epicentro? Bot conta (o Teams dá
+--- time ao Humanoid dele), e quem está sem time conta como inimigo.
+local function enemyNear(pos: Vector3, teamId: number?, skip: { Player }): boolean
+	for _, hum in ipairs(humanoidsIn(pos, S.targetRadius, skip)) do
+		local char = hum.Parent
+		local asPlayer = if char then Players:GetPlayerFromCharacter(char :: Instance) else nil
+		if Teams.teamOf(asPlayer or hum) ~= teamId then
+			return true
+		end
+	end
+	return false
+end
+
+local function scanOpportunities()
+	local players = Players:GetPlayers()
+	local seen: { [string]: boolean } = {}
+
+	for i = 1, #players do
+		for j = i + 1, #players do
+			local a, b = players[i], players[j]
+			if not Teams.areAllies(a, b) then
+				continue
+			end
+			local key = pairKey(a.UserId, b.UserId)
+			seen[key] = true
+
+			local open = false
+			local elA: string? = nil
+			local elB: string? = nil
+			local mid: Vector3? = nil
+			if ready(a) and ready(b) and combat then
+				elA, elB = combat.getElement(a), combat.getElement(b)
+				local ra, rb = rootOf(a), rootOf(b)
+				-- elementos IGUAIS não fundem (GDD §9): não é oportunidade
+				if elA and elB and elA ~= elB and ra and rb and (ra.Position - rb.Position).Magnitude <= PING_HEAR then
+					mid = flat((ra.Position + rb.Position) / 2)
+					open = enemyNear(mid :: Vector3, Teams.teamOf(a), { a, b })
+				end
+			end
+
+			if open and not oppOpen[key] then
+				oppOpen[key] = true
+				emit(Events.Name.SintoniaOpportunity, a, {
+					with_user_id = b.UserId,
+					element = elA,
+					with_element = elB,
+					pos = mid,
+				})
+			elseif not open then
+				oppOpen[key] = nil
+			end
+		end
+	end
+
+	for key in pairs(oppOpen) do
+		if not seen[key] then
+			oppOpen[key] = nil -- o par deixou de existir (saiu, trocou de time)
+		end
+	end
 end
 
 -- -------------------------------------------------------------------- tick
-function Sintonia.step(_dt: number)
+function Sintonia.step(dt: number)
 	local now = os.clock()
+
+	oppAcc += dt
+	if oppAcc >= OPP_SCAN then
+		oppAcc = 0
+		scanOpportunities()
+	end
 
 	for i = #recent, 1, -1 do
 		if now - recent[i].t > S.window then
@@ -560,17 +751,8 @@ function Sintonia.step(_dt: number)
 	for i = #channels, 1, -1 do
 		local ch = channels[i]
 		if not isAlive(ch.a) or not isAlive(ch.b) then
-			-- INTERROMPIDO (GDD §9): morreu no meio da canalização. O custo
-			-- já foi cobrado — a dupla fica seca. É o risco do combo.
 			table.remove(channels, i)
-			releaseChannel(ch)
-			announceState({
-				phase = "failed",
-				comboKey = ch.combo.key,
-				pos = ch.pos,
-				byUserId = ch.a.UserId,
-				withUserId = ch.b.UserId,
-			})
+			failChannel(ch, "died")
 		elseif now >= ch.fireAt then
 			table.remove(channels, i)
 			releaseChannel(ch)
@@ -596,14 +778,7 @@ function Sintonia.onPlayerRemoving(player: Player)
 		local ch = channels[i]
 		if ch.a == player or ch.b == player then
 			table.remove(channels, i)
-			releaseChannel(ch)
-			announceState({
-				phase = "failed",
-				comboKey = ch.combo.key,
-				pos = ch.pos,
-				byUserId = ch.a.UserId,
-				withUserId = ch.b.UserId,
-			})
+			failChannel(ch, "left")
 		end
 	end
 end
@@ -612,7 +787,10 @@ end
 -- AUTOTESTE — cole no Command Bar do Studio (servidor):
 --   require(game.ServerScriptService.Server.Sintonia).selfTest()
 -- Cobre o que não dá para ver a olho: a matriz completa, a regra de "mesmo
--- elemento não funde", a geometria da janela e a conta do dano.
+-- elemento não funde", a de "inimigo não funde", a geometria da janela e a
+-- conta do dano.
+-- ⚠ RODE NO LOBBY: o item 3.1 monta e limpa o Teams DE VERDADE — no meio de uma
+-- partida isto apagaria os duos e desligaria a Sintonia até a próxima.
 -- ============================================================================
 function Sintonia.selfTest()
 	-- 1) os 10 pares existem e TODOS têm receita de terreno (combo sem receita
@@ -648,6 +826,30 @@ function Sintonia.selfTest()
 	local far = Vector3.new(S.targetRadius + 1, 0, 0)
 	assert((o - near).Magnitude <= S.targetRadius, "dentro do raio deve fundir")
 	assert((o - far).Magnitude > S.targetRadius, "fora do raio NÃO pode fundir")
+
+	-- 3.1) P0 — SÓ ALIADOS FUNDEM. Os sujeitos são Humanoids de mentira porque o
+	--      Teams aceita qualquer membro (jogador ou bot) e o `epicenter` só olha
+	--      time e distância. Roda o funil de verdade, não uma cópia da regra.
+	local dummies: { Humanoid } = {}
+	for _ = 1, 4 do
+		table.insert(dummies, Instance.new("Humanoid"))
+	end
+	Teams.build(dummies :: any, 2) -- duos: {1,2} aliados · {3,4} aliados
+	assert(Teams.areAllies(dummies[1], dummies[2]), "1 e 2 são do mesmo duo")
+	assert(not Teams.areAllies(dummies[1], dummies[3]), "1 e 3 são de times diferentes")
+	assert(not Teams.areAllies(dummies[1], dummies[1]), "ninguém é aliado de si mesmo")
+
+	local castA = { player = dummies[1] :: any, element = "Fire" :: Elements.Id, pos = o, t = os.clock() }
+	assert(epicenter(castA, dummies[2] :: any, near) ~= nil, "ALIADOS colados no alvo TÊM de fundir")
+	assert(epicenter(castA, dummies[3] :: any, near) == nil, "INIMIGOS NÃO FUNDEM — nem colados no mesmo alvo")
+	-- (o caso "aliado longe" cai no pacto de ping, que precisa de UserId real —
+	-- a regra de distância já está provada no item 3 acima)
+
+	Teams.clear()
+	assert(epicenter(castA, dummies[2] :: any, near) == nil, "sem times montados, nada funde (lobby)")
+	for _, d in ipairs(dummies) do
+		d:Destroy()
+	end
 
 	-- 4) "mais forte que a soma das partes" (GDD §9)
 	local a, b = Balance.elements.Fire.basic.dmg, Balance.elements.Lightning.basic.dmg

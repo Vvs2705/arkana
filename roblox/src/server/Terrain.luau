@@ -10,6 +10,24 @@
 --   3. materiais NUNCA mudam materiais → `cell.material` é escrito uma só vez,
 --      no build; toda a magia acontece em `cell.state`.
 --
+-- MODELO DE FOGO (corrigido em 18/08, achado da auditoria externa):
+--   O modelo antigo re-sorteava `propagateChance` (30%) por vizinho A CADA TICK
+--   durante os 8s de queima — até 16 rolagens para a MESMA aresta:
+--       1 - (1 - 0,30)^16 ≈ 99,67%
+--   Isso não é "propagação de 30%", é "floresta conectada queima inteira, com
+--   certeza". É a carbonização que já tinha reprovado no protótipo 2D.
+--   Agora são DUAS regras, e as duas são teto:
+--     a) UMA ROLAGEM POR ARESTA — quando uma célula COMEÇA a queimar, cada
+--        vizinho combustível recebe UMA chance (`spreadChancePerEdge`) e nunca
+--        mais. O fogo vira uma frente que avança, não uma sentença.
+--     b) ORÇAMENTO DE COMBUSTÍVEL — cada IGNIÇÃO (o incêndio que nasce de uma
+--        magia) carrega `fuelBudget` células. Cada célula que a FRENTE acende
+--        consome 1; esgotou, a frente para mesmo cercada de floresta. É o teto
+--        duro que não depende de sorteio — e o que torna o fogo balanceável.
+--   O orçamento cobre a PROPAGAÇÃO, não o raio da magia: as células acesas
+--   direto pelo impacto são sementes e não cobram dele (senão uma tática de
+--   raio 3 gastaria o orçamento inteiro no próprio impacto e nada propagaria).
+--
 -- ORÇAMENTO DE PARTS (mobile, GDD §19.2 — teto ~4000): ≈2650 no boot —
 --   piso 994 (runs horizontais com teto de 4 células, para cada laje ter o
 --   próprio tom) + borda 4 + água 205 + árvore 389×3 + rocha 51×2 + grama 176.
@@ -91,6 +109,28 @@ local active: { [number]: boolean } = {}
 --- por isso vive FORA de `cell.state`: estados transitórios (Mud, Wall) passam
 --- por cima de Burned e, ao expirarem, a árvore não pode "ressuscitar".
 local burnedOut: { [number]: boolean } = {}
+
+--- INCÊNDIO = uma frente com orçamento próprio (ver "MODELO DE FOGO" no topo).
+--- `seeds` são as células acesas pelo impacto da magia; `spread` as que a frente
+--- conquistou (as únicas que cobram do `budget`); `alive` é quantas ainda
+--- queimam — chega a zero, o incêndio acabou e vira uma linha de telemetria.
+type Fire = {
+	id: number,
+	budget: number,
+	seeds: number,
+	spread: number,
+	alive: number,
+	cx: number,
+	cy: number,
+}
+local fires: { [number]: Fire } = {}
+--- célula acesa → id do incêndio que a acendeu (só enquanto ela queima)
+local fireOf: { [number]: number } = {}
+--- células que ainda devem fazer a ÚNICA rolagem por aresta (no próximo tick:
+--- é o que faz a frente avançar um anel por tick em vez de tudo no mesmo frame)
+local pendingSpread: { [number]: boolean } = {}
+local nextFireId = 0
+
 local folder: Folder? = nil
 local acc = 0
 --- gerador próprio: não mexe no estado global de `math.random` das outras raias
@@ -262,11 +302,74 @@ local function applyVisual(idx: number)
 	end
 end
 
+-- ------------------------------------------------------------- telemetria
+--- Require PREGUIÇOSO e protegido: a auditoria quer medir "células afetadas por
+--- ignição" para detectar carbonização, mas telemetria é observação — se o
+--- coletor não existir, o terreno segue queimando. `nil` = não resolvido ainda,
+--- `false` = ausente (não tenta de novo).
+local telemetry: any = nil
+local fireEvent: string = "terrain_state_change"
+
+local function emitFireOut(fire: Fire)
+	if telemetry == nil then
+		local ok, tel, ev = pcall(function()
+			return require(script.Parent:FindFirstChild("Telemetry") :: any) :: any,
+				require(Shared:FindFirstChild("Events") :: any) :: any
+		end)
+		telemetry = if ok and tel then tel else false
+		if ok and ev and ev.Name and ev.Name.TerrainStateChange then
+			fireEvent = ev.Name.TerrainStateChange
+		end
+	end
+	if not telemetry then
+		return
+	end
+	pcall(telemetry.emit, fireEvent, nil, {
+		-- contrato que o coletor documentou para terreno: { state, cells }. É por
+		-- `state = "Burning"` + `element` que ele conta isto como IGNIÇÃO.
+		state = "Burning",
+		element = "Fire",
+		--- o evento sai quando a frente MORRE (é aí que o tamanho é definitivo)
+		reason = "fire_out",
+		--- O NÚMERO QUE A AUDITORIA PEDIU: células afetadas por esta ignição.
+		cells = fire.seeds + fire.spread,
+		seeds = fire.seeds,
+		spread = fire.spread,
+		fuel_left = fire.budget,
+		--- frente parada por falta de combustível (e não por falta de floresta):
+		--- se isto vier alto no dashboard, `fuelBudget` está apertado demais
+		fuel_exhausted = fire.budget <= 0,
+		cx = fire.cx,
+		cy = fire.cy,
+	})
+end
+
 -- --------------------------------------------------------- máquina de estados
+--- Célula deixou de queimar (expirou, apagou na água, virou muro): devolve a
+--- vaga ao incêndio. Quando a última chama de uma frente morre, o incêndio se
+--- fecha e reporta o tamanho. Ponto ÚNICO — todo caminho passa por `setState`.
+local function leaveFire(idx: number)
+	local id = fireOf[idx]
+	fireOf[idx] = nil
+	pendingSpread[idx] = nil
+	local fire = if id then fires[id] else nil
+	if not fire then
+		return
+	end
+	fire.alive -= 1
+	if fire.alive <= 0 then
+		fires[fire.id] = nil
+		emitFireOut(fire)
+	end
+end
+
 --- Escreve o estado, agenda a expiração e sincroniza o visual. `duration <= 0`
 --- significa estado permanente (Burned) ou volta ao Normal.
 local function setState(idx: number, state: Grid.State, duration: number)
 	local cell = cells[idx]
+	if cell.state == "Burning" and state ~= "Burning" then
+		leaveFire(idx)
+	end
 	cell.state = state
 	if duration > 0 then
 		cell.stateUntil = os.clock() + duration
@@ -297,10 +400,35 @@ local function isFlammable(idx: number): boolean
 	return Grid.FLAMMABLE[cell.material] == true
 end
 
-local function ignite(idx: number)
-	if isFlammable(idx) then
-		setState(idx, "Burning", T.burnDuration)
+--- Abre um incêndio: uma ignição = uma magia de Fogo = um orçamento.
+local function newFire(cx: number, cy: number): Fire
+	nextFireId += 1
+	local fire: Fire = { id = nextFireId, budget = T.fuelBudget, seeds = 0, spread = 0, alive = 0, cx = cx, cy = cy }
+	fires[nextFireId] = fire
+	return fire
+end
+
+--- Acende `idx` dentro da frente `fire`. `charge = true` quando a chama veio da
+--- PROPAGAÇÃO (rolagem de aresta ou rajada de Vento) — só ela cobra combustível;
+--- as sementes do impacto da magia são de graça (ver "MODELO DE FOGO" no topo).
+local function ignite(idx: number, fire: Fire, charge: boolean): boolean
+	if not isFlammable(idx) then
+		return false
 	end
+	if charge then
+		if fire.budget <= 0 then
+			return false -- teto duro: a frente para mesmo com floresta em volta
+		end
+		fire.budget -= 1
+		fire.spread += 1
+	else
+		fire.seeds += 1
+	end
+	fireOf[idx] = fire.id
+	fire.alive += 1
+	pendingSpread[idx] = true -- fará a sua ÚNICA rolagem por aresta no próximo tick
+	setState(idx, "Burning", T.burnDuration)
+	return true
 end
 
 -- ------------------------------------------------------- iteração espacial
@@ -489,6 +617,9 @@ function Terrain.build(layout: { { Grid.Material } })
 	fx = {}
 	active = {}
 	burnedOut = {}
+	fires = {}
+	fireOf = {}
+	pendingSpread = {}
 	acc = 0
 
 	for cy = 0, Grid.ROWS - 1 do
@@ -615,11 +746,16 @@ end
 -- -------------------------------------------------------------- reações (§14)
 --- FOGO: acende cobertura, derrete o gelo e seca a lama.
 local function applyFire(cx: number, cy: number, r: number)
+	-- o incêndio só nasce se houver o que queimar: sem isto, cada bola de fogo
+	-- em campo aberto abriria uma frente vazia e uma linha de telemetria falsa
+	local fire: Fire? = nil
 	forDisc(cx, cy, r, function(i, cell)
 		if cell.state == "Frozen" or cell.state == "Mud" then
 			setState(i, restState(i), 0) -- fogo derrete o gelo e seca a lama
 		elseif isFlammable(i) then
-			ignite(i)
+			local f = fire or newFire(cx, cy)
+			fire = f
+			ignite(i, f, false) -- semente: o raio da magia não cobra combustível
 		end
 	end)
 end
@@ -686,7 +822,15 @@ local function applyWind(cx: number, cy: number, r: number)
 		if counts[k] <= 1 then
 			setState(i, restState(i), 0) -- sem oxigênio, a chama pequena morre
 		else
-			forNeighbors(i, ignite)
+			-- a rajada acende sem sorteio (é a arma de dois gumes do GDD §14),
+			-- mas COBRA COMBUSTÍVEL da frente: se o Vento não pagasse, ele seria
+			-- exatamente o buraco pelo qual a carbonização voltaria.
+			local fire = fires[fireOf[i] or 0]
+			if fire then
+				forNeighbors(i, function(nIdx)
+					ignite(nIdx, fire, true)
+				end)
+			end
 		end
 	end
 end
@@ -775,11 +919,20 @@ local function simTick()
 	for _, i in ipairs(snapshot) do
 		local cell = cells[i]
 		if cell.state == "Burning" then
-			forNeighbors(i, function(nIdx)
-				if isFlammable(nIdx) and rng:NextNumber() < T.propagateChance then
-					ignite(nIdx)
+			-- UMA ROLAGEM POR ARESTA: a célula sorteia cada vizinho UMA vez, no
+			-- tick seguinte à própria ignição, e nunca mais. `pendingSpread` é o
+			-- que garante o "nunca mais" — era daí que vinham as 16 rolagens.
+			if pendingSpread[i] then
+				pendingSpread[i] = nil
+				local fire = fires[fireOf[i] or 0]
+				if fire then
+					forNeighbors(i, function(nIdx)
+						if fire.budget > 0 and isFlammable(nIdx) and rng:NextNumber() < T.spreadChancePerEdge then
+							ignite(nIdx, fire, true)
+						end
+					end)
 				end
-			end)
+			end
 			if now >= cell.stateUntil then
 				-- carvão PERMANENTE: a cobertura sumiu e o mapa mudou de verdade
 				burnedOut[i] = true
@@ -799,11 +952,109 @@ end
 -- construído):  require(game.ServerScriptService.Server.Terrain).selfTest()
 -- Cobre o que custou um playtest para descobrir: dá para SAIR de todo lugar
 -- onde dá para ENTRAR. Reprova de novo se alguém mexer nas cotas do lago.
+-- Cobre também a correção do fogo (auditoria 18/08): uma ignição no meio da
+-- floresta densa NÃO pode consumir a floresta inteira.
 -- ============================================================================
 --- cota em que o personagem PISA nesta célula
 local function standY(cx: number, cy: number): number
 	local cell = cells[idxOf(cx, cy)]
 	return if cell.material == "Water" then waterY(cx, cy) else FLOOR_Y
+end
+
+local CELL_COUNT = Grid.COLS * Grid.ROWS
+
+--- CORAÇÃO DA MAIOR MANCHA COMBUSTÍVEL CONTÍGUA — o pior lugar do mapa para
+--- acender. Não basta procurar um 5×5 denso: uma ilha de grama alta é densa e
+--- não prova nada; o que a auditoria teme é a FLORESTA CONECTADA. Então: acha
+--- as componentes por flood 4-vizinhos, fica com a maior e, dentro dela, mira
+--- a janela 5×5 mais cheia. Varre em vez de usar coordenada mágica — o layout é
+--- de outra raia e pode mudar sem avisar este teste.
+local function forestHeart(): (number, number, number)
+	local comp: { [number]: number } = {}
+	local bestId, bestSize, nextId = 0, 0, 0
+	for cy = 1, Grid.ROWS - 2 do
+		for cx = 1, Grid.COLS - 2 do
+			local start = idxOf(cx, cy)
+			if comp[start] == nil and Grid.FLAMMABLE[cells[start].material] then
+				nextId += 1
+				comp[start] = nextId
+				local queue = { start }
+				local head = 1
+				while head <= #queue do
+					local i = queue[head]
+					head += 1
+					forNeighbors(i, function(n)
+						if comp[n] == nil and Grid.FLAMMABLE[cells[n].material] then
+							comp[n] = nextId
+							table.insert(queue, n)
+						end
+					end)
+				end
+				if #queue > bestSize then
+					bestId, bestSize = nextId, #queue
+				end
+			end
+		end
+	end
+
+	local bx, by, best = 0, 0, -1
+	for cy = 3, Grid.ROWS - 4 do
+		for cx = 3, Grid.COLS - 4 do
+			if comp[idxOf(cx, cy)] == bestId then
+				local n = 0
+				for dy = -2, 2 do
+					for dx = -2, 2 do
+						if Grid.FLAMMABLE[cells[idxOf(cx + dx, cy + dy)].material] then
+							n += 1
+						end
+					end
+				end
+				if n > best then
+					bx, by, best = cx, cy, n
+				end
+			end
+		end
+	end
+	return bx, by, bestSize
+end
+
+--- Apaga tudo que a simulação acendeu: o autoteste não pode entregar o mapa
+--- carbonizado para a partida que vem depois dele.
+local function clearFires()
+	fires = {}
+	fireOf = {}
+	pendingSpread = {}
+	for i = 1, CELL_COUNT do
+		local st = cells[i].state
+		if st == "Burning" or st == "Burned" then
+			burnedOut[i] = nil
+			setState(i, "Normal", 0)
+		end
+	end
+end
+
+--- SIMULAÇÃO OFFLINE DE UM INCÊNDIO (sem Studio e sem esperar os 8s de
+--- relógio): acende e roda os ticks na mão. O RELÓGIO NÃO ANDA durante o laço,
+--- então NENHUMA célula expira — este é o PIOR CASO do modelo: nada se apaga
+--- sozinho, quem segura a frente é só o orçamento. Devolve (acesas, sementes,
+--- propagadas) e deixa o mapa como encontrou.
+local function simulateIgnition(cx: number, cy: number, radius: number): (number, number, number)
+	local before = nextFireId
+	applyFire(cx, cy, radius)
+	local fire = if nextFireId > before then fires[nextFireId] else nil
+	for _ = 1, 64 do -- 64 ticks = 32 s de jogo; a frente para muito antes
+		simTick()
+	end
+	local lit = 0
+	for i = 1, CELL_COUNT do
+		if cells[i].state == "Burning" then
+			lit += 1
+		end
+	end
+	local seeds = if fire then fire.seeds else 0
+	local spread = if fire then fire.spread else 0
+	clearFires()
+	return lit, seeds, spread
 end
 
 function Terrain.selfTest()
@@ -858,9 +1109,62 @@ function Terrain.selfTest()
 	assert(shore > 0, "lago sem margem rasa: sem o degrau ninguém sai da água")
 	assert(stuck == 0, string.format("%d células prenderiam o jogador", stuck))
 
+	-- ---------------------------------------------------------------- FOGO
+	-- O ASSERT QUE PAGA A CORREÇÃO DA AUDITORIA (18/08): com o modelo antigo
+	-- (30% por vizinho a cada tick, 16 rolagens ≈ 99,7%) uma ignição no meio da
+	-- floresta acendia a mancha contígua INTEIRA (~238 células) e este teste
+	-- reprovaria. Cada rodada acende no ponto mais denso do mapa e roda o pior
+	-- caso (relógio parado: nada se apaga sozinho).
+	local flammable = 0
+	for i = 1, CELL_COUNT do
+		if Grid.FLAMMABLE[cells[i].material] then
+			flammable += 1
+		end
+	end
+	local fx0, fy0, patch = forestHeart()
+	local radius = Balance.elements.Fire.tactic.terrainRadius
+	local RUNS = 12
+	--- teto de leitura: uma ignição não pode levar 1/3 da mancha contígua em que
+	--- caiu. É folgado de propósito (o teto real é `seeds + fuelBudget`) — quem
+	--- reprova aqui é regressão de MODELO, não variação de sorteio. Com o modelo
+	--- antigo (99,7% por aresta) daria a mancha INTEIRA e reprovaria na hora.
+	local sane = patch // 3
+	local worst, sum = 0, 0
+	for _ = 1, RUNS do
+		local lit, seeds, spread = simulateIgnition(fx0, fy0, radius)
+		assert(
+			spread <= T.fuelBudget,
+			string.format("orçamento de combustível furado: %d células propagadas > %d", spread, T.fuelBudget)
+		)
+		assert(
+			lit <= seeds + T.fuelBudget,
+			string.format("incêndio passou do teto: %d acesas > %d sementes + %d de orçamento", lit, seeds, T.fuelBudget)
+		)
+		assert(
+			lit <= sane,
+			string.format("carbonização: 1 ignição acendeu %d células da mancha de %d", lit, patch)
+		)
+		worst = math.max(worst, lit)
+		sum += lit
+	end
+
 	local parts = if folder then #folder:GetDescendants() else 0
 	assert(parts <= 4000, "orçamento de parts do GDD §19.2 estourado: " .. parts)
 	print(string.format("[Terrain] autoteste OK — %d parts · lago %d (%d de margem) · 0 armadilhas", parts, water, shore))
+	print(
+		string.format(
+			"[Terrain] fogo no coração da floresta (%d,%d) · %d ignições · pior caso %d células (média %.1f)"
+				.. " · mancha contígua %d · combustível do mapa %d · teto de sanidade %d",
+			fx0,
+			fy0,
+			RUNS,
+			worst,
+			sum / RUNS,
+			patch,
+			flammable,
+			sane
+		)
+	)
 end
 
 --- Tick da simulação em passo fixo (`burnTick`). Chamado pelo Heartbeat do Main

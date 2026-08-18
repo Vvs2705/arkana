@@ -181,7 +181,7 @@ require(game.ServerScriptService.Server.Match).selfTest()
 
 ### Knobs de calibração (editar `roblox/src/shared/Balance.luau`, não o código)
 velocidade do mago (`player.speed = 22`) · dano do combo (`sintonia.dmgMult = 2.35`)
-· propagação do fogo (`terrain.propagateChance = 0.30`) · ritmo da zona (`match.zone`).
+· tamanho do incêndio (`terrain.fuelBudget`) · ritmo da zona (`match.zone`).
 
 ## 7. O que NENHUM agente faz (fronteira dura)
 

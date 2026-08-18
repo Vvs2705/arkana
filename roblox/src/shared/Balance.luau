@@ -47,8 +47,11 @@ Balance.player = {
 	dodge = {
 		dist = 19, -- studs (2D: 150 px)
 		duration = 0.2,
-		iframes = 0.28,
-		cooldown = 1.6,
+		--- HIPÓTESE DE TESTE (auditoria externa 18/08): 0,28 s de i-frame com CD
+		--- de 1,6 s dava até ~17,5% do tempo em invulnerabilidade — a esquiva
+		--- apagava ataque em vez de reposicionar. Valores antigos: 0.28 / 1.6.
+		iframes = 0.18,
+		cooldown = 2.6,
 	},
 }
 
@@ -92,7 +95,25 @@ Balance.terrain = {
 	burnDmgMin = 4,
 	burnDmgMax = 10,
 	burnTick = 0.5,
-	--- chance por tick de propagar para CADA vizinho inflamável
+	--- CORREÇÃO CRÍTICA (auditoria externa 18/08): antes era 30% por tick, por
+	--- vizinho, durante 8s = até 16 rolagens → 1-(1-0.3)^16 ≈ **99,67%**. Ou seja,
+	--- "floresta conectada pega fogo inteira, com certeza" — não é propagação,
+	--- é carbonização garantida. Agora é UMA ROLAGEM POR ARESTA: quando uma
+	--- célula começa a queimar, cada vizinho combustível recebe UMA chance.
+	spreadChancePerEdge = 0.5,
+	--- teto de células por incêndio (rede de segurança independente do sorteio):
+	--- ao esgotar, a ignição para de propagar mesmo com floresta em volta.
+	---
+	--- DECISÃO DO COORDENADOR (18/08): em floresta densa o orçamento esgota em
+	--- 100% das ignições, então **este é o botão que define o tamanho do
+	--- incêndio** — a rolagem por aresta decide só a FORMA da frente. Medido:
+	--- ~44 células por tática de Fogo. É deliberado: incêndio previsível é
+	--- aprendível ("uma bola de fogo abre mais ou menos ISTO de clareira") e o
+	--- jogador consegue PLANEJAR a jogada, que é o pilar do GDD §14. Tamanho
+	--- aleatório (36–100) daria drama e tiraria estratégia.
+	--- Para regular incêndio: mexa AQUI, não no sorteio.
+	fuelBudget = 16,
+	--- OBSOLETO — mantido só para não quebrar leitura antiga; não usar.
 	propagateChance = 0.30,
 	--- célula queima ~8s e vira carvão (cobertura DESAPARECE)
 	burnDuration = 8.0,
@@ -113,17 +134,36 @@ Balance.terrain = {
 	grassBurns = false,
 }
 
+-- ============================================================================
+-- EXPERIMENTO A/B (auditoria externa 18/08) — o playtest de duplas compara duas
+-- configurações de Sintonia. Trocar aqui é a ÚNICA coisa que muda entre coortes:
+-- nenhum código lê variante, todos leem `Balance.sintonia` já resolvido.
+--   A = configuração atual (punitiva, telegrafada)
+--   B = mais permissiva: canaliza mais rápido, volta antes, explode menos
+-- Hipótese: B aumenta uso intencional sem virar spam nem "botão de deletar".
+-- ============================================================================
+Balance.experiment = {
+	sintoniaVariant = "A", -- "A" | "B"
+}
+
+local SINTONIA_VARIANTS = {
+	A = { channel = 1.0, sharedCooldown = 24.0, dmgMult = 2.35 },
+	B = { channel = 0.75, sharedCooldown = 18.0, dmgMult = 2.0 },
+}
+
 -- Sintonia / Conjuração Combinada (GDD §9) — pilar de inovação
+local sintoniaVariant = SINTONIA_VARIANTS[Balance.experiment.sintoniaVariant] or SINTONIA_VARIANTS.A
 Balance.sintonia = {
-	--- janela para o segundo conjurador entrar no combo
+	--- janela para o segundo conjurador entrar no combo (igual nas duas coortes:
+	--- não se dificulta a coordenação antes de provar que ela é entendida)
 	window = 1.5,
 	--- canalização visível/sonora antes da fusão (dá para interromper)
-	channel = 1.0,
+	channel = sintoniaVariant.channel,
 	--- cooldown compartilhado longo: combo errado = squad vulnerável
-	sharedCooldown = 24.0,
+	sharedCooldown = sintoniaVariant.sharedCooldown,
 	--- distância máxima entre os alvos para considerar "mesmo alvo/área"
 	targetRadius = 14,
-	dmgMult = 2.35,
+	dmgMult = sintoniaVariant.dmgMult,
 }
 
 Balance.bots = {
@@ -166,7 +206,10 @@ Balance.controls = {
 	--- assistência do esquema Simples (GDD §19.3): a mira gruda no inimigo mais
 	--- próximo dentro de um cone na direção do arrasto
 	aimAssist = {
-		coneDeg = 30,
+		--- HIPÓTESE DE TESTE (auditoria externa 18/08): 30° é permissivo demais
+		--- como valor universal — vira aquisição de alvo, não assistência, e
+		--- contamina a leitura de skill. Valor antigo: 30.
+		coneDeg = 18,
 		range = 65,
 	},
 	stickDeadzone = 0.15,

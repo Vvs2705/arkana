@@ -512,8 +512,17 @@ Extensão social da mecânica central: um ping dedicado "COMBO?" onde você prop
 **Este jogo nunca será pay-to-win.** Formalizado como regra de produto:
 1. Todo item que afeta poder (armas arcanas, runas, pergaminhos) SÓ existe dentro da partida, achado no loot — nunca vendido, nunca em passe, nunca em caixa.
 2. Loja e passe vendem exclusivamente cosméticos (seção 7). Zero atributo em skin.
-3. Novos magos: desbloqueáveis com moeda GRATUITA ganha jogando (caminho Apex) — quem paga só acelera acesso, nunca ganha vantagem, e todo mago é balanceado para o mesmo teto.
-4. Publicar o Juramento na página da loja — o compromisso vira diferencial de marketing num mercado mobile saturado de P2W.
+3. Novos magos: desbloqueáveis com moeda GRATUITA ganha jogando. **Dinheiro não
+   compra nem acelera acesso a mago** — todo mago é balanceado para o mesmo teto.
+   *(Corrigido em 18/08/2026: a versão anterior permitia pagar para acelerar o
+   desbloqueio, o que contradizia o próprio Juramento. Auditoria externa pegou a
+   contradição; a regra passa a ser literal — dinheiro nunca compra poder,
+   personagem, cooldown, loot, reroll, boost competitivo nem acesso antecipado.)*
+4. **Nenhuma caixa aleatória paga, em nenhuma plataforma.** Além de coerente com
+   a marca, evita a complexidade jurídica do ECA Digital (em vigor desde
+   17/03/2026), que restringe mecânicas de item aleatório pago a menores de 18
+   anos no Brasil. Venda direta resolve o mesmo problema comercial sem isso.
+5. Publicar o Juramento na página da loja — o compromisso vira diferencial de marketing num mercado mobile saturado de P2W.
 
 ### 19.2 Guardrails de escopo mobile (o que NÃO fazer)
 O inimigo nº 1 de um projeto solo/equipe pequena é feature demais. Regras duras:

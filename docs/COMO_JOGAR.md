@@ -99,7 +99,7 @@ elementos usados. Bots preenchem a partida quando faltam jogadores.
 ### Ajustes rápidos (arquivo de dados, não código)
 Tudo em `roblox/src/shared/Balance.luau`:
 `player.speed` (velocidade) · `sintonia.dmgMult` (força do combo) ·
-`terrain.propagateChance` (velocidade do incêndio) · `match.zone` (ritmo da zona).
+`terrain.fuelBudget` (tamanho do incêndio) · `match.zone` (ritmo da zona).
 
 ---
 

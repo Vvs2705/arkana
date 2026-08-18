@@ -1,7 +1,14 @@
 --!strict
 -- ============================================================================
--- RAIA R2 (cliente) — UI DA SINTONIA: Ping "COMBO?", aceite em 1 toque,
+-- RAIA R2 (cliente) — UI DA SINTONIA: Ping "COMBO?", CONVITE EM 1 TOQUE,
 -- canalização e o nome do combo executado. GDD §9 + §18.7.
+--
+-- O CONVITE É O PRODUTO (auditoria de 18/08): quem recebe um ping vê um card
+-- com quem chamou, os DOIS elementos (cor + FORMA), o NOME do combo que sai
+-- disso — "EXPLOSÃO DE PLASMA", não "combo" — e dois alvos de dedo grandes:
+-- [ ACEITAR ] e [ × ]. Aceitou, os dois passam a ver o MESMO marco no mundo e
+-- a MESMA barra. Recusar é local e silencioso: não pune, não avisa o outro,
+-- não abre tutorial. Coordenar sem microfone tem de ser um gesto trivial.
 --
 -- O CLIENTE NÃO DECIDE NADA. Ele manda duas intenções (ProposeSintonia,
 -- AcceptSintonia) e desenha o que Net.SintoniaState anuncia. Distância,
@@ -28,6 +35,7 @@ local Elements = require(Shared:WaitForChild("Elements"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
 local Strings = require(Shared:WaitForChild("Strings"))
+local Badge = require(script.Parent:WaitForChild("HudBadge"))
 
 -- ------------------------------------------------------------------ paleta
 local NIGHT = Color3.fromHex("#0B1026")
@@ -38,18 +46,31 @@ local TEXT = Color3.fromHex("#E8E6F0")
 local TEXT_DIM = Color3.fromHex("#9A97AD")
 local DANGER = Color3.fromHex("#E04040")
 
+--- cor do TIME (a mesma do parceiro no HUD) — o pacto é da DUPLA, não do
+--- elemento. Manter idêntica à `ALLY` de Hud.luau.
+local ALLY = Color3.fromHex("#FF5CE1")
+
 -- ------------------------------------------------------------------ layout (dp)
 local L = {
 	ping = 64, -- 64dp > 48dp do GDD: é o alvo de dedo mais crítico da tela
 	pingX = 16,
-	cardW = 244,
-	cardH = 104,
+	cardW = 262,
+	cardH = 152,
+	--- os dois alvos de dedo do convite. 56dp e 52dp > 48dp do GDD.
 	acceptH = 56,
+	declineW = 52,
+	badge = 30,
 	cardGap = 12,
 	bannerTop = 166, -- logo abaixo do anúncio do HUD (raia D usa até ~158)
 	bannerH = 46,
 	pad = 8,
 }
+
+--- Distância até onde a canalização de OUTRA dupla ainda me interessa na faixa
+--- do topo. Mais longe que isto o telegrama continua no MUNDO (pilar de luz),
+--- que é onde ele importa — a faixa é para o que me atinge.
+--- CALIBRAÇÃO: é este número se a tela piscar com combo do outro lado do mapa.
+local BANNER_RANGE = 140
 
 --- 1 dp → px, mesma régua da raia C (viewport de 640 px ≈ celular pequeno em
 --- paisagem). CALIBRAÇÃO: é este número se os botões saírem fora de escala.
@@ -58,59 +79,27 @@ local function dpScale(): number
 	return math.clamp((if cam then cam.ViewportSize.Y else 640) / 640, 0.85, 2.0)
 end
 
--- --------------------------------------------------- textos locais (i18n)
---- ponytail: estas chaves pertencem a Shared/Strings, mas aquele arquivo é de
---- outra raia nesta missão. Quando o coordenador abrir Strings.luau, mover
---- este bloco para lá e trocar por Strings.t() — a assinatura já é a mesma.
-local UI = {
-	pt = {
-		ask = "COMBO?",
-		accept = "ACEITAR",
-		proposed = "%s quer SINTONIA",
-		with = "Elemento: %s",
-		marked = "ALVO MARCADO",
-		channeling = "CANALIZANDO SINTONIA",
-		broken = "SINTONIA INTERROMPIDA",
-	},
-	en = {
-		ask = "COMBO?",
-		accept = "ACCEPT",
-		proposed = "%s wants ATTUNEMENT",
-		with = "Element: %s",
-		marked = "TARGET MARKED",
-		channeling = "CHANNELING ATTUNEMENT",
-		broken = "ATTUNEMENT BROKEN",
-	},
-}
-
-local function t(key: string, ...): string
-	local dict = (UI :: any)[Strings.getLang()] or UI.pt
-	local s = dict[key] or key
-	if select("#", ...) == 0 then
-		return s
-	end
-	local ok, formatted = pcall(string.format, s, ...)
-	return ok and formatted or s
-end
-
+-- ------------------------------------------------------------------ i18n
+--- Todo texto vem de Shared/Strings (chaves `sintonia.*`). Nada solto aqui.
 local function elementOf(id: any): Elements.Element?
 	return if Elements.isValid(id) then (Elements.ById :: any)[id] else nil
-end
-
-local function elementName(id: any): string
-	local e = elementOf(id)
-	if not e then
-		return "?"
-	end
-	return if Strings.getLang() == "pt" then e.pt else e.en
 end
 
 local function comboName(key: any): string
 	local combo = if typeof(key) == "string" then Elements.Combos[key] else nil
 	if not combo then
-		return "SINTONIA"
+		return Strings.t("hud.seal")
 	end
 	return string.upper(if Strings.getLang() == "pt" then combo.pt else combo.en)
+end
+
+--- O combo que ESTES dois elementos fazem. A matriz é do GDD §9 e vive em
+--- Shared/Elements — aqui só se pergunta a ela.
+local function comboOf(a: any, b: any): Elements.Combo?
+	if not (Elements.isValid(a) and Elements.isValid(b)) then
+		return nil
+	end
+	return Elements.getCombo(a, b)
 end
 
 local function comboColor(key: any): Color3
@@ -161,15 +150,34 @@ local conns: { RBXScriptConnection } = {}
 local pingBtn: TextButton
 local card: Frame
 local cardTitle: TextLabel
-local cardSub: TextLabel
+local comboLabel: TextLabel
+local badgeA: Frame
+local badgeB: Frame
 local acceptBtn: TextButton
+local declineBtn: TextButton
 local banner: Frame
 local bannerLabel: TextLabel
 local bannerFill: Frame
 
+--- meu elemento ativo (Net.StatsUpdate) — sem ele não dá para dizer QUAL combo
+--- sai da dupla, que é o que transforma "aceitar?" em decisão informada
+local myElement: any = nil
+--- recusa é LOCAL: o servidor não tem remote de recusa e a proposta expira
+--- sozinha. Recusar não pune, não avisa o outro, não abre tutorial.
+local declinedFrom: number? = nil
+
 --- proposta recebida/enviada (o servidor manda; aqui só conta o tempo)
-type Proposal = { byUserId: number, byName: string, element: any, pos: Vector3, left: number, withUserId: number? }
-type Channel = { comboKey: string, pos: Vector3, radius: number, left: number, total: number }
+type Proposal = {
+	byUserId: number,
+	byName: string,
+	element: any,
+	pos: Vector3,
+	left: number,
+	total: number,
+	withUserId: number?,
+}
+--- `mine` = eu conjuro ou estou perto o bastante para a faixa do topo valer
+type Channel = { comboKey: string, pos: Vector3, radius: number, left: number, total: number, mine: boolean }
 
 local proposal: Proposal? = nil
 local channel: Channel? = nil
@@ -203,14 +211,18 @@ local function clearMark()
 end
 
 --- Marco do alvo pingado: losango flutuante na cor do elemento proposto.
-local function showMark(pos: Vector3, element: any)
+--- Com o pacto fechado ele vira a COR DO TIME e cresce — e os DOIS jogadores
+--- veem exatamente o mesmo marco, que é o ponto inteiro do GDD §18.7.
+local function showMark(pos: Vector3, element: any, pact: boolean)
 	clearMark()
 	local folder = fxFolder
 	if not folder then
 		return
 	end
 	local e = elementOf(element)
-	local part = fxPart(folder, Vector3.new(3, 3, 3), pos + Vector3.new(0, 6, 0), if e then e.glow else GOLD, 0.25)
+	local color = if pact then ALLY else (if e then e.glow else GOLD)
+	local side = if pact then 4 else 3
+	local part = fxPart(folder, Vector3.new(side, side, side), pos + Vector3.new(0, 6, 0), color, 0.25)
 	part.CFrame = CFrame.new(part.Position) * CFrame.Angles(0, math.rad(45), math.rad(45))
 	markPart = part
 end
@@ -265,6 +277,16 @@ local function sendAccept()
 	Net.event(Net.Names.AcceptSintonia):FireServer({ fromUserId = p.byUserId })
 end
 
+--- Recusar é só sumir com o card. Sem punição, sem aviso ao proponente, sem
+--- tutorial: errar o convite não pode custar nada (auditoria de 18/08).
+local function sendDecline()
+	local p = proposal
+	if p then
+		declinedFrom = p.byUserId
+	end
+	card.Visible = false
+end
+
 -- ------------------------------------------------------------------ montagem
 local function layout()
 	local k = dpScale()
@@ -278,7 +300,14 @@ local function layout()
 	--- o card encosta EM CIMA do botão de ping: os dois ficam no mesmo alcance
 	--- de polegar, e o "ACEITAR" nunca nasce onde o dedo já está apoiado
 	card.Position = UDim2.new(0, math.floor(L.pingX * k), 0.5, -math.floor((L.ping / 2 + L.cardGap) * k))
-	acceptBtn.Size = UDim2.new(1, 0, 0, math.floor(L.acceptH * k))
+	--- ACEITAR ocupa o resto da largura; o × fica no canto, longe o bastante
+	--- para o polegar não confundir os dois
+	local decline = math.floor(L.declineW * k)
+	declineBtn.Size = UDim2.new(0, decline, 1, 0)
+	acceptBtn.Size = UDim2.new(1, -(decline + math.floor(6 * k)), 1, 0)
+	local badge = math.floor(L.badge * k)
+	badgeA.Size = UDim2.fromOffset(badge, badge)
+	badgeB.Size = UDim2.fromOffset(badge, badge)
 
 	banner.Position = UDim2.new(0.5, 0, 0, math.floor(L.bannerTop * k))
 	banner.Size = UDim2.new(0.46, 0, 0, math.floor(L.bannerH * k))
@@ -294,7 +323,7 @@ local function build(root: ScreenGui)
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Font = Enum.Font.GothamBold,
-		Text = t("ask"),
+		Text = Strings.t("sintonia.ask"),
 		TextColor3 = GOLD,
 		TextScaled = true,
 	}, root)
@@ -322,7 +351,7 @@ local function build(root: ScreenGui)
 
 	cardTitle = mk("TextLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 16),
+		Size = UDim2.new(1, 0, 0.12, 0),
 		Font = Enum.Font.GothamBold,
 		Text = "",
 		TextColor3 = TEXT,
@@ -331,33 +360,104 @@ local function build(root: ScreenGui)
 	}, content)
 	mk("UITextSizeConstraint", { MaxTextSize = 15 }, cardTitle)
 
-	cardSub = mk("TextLabel", {
+	--- toda proposta vem com alvo (o servidor prende a posição ao alcance de uma
+	--- magia). Dizer isso no card resolve o caso em que o marco está atrás do
+	--- jogador: ele aceita sabendo que existe um ponto, e só depois se vira.
+	mk(
+		"UITextSizeConstraint",
+		{ MaxTextSize = 11 },
+		mk("TextLabel", {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0.12, 0),
+			Font = Enum.Font.Gotham,
+			Text = Strings.t("sintonia.marked"),
+			TextColor3 = GOLD_DIM,
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		}, content)
+	)
+
+	--- OS DOIS ELEMENTOS em cor + FORMA (GDD §10). É o que o jogador confere
+	--- antes de apertar: sem eles, "ACEITAR" é aposta no escuro.
+	local row = mk("Frame", {
+		Name = "Pair",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 18),
-		Size = UDim2.new(1, 0, 0, 13),
-		Font = Enum.Font.Gotham,
-		Text = "",
+		Position = UDim2.new(0, 0, 0.16, 0),
+		Size = UDim2.new(1, 0, 0.24, 0),
+	}, content)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 6),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, row)
+
+	badgeA = Badge.new(row, L.badge)
+	badgeA.LayoutOrder = 1
+	mk("TextLabel", {
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Size = UDim2.new(0, 14, 0.7, 0),
+		Font = Enum.Font.GothamBold,
+		Text = "+",
 		TextColor3 = TEXT_DIM,
+		TextScaled = true,
+	}, row)
+	badgeB = Badge.new(row, L.badge)
+	badgeB.LayoutOrder = 3
+
+	--- O NOME DO COMBO. É a promessa do toque — "EXPLOSÃO DE PLASMA" ensina a
+	--- matriz do GDD §9 sem uma linha de tutorial.
+	comboLabel = mk("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0.43, 0),
+		Size = UDim2.new(1, 0, 0.15, 0),
+		Font = Enum.Font.GothamBlack,
+		Text = "",
+		TextColor3 = GOLD,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, content)
-	mk("UITextSizeConstraint", { MaxTextSize = 13 }, cardSub)
+	mk("UITextSizeConstraint", { MaxTextSize = 19 }, comboLabel)
 
-	--- ALVO DE DEDO PRINCIPAL: 56dp de altura, largura cheia do card. Não muda
-	--- de tamanho ao ser tocado (regra da raia C: botão que se mexe erra o toque).
+	--- ALVOS DE DEDO (56dp e 52dp — o mínimo do GDD é 48dp): ACEITAR toma quase
+	--- toda a largura, × fica no canto. Nenhum dos dois muda de tamanho ao ser
+	--- tocado (regra da raia C: botão que se mexe embaixo do dedo erra o toque).
+	local buttons = mk("Frame", {
+		Name = "Actions",
+		AnchorPoint = Vector2.new(0, 1),
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(1, 0, 0.41, 0),
+	}, content)
+
 	acceptBtn = mk("TextButton", {
 		Name = "Accept",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 0, 1, 0),
 		BackgroundColor3 = GOLD,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Font = Enum.Font.GothamBold,
-		Text = t("accept"),
+		Text = Strings.t("sintonia.accept"),
 		TextColor3 = NIGHT_DEEP,
 		TextScaled = true,
-	}, content)
+	}, buttons)
 	mk("UITextSizeConstraint", { MaxTextSize = 20 }, acceptBtn)
+
+	declineBtn = mk("TextButton", {
+		Name = "Decline",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		BackgroundColor3 = NIGHT_DEEP,
+		BackgroundTransparency = 0.2,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Font = Enum.Font.GothamBold,
+		Text = Strings.t("sintonia.decline"),
+		TextColor3 = TEXT_DIM,
+		TextScaled = true,
+	}, buttons)
+	mk("UIStroke", { Color = GOLD_DIM, Thickness = 1, Transparency = 0.3 }, declineBtn)
+	mk("UITextSizeConstraint", { MaxTextSize = 26 }, declineBtn)
 
 	-- ------------------------------------------------- faixa de canalização
 	banner = mk("Frame", {
@@ -398,6 +498,8 @@ local function build(root: ScreenGui)
 end
 
 -- --------------------------------------------------------------- servidor → UI
+--- O CONVITE. Card claro: quem chamou, os DOIS elementos (cor + forma), o nome
+--- do combo que sai disso e dois alvos de dedo. Nada mais.
 local function refreshCard()
 	local p = proposal
 	local me = localPlayer
@@ -405,14 +507,49 @@ local function refreshCard()
 		card.Visible = false
 		return
 	end
-	-- proposta minha, ou já aceita: nada a tocar — só o marco no mundo
-	if p.byUserId == me.UserId or p.withUserId ~= nil then
+	-- proposta minha, já aceita, ou recusada: nada a tocar — só o marco no mundo
+	if p.byUserId == me.UserId or p.withUserId ~= nil or declinedFrom == p.byUserId then
 		card.Visible = false
 		return
 	end
-	cardTitle.Text = t("proposed", p.byName)
-	cardSub.Text = t("with", elementName(p.element))
+	cardTitle.Text = Strings.t("sintonia.proposed", p.byName)
+	Badge.paint(badgeA, p.element)
+	Badge.paint(badgeB, myElement)
+
+	local combo = comboOf(p.element, myElement)
+	if combo then
+		comboLabel.Text = comboName(combo.key)
+		comboLabel.TextColor3 = combo.color
+	elseif Elements.isValid(myElement) then
+		--- mesmo elemento não funde (GDD §9). O convite continua aceitável — a
+		--- dupla ainda pode trocar de elemento antes de conjurar. O card ensina,
+		--- não bloqueia.
+		comboLabel.Text = Strings.t("sintonia.same")
+		comboLabel.TextColor3 = DANGER
+	else
+		comboLabel.Text = Strings.t("sintonia.together")
+		comboLabel.TextColor3 = TEXT_DIM
+	end
 	card.Visible = true
+end
+
+--- A faixa do topo é para o que me atinge: combo meu, ou perto de mim. O
+--- telegrama do MUNDO (pilar de luz) continua global — é ele que dá ao inimigo
+--- a chance de interromper, exigida pelo GDD §9.
+local function concernsMe(payload: any): boolean
+	local me = localPlayer
+	if not me then
+		return false
+	end
+	if payload.byUserId == me.UserId or payload.withUserId == me.UserId then
+		return true
+	end
+	local char = me.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not root or not root:IsA("BasePart") or typeof(payload.pos) ~= "Vector3" then
+		return false
+	end
+	return (root.Position - payload.pos).Magnitude <= BANNER_RANGE
 end
 
 local function onState(payload: any)
@@ -425,18 +562,37 @@ local function onState(payload: any)
 		if typeof(payload.pos) ~= "Vector3" or typeof(payload.byUserId) ~= "number" then
 			return
 		end
+		local ttl = tonumber(payload.ttl) or 6
+		local pact = payload.withUserId ~= nil
 		proposal = {
 			byUserId = payload.byUserId,
 			byName = tostring(payload.byName or "?"),
 			element = payload.element,
 			pos = payload.pos,
-			left = tonumber(payload.ttl) or 6,
+			left = ttl,
+			total = math.max(ttl, 0.05),
 			withUserId = payload.withUserId,
 		}
-		showMark(payload.pos, payload.element)
+		if not pact then
+			declinedFrom = nil -- pingou de novo: o convite volta, sem rancor
+		end
+		showMark(payload.pos, payload.element, pact)
 		refreshCard()
-		if payload.withUserId ~= nil then
-			bannerLabel.Text = t("marked")
+
+		local me = localPlayer
+		if pact then
+			--- PACTO FECHADO: os DOIS veem o mesmo marco e a mesma barra até a
+			--- hora de conjurar junto.
+			bannerLabel.Text = Strings.t("sintonia.together")
+			bannerLabel.TextColor3 = ALLY
+			bannerFill.BackgroundColor3 = ALLY
+			banner.Visible = true
+			flashLeft = 0
+		elseif me and payload.byUserId == me.UserId then
+			-- meu ping saiu: confirmação curta, sem roubar a tela
+			bannerLabel.Text = Strings.t("sintonia.marked")
+			bannerLabel.TextColor3 = GOLD
+			bannerFill.BackgroundColor3 = GOLD
 			bannerFill.Size = UDim2.fromScale(1, 1)
 			banner.Visible = true
 			flashLeft = 1.6
@@ -446,18 +602,23 @@ local function onState(payload: any)
 			return
 		end
 		local total = tonumber(payload.duration) or 1
+		local mine = concernsMe(payload)
 		channel = {
 			comboKey = payload.comboKey,
 			pos = payload.pos,
 			radius = tonumber(payload.radius) or 12,
 			left = total,
 			total = math.max(total, 0.05),
+			mine = mine,
 		}
-		bannerLabel.Text = t("channeling")
-		bannerLabel.TextColor3 = comboColor(payload.comboKey)
-		banner.Visible = true
-		flashLeft = 0
 		showBeacon(payload.pos, payload.comboKey)
+		if mine then
+			bannerLabel.Text = Strings.t("sintonia.channeling")
+			bannerLabel.TextColor3 = comboColor(payload.comboKey)
+			bannerFill.BackgroundColor3 = comboColor(payload.comboKey)
+			banner.Visible = true
+			flashLeft = 0
+		end
 	elseif phase == "fired" then
 		channel = nil
 		clearBeacon()
@@ -469,19 +630,25 @@ local function onState(payload: any)
 			proposal = nil
 			refreshCard()
 		end
-		bannerLabel.Text = comboName(payload.comboKey)
-		bannerLabel.TextColor3 = comboColor(payload.comboKey)
-		bannerFill.Size = UDim2.fromScale(1, 1)
-		banner.Visible = true
-		flashLeft = 2.4
+		if concernsMe(payload) then
+			bannerLabel.Text = comboName(payload.comboKey)
+			bannerLabel.TextColor3 = comboColor(payload.comboKey)
+			bannerFill.BackgroundColor3 = comboColor(payload.comboKey)
+			bannerFill.Size = UDim2.fromScale(1, 1)
+			banner.Visible = true
+			flashLeft = 2.4
+		end
 	elseif phase == "failed" then
 		channel = nil
 		clearBeacon()
-		bannerLabel.Text = t("broken")
-		bannerLabel.TextColor3 = DANGER
-		bannerFill.Size = UDim2.fromScale(0, 1)
-		banner.Visible = true
-		flashLeft = 2.0
+		if concernsMe(payload) then
+			bannerLabel.Text = Strings.t("sintonia.broken")
+			bannerLabel.TextColor3 = DANGER
+			bannerFill.BackgroundColor3 = DANGER
+			bannerFill.Size = UDim2.fromScale(0, 1)
+			banner.Visible = true
+			flashLeft = 2.0
+		end
 	end
 end
 
@@ -513,7 +680,23 @@ function SintoniaUi.init(player: Player)
 
 	table.insert(conns, pingBtn.Activated:Connect(sendPropose))
 	table.insert(conns, acceptBtn.Activated:Connect(sendAccept))
+	table.insert(conns, declineBtn.Activated:Connect(sendDecline))
 	table.insert(conns, Net.event(Net.Names.SintoniaState).OnClientEvent:Connect(onState))
+
+	--- meu elemento ativo é do servidor (Net.StatsUpdate). Trocar de elemento
+	--- com o card aberto REESCREVE o nome do combo na hora — é assim que o
+	--- jogador descobre a matriz do GDD §9 sem tutorial.
+	table.insert(
+		conns,
+		Net.event(Net.Names.StatsUpdate).OnClientEvent:Connect(function(p: any)
+			if typeof(p) == "table" and Elements.isValid(p.element) and p.element ~= myElement then
+				myElement = p.element
+				if card.Visible then
+					refreshCard()
+				end
+			end
+		end)
+	)
 
 	local cam = Workspace.CurrentCamera
 	if cam then
@@ -536,12 +719,13 @@ function SintoniaUi.update(dt: number)
 		pingBtn.TextTransparency = 0
 	end
 
-	-- proposta expira sozinha (o servidor tem o mesmo prazo — aqui é só a tela)
+	-- proposta/pacto expiram sozinhos (o servidor tem o mesmo prazo — aqui é a tela)
 	local p = proposal
 	if p then
 		p.left -= dt
 		if p.left <= 0 then
 			proposal = nil
+			p = nil
 			clearMark()
 			refreshCard()
 		end
@@ -553,12 +737,12 @@ function SintoniaUi.update(dt: number)
 		mark.CFrame = CFrame.new(mark.Position) * CFrame.Angles(0, os.clock() * 1.5, math.rad(45))
 	end
 
-	-- canalização: barra enche e o quadrado do chão cresce até o raio do combo
+	-- canalização: o quadrado do chão cresce até o raio do combo. TODOS veem,
+	-- inimigo inclusive — é o telegrama que permite interromper (GDD §9).
 	local ch = channel
 	if ch then
 		ch.left -= dt
 		local k = math.clamp(1 - ch.left / ch.total, 0, 1)
-		bannerFill.Size = UDim2.fromScale(k, 1)
 		local ring = beaconRing
 		if ring then
 			local side = math.max(2, ch.radius * 2 * k)
@@ -573,9 +757,18 @@ function SintoniaUi.update(dt: number)
 		--- tela não pode ficar travada em canalização eterna
 		if ch.left < -2 then
 			channel = nil
+			ch = nil
 			clearBeacon()
 			banner.Visible = false
 		end
+	end
+
+	-- faixa do topo, por prioridade: canalização que me atinge > pacto aberto >
+	-- último anúncio apagando.
+	if ch and ch.mine then
+		bannerFill.Size = UDim2.fromScale(math.clamp(1 - ch.left / ch.total, 0, 1), 1)
+	elseif p and p.withUserId ~= nil then
+		bannerFill.Size = UDim2.fromScale(math.clamp(p.left / p.total, 0, 1), 1)
 	elseif flashLeft > 0 then
 		flashLeft -= dt
 		if flashLeft <= 0 then
@@ -604,6 +797,8 @@ function SintoniaUi.destroy()
 	end
 	proposal = nil
 	channel = nil
+	myElement = nil
+	declinedFrom = nil
 end
 
 return SintoniaUi

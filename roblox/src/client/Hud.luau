@@ -1,7 +1,17 @@
 --!strict
 -- ============================================================================
 -- RAIA D (HUD/UI) — HUD INFORMATIVO: vida, Escudo Evolutivo (nível + progresso
--- para o próximo), mana, Selo de Arkana e área de anúncios.
+-- para o próximo), mana, Selo de Arkana, PRESENÇA DO PARCEIRO e anúncios.
+--
+-- A DUPLA É METADE DO JOGO (auditoria de 18/08): o jogador precisa saber sem
+-- procurar quem é o parceiro, onde ele está, qual elemento ele tem e se está
+-- vivo. Por isso a faixa do parceiro (alto à direita, sob a barra da partida) e
+-- a SETA que aponta para ele — a mesma seta vira marcador sobre a cabeça dele
+-- quando está em quadro. Cor do TIME (magenta), nunca a do elemento: elemento
+-- se lê no selo ao lado.
+-- O SELO DE ARKANA É O MEDIDOR DE SINTONIA (GDD §10): as duas gemas do par
+-- acendem quando a fusão está disponível AGORA. É o que ensina o combo sem
+-- uma linha de texto.
 --
 -- IDENTIDADE (GDD §10): azul-noite #0B1026 + dourado #F0C75E, painéis chapados
 -- e cantos vivos (estética blocky — nada de canto arredondado).
@@ -12,12 +22,17 @@
 -- O cliente NÃO decide nada: só apresenta Net.StatsUpdate / Net.Announce.
 -- ============================================================================
 
+local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
+local Elements = require(Shared:WaitForChild("Elements"))
 local Net = require(Shared:WaitForChild("Net"))
 local Strings = require(Shared:WaitForChild("Strings"))
+local Badge = require(script.Parent:WaitForChild("HudBadge"))
 
 -- ------------------------------------------------------------------ paleta
 local NIGHT = Color3.fromHex("#0B1026")
@@ -29,6 +44,11 @@ local TEXT_DIM = Color3.fromHex("#9A97AD")
 local HP_GREEN = Color3.fromHex("#35C94A")
 local DANGER = Color3.fromHex("#E04040")
 local MANA_BLUE = Color3.fromHex("#2AA7FF")
+--- COR DO TIME (não do elemento). Magenta é a única família de cor que não
+--- colide com nada em cena: nenhum dos 5 elementos, nem o dourado da marca, nem
+--- o violeta da zona, nem o verde da vida, nem o vermelho do perigo. Some com
+--- ela e o parceiro vira mais um borrão na tela.
+local ALLY = Color3.fromHex("#FF5CE1")
 
 --- cores do Escudo Evolutivo por nível (GDD §5: branco → azul → roxo → dourado)
 local SHIELD_COLORS = {
@@ -74,7 +94,23 @@ local L = {
 	announceHold = 2.6,
 	announceFade = 0.5,
 	sealSpinDeg = 6, -- graus/s
+	--- faixa do parceiro: alto à DIREITA, logo abaixo da barra da partida
+	--- (ArkanaMatch ocupa 12..74). O centro fica livre para o anúncio e o
+	--- alto-esquerdo para as próprias barras.
+	partnerTop = 82,
+	partnerRight = 12,
+	partnerW = 200,
+	partnerH = 40,
+	--- seta do parceiro: some nas bordas quando ele sai de quadro
+	arrow = 30,
+	arrowMargin = 34,
 }
+
+--- Alcance em que a dupla ainda "combina" — espelho COSMÉTICO do alcance de
+--- ping do servidor (Sintonia.PING_HEAR = 120 studs). Só decide se as gemas
+--- acendem; quem valida a fusão é o servidor. CALIBRAÇÃO: é este número se as
+--- gemas acenderem com o parceiro longe demais para ajudar.
+local FUSE_HINT_RANGE = 120
 
 -- ------------------------------------------------------------------ helpers
 local function mk(class: string, props: { [string]: any }, parent: Instance?): any
@@ -140,7 +176,15 @@ local shieldLabel: TextLabel
 local manaLabel: TextLabel, manaValue: TextLabel
 local pips: { Frame } = {}
 local seal: Frame
+local gems: { Frame } = {}
 local announce: TextLabel
+local partnerPanel: Frame
+local partnerName: TextLabel
+local partnerBadge: Frame
+local partnerFill: Frame
+local arrow: Frame
+
+local localPlayer: Player? = nil
 
 --- último pacote do servidor (fonte da verdade) e o que está desenhado (suave)
 local stats = {
@@ -155,6 +199,47 @@ local stats = {
 }
 local shown = { hp = 1, shield = 0, evo = 0, mana = 1 }
 local announceLeft = 0
+
+--- ELEMENTO ATIVO — o meu vem de Net.StatsUpdate. Sem ele o Selo não acende.
+local myElement: any = nil
+--- PARCEIRO publicado pelo servidor. Contrato PEDIDO à raia de TIMES (hoje o
+--- servidor sabe o time em Server/Teams.luau, mas não conta a ninguém):
+---   Net.MatchState.mate = { userId: number, name: string?, element: Id? }
+--- Ausente = sem dupla; a faixa e a seta somem em vez de mentir.
+local mateUserId: number? = nil
+local mateName = ""
+local mateElement: any = nil
+--- Enquanto esse campo não existe: quem fechou PACTO comigo. O servidor só
+--- manda `withUserId` para os DOIS envolvidos (Sintonia.accept), então isso é
+--- fato dele, não palpite meu — e é exatamente a dupla que a missão mede.
+local pactUserId: number? = nil
+--- Elemento que cada vizinho MOSTROU ao propor Sintonia — hoje é a única fonte
+--- de elemento alheio no contrato (Net.SintoniaState.element). Vale enquanto
+--- `mate.element` não vier no pacote da partida.
+local elementSeen: { [number]: any } = {}
+local mateAlive = false
+local paintedElement: any = nil
+local fuseReady = false
+local gemPulse = 0
+
+--- Quem é meu parceiro: o time publicado na partida e, na falta dele, o pacto
+--- de Sintonia em curso. ponytail: a segunda leitura são 2 linhas e some no dia
+--- em que `mate` entrar em Net.MatchState — até lá é ela que faz a dupla
+--- existir na tela.
+local function matePlayer(): Player?
+	local uid = mateUserId or pactUserId
+	return if uid then Players:GetPlayerByUserId(uid) else nil
+end
+
+--- Corpo replicado do jogador: posição e vida chegam de graça pela plataforma,
+--- não precisam de remote.
+local function bodyOf(p: Player?): (any, any)
+	local char = if p then (p :: Player).Character else nil
+	if not char then
+		return nil, nil
+	end
+	return char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
+end
 
 --- progresso 0..1 rumo ao próximo nível do escudo (GDD §5, thresholds do Balance)
 local function evoProgress(): number
@@ -282,11 +367,12 @@ local function buildSeal(root: ScreenGui)
 			Rotation = math.deg(math.atan2(by - y, bx - x)),
 		}, seal)
 
-		-- gema (quadrado girado 45° = losango: cor + FORMA)
-		mk("Frame", {
+		-- gema (quadrado girado 45° = losango: cor + FORMA). Apagada por padrão;
+		-- `refreshGems` acende o PAR quando a fusão está disponível.
+		gems[i] = mk("Frame", {
 			Name = "Gem" .. i,
 			BackgroundColor3 = SEAL_GEMS[i],
-			BackgroundTransparency = 0.45, -- apaga: R2 acende no combo disponível
+			BackgroundTransparency = 0.45,
 			BorderSizePixel = 0,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, x, 0.5, y),
@@ -308,14 +394,183 @@ local function buildSeal(root: ScreenGui)
 	}, seal)
 end
 
+--- Faixa do parceiro: nome + elemento (cor + FORMA) + vida. Escondida enquanto
+--- não houver dupla — campo vazio no HUD é ruído, não informação.
+local function buildPartner(root: ScreenGui)
+	partnerPanel = mk("Frame", {
+		Name = "Partner",
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundColor3 = NIGHT,
+		BackgroundTransparency = 0.4,
+		BorderSizePixel = 0,
+		Position = UDim2.new(1, -L.partnerRight, 0, L.partnerTop),
+		Size = UDim2.fromOffset(L.partnerW, L.partnerH),
+		Visible = false,
+	}, root)
+	mk("UIStroke", { Color = ALLY, Thickness = 1, Transparency = 0.3 }, partnerPanel)
+
+	local content = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, partnerPanel)
+	mk("UIPadding", {
+		PaddingLeft = UDim.new(0, 6),
+		PaddingRight = UDim.new(0, 6),
+		PaddingTop = UDim.new(0, 5),
+		PaddingBottom = UDim.new(0, 5),
+	}, content)
+
+	partnerBadge = Badge.new(content, 18)
+
+	partnerName = mk("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 22, 0, 2),
+		Size = UDim2.new(1, -22, 0, 14),
+		Font = Enum.Font.GothamBold,
+		Text = "",
+		TextColor3 = ALLY,
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, content)
+	mk("UITextSizeConstraint", { MinTextSize = 9, MaxTextSize = 14 }, partnerName)
+
+	partnerFill = bar(content, 22, 6, ALLY, false)
+end
+
+--- Seta do parceiro. UMA peça faz os dois papéis: marcador discreto sobre a
+--- cabeça dele quando está em quadro, e indicador preso à borda apontando para
+--- ele quando não está. Chevron de dois traços — cor do TIME, zero asset.
+--- O nome dele já vem de graça do Roblox (nametag nativo) — não repetimos aqui.
+local function buildArrow(root: ScreenGui)
+	arrow = mk("Frame", {
+		Name = "PartnerArrow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(L.arrow, L.arrow),
+		Visible = false,
+	}, root)
+	--- em Rotation = 0 o chevron aponta para a DIREITA; o pivô é a ponta,
+	--- porque Rotation gira em torno do AnchorPoint
+	for _, deg in ipairs({ 34, -34 }) do
+		mk("Frame", {
+			BackgroundColor3 = ALLY,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.fromScale(0.96, 0.5),
+			Size = UDim2.fromScale(0.62, 0.17),
+			Rotation = deg,
+		}, arrow)
+	end
+end
+
+--- O Selo É o medidor de Sintonia (GDD §10): acende as DUAS gemas do par
+--- quando existe fusão possível AGORA. É convite, não promessa — quem valida a
+--- fusão continua sendo o servidor.
+local function refreshGems(dt: number)
+	gemPulse = if fuseReady then (gemPulse + dt * 2.2) % 1 else 0
+	local beat = (1 - math.cos(gemPulse * math.pi * 2)) / 2
+	for i, gem in ipairs(gems) do
+		local id: any = Elements.Order[i]
+		local lit = fuseReady and (id == myElement or id == mateElement)
+		gem.BackgroundTransparency = if lit then 0.05 * (1 - beat) elseif id == myElement then 0.2 else 0.72
+		local px = if lit then 11 + beat * 4 else 10
+		gem.Size = UDim2.fromOffset(px, px)
+	end
+end
+
+--- Onde a seta encosta na borda, a partir do vetor centro→parceiro. Pura de
+--- propósito: é a única conta desta tela que não dá para conferir a olho — o
+--- autoteste no fim do arquivo cobre ela.
+local function edgePoint(dx: number, dy: number, halfW: number, halfH: number): (number, number)
+	if math.abs(dx) < 1e-3 and math.abs(dy) < 1e-3 then
+		dy = 1 -- parceiro exatamente no centro: aponta para baixo em vez de NaN
+	end
+	local sx = if math.abs(dx) > 1e-3 then halfW / math.abs(dx) else math.huge
+	local sy = if math.abs(dy) > 1e-3 then halfH / math.abs(dy) else math.huge
+	local s = math.min(sx, sy) -- a borda mais próxima é quem trava
+	return dx * s, dy * s
+end
+
+--- Presença da dupla: quem é, onde está, qual elemento, se está vivo.
+--- Posição e vida do parceiro chegam pelo CORPO replicado (de graça na
+--- plataforma); só a identidade e o elemento dependem do servidor.
+local function updatePartner()
+	local mp = matePlayer()
+	local cam = Workspace.CurrentCamera
+	if not mp then
+		partnerPanel.Visible = false
+		arrow.Visible = false
+		mateAlive, fuseReady = false, false
+		return
+	end
+	partnerPanel.Visible = true
+
+	local element = mateElement or elementSeen[mp.UserId]
+	mateElement = element
+	if element ~= paintedElement then
+		paintedElement = element
+		Badge.paint(partnerBadge, element)
+	end
+
+	local mateRoot, hum = bodyOf(mp)
+	mateAlive = hum ~= nil and hum.Health > 0
+	partnerName.Text = if mateAlive
+		then (if mateName ~= "" then mateName else mp.DisplayName)
+		else Strings.t("hud.partner.down")
+	partnerName.TextColor3 = if mateAlive then ALLY else DANGER
+	partnerFill.BackgroundColor3 = if mateAlive then ALLY else DANGER
+	partnerFill.Size = UDim2.fromScale(
+		if mateAlive then clamp01(hum.Health / math.max(hum.MaxHealth, 1)) else 0,
+		1
+	)
+
+	local myRoot = bodyOf(localPlayer)
+	if not (mateAlive and mateRoot and myRoot and cam and gui) then
+		arrow.Visible = false
+		fuseReady = false
+		return
+	end
+
+	--- fusão possível = elementos diferentes (a matriz do GDD §9 decide) e o
+	--- parceiro perto o bastante para atacar o mesmo alvo
+	fuseReady = Elements.isValid(myElement)
+		and Elements.isValid(element)
+		and Elements.getCombo(myElement, element) ~= nil
+		and (mateRoot.Position - myRoot.Position).Magnitude <= FUSE_HINT_RANGE
+
+	-- ---------------------------------------------------------------- seta
+	local view = (gui :: ScreenGui).AbsoluteSize
+	local sp, onScreen = cam:WorldToViewportPoint(mateRoot.Position + Vector3.new(0, 4.5, 0))
+	--- WorldToViewportPoint conta a partir do topo REAL da tela; este ScreenGui
+	--- respeita a barra do Roblox (IgnoreGuiInset = false), então desconta.
+	local inset = GuiService:GetGuiInset()
+	local x, y = sp.X - inset.X, sp.Y - inset.Y
+	--- atrás da câmera o ponto projeta espelhado: reflete pelo centro para a
+	--- seta apontar para trás, e não para o lado errado
+	if sp.Z <= 0 then
+		x, y = view.X - x, view.Y - y
+	end
+
+	local m = L.arrowMargin
+	local cx, cy = view.X / 2, view.Y / 2
+	if sp.Z <= 0 or not onScreen or x < m or x > view.X - m or y < m or y > view.Y - m then
+		-- fora de quadro: encosta no retângulo seguro e aponta para ele
+		local ox, oy = edgePoint(x - cx, y - cy, cx - m, cy - m)
+		arrow.Position = UDim2.fromOffset(cx + ox, cy + oy)
+		arrow.Rotation = math.deg(math.atan2(oy, ox))
+	else
+		arrow.Position = UDim2.fromOffset(x, y)
+		arrow.Rotation = 90 -- em quadro: aponta para BAIXO, na cabeça dele
+	end
+	arrow.Visible = true
+end
+
 -- ------------------------------------------------------------------ API
-function Hud.init(_player: Player)
+function Hud.init(player: Player)
 	if gui then
 		return
 	end
+	localPlayer = player
 	Strings.followPlayerLocale()
 
-	local playerGui = _player:WaitForChild("PlayerGui")
+	local playerGui = player:WaitForChild("PlayerGui")
 	local root = mk("ScreenGui", {
 		Name = "ArkanaHud", -- a raia C usa "ArkanaControls" — não colidir
 		ResetOnSpawn = false, -- sobrevive ao respawn: nada de HUD vazando/recriando
@@ -327,6 +582,8 @@ function Hud.init(_player: Player)
 
 	buildPanel(root)
 	buildSeal(root)
+	buildPartner(root)
+	buildArrow(root)
 	announce = mk("TextLabel", {
 		Name = "Announce",
 		BackgroundTransparency = 1,
@@ -363,6 +620,10 @@ function Hud.init(_player: Player)
 			stats.evo = tonumber(p.evo) or stats.evo
 			stats.mana = tonumber(p.mana) or stats.mana
 			stats.manaMax = tonumber(p.manaMax) or stats.manaMax
+			-- elemento ativo: é ele que acende a minha gema no Selo
+			if Elements.isValid(p.element) then
+				myElement = p.element
+			end
 			-- p.cooldowns é da raia C (desenha nos próprios botões) — o HUD ignora
 			if stats.shieldLv ~= lastLv then
 				refreshShieldLevel()
@@ -385,6 +646,50 @@ function Hud.init(_player: Player)
 			end
 			local args = (isTable and p.args) or { ... }
 			showAnnounce(Strings.t(key, table.unpack(args)))
+		end)
+	)
+
+	--- QUEM É MEU PARCEIRO — o servidor manda, o HUD mostra. Pacote ausente =
+	--- sem dupla (cai no pacto de Sintonia em curso, ver `matePlayer`).
+	table.insert(
+		conns,
+		Net.event(Net.Names.MatchState).OnClientEvent:Connect(function(p: any)
+			if typeof(p) ~= "table" then
+				return
+			end
+			local m = p.mate
+			if typeof(m) == "table" and tonumber(m.userId) then
+				mateUserId = tonumber(m.userId)
+				mateName = tostring(m.name or "")
+				mateElement = if Elements.isValid(m.element) then m.element else nil
+			else
+				mateUserId, mateName, mateElement = nil, "", nil
+			end
+		end)
+	)
+
+	--- Quem propõe Sintonia REVELA o elemento (Net.SintoniaState). É a única
+	--- fonte de elemento alheio no contrato de hoje — sem ela o Selo nunca
+	--- acenderia o par. ponytail: some quando `mate.element` vier na partida.
+	table.insert(
+		conns,
+		Net.event(Net.Names.SintoniaState).OnClientEvent:Connect(function(p: any)
+			if typeof(p) ~= "table" or p.phase ~= "proposed" or typeof(p.byUserId) ~= "number" then
+				return
+			end
+			if Elements.isValid(p.element) then
+				elementSeen[p.byUserId] = p.element
+			end
+			--- pacto fechado: o servidor só conta `withUserId` para os DOIS
+			--- envolvidos, então se um deles sou eu, o outro é meu parceiro.
+			local me = localPlayer
+			if me and typeof(p.withUserId) == "number" then
+				if p.withUserId == me.UserId then
+					pactUserId = p.byUserId
+				elseif p.byUserId == me.UserId then
+					pactUserId = p.withUserId
+				end
+			end
 		end)
 	)
 end
@@ -422,6 +727,8 @@ function Hud.update(dt: number)
 	manaValue.Text = string.format("%d", math.max(0, math.floor(stats.mana)))
 
 	seal.Rotation = (seal.Rotation + dt * L.sealSpinDeg) % 360
+	updatePartner()
+	refreshGems(dt)
 
 	if announceLeft > 0 then
 		announceLeft -= dt
@@ -438,10 +745,47 @@ function Hud.destroy()
 	end
 	table.clear(conns)
 	table.clear(pips)
+	table.clear(gems)
+	table.clear(elementSeen)
+	mateUserId, mateName, mateElement, paintedElement, pactUserId = nil, "", nil, nil, nil
+	mateAlive, fuseReady = false, false
+	localPlayer = nil
 	if gui then
 		gui:Destroy()
 		gui = nil
 	end
+end
+
+-- ============================================================================
+-- AUTOTESTE — cole no Command Bar do Studio (cliente):
+--   require(game.Players.LocalPlayer.PlayerScripts.Client.Hud).selfTest()
+-- Cobre a única conta desta tela que não dá para ver a olho: a seta do parceiro
+-- fora de quadro. Errar aqui deixa a seta parada num canto para sempre — e a
+-- presença da dupla é o item nº 1 desta raia.
+-- ============================================================================
+function Hud.selfTest()
+	local hw, hh = 300, 200 -- meia tela útil (já descontada a margem)
+
+	-- parceiro à direita: encosta na borda direita, na altura do meio
+	local ox, oy = edgePoint(1000, 0, hw, hh)
+	assert(math.abs(ox - hw) < 1e-6 and math.abs(oy) < 1e-6, "seta à direita saiu do lugar")
+
+	-- parceiro acima: encosta no topo
+	ox, oy = edgePoint(0, -1000, hw, hh)
+	assert(math.abs(oy + hh) < 1e-6 and math.abs(ox) < 1e-6, "seta acima saiu do lugar")
+
+	-- diagonal: trava na borda MAIS PRÓXIMA e nunca vaza do retângulo
+	ox, oy = edgePoint(500, 500, hw, hh)
+	assert(math.abs(ox) <= hw + 1e-6 and math.abs(oy) <= hh + 1e-6, "seta vazou do retângulo")
+	assert(math.abs(oy - hh) < 1e-6, "diagonal tem de travar na borda de cima/baixo")
+
+	-- parceiro exatamente no centro (câmera em cima dele): sem NaN, aponta baixo
+	ox, oy = edgePoint(0, 0, hw, hh)
+	assert(ox == ox and oy == oy, "caso degenerado virou NaN")
+	assert(oy > 0, "caso degenerado tem de apontar para baixo")
+
+	print("[Hud] autoteste OK — seta do parceiro")
+	return true
 end
 
 return Hud
