@@ -76,12 +76,39 @@ Net.event(Net.Names.AcceptSintonia).OnServerEvent:Connect(function(player, paylo
 end)
 
 -- ------------------------------------------------------------------ jogadores
+--- Presença do personagem (escala + silhueta de mago). Opcional e protegido:
+--- se o módulo faltar ou quebrar, o jogador ainda nasce jogável.
+local avatarModule: any = nil
+local avatarLoaded = false
+local function avatarSetup(player: Player, character: Model, humanoid: Humanoid)
+	if not avatarLoaded then
+		avatarLoaded = true
+		local mod = ServerModules:FindFirstChild("Avatar")
+		if mod and mod:IsA("ModuleScript") then
+			local ok, m = pcall(require, mod)
+			avatarModule = ok and m or nil
+			if not ok then
+				warn("[ARKANA] Avatar falhou: " .. tostring(m))
+			end
+		end
+	end
+	if avatarModule and avatarModule.setup then
+		pcall(avatarModule.setup, player, character, humanoid)
+	end
+end
+
 local function onCharacter(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid") :: Humanoid
 	humanoid.WalkSpeed = Balance.player.speed
+	-- COMANDO BÁSICO DE BR: o pulo precisa existir. O Roblox moderno ignora
+	-- JumpPower quando UseJumpPower está desligado — sem esta linha o valor de
+	-- Balance não vale nada. (O Espaço chegou a ser "engolido" pela esquiva no
+	-- primeiro build; reprovado no teste do Diretor em 18/08.)
+	humanoid.UseJumpPower = true
 	humanoid.JumpPower = Balance.player.jumpPower
 	humanoid.MaxHealth = Balance.player.hp
 	humanoid.Health = Balance.player.hp
+	avatarSetup(player, character, humanoid)
 	Combat.onCharacterAdded(player, character, humanoid)
 end
 

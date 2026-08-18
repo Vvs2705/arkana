@@ -29,11 +29,14 @@ A partir daí, salvar um arquivo `.luau` atualiza o jogo aberto na hora.
 | Ação | Comando |
 |---|---|
 | Mover | `W` `A` `S` `D` |
+| **Pular** | **Espaço** |
+| **Correr** | **Shift esquerdo** (segurar) |
+| **Agachar** | **C** (alterna) |
 | Mirar | mouse (a direção do cursor no chão) |
 | Ataque básico | segurar **botão esquerdo** (atira sozinho na cadência) |
 | Magia tática | **botão direito** (usa cooldown, não mana) |
-| Esquiva (i-frames) | **Espaço** ou **Shift esquerdo** |
-| Trocar elemento | **Q** / **E** (cicla) ou **1–5** (direto) |
+| **Esquiva (i-frames)** | **Q** |
+| Trocar elemento | **1–5** (direto) ou **roda do mouse** (cicla) |
 | Girar câmera | mouse (padrão do Roblox) |
 
 ### Celular / toque
@@ -41,9 +44,11 @@ A partir daí, salvar um arquivo `.luau` atualiza o jogo aberto na hora.
 |---|---|
 | Mover | thumbstick nativo (lado esquerdo) |
 | Girar câmera | arrastar no meio/alto da tela |
+| **Pular / Correr / Agachar** | botões próprios (PULAR à direita; CORRER e AGACHAR à esquerda) |
 | **Atirar mirando** | **pressione o botão da magia e ARRASTE** na direção do alvo → **solte para disparar** |
 | Tiro rápido | **toque curto** no botão (atira para onde a câmera olha) |
 | Cancelar o tiro | arraste e **volte o dedo ao centro** antes de soltar |
+| Esquiva | botão **ESQ** |
 | Trocar elemento | tocar no elemento no carrossel |
 
 > O gesto de arrastar-e-soltar é **um movimento só** — foi a correção do que você

@@ -14,6 +14,16 @@
 --
 -- REQUISITO Nº 2: troca de elemento responde ao toque — ver ControlsTouch.
 --
+-- REQUISITO Nº 3, do segundo teste do Diretor: SEM COMANDO BÁSICO NÃO TEM
+-- JOGO. Pular, correr e agachar existem e são os do gênero:
+--   Pular  = ESPAÇO (nativo do Roblox — nunca sinkado aqui) / botão PULAR
+--   Correr = SHIFT ESQUERDO segurado / botão CORRER (alterna)
+--   Agachar= C (alterna) / botão AGACHAR
+--   Esquiva= Q (era do elemento; mobilidade merece a tecla nobre) / ESQ
+--   Elemento = 1–5 e RODA DO MOUSE / carrossel
+-- O bug era literal: BindAction do Espaço devolvia Sink e ENGOLIA o pulo,
+-- então quem caía no lago (rebaixo de 2,5 studs) não subia mais.
+--
 -- MOVIMENTO E CÂMERA SÃO NATIVOS. O thumbstick de toque e o WASD vêm prontos
 -- no PlayerModule do Roblox e a câmera de 3ª pessoa também: "aproveitar os
 -- sistemas da plataforma" (docs/ROBLOX.md §2). Aqui só ajustamos o zoom para
@@ -24,7 +34,6 @@
 -- O cooldown desenhado no botão é PREVISÃO local; StatsUpdate corrige.
 -- ============================================================================
 
-local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -56,6 +65,7 @@ type TouchHandle = {
 	setElement: (string) -> (),
 	setPressed: (string, boolean) -> (),
 	setCooldown: (string, number, number) -> (),
+	setToggle: (string, boolean) -> (),
 }
 
 local camera = workspace.CurrentCamera
@@ -75,6 +85,11 @@ local lastBasic = 0
 local remCast: RemoteEvent? = nil
 local remSwitch: RemoteEvent? = nil
 local remDodge: RemoteEvent? = nil
+local remStance: RemoteEvent? = nil
+
+--- postura: INTENÇÃO local, efeito no servidor (ver bloco de comandos básicos)
+local sprint = false
+local crouch = false
 
 local NUM_KEYS = {
 	Enum.KeyCode.One,
@@ -225,6 +240,59 @@ local function cycleElement(step: number)
 	setElement(Elements.Order[(idx - 1 + step) % count + 1])
 end
 
+-- --------------------------------------------- comandos básicos (pular/correr/agachar)
+-- DIVISÃO DE TRABALHO, e ela não é negociável:
+--   · PULAR é da PLATAFORMA. O Espaço pertence ao Roblox e nenhum BindAction
+--     daqui pode sinká-lo. No toque, o botão só encosta em Humanoid.Jump —
+--     a física, o duplo-pulo-nunca e o estado de queda continuam do engine.
+--   · CORRER e AGACHAR são INTENÇÃO, não efeito: quem escreve Humanoid.WalkSpeed
+--     é o servidor (Combat.step, TODO frame, a partir do terreno). Mexer na
+--     velocidade aqui seria apagado no frame seguinte — por isso vai no remote.
+
+local function sendStance()
+	if remStance then
+		(remStance :: RemoteEvent):FireServer({ sprint = sprint, crouch = crouch })
+	end
+	if touchUi then
+		local ui = touchUi :: TouchHandle
+		ui.setToggle("sprint", sprint)
+		ui.setToggle("crouch", crouch)
+	end
+end
+
+--- correr: SEGURAR no PC, ALTERNAR no toque (o dedo não pode ficar preso num
+--- botão enquanto mira com o outro)
+local function setSprint(on: boolean)
+	if sprint ~= on then
+		sprint = on
+		sendStance()
+	end
+end
+
+local function toggleCrouch()
+	crouch = not crouch
+	sendStance()
+end
+
+--- Pulo do botão de toque. No PC não existe função nenhuma: é o Espaço nativo.
+local function doJump()
+	local hum = humanoid()
+	if hum then
+		hum.Jump = true
+	end
+end
+
+--- Botões de toque de ação simples (sem gesto de mira): um toque, uma ação.
+local function onSimpleTouch(kind: string)
+	if kind == "jump" then
+		doJump()
+	elseif kind == "sprint" then
+		setSprint(not sprint)
+	elseif kind == "crouch" then
+		toggleCrouch()
+	end
+end
+
 -- ------------------------------------------------------- máquina do gesto
 
 local function updateDrag(g: Gesture, input: InputObject)
@@ -368,27 +436,24 @@ local function pcAimDirection(from: Vector3): Vector3
 end
 
 local function bindKeyboard()
-	-- Espaço = Esquiva. Sink derruba o pulo padrão: esquiva com i-frames é a
-	-- mecânica do GDD §15, pular não é. (Toque continua com botão próprio.)
-	ContextActionService:BindAction("ArkanaDodge", function(_, state)
-		if state == Enum.UserInputState.Begin then
-			doDodge(nil)
-		end
-		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.Space, Enum.KeyCode.LeftShift)
-
+	-- NENHUM BindAction aqui. O Espaço é do pulo nativo e sinká-lo foi
+	-- exatamente o que reprovou a build anterior.
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.Q then
-			cycleElement(1)
+		local key = input.KeyCode
+		if key == Enum.KeyCode.Q then
+			doDodge(nil) -- esquiva: é a habilidade de mobilidade, leva a tecla nobre
 			return
-		elseif input.KeyCode == Enum.KeyCode.E then
-			cycleElement(-1)
+		elseif key == Enum.KeyCode.C then
+			toggleCrouch()
+			return
+		elseif key == Enum.KeyCode.LeftShift then
+			setSprint(true)
 			return
 		end
-		local slot = table.find(NUM_KEYS, input.KeyCode)
+		local slot = table.find(NUM_KEYS, key)
 		if slot then
 			setElement(Elements.Order[slot])
 			return
@@ -399,6 +464,28 @@ local function bindKeyboard()
 				doCast("tactic", pcAimDirection(from))
 			end
 		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.LeftShift then
+			setSprint(false) -- correr é SEGURAR, como em todo BR de PC
+		end
+	end)
+
+	-- roda do mouse cicla o elemento (papel que era do Q).
+	-- ponytail: a roda também dá zoom na câmera nativa e isso fica assim — o
+	-- zoom está preso entre 14 e 26 studs no init, então o efeito colateral tem
+	-- 12 studs de tamanho e não vale um ContextActionService só para ele.
+	-- `processed` é ignorado de propósito: a câmera nativa marca a roda como
+	-- processada e o ciclo morreria calado.
+	UserInputService.InputChanged:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseWheel then
+			return
+		end
+		if UserInputService:GetFocusedTextBox() then
+			return
+		end
+		cycleElement(if input.Position.Z > 0 then 1 else -1)
 	end)
 end
 
@@ -417,11 +504,14 @@ function Controls.init(p: Player)
 	remCast = Net.event(Net.Names.CastSpell)
 	remSwitch = Net.event(Net.Names.SwitchElement)
 	remDodge = Net.event(Net.Names.Dodge)
+	--- PENDÊNCIA PARA O COORDENADOR: nome cru porque Shared/Net não é desta
+	--- raia. Vira Net.Names.Stance quando ele oficializar.
+	remStance = Net.event("Stance")
 
 	buildAimMarker()
 
 	if UserInputService.TouchEnabled then
-		touchUi = ControlsTouch.build(p, beginGesture, setElement)
+		touchUi = ControlsTouch.build(p, beginGesture, setElement, onSimpleTouch)
 	end
 	if UserInputService.KeyboardEnabled then
 		bindKeyboard()
@@ -462,10 +552,18 @@ function Controls.init(p: Player)
 		end
 	end)
 
-	-- servidor e cliente começam no mesmo elemento
+	-- corpo novo nasce DE PÉ (o servidor zera a postura no respawn). Reenvia a
+	-- intenção para os dois lados não discordarem se o Shift ficou segurado.
+	p.CharacterAdded:Connect(function()
+		crouch = false
+		task.defer(sendStance)
+	end)
+
+	-- servidor e cliente começam no mesmo elemento e na mesma postura
 	if remSwitch then
 		(remSwitch :: RemoteEvent):FireServer({ id = element })
 	end
+	sendStance()
 end
 
 function Controls.update(_dt: number)

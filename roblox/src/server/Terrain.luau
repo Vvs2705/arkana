@@ -10,11 +10,12 @@
 --   3. materiais NUNCA mudam materiais → `cell.material` é escrito uma só vez,
 --      no build; toda a magia acontece em `cell.state`.
 --
--- ORÇAMENTO DE PARTS (mobile, GDD §19.2 — teto ~4000):
---   piso mesclado em runs horizontais (~300) + paredão em 4 lajes + parts só
---   para células "interessantes" (Water/Tree/Rock/TallGrass) ≈ 1100 no boot.
+-- ORÇAMENTO DE PARTS (mobile, GDD §19.2 — teto ~4000): ≈2650 no boot —
+--   piso 994 (runs horizontais com teto de 4 células, para cada laje ter o
+--   próprio tom) + borda 4 + água 205 + árvore 389×3 + rocha 51×2 + grama 176.
 --   Estados em células de piso (Mud, Wall) criam part PREGUIÇOSAMENTE e a
 --   destroem ao expirar — o mapa nunca acumula geometria morta.
+--   Se precisar cortar: GROUND_RUN_MAX 4 → 6 devolve ~140 parts.
 --
 -- FRONTEIRA DE RESPONSABILIDADE: o Terrain NUNCA aplica dano. Ele publica o
 -- perigo em `hazardAt` e o Combat (raia B) decide quem toma quanto.
@@ -25,6 +26,8 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Grid = require(Shared:WaitForChild("Grid"))
 local Balance = require(Shared:WaitForChild("Balance"))
+--- só pelo hash determinístico (variação visual sem semente global)
+local Arena = require(script.Parent:WaitForChild("Arena"))
 
 local Terrain = {}
 
@@ -38,14 +41,37 @@ local GROUND_THICK = 6
 --- o lago é um rebaixo REAL no terreno; congelar ergue a lâmina até o chão
 local WATER_THICK = 4
 local WATER_DEPTH = 2.5
+--- MARGEM EM DEGRAU (achado do playtest 18/08: dava para cair e não sair).
+--- A água que faz fronteira com terra é RASA e forma um degrau; o miolo do lago
+--- continua fundo — a profundidade é justamente o que o Diretor aprovou.
+--- Os dois degraus (terra→raso = 1.1, raso→fundo = 1.4) ficam abaixo do
+--- step-up automático do Humanoid (~HipHeight, ≈2 studs no R15): sai andando,
+--- sem depender do pulo. NÃO SUBIR estes números sem re-testar a saída.
+local SHORE_DEPTH = 1.1
 local WATER_Y = FLOOR_Y - WATER_DEPTH - WATER_THICK / 2
+local SHORE_Y = FLOOR_Y - SHORE_DEPTH - WATER_THICK / 2
 local ICE_Y = FLOOR_Y - WATER_THICK / 2
---- tronco largo o bastante para a floresta bloquear de fato (personagem ≈ 2 studs)
+--- tronco largo o bastante para a floresta bloquear de fato (personagem ≈ 2.6
+--- studs de largura desde o avatar 1.3× — o vão de 1.4 entre troncos barra)
 local TRUNK_W = 2.6
 local TRUNK_H = 7
 local STUMP_H = 2
---- copa levemente maior que a célula: copas vizinhas fecham um teto contínuo
-local CANOPY_H = 5
+--- copa em 2 blocos (corpo largo + coroa estreita): silhueta escalonada, o look
+--- Pixel Gun. O corpo é maior que a célula, então copas vizinhas ainda fecham
+--- um teto contínuo. Só o TOPO varia por árvore (o corpo começa sempre em
+--- TRUNK_H): baixar a copa raspava a cabeça do avatar 1.3× (~7.4 studs).
+local CANOPY_H = 3.2
+local CANOPY_VARY = 1.2
+local CROWN_H = 1.6
+local CROWN_W = Grid.CELL_SIZE - 1.4
+--- areia da praia: detalhe de level art, não contrato de gameplay (o material
+--- da célula continua sendo Dirt — é nela que a Água vira lamaçal)
+local SAND = Color3.fromHex("#C2A567")
+--- teto do merge de piso: cada laje ganha o próprio tom e o campo deixa de ser
+--- uma chapa de cor única. Menor = mais variação e mais parts.
+local GROUND_RUN_MAX = 4
+--- sais do hash visual (distintos dos do Arena para não correlacionar camadas)
+local SALT_CELL, SALT_GROUND, SALT_TREE, SALT_ROCK = 53, 59, 61, 67
 --- tintas finas de chão (lama / carvão) — encostam no piso sem z-fighting
 local FILM_THICK = 0.4
 local FILM_Y = FLOOR_Y + 0.05 - FILM_THICK / 2
@@ -94,9 +120,54 @@ local function newPart(name: string, size: Vector3, pos: Vector3, color: Color3,
 	return p
 end
 
+local function shade(c: Color3, f: number): Color3
+	return Color3.new(math.min(c.R * f, 1), math.min(c.G * f, 1), math.min(c.B * f, 1))
+end
+
+--- Água de MARGEM: faz fronteira (8-vizinhança) com algo que não é água. É o
+--- degrau raso pelo qual se sai do lago andando. Puro do layout — não guarda
+--- tabela nem depende de ordem de construção.
+local function isShoreWater(cx: number, cy: number): boolean
+	for dy = -1, 1 do
+		for dx = -1, 1 do
+			local x, y = cx + dx, cy + dy
+			if not Grid.inBounds(x, y) or cells[idxOf(x, y)].material ~= "Water" then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function waterY(cx: number, cy: number): number
+	return if isShoreWater(cx, cy) then SHORE_Y else WATER_Y
+end
+
+--- cor do MATERIAL com variação sutil por célula (mata o efeito "chapa de cor
+--- única"). Só vale no estado Normal: estado tem cor própria e é gameplay.
+local function baseColor(cell: Grid.Cell): Color3
+	local c = Grid.COLORS[cell.material]
+	if cell.material == "Water" and isShoreWater(cell.cx, cell.cy) then
+		c = shade(c, 1.22) -- o raso lê mais claro: a margem se anuncia sozinha
+	end
+	return shade(c, 0.93 + Arena.hash01(cell.cx, cell.cy, SALT_CELL) * 0.14)
+end
+
 --- o estado sobrepõe a cor do material (Normal não tem cor de estado)
 local function stateColor(cell: Grid.Cell): Color3
-	return Grid.STATE_COLORS[cell.state] or Grid.COLORS[cell.material]
+	return Grid.STATE_COLORS[cell.state] or baseColor(cell)
+end
+
+--- altura do tufo de grama alta: varia SÓ PARA CIMA — Grid.HEIGHTS.TallGrass é
+--- o mínimo que ESCONDE o personagem, e sem esconderijo a contra-jogada do
+--- GDD §14 ("fogo em grama alta revela quem se escondia") não tem o que revelar.
+local function tallGrassH(cx: number, cy: number): number
+	return Grid.HEIGHTS.TallGrass + Arena.hash01(cx, cy, SALT_CELL) * 0.9
+end
+
+--- corpo da copa desta árvore (a coroa vai por cima) — varia a linha do topo
+local function canopyH(cx: number, cy: number): number
+	return CANOPY_H + Arena.hash01(cx, cy, SALT_TREE) * CANOPY_VARY
 end
 
 --- Reflete `cell.state` na geometria. Único ponto que toca parts fora do build.
@@ -156,7 +227,13 @@ local function applyVisual(idx: number)
 				trunk.Color = Grid.STATE_COLORS.Burned
 			end
 		elseif cell.part then
-			cell.part.Color = stateColor(cell)
+			local col = stateColor(cell)
+			cell.part.Color = col
+			for _, ch in ipairs(cell.part:GetChildren()) do
+				if ch:IsA("BasePart") then
+					ch.Color = col -- a coroa acompanha o corpo (fogo tem que ler)
+				end
+			end
 		end
 		return
 	end
@@ -165,8 +242,10 @@ local function applyVisual(idx: number)
 		local p = cell.part
 		if p then
 			p.Color = stateColor(cell)
-			-- congelar ERGUE a lâmina até o nível do chão: a ponte é literal
-			p.Position = Vector3.new(center.X, if st == "Frozen" then ICE_Y else WATER_Y, center.Z)
+			-- congelar ERGUE a lâmina até o nível do chão: a ponte é literal.
+			-- Fora do gelo, cada célula volta à SUA cota (rasa na margem).
+			local y = if st == "Frozen" then ICE_Y else waterY(cell.cx, cell.cy)
+			p.Position = Vector3.new(center.X, y, center.Z)
 		end
 		return
 	end
@@ -176,7 +255,7 @@ local function applyVisual(idx: number)
 		p.Color = stateColor(cell)
 		if cell.material == "TallGrass" then
 			-- grama alta queimada vira cinza rente ao chão (deixa de esconder)
-			local h = if burnedOut[idx] then FILM_THICK else Grid.HEIGHTS.TallGrass
+			local h = if burnedOut[idx] then FILM_THICK else tallGrassH(cell.cx, cell.cy)
 			p.Size = Vector3.new(CELL, h, CELL)
 			p.Position = Vector3.new(center.X, FLOOR_Y + h / 2, center.Z)
 		end
@@ -252,38 +331,63 @@ local function forNeighbors(idx: number, fn: (nIdx: number) -> ())
 end
 
 -- --------------------------------------------------------------- construção
-local function emitGroundRun(x0: number, x1: number, cy: number, material: Grid.Material)
+local function emitGroundRun(x0: number, x1: number, cy: number, base: Color3)
 	local a = Grid.cellToWorld(x0, cy)
 	local b = Grid.cellToWorld(x1, cy)
 	newPart(
 		"Ground",
 		Vector3.new((x1 - x0 + 1) * CELL, GROUND_THICK, CELL),
 		Vector3.new((a.X + b.X) / 2, FLOOR_Y - GROUND_THICK / 2, a.Z),
-		Grid.COLORS[material],
+		shade(base, 0.94 + Arena.hash01(x0, cy, SALT_GROUND) * 0.12),
 		true
 	)
 end
 
---- Piso em lajes mescladas por linha (greedy horizontal). O lago fica de fora
---- de propósito: sem laje embaixo, a água é um rebaixo real e não um decalque.
+--- praia: terra encostada na água (8-vizinhança) ganha cor de areia. É pintura
+--- — o material continua Dirt, então a regra "Água + terra = lamaçal" fica de pé.
+local function isBeach(layout: { { Grid.Material } }, cx: number, cy: number): boolean
+	if layout[cy][cx] ~= "Dirt" then
+		return false
+	end
+	for dy = -1, 1 do
+		for dx = -1, 1 do
+			local x, y = cx + dx, cy + dy
+			if Grid.inBounds(x, y) and layout[y][x] == "Water" then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+--- Piso em lajes mescladas por linha (greedy horizontal, com teto de
+--- comprimento para que cada laje tenha o próprio tom). O lago fica de fora de
+--- propósito: sem laje embaixo, a água é um rebaixo real e não um decalque.
 local function buildGround(layout: { { Grid.Material } })
 	for cy = 1, Grid.ROWS - 2 do
-		local runMat: Grid.Material? = nil
+		local runKey: string? = nil
+		local runColor: Color3? = nil
 		local runStart = 0
 		for cx = 1, Grid.COLS - 1 do
-			local mat: Grid.Material? = nil
+			local key: string? = nil
+			local color: Color3? = nil
 			-- cx == COLS-1 é o anel de borda: entra como "sem piso" e fecha o run
 			if cx < Grid.COLS - 1 then
 				local m = layout[cy][cx]
 				if m ~= "Water" then
-					mat = m
+					if isBeach(layout, cx, cy) then
+						key, color = "Sand", SAND
+					else
+						key, color = m, Grid.COLORS[m]
+					end
 				end
 			end
-			if mat ~= runMat then
-				if runMat ~= nil then
-					emitGroundRun(runStart, cx - 1, cy, runMat)
+			if key ~= runKey or cx - runStart >= GROUND_RUN_MAX then
+				if runKey ~= nil then
+					emitGroundRun(runStart, cx - 1, cy, runColor :: Color3)
 				end
-				runMat = mat
+				runKey = key
+				runColor = color
 				runStart = cx
 			end
 		end
@@ -306,36 +410,66 @@ local function buildCellPart(idx: number, cell: Grid.Cell)
 	local c = Grid.cellToWorld(cell.cx, cell.cy)
 	local mat = cell.material
 
+	local col = baseColor(cell)
+
 	if mat == "Water" then
 		cell.part = newPart(
 			"Water",
 			Vector3.new(CELL, WATER_THICK, CELL),
-			Vector3.new(c.X, WATER_Y, c.Z),
-			Grid.COLORS.Water,
+			Vector3.new(c.X, waterY(cell.cx, cell.cy), c.Z),
+			col,
 			true
 		)
 	elseif mat == "Tree" then
+		-- a copa começa sempre no topo do tronco; o que varia é a linha do topo
+		local bodyH = canopyH(cell.cx, cell.cy)
 		trunks[idx] = newPart(
 			"Trunk",
 			Vector3.new(TRUNK_W, TRUNK_H, TRUNK_W),
 			Vector3.new(c.X, FLOOR_Y + TRUNK_H / 2, c.Z),
-			Grid.COLORS.Dirt,
+			shade(Grid.COLORS.Dirt, 0.86),
 			true
 		)
-		cell.part = newPart(
+		local canopy = newPart(
 			"Canopy",
-			Vector3.new(CELL + 0.2, CANOPY_H, CELL + 0.2),
-			Vector3.new(c.X, FLOOR_Y + Grid.HEIGHTS.Tree - CANOPY_H / 2, c.Z),
-			Grid.COLORS.Tree,
+			Vector3.new(CELL + 0.2, bodyH, CELL + 0.2),
+			Vector3.new(c.X, FLOOR_Y + TRUNK_H + bodyH / 2, c.Z),
+			col,
 			true
 		)
+		-- coroa FILHA da copa: some junto quando o fogo derruba a cobertura,
+		-- sem uma segunda tabela de bookkeeping para manter em sincronia
+		local crown = newPart(
+			"Crown",
+			Vector3.new(CROWN_W, CROWN_H, CROWN_W),
+			Vector3.new(c.X, FLOOR_Y + TRUNK_H + bodyH + CROWN_H / 2, c.Z),
+			col,
+			false
+		)
+		crown.Parent = canopy
+		cell.part = canopy
 	elseif mat == "Rock" then
-		local h = Grid.HEIGHTS.Rock
-		cell.part = newPart("Rock", Vector3.new(CELL, h, CELL), Vector3.new(c.X, FLOOR_Y + h / 2, c.Z), Grid.COLORS.Rock, true)
+		local v = Arena.hash01(cell.cx, cell.cy, SALT_ROCK)
+		-- varia SÓ PARA CIMA: Grid.HEIGHTS.Rock é a altura que faz da rocha
+		-- COBERTURA (esconde o mago inteiro). Encolher afloramento = furar cobertura.
+		local h = Grid.HEIGHTS.Rock * (1 + v * 0.35)
+		local rock = newPart("Rock", Vector3.new(CELL, h, CELL), Vector3.new(c.X, FLOOR_Y + h / 2, c.Z), col, true)
+		-- lasca de topo (decorativa, sem colisão — nasce acima da cabeça):
+		-- quebra o cubo perfeito e dá a leitura "facetada" do afloramento
+		local capH = h * 0.3
+		local cap = newPart(
+			"RockCap",
+			Vector3.new(CELL - 1.2, capH, CELL - 1.2),
+			Vector3.new(c.X + (v - 0.5) * 1.2, FLOOR_Y + h + capH / 2, c.Z + (0.5 - v) * 1.2),
+			shade(col, 1.12),
+			false
+		)
+		cap.Parent = rock
+		cell.part = rock
 	elseif mat == "TallGrass" then
-		local h = Grid.HEIGHTS.TallGrass
+		local h = tallGrassH(cell.cx, cell.cy)
 		-- sem colisão: a grama alta atrasa (speedMultAt), não barra
-		cell.part = newPart("TallGrass", Vector3.new(CELL, h, CELL), Vector3.new(c.X, FLOOR_Y + h / 2, c.Z), Grid.COLORS.TallGrass, false)
+		cell.part = newPart("TallGrass", Vector3.new(CELL, h, CELL), Vector3.new(c.X, FLOOR_Y + h / 2, c.Z), col, false)
 	end
 end
 
@@ -658,6 +792,75 @@ local function simTick()
 			setState(i, restState(i), 0)
 		end
 	end
+end
+
+-- ============================================================================
+-- AUTOTESTE (rodar na Command Bar do Studio, DEPOIS do Play — precisa do mapa
+-- construído):  require(game.ServerScriptService.Server.Terrain).selfTest()
+-- Cobre o que custou um playtest para descobrir: dá para SAIR de todo lugar
+-- onde dá para ENTRAR. Reprova de novo se alguém mexer nas cotas do lago.
+-- ============================================================================
+--- cota em que o personagem PISA nesta célula
+local function standY(cx: number, cy: number): number
+	local cell = cells[idxOf(cx, cy)]
+	return if cell.material == "Water" then waterY(cx, cy) else FLOOR_Y
+end
+
+function Terrain.selfTest()
+	assert(#cells > 0, "rode DEPOIS do build (Play), senão não há mapa para testar")
+	--- degrau que o Humanoid sobe andando. Fica abaixo da HipHeight (≈2 no R15,
+	--- ≈2.6 com o avatar 1.3×) — conservador de propósito.
+	local STEP = 2.0
+	local function walkable(cx: number, cy: number): boolean
+		if cx <= 0 or cy <= 0 or cx >= Grid.COLS - 1 or cy >= Grid.ROWS - 1 then
+			return false
+		end
+		local m = cells[idxOf(cx, cy)].material
+		return m ~= "Rock" and m ~= "Tree"
+	end
+
+	-- BFS do campo aberto central subindo só degraus ≤ STEP. Descer é sempre
+	-- livre, então "alcançável a pé" ⇒ "escapável a pé".
+	local seen: { [number]: boolean } = {}
+	local queue: { { number } } = { { 30, 30 } }
+	seen[idxOf(30, 30)] = true
+	local head = 1
+	while head <= #queue do
+		local c = queue[head]
+		head += 1
+		for _, d in ipairs(Grid.NEIGHBORS4) do
+			local x, y = c[1] + d[1], c[2] + d[2]
+			if walkable(x, y) and not seen[idxOf(x, y)] and standY(x, y) - standY(c[1], c[2]) <= STEP then
+				seen[idxOf(x, y)] = true
+				table.insert(queue, { x, y })
+			end
+		end
+	end
+
+	local water, shore, stuck = 0, 0, 0
+	for cy = 1, Grid.ROWS - 2 do
+		for cx = 1, Grid.COLS - 2 do
+			if not walkable(cx, cy) then
+				continue
+			end
+			if cells[idxOf(cx, cy)].material == "Water" then
+				water += 1
+				if isShoreWater(cx, cy) then
+					shore += 1
+				end
+			end
+			if not seen[idxOf(cx, cy)] then
+				stuck += 1
+				warn(string.format("[Terrain] célula sem saída em (%d,%d)", cx, cy))
+			end
+		end
+	end
+	assert(shore > 0, "lago sem margem rasa: sem o degrau ninguém sai da água")
+	assert(stuck == 0, string.format("%d células prenderiam o jogador", stuck))
+
+	local parts = if folder then #folder:GetDescendants() else 0
+	assert(parts <= 4000, "orçamento de parts do GDD §19.2 estourado: " .. parts)
+	print(string.format("[Terrain] autoteste OK — %d parts · lago %d (%d de margem) · 0 armadilhas", parts, water, shore))
 end
 
 --- Tick da simulação em passo fixo (`burnTick`). Chamado pelo Heartbeat do Main

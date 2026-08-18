@@ -9,17 +9,51 @@
 -- ACESSIBILIDADE (GDD §10): a FORMA do projétil vem de Elements.shape — o
 -- elemento se lê pela silhueta, não só pela cor.
 -- ORÇAMENTO (GDD §19.2, alvo 60 fps em celular): tetos duros de projéteis,
--- estilhaços e números de dano; sombra e colisão desligadas em tudo.
+-- estilhaços e números de dano; sombra e colisão desligadas em tudo. Todo
+-- efeito novo passa pelo MODO NÉVOA (`lite()`): em aparelho fraco caem
+-- partícula, luz extra e metade dos estilhaços — nunca a leitura do combate.
 -- ============================================================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Debris = game:GetService("Debris")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Net = require(Shared:WaitForChild("Net"))
+
+-- ------------------------------------------------------------- modo névoa
+--- O knob de qualidade mora no Atmosphere (um só para o Diretor mexer). Require
+--- PREGUIÇOSO E PROTEGIDO — mesmo padrão do Main com os módulos opcionais: se o
+--- Atmosphere não estiver no lugar, o VFX continua de pé com o palpite abaixo.
+local atmos: any = nil
+local FALLBACK_LITE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local function atmosphere(): any
+	if atmos == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Atmosphere")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		atmos = (ok and m) or false
+	end
+	return atmos or nil
+end
+
+--- true = cortar partícula, luz extra e estilhaço (GDD §19.2). Consultado a
+--- cada efeito, não uma vez só: o vigia de fps pode rebaixar no meio da partida.
+local function lite(): boolean
+	local a = atmosphere()
+	if a and a.isLite then
+		local ok, v = pcall(a.isLite)
+		if ok then
+			return v == true
+		end
+	end
+	return FALLBACK_LITE
+end
 
 -- ------------------------------------------------------------------ orçamento
 local MAX_PROJECTILES = 40
@@ -28,14 +62,41 @@ local MAX_NUMBERS = 24
 local PROJ_LIFE = 3.0 -- s: rede perdida/impacto não avisado não vira lixo eterno
 
 local IMPACT = {
-	weakShards = 5,
-	strongShards = 10,
+	--- estilhaços: o modo leve corta pela metade (o teto duro continua o mesmo)
+	weakShards = 8,
+	strongShards = 16,
+	weakShardsLite = 3,
+	strongShardsLite = 6,
 	shardLife = 0.6,
-	flashLife = 0.2,
+	flashLife = 0.16, -- mais curto e mais forte: flash longo vira borrão
+	waveLife = 0.34,
+	weakWave = 12, -- diâmetro final da onda de choque, em studs
+	strongWave = 24,
 	--- alcance em studs onde o impacto ainda sacode a câmera
 	shakeRange = 70,
 	traumaWeak = 0.22,
 	traumaStrong = 0.5,
+}
+
+--- Flash de conjuração na ponta do cajado. O `origin` do SpellSpawned JÁ é a
+--- ponta (o servidor soma o MUZZLE) — não precisamos caçar o braço do avatar.
+local CAST = {
+	life = 0.18,
+	weakDisc = 3.4, -- diâmetro final do disco, em studs
+	strongDisc = 5.6,
+}
+
+--- Sintonia disparada: o momento mais importante do jogo (GDD §9). Grande,
+--- vertical e de cor do combo — impossível confundir com um tiro comum.
+local SINTONIA = {
+	pillarHeight = 120,
+	pillarLife = 0.9,
+	domeLife = 0.55,
+	ringLife = 0.7,
+	shards = 18,
+	shardLife = 1.1,
+	trauma = 0.85,
+	shakeRange = 160, -- ninguém perde a Sintonia por estar longe
 }
 
 local SHAKE = {
@@ -64,6 +125,9 @@ type Projectile = {
 	dir: Vector3,
 	speed: number,
 	age: number,
+	--- pulsação (só no modo cheio): guardamos o tamanho base para não somar erro
+	baseSize: Vector3?,
+	light: PointLight?,
 }
 
 local folder: Folder? = nil
@@ -106,6 +170,37 @@ local function decor(p: BasePart)
 	p.Parent = bin()
 end
 
+--- Disco/cilindro deitado ou de pé. O eixo do Cylinder é o X LOCAL, então
+--- girá-lo 90° em Z põe a face virada para cima (onda no chão) e 90° em Y põe
+--- a face virada para a frente (flash de cano).
+local FLAT = CFrame.Angles(0, 0, math.rad(90))
+local FACE = CFrame.Angles(0, math.rad(90), 0)
+
+local function disc(color: Color3, thickness: number, diameter: number): BasePart
+	local p = Instance.new("Part")
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(thickness, diameter, diameter)
+	p.Color = color
+	decor(p)
+	p.Material = Enum.Material.Neon -- neon = passa do Threshold do bloom = magia
+	return p
+end
+
+--- Luz curta que morre junto com o efeito. No modo leve a luz sai: PointLight
+--- é dos itens mais caros do frame em celular.
+local function blink(parent: BasePart, color: Color3, brightness: number, range: number, life: number)
+	if lite() then
+		return
+	end
+	local l = Instance.new("PointLight")
+	l.Color = color
+	l.Brightness = brightness
+	l.Range = range
+	l.Shadows = false
+	l.Parent = parent
+	TweenService:Create(l, TweenInfo.new(life), { Brightness = 0 }):Play()
+end
+
 -- ------------------------------------------------------------------ projétil
 --- A silhueta do elemento (Elements.shape) montada em primitivas.
 local function buildBody(shape: string, color: Color3): BasePart
@@ -139,16 +234,59 @@ end
 
 --- rotação extra da forma: o disco de Vento fica de pé (o eixo do Cylinder é o
 --- X local, então gira 90° em Y para encarar o trajeto), cubo e lasca giram.
-local RING_FACE = CFrame.Angles(0, math.rad(90), 0)
 local function shapeOffset(shape: string, age: number): CFrame
 	if shape == "Ring" then
-		return RING_FACE -- disco simétrico: girá-lo no próprio eixo não se vê
+		return FACE -- disco simétrico: girá-lo no próprio eixo não se vê
 	elseif shape == "Block" then
 		return CFrame.Angles(age * 5, age * 4, 0)
 	elseif shape == "Bolt" then
 		return CFrame.Angles(0, 0, age * 14)
 	end
 	return CFrame.identity
+end
+
+--- FLASH DE CONJURAÇÃO: disco neon na ponta do cajado, virado para o trajeto.
+--- Sem isso o tiro "nasce seco" — este é o feedback de que a magia SAIU de mim.
+local function castFlash(origin: Vector3, dir: Vector3, e: any, strong: boolean)
+	local d = if strong then CAST.strongDisc else CAST.weakDisc
+	local flash = disc(e.glow, 0.3, d * 0.3)
+	flash.Transparency = 0.05
+	flash.CFrame = CFrame.lookAt(origin, origin + dir) * FACE
+	TweenService:Create(flash, TweenInfo.new(CAST.life, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.05, d, d),
+		Transparency = 1,
+	}):Play()
+	-- luz só na TÁTICA: o básico é spammável e a luz do próprio projétil (que
+	-- nasce nesta mesma posição) já acende o cano. Orçamento de PointLight é
+	-- curto em celular — gastar no tiro comum é o jeito rápido de perder fps.
+	if strong then
+		blink(flash, e.glow, 5, 16, CAST.life)
+	end
+	Debris:AddItem(flash, CAST.life + 0.05)
+end
+
+--- Partículas acompanhando o projétil, na cor do elemento. Só no modo cheio:
+--- 40 projéteis × emissor é o primeiro lugar onde um celular fraco engasga.
+local function attachSparks(part: BasePart, e: any)
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(e.glow, e.color)
+	pe.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.85),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	pe.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	pe.Lifetime = NumberRange.new(0.16, 0.26)
+	pe.Rate = 18 -- ~4 vivas por projétil: cauda densa sem custo de fogos
+	pe.Speed = NumberRange.new(0, 1.5)
+	pe.SpreadAngle = Vector2.new(20, 20)
+	pe.Rotation = NumberRange.new(0, 360)
+	pe.RotSpeed = NumberRange.new(-140, 140)
+	pe.LightEmission = 0.8
+	pe.LightInfluence = 0 -- cor chapada: a partícula não escurece na sombra
+	pe.Parent = part
 end
 
 local function spawnProjectile(payload: any)
@@ -164,11 +302,17 @@ local function spawnProjectile(payload: any)
 	if typeof(origin) ~= "Vector3" or not dir then
 		return
 	end
+
+	local e = element(payload.element)
+	local strong = payload.strong == true
+	-- o flash sai ANTES do teto: mesmo com a tela cheia de projéteis, o jogador
+	-- precisa ver que o próprio disparo aconteceu
+	castFlash(origin, dir, e, strong)
+
 	if projCount >= MAX_PROJECTILES then
 		return -- teto de partículas: o servidor continua certo, só não desenhamos
 	end
 
-	local e = element(payload.element)
 	local part = buildBody(e.shape, e.color)
 	part.Name = "Proj_" .. id
 	part.CFrame = CFrame.lookAt(origin, origin + dir)
@@ -181,22 +325,33 @@ local function spawnProjectile(payload: any)
 	light.Shadows = false
 	light.Parent = part
 
-	-- trilha em blocos: dois pontos e um Trail curto
+	-- trilha em blocos: dois pontos e um Trail. Mais longa e afinando no fim —
+	-- a cauda é o que faz um projétil lento parecer rápido.
 	local a0 = Instance.new("Attachment")
-	a0.Position = Vector3.new(0, 0.35, 0)
+	a0.Position = Vector3.new(0, 0.5, 0)
 	a0.Parent = part
 	local a1 = Instance.new("Attachment")
-	a1.Position = Vector3.new(0, -0.35, 0)
+	a1.Position = Vector3.new(0, -0.5, 0)
 	a1.Parent = part
 	local trail = Instance.new("Trail")
 	trail.Attachment0 = a0
 	trail.Attachment1 = a1
 	trail.Color = ColorSequence.new(e.glow, e.color)
-	trail.Transparency = NumberSequence.new(0.2, 1)
-	trail.Lifetime = 0.22
-	trail.LightEmission = 0.6
+	trail.Transparency = NumberSequence.new(0.15, 1)
+	trail.WidthScale = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0.15),
+	})
+	trail.Lifetime = 0.38
+	trail.LightEmission = 0.75
+	trail.LightInfluence = 0
 	trail.FaceCamera = true
 	trail.Parent = part
+
+	local rich = not lite()
+	if rich then
+		attachSparks(part, e)
+	end
 
 	projectiles[id] = {
 		part = part,
@@ -205,6 +360,8 @@ local function spawnProjectile(payload: any)
 		dir = dir,
 		speed = math.clamp(tonumber(payload.speed) or 60, 1, 400),
 		age = 0,
+		baseSize = if rich then part.Size else nil,
+		light = light,
 	}
 	projCount += 1
 end
@@ -224,7 +381,7 @@ local function jitter(s: number, scale: number): number
 	return (math.random() * 2 - 1) * s * scale
 end
 
-local function addTrauma(pos: Vector3, strong: boolean)
+local function addTrauma(pos: Vector3, amount: number, range: number)
 	local plr = localPlayer
 	local char = plr and plr.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -232,13 +389,52 @@ local function addTrauma(pos: Vector3, strong: boolean)
 		return
 	end
 	local d = (root.Position - pos).Magnitude
-	if d > IMPACT.shakeRange then
+	if d > range then
 		return
 	end
 	-- impacto pequeno ≠ tática, e longe sacode menos que no colo
-	local falloff = 1 - d / IMPACT.shakeRange
-	local add = (strong and IMPACT.traumaStrong or IMPACT.traumaWeak) * falloff
-	trauma = math.min(1, trauma + add)
+	trauma = math.min(1, trauma + amount * (1 - d / range))
+end
+
+--- Estilhaços com física de verdade (Anchored = false): custam pouco e são o
+--- que dá peso ao impacto. Devolve quantos saíram (para devolver ao orçamento).
+local function shards(pos: Vector3, color: Color3, want: number, life: number, up: number): number
+	local n = math.min(want, MAX_DEBRIS - debrisAlive)
+	if n <= 0 then
+		return 0
+	end
+	debrisAlive += n
+	for _ = 1, n do
+		local s = 0.35 + math.random() * 0.45
+		local shard = Instance.new("Part")
+		shard.Size = Vector3.new(s, s, s)
+		shard.Color = color
+		decor(shard)
+		shard.Anchored = false -- só estes caem: a gravidade faz a graça
+		shard.CFrame = CFrame.new(pos + Vector3.new(math.random() - 0.5, math.random() * 0.6, math.random() - 0.5))
+			* CFrame.Angles(math.random() * 6, math.random() * 6, 0)
+		shard.AssemblyLinearVelocity =
+			Vector3.new((math.random() - 0.5) * 40, up + math.random() * 18, (math.random() - 0.5) * 40)
+		TweenService:Create(shard, TweenInfo.new(life), { Transparency = 1 }):Play()
+		Debris:AddItem(shard, life)
+	end
+	task.delay(life + 0.1, function()
+		debrisAlive -= n
+	end)
+	return n
+end
+
+--- Onda de choque: disco neon deitado que abre no chão e some. UMA part —
+--- o anel em blocos custa 8 e lê igual a esta distância de jogo.
+local function shockwave(pos: Vector3, color: Color3, diameter: number, life: number)
+	local wave = disc(color, 0.5, diameter * 0.15)
+	wave.Transparency = 0.1
+	wave.CFrame = CFrame.new(pos) * FLAT
+	TweenService:Create(wave, TweenInfo.new(life, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.05, diameter, diameter),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(wave, life + 0.05)
 end
 
 local function impact(payload: any)
@@ -255,8 +451,10 @@ local function impact(payload: any)
 
 	local e = element(payload.element)
 	local strong = payload.strong == true
+	local isLite = lite()
 
-	-- flash: bola neon que abre e some
+	-- flash: bola neon que abre e some. Curto e FORTE — o olho lê o pico, não
+	-- a duração; flash demorado só vira borrão na tela pequena.
 	local flash = Instance.new("Part")
 	flash.Shape = Enum.PartType.Ball
 	flash.Size = Vector3.new(1, 1, 1)
@@ -266,11 +464,11 @@ local function impact(payload: any)
 	flash.CFrame = CFrame.new(pos)
 	local flashLight = Instance.new("PointLight")
 	flashLight.Color = e.glow
-	flashLight.Brightness = strong and 6 or 3
-	flashLight.Range = strong and 26 or 14
+	flashLight.Brightness = strong and 9 or 5
+	flashLight.Range = strong and 32 or 18
 	flashLight.Shadows = false
 	flashLight.Parent = flash
-	local size = strong and 11 or 6
+	local size = strong and 13 or 7
 	TweenService:Create(flash, TweenInfo.new(IMPACT.flashLife, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Size = Vector3.new(size, size, size),
 		Transparency = 1,
@@ -278,34 +476,81 @@ local function impact(payload: any)
 	TweenService:Create(flashLight, TweenInfo.new(IMPACT.flashLife), { Brightness = 0 }):Play()
 	Debris:AddItem(flash, IMPACT.flashLife + 0.05)
 
+	-- onda de choque no chão: é ela que diz "ONDE" o impacto pegou
+	shockwave(pos, e.glow, if strong then IMPACT.strongWave else IMPACT.weakWave, IMPACT.waveLife)
+
 	-- explosão em BLOCOS: cubinhos que voam e somem (nada de partícula cara)
-	local want = strong and IMPACT.strongShards or IMPACT.weakShards
-	local n = math.min(want, MAX_DEBRIS - debrisAlive)
-	if n > 0 then
-		debrisAlive += n
-		for _ = 1, n do
-			local s = 0.35 + math.random() * 0.45
-			local shard = Instance.new("Part")
-			shard.Size = Vector3.new(s, s, s)
-			shard.Color = e.color
-			decor(shard)
-			shard.Anchored = false -- só estes caem: a gravidade faz a graça
-			shard.CFrame = CFrame.new(pos + Vector3.new(math.random() - 0.5, math.random() * 0.6, math.random() - 0.5))
-				* CFrame.Angles(math.random() * 6, math.random() * 6, 0)
-			shard.AssemblyLinearVelocity = Vector3.new(
-				(math.random() - 0.5) * 40,
-				12 + math.random() * 18,
-				(math.random() - 0.5) * 40
-			)
-			TweenService:Create(shard, TweenInfo.new(IMPACT.shardLife), { Transparency = 1 }):Play()
-			Debris:AddItem(shard, IMPACT.shardLife)
-		end
-		task.delay(IMPACT.shardLife + 0.1, function()
-			debrisAlive -= n
-		end)
+	local want = if isLite
+		then (if strong then IMPACT.strongShardsLite else IMPACT.weakShardsLite)
+		else (if strong then IMPACT.strongShards else IMPACT.weakShards)
+	shards(pos, e.color, want, IMPACT.shardLife, 12)
+
+	addTrauma(pos, if strong then IMPACT.traumaStrong else IMPACT.traumaWeak, IMPACT.shakeRange)
+end
+
+-- ------------------------------------------------------------------ sintonia
+--- A FUSÃO (GDD §9): pilar de luz + domo + onda gigante na cor do combo, mais
+--- um soco de cor na tela inteira. Nada aqui se parece com um tiro comum — é o
+--- ponto alto da partida e tem que ser visto do outro lado do mapa.
+local function sintonia(payload: any)
+	if typeof(payload) ~= "table" or payload.phase ~= "fired" then
+		return
+	end
+	local pos = payload.pos
+	if typeof(pos) ~= "Vector3" then
+		return
+	end
+	local combo = Elements.Combos[tostring(payload.comboKey)]
+	local col = (combo and combo.color) or GOLD
+	local radius = math.clamp(tonumber(payload.radius) or 16, 4, 60)
+	local isLite = lite()
+
+	-- 1) PILAR vertical: a leitura à distância. Some subindo.
+	local pillar = disc(col, SINTONIA.pillarHeight, radius * 0.5)
+	pillar.Transparency = 0.25
+	pillar.CFrame = CFrame.new(pos + Vector3.new(0, SINTONIA.pillarHeight * 0.5, 0)) * FLAT
+	TweenService:Create(pillar, TweenInfo.new(SINTONIA.pillarLife, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(SINTONIA.pillarHeight, radius * 1.6, radius * 1.6),
+		Transparency = 1,
+	}):Play()
+	blink(pillar, col, 12, math.min(60, radius * 3), SINTONIA.pillarLife)
+	Debris:AddItem(pillar, SINTONIA.pillarLife + 0.05)
+
+	-- 2) DOMO: a esfera que marca o raio real do combo (é onde doeu). Fora do
+	-- modo leve: uma esfera translúcida de 40+ studs tapa a tela inteira e
+	-- fill-rate é justamente onde o celular fraco morre. Lá o pilar + a onda no
+	-- chão já contam a mesma história.
+	if not isLite then
+		local dome = Instance.new("Part")
+		dome.Shape = Enum.PartType.Ball
+		dome.Size = Vector3.new(2, 2, 2)
+		dome.Color = col
+		decor(dome)
+		dome.Material = Enum.Material.Neon
+		dome.Transparency = 0.45
+		dome.CFrame = CFrame.new(pos)
+		TweenService:Create(dome, TweenInfo.new(SINTONIA.domeLife, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Size = Vector3.new(radius * 2, radius * 2, radius * 2),
+			Transparency = 1,
+		}):Play()
+		Debris:AddItem(dome, SINTONIA.domeLife + 0.05)
 	end
 
-	addTrauma(pos, strong)
+	-- 3) ONDA no chão, no diâmetro do efeito
+	shockwave(pos, col, radius * 2.4, SINTONIA.ringLife)
+
+	if not isLite then
+		shards(pos, col, SINTONIA.shards, SINTONIA.shardLife, 26)
+	end
+
+	addTrauma(pos, SINTONIA.trauma, SINTONIA.shakeRange)
+
+	-- 4) a tela inteira toma a cor do combo por um instante (Atmosphere é dono
+	-- do color grading; se ele não estiver carregado, o resto continua valendo)
+	local a = atmosphere()
+	if a and a.pulse then
+		pcall(a.pulse, col, 1, 0.75)
+	end
 end
 
 -- ------------------------------------------------------------------ números
@@ -364,6 +609,8 @@ function Vfx.init(player: Player)
 	table.insert(conns, Net.event(Net.Names.SpellSpawned).OnClientEvent:Connect(spawnProjectile))
 	table.insert(conns, Net.event(Net.Names.SpellImpact).OnClientEvent:Connect(impact))
 	table.insert(conns, Net.event(Net.Names.DamageNumber).OnClientEvent:Connect(damageNumber))
+	-- a SintoniaUi também escuta este remote (ela desenha o banner, nós o mundo)
+	table.insert(conns, Net.event(Net.Names.SintoniaState).OnClientEvent:Connect(sintonia))
 
 	-- Screen shake DEPOIS da câmera padrão do Roblox — em RenderStepped o script
 	-- de câmera sobrescreveria o offset e o shake sumiria.
@@ -395,6 +642,17 @@ function Vfx.update(dt: number)
 		else
 			p.pos += p.dir * (p.speed * dt)
 			p.part.CFrame = CFrame.lookAt(p.pos, p.pos + p.dir) * shapeOffset(p.shape, p.age)
+			-- pulsação: a magia "respira" enquanto voa. baseSize só existe no
+			-- modo cheio — no leve o projétil é sólido e não custa nada por frame.
+			local base = p.baseSize
+			if base then
+				local k = math.sin(p.age * 16)
+				p.part.Size = base * (1 + 0.1 * k)
+				local l = p.light
+				if l then
+					l.Brightness = 2 + 1.1 * k
+				end
+			end
 		end
 	end
 end

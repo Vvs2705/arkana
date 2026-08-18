@@ -51,6 +51,10 @@ local function hash01(x: number, y: number, salt: number): number
 	return hash32(x, y, salt) / 4294967296
 end
 
+--- Exposto para o Terrain variar COR e TAMANHO por célula sem inventar um
+--- segundo gerador: uma fonte de aleatoriedade só = mesmo mapa em toda máquina.
+Arena.hash01 = hash01
+
 -- --------------------------------------------------------- features da arena
 -- LAGO (nordeste) — elipse + praia de terra em volta (a terra é onde a Água
 -- vira lamaçal, GDD §14).
@@ -211,6 +215,40 @@ function Arena.generate(): Layout
 			local m = layout[cy][cx]
 			if m == "Tree" or m == "Rock" or m == "Water" then
 				layout[cy][cx] = "Grass"
+			end
+		end
+	end
+
+	-- 8.5 SELA OS BOLSÕES SEM SAÍDA. O ruído da floresta deixa buracos de chão
+	-- totalmente cercados por tronco. Ninguém CHEGA neles andando — mas o Match
+	-- escolhe spawn por "célula não bloqueia", não por alcançabilidade, e quem
+	-- nascesse ali passaria a partida preso. Viram árvore: somem do mapa andável
+	-- e ainda engrossam a contiguidade de que o incêndio precisa.
+	-- Vizinhança-4 de propósito (conservador): não aposta que o personagem
+	-- consiga se espremer na diagonal entre dois troncos.
+	local blocked = { Tree = true, Rock = true, Water = true }
+	local seen: { [number]: boolean } = {}
+	local queue: { number } = { 30 * COLS + 30 } -- campo aberto central, sempre livre
+	seen[queue[1]] = true
+	local head = 1
+	while head <= #queue do
+		local k = queue[head]
+		head += 1
+		local cx = k % COLS
+		local cy = (k - cx) / COLS
+		for _, d in ipairs(Grid.NEIGHBORS4) do
+			local x, y = cx + d[1], cy + d[2]
+			local nk = y * COLS + x
+			if inner(x, y) and not seen[nk] and not blocked[layout[y][x]] then
+				seen[nk] = true
+				table.insert(queue, nk)
+			end
+		end
+	end
+	for cy = 1, ROWS - 2 do
+		for cx = 1, COLS - 2 do
+			if not blocked[layout[cy][cx]] and not seen[cy * COLS + cx] then
+				layout[cy][cx] = "Tree"
 			end
 		end
 	end

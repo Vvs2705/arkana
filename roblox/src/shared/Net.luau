@@ -21,6 +21,12 @@ Net.Names = {
 	CastSpell = "CastSpell", -- { kind: "basic"|"tactic", dir: Vector3 }
 	SwitchElement = "SwitchElement", -- { id: Elements.Id }
 	Dodge = "Dodge", -- { dir: Vector3 }
+	--- postura (comandos básicos de BR): { sprint: boolean, crouch: boolean }.
+	--- ROTEAMENTO: quem escuta este remote é o próprio Combat (em Combat.init),
+	--- não o Main — o servidor precisa aplicar a postura dentro do mesmo cálculo
+	--- de WalkSpeed. Está aqui para o `initServer` criá-lo cedo e para o contrato
+	--- ficar visível; NÃO adicionar um segundo handler no Main (dupla escuta).
+	Stance = "Stance",
 	ProposeSintonia = "ProposeSintonia", -- { pos: Vector3 } (Ping de Sintonia, GDD §18.7)
 	AcceptSintonia = "AcceptSintonia", -- { fromUserId: number }
 

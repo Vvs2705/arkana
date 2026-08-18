@@ -29,9 +29,22 @@ local Net = require(Shared:WaitForChild("Net"))
 -- --- constantes de sensação/varredura (NÃO são balanceamento) ---------------
 --- alcance máximo de qualquer projétil. 2D: 720 px ÷ 8 px/stud = 90 studs.
 local MAX_RANGE = 720 / Balance.PX_PER_STUD
+--- Escala do avatar (raia de arte). Require protegido, mesmo padrão do
+--- notifySintonia: o Avatar é cosmético e o Combate não pode cair com ele.
+local AVATAR_SCALE = 1.3
+do
+	local mod = script.Parent and script.Parent:FindFirstChild("Avatar")
+	local ok, m = pcall(require, mod :: ModuleScript)
+	local scale = if ok and typeof(m) == "table" then tonumber((m :: any).SCALE) else nil
+	if scale and scale > 0 then
+		AVATAR_SCALE = scale
+	end
+end
 --- folga de corpo no teste centro-a-centro (2D: 14 px ≈ 1.75 studs, arredondado
---- para 2 porque o torso do avatar Roblox é mais largo que o boneco 2D)
-local HIT_PAD = 2
+--- para 2 porque o torso do avatar Roblox é mais largo que o boneco 2D). O
+--- corpo cresceu com Avatar.SCALE, e a folga cresce junto: sem isto, tiro que
+--- acerta a cabeça na tela erra na mecânica e o TTK medido no playtest mente.
+local HIT_PAD = 2 * AVATAR_SCALE
 --- sub-passo da varredura: menor que meia célula evita túnel em hitch de rede
 local SUBSTEP = Grid.CELL_SIZE * 0.5
 --- ponta do cajado: de onde o projétil nasce (2D: 20 px)
@@ -43,6 +56,30 @@ local MAX_STEP = 0.1
 --- cadência do StatsUpdate para o dono (a mana regenera todo frame; 10 Hz é
 --- imperceptível na HUD e 10x mais barato que replicar a cada Heartbeat)
 local STATS_INTERVAL = 0.1
+
+-- --- POSTURA (comandos básicos de BR: correr / agachar) ---------------------
+-- KNOBS DE CALIBRAÇÃO (não são balanceamento de dano — ajustar no playtest):
+--- correr: rápido o bastante para reposicionar, lento o bastante para não
+--- transformar o mapa inteiro em corrida (padrão do gênero: ~1.3x)
+local SPRINT_MULT = 1.35
+--- agachar: metade da velocidade é o preço de ficar baixo atrás da cobertura
+local CROUCH_MULT = 0.5
+--- quanto o quadril desce ao agachar, em FRAÇÃO do quadril de pé — assim o
+--- agachamento acompanha Avatar.SCALE e qualquer rig sem número mágico (o
+--- corpo abaixa DE VERDADE e replica: o inimigo vê quem está agachado).
+--- ponytail: TETO CONHECIDO — no R6 o HipHeight base é 0, então lá isto vira
+--- no-op visual; o R15 (padrão do Roblox hoje) abaixa normalmente. Agachamento
+--- visível em R6 pede animação de rig, não outro número aqui.
+local CROUCH_HIP_MULT = 0.5
+
+--- Multiplicador de velocidade da postura. Agachar VENCE correr: quem segura
+--- o agachar não corre por acidente.
+local function stanceMult(sprint: boolean, crouch: boolean): number
+	if crouch then
+		return CROUCH_MULT
+	end
+	return if sprint then SPRINT_MULT else 1
+end
 
 -- ---------------------------------------------------------------------- tipos
 type State = {
@@ -65,6 +102,11 @@ type State = {
 	root: BasePart?,
 	hazardAcc: number,
 	walkSpeedSet: number,
+	--- postura (intenção do cliente, aplicada e validada AQUI)
+	sprint: boolean,
+	crouch: boolean,
+	--- HipHeight de pé do rig (R6 e R15 têm bases diferentes)
+	hipBase: number,
 }
 
 type Projectile = {
@@ -102,6 +144,11 @@ local evSpawned: RemoteEvent
 local evImpact: RemoteEvent
 local evStats: RemoteEvent
 local evDamage: RemoteEvent
+--- POSTURA (correr/agachar). O nome NÃO está em Net.Names porque Shared/Net é
+--- do COORDENADOR — Net.event aceita nome livre e cria o RemoteEvent no
+--- servidor / espera no cliente. PENDÊNCIA: oficializar como
+--- Net.Names.Stance = "Stance" e rotear pelo Main, como as outras intenções.
+local evStance: RemoteEvent
 
 -- ------------------------------------------------------------------ Sintonia
 --- O módulo é stub em R1 (no-op) e vira o pilar em R2. Require preguiçoso e
@@ -204,6 +251,14 @@ function Combat.init(terrainModule: any)
 	evImpact = Net.event(Net.Names.SpellImpact)
 	evStats = Net.event(Net.Names.StatsUpdate)
 	evDamage = Net.event(Net.Names.DamageNumber)
+
+	-- intenção de POSTURA: payload tratado como hostil (só dois booleanos saem
+	-- dele). O Main roteia as outras intenções; esta se auto-roteia enquanto o
+	-- nome não entra em Net.Names.
+	evStance = Net.event("Stance")
+	evStance.OnServerEvent:Connect(function(player, payload)
+		Combat.handleStance(player, payload)
+	end)
 end
 
 function Combat.onPlayerAdded(player: Player)
@@ -226,6 +281,9 @@ function Combat.onPlayerAdded(player: Player)
 		root = nil,
 		hazardAcc = 0,
 		walkSpeedSet = -1,
+		sprint = false,
+		crouch = false,
+		hipBase = 0,
 	}
 end
 
@@ -255,7 +313,48 @@ function Combat.onCharacterAdded(player: Player, character: Model, humanoid: Hum
 	st.iframesUntil = 0
 	st.hazardAcc = 0
 	st.walkSpeedSet = -1
+	--- corpo novo nasce de pé: a postura antiga não sobrevive à morte
+	st.sprint = false
+	st.crouch = false
+	st.hipBase = humanoid.HipHeight
+	--- PULO (comando básico de BR, reprovado no teste de 18/08 por não existir):
+	--- o Roblox só obedece JumpPower quando UseJumpPower está ligado. O Main já
+	--- liga; repetimos aqui de graça porque quem cria bot/personagem sem passar
+	--- pelo Main também precisa pular. Com Gravity 196.2, JumpPower 50 = 6.4
+	--- studs de altura — folga larga sobre o rebaixo de 2,5 studs do lago.
+	humanoid.UseJumpPower = true
+	humanoid.JumpPower = Balance.player.jumpPower
+	--- Shift esquerdo é CORRER. O shift-lock nativo (opção do jogador) roubaria
+	--- a tecla, então ele sai de cena — a mira do PC é o cursor no chão, não o
+	--- centro da tela, e nada aqui depende do mouse travado.
+	player.DevEnableMouseLock = false
 	sendStats(st)
+end
+
+--- Intenção de POSTURA vinda do cliente: correr (sprint) e agachar (crouch).
+--- AUTORIDADE: o cliente só pede; quem escreve WalkSpeed é o `step` daqui —
+--- por isso postura NÃO pode ser só um efeito de cliente (seria apagada no
+--- frame seguinte). Payload hostil até prova em contrário: dois booleanos.
+function Combat.handleStance(player: Player, payload: any)
+	local st = states[player]
+	if not st or typeof(payload) ~= "table" then
+		return
+	end
+	st.sprint = (payload :: any).sprint == true
+	local wants = (payload :: any).crouch == true
+	local hum = st.humanoid
+	if wants ~= st.crouch and hum and hum.Parent then
+		if wants then
+			--- mede o quadril DE PÉ no instante de agachar, não no nascimento do
+			--- personagem: a escala do R15 (Avatar.SCALE) chega um frame depois e
+			--- congelar o valor errado deixaria o jogador afundado ao levantar.
+			st.hipBase = hum.HipHeight
+			hum.HipHeight = st.hipBase * CROUCH_HIP_MULT
+		else
+			hum.HipHeight = st.hipBase
+		end
+	end
+	st.crouch = wants
 end
 
 -- ------------------------------------------------------------------ conjuração
@@ -541,8 +640,12 @@ function Combat.step(dt: number)
 			root.AssemblyLinearVelocity = Vector3.new(v.X, root.AssemblyLinearVelocity.Y, v.Z)
 		end
 
-		-- lama/grama alta mudam a velocidade de andar (GDD §14)
-		local want = Balance.player.speed * (terrain.speedMultAt(root.Position) or 1)
+		-- lama/grama alta mudam a velocidade de andar (GDD §14); correr e
+		-- agachar multiplicam por cima — este é o único lugar que escreve a
+		-- WalkSpeed do jogador, então é aqui que a postura vale de fato.
+		local want = Balance.player.speed
+			* (terrain.speedMultAt(root.Position) or 1)
+			* stanceMult(st.sprint, st.crouch)
 		if math.abs(want - st.walkSpeedSet) > 0.01 then
 			hum.WalkSpeed = want
 			st.walkSpeedSet = want
@@ -658,6 +761,13 @@ function Combat.selfTest()
 	rest -= absorbed
 	hp -= math.min(rest, hp)
 	assert(sh == 0 and hp == 80, "70 de dano em 50 de escudo → escudo 0, vida 80")
+
+	-- POSTURA: agachar vence correr e nenhuma postura passa perto de zero
+	assert(stanceMult(false, false) == 1, "de pé = velocidade base")
+	assert(stanceMult(true, false) > 1, "correr tem de ser mais rápido")
+	assert(stanceMult(false, true) < 1, "agachado tem de ser mais lento")
+	assert(stanceMult(true, true) == stanceMult(false, true), "agachar vence correr")
+	assert(Balance.player.speed * stanceMult(false, true) > 1, "agachado ainda anda")
 
 	print("[Combat] autoteste OK")
 	return true
