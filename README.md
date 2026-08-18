@@ -109,6 +109,7 @@ A avaliação de engine e o gatilho para reconsiderar Godot estão em
 
 | Documento | Conteúdo |
 |---|---|
+| [docs/PROJETO.md](docs/PROJETO.md) | **Comece aqui** — da ideia ao estado atual, em narrativa |
 | [docs/GDD.md](docs/GDD.md) | **Fonte da verdade** do produto: classes, magos, balanceamento, monetização, roadmap |
 | [docs/HISTORICO.md](docs/HISTORICO.md) | Como o protótipo foi construído, decisões técnicas e armadilhas conhecidas |
 | [docs/PROJETO_PRISMA.md](docs/PROJETO_PRISMA.md) | Estratégia para elevar o gráfico ao nível comercial |
