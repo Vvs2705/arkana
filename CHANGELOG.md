@@ -2,6 +2,61 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.2.0-roblox — 2026-08-18 — "Campo de Provas" no Roblox (R0–R3)
+
+Primeira versão da vertente **Roblox** (produto de validação — GDD §9 "Decisões
+travadas", plano em `docs/ROBLOX.md`). Terceira pessoa, estética blocky
+(referência Pixel Gun 3D), servidor autoritativo. Código em `roblox/`,
+sincronizado por **Rojo**; `rojo build` gera o arquivo do lugar.
+
+**R0 · Fundação** — projeto Rojo, `Shared/Balance` (porte fiel dos números do
+protótipo 2D + conversão px→studs), `Shared/Elements` (5 elementos com cor +
+FORMA e a matriz dos 10 combos), `Shared/Grid` (materiais imutáveis, estados
+mutáveis) e `Shared/Net` (remotes com sanitização — o cliente manda intenção,
+nunca dano).
+
+**R1 · Os pilares**
+- Arena 60×60 determinística: lago de 205 células contíguas, floresta com
+  densidade **acima do limiar de percolação** (238 de 282 árvores conectadas —
+  abaixo disso o incêndio morre em bolsões e o pilar do GDD §14 não acontece).
+- Terreno reativo completo: fogo propaga e derruba a copa, lago **congela
+  erguendo a lâmina até o chão** (ponte literal), raio eletrocuta toda a água
+  conectada, terra ergue muro, água+terra vira lamaçal.
+- Combate 100% autoritativo: projéteis com tempo de viagem (zero hitscan),
+  mana/cooldown/dano decididos no servidor, Escudo Evolutivo 1→4, i-frames.
+- **Controles com mira e disparo em UM gesto** (correção da reprovação do teste
+  em aparelho real): arrasta do botão da magia e solta; toque curto atira
+  rápido; voltar ao centro cancela. Carrossel de elementos com alvos de 58dp.
+- HUD com nível de escudo em número **e** pips (acessibilidade além da cor),
+  Selo de Arkana, VFX blocky, números de dano e i18n PT-BR/EN.
+
+**R2 · Sintonia (o pilar de inovação, GDD §9)** — os 10 combos com dano em área
+e reação de terreno coerente; janela de 1,5s, canalização interrompível de 1s e
+**cooldown compartilhado cobrado no início** (combo interrompido não devolve o
+custo — é o que impede spam); Ping de Sintonia (GDD §18.7) para combinar sem
+microfone; mana dos dois conjuradores drenada.
+
+**R3 · Loop de battle royale** — `Lobby → Playing → Ended`, zona arcana em 5
+fases com dano crescente, eliminações com crédito de abate, **bots de
+preenchimento** montados em blocos por código (FSM do protótipo: vagar,
+perseguir, atacar, fugir do fogo) e **Selo do Campeão** com abates, dano,
+combos e elementos usados.
+
+### Verificação
+
+`rojo build` limpo e **19 arquivos Luau sem erro de sintaxe** (`luau-compile`).
+Autotestes embutidos: `Combat.selfTest()`, `Sintonia.selfTest()`,
+`Match.selfTest()`. **Playtest é humano** — nada foi jogado ainda.
+
+### Limitações conhecidas
+
+- Sem times: dois jogadores hostis podem disparar um combo entre si (queima o
+  cooldown de ambos). Resolve-se quando houver squads.
+- Atordoamento dos combos elétricos pendente (exige `Combat.applyStatus`).
+- Bots limitados a 11 até haver medição de performance em aparelho fraco.
+- Jogador eliminado ainda consegue conjurar do poleiro de espectador.
+- Fontes Cinzel/Chakra Petch do GDD §10 exigem upload pelo Diretor.
+
 ## v0.1.2 — 2026-08-17 — PRISMA-1: fundação de render
 
 Primeira leva do Projeto Prisma (docs/PROJETO_PRISMA.md §3), executada em

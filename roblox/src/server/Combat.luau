@@ -89,6 +89,14 @@ local projectiles: { Projectile } = {}
 local nextProjectileId = 0
 local statsAcc = 0
 
+-- --- ADIÇÃO ADITIVA DA RAIA R3 (Match/Bots) — nada aqui muda o cálculo de dano
+--- Alvos NÃO-jogadores (bots do Match). `findHit` passa a enxergar quem se
+--- inscreve aqui; sem inscrição, o combate se comporta exatamente como antes.
+local extraTargets: { [Humanoid]: boolean } = {}
+--- Observadores de dano: chamados DEPOIS de aplicar, com o dano efetivo. O
+--- Match usa para crédito de abate e para os números do Selo do Campeão.
+local damageListeners: { (Humanoid, number, Player?) -> () } = {}
+
 --- remotes resolvidos uma vez no init (Net.event faz FindFirstChild por chamada)
 local evSpawned: RemoteEvent
 local evImpact: RemoteEvent
@@ -387,6 +395,10 @@ function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer
 		return
 	end
 
+	for _, fn in ipairs(damageListeners) do
+		fn(targetHumanoid, dealt, fromPlayer)
+	end
+
 	local rootPart = targetHumanoid.RootPart
 	if rootPart then
 		evDamage:FireAllClients({ pos = rootPart.Position, amount = dealt, crit = strong == true })
@@ -416,6 +428,34 @@ end
 function Combat.getElement(player: Player): string?
 	local st = states[player]
 	return if st then st.element else nil
+end
+
+--- SINTONIA (GDD §9) — a outra metade do limitador "consome a magia dos DOIS
+--- conjuradores": a Sintonia cobra o cooldown compartilhado e chama isto para
+--- deixar os dois SECOS. É o que faz "combo errado = dupla vulnerável" ser
+--- verdade mecânica, e não texto de design. Costura do coordenador na
+--- integração da R2/R3 — a Sintonia já chamava esta função de forma opcional.
+function Combat.drainMana(player: Player)
+	local st = states[player]
+	if not st then
+		return
+	end
+	st.mana = 0
+	sendStats(st)
+end
+
+--- Registra/remove um Humanoid não-jogador (bot) como alvo válido das magias.
+function Combat.registerTarget(humanoid: Humanoid)
+	extraTargets[humanoid] = true
+end
+
+function Combat.unregisterTarget(humanoid: Humanoid)
+	extraTargets[humanoid] = nil
+end
+
+--- Assina o fluxo de dano (leitura pura, pós-aplicação).
+function Combat.onDamage(fn: (Humanoid, number, Player?) -> ())
+	table.insert(damageListeners, fn)
 end
 
 -- -------------------------------------------------------------------- impacto
@@ -456,6 +496,16 @@ local function findHit(p: Projectile): Humanoid?
 		end
 		if (root.Position - p.pos).Magnitude ^ 2 < reach2 then
 			return st.humanoid
+		end
+	end
+	-- alvos não-jogadores registrados pela raia R3 (bots): mesma esfera curta
+	for hum in pairs(extraTargets) do
+		local root = hum.RootPart
+		if hum.Health <= 0 or not root or not root.Parent then
+			continue
+		end
+		if (root.Position - p.pos).Magnitude ^ 2 < reach2 then
+			return hum
 		end
 	end
 	return nil

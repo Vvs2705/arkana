@@ -139,15 +139,49 @@ O teste do APK 2D reprovou dois pontos — os dois viram REQUISITO nativo aqui:
 
 ---
 
-## 6. Definition of Done da missão
+## 6. Definition of Done da missão — FECHADO em 18/08/2026
 
-- [ ] R0, R1, R2, R3 completas, cada uma commitada com CHANGELOG atualizado.
-- [ ] `rojo build` gera `.rbxlx` sem erro e a estrutura confere.
-- [ ] Análise estática Luau sem erros; nenhum RemoteEvent confia no cliente.
-- [ ] `docs/ROBLOX.md` (este arquivo) atualizado com o que mudou de verdade.
-- [ ] Memória da equipe atualizada (`_memoria/arkana.md` + `LICOES.md`).
-- [ ] Relatório final ao Diretor: como abrir no Studio, o que testar, o que
-      ficou pendente e o que exige a conta dele (publicar).
+- [x] R0, R1, R2, R3 completas, commitadas, CHANGELOG atualizado (v0.2.0-roblox).
+- [x] `rojo build` gera `.rbxlx` sem erro (233 KB) e a estrutura confere.
+- [x] Verificação estática: **19 arquivos Luau, 0 erros** via `luau-compile`
+      (toolchain Luau 0.734 instalado em `%LOCALAPPDATA%\Programs\luau`).
+      Nota: `luau-analyze` não serve aqui — sem o dump de tipos do Roblox ele
+      acusa `Unknown global 'game'` em todo arquivo. O gate é o `luau-compile`.
+- [x] Nenhum RemoteEvent confia no cliente: `Main.server` sanitiza toda entrada,
+      `Combat` valida vivo/cadência/cooldown/mana com o relógio do servidor, e
+      dano só existe via `Combat.applyDamage` (zona e terreno respeitam isso).
+- [x] Este documento atualizado · [x] Memória da equipe atualizada.
+- [x] Relatório final ao Diretor entregue (ver §10).
+
+### Autotestes embutidos (rodar na Command Bar do Studio)
+```lua
+require(game.ServerScriptService.Server.Combat).selfTest()
+require(game.ServerScriptService.Server.Sintonia).selfTest()
+require(game.ServerScriptService.Server.Match).selfTest()
+```
+
+---
+
+## 10. Como abrir e testar (Diretor)
+
+1. Abra o **Roblox Studio** e crie um lugar vazio (ou abra `roblox/build/arkana.rbxlx`,
+   gerado por `rojo build`).
+2. Para desenvolver com sincronização ao vivo: no terminal, dentro de `roblox/`,
+   rode `rojo serve`; no Studio, plugin **Rojo → Connect**.
+3. Aperte **Play**. Para testar a Sintonia (a pergunta de validação nº 1),
+   use **Test → Clients and Servers → 2 jogadores**.
+
+### O que observar (o que esta missão existe para responder)
+- **V1 Sintonia:** dois magos conjurando elementos diferentes no mesmo alvo em
+  1,5s disparam a canalização e a Magia Combinada. É divertido? Vale o risco?
+- **V2 TTK:** duelo parelho deve durar ~1,5–2,5s. Rápido demais? Lento demais?
+- **V3 Terreno:** queimar a floresta e congelar o lago mudam a partida de fato?
+- **V4 Elementos:** algum domina claramente os outros?
+- **V5 Feel:** o gesto único de mira/disparo resolveu o problema do celular?
+
+### Knobs de calibração (editar `roblox/src/shared/Balance.luau`, não o código)
+velocidade do mago (`player.speed = 22`) · dano do combo (`sintonia.dmgMult = 2.35`)
+· propagação do fogo (`terrain.propagateChance = 0.30`) · ritmo da zona (`match.zone`).
 
 ## 7. O que NENHUM agente faz (fronteira dura)
 
