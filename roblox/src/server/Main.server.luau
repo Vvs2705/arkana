@@ -32,6 +32,23 @@ Combat.init(Terrain)
 Sintonia.init(Terrain, Combat)
 Match.init(Terrain, Combat)
 
+-- ONBOARDING (Campo de Provas de 3 min). Opcional e protegido: se o módulo
+-- faltar, o jogador simplesmente entra direto na partida.
+local okTutorial, Tutorial = pcall(require, ServerModules:WaitForChild("Tutorial") :: ModuleScript)
+if not okTutorial then
+	warn("[ARKANA] tutorial indisponível: " .. tostring(Tutorial))
+	Tutorial = nil
+end
+if Tutorial then
+	-- o cliente avisa quando quer PULAR — é a única intenção do tutorial, e
+	-- pular é sempre permitido (respeitar quem já sabe jogar é parte da spec)
+	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
+		if typeof(payload) == "table" and (payload :: any).skip then
+			pcall(Tutorial.skip, player)
+		end
+	end)
+end
+
 -- Telemetria por último: observa todos os outros, não é observada por ninguém.
 -- Protegida por pcall — se o coletor quebrar, a partida continua de pé.
 local okTelemetry, Telemetry = pcall(require, ServerModules:WaitForChild("Telemetry") :: ModuleScript)
@@ -119,6 +136,13 @@ local function onCharacter(player: Player, character: Model)
 	humanoid.Health = Balance.player.hp
 	avatarSetup(player, character, humanoid)
 	Combat.onCharacterAdded(player, character, humanoid)
+	-- Campo de Provas no PRIMEIRO corpo do jogador: é a primeira coisa que
+	-- alguém de fora vê. O módulo devolve false para quem já passou na sessão.
+	if Tutorial then
+		task.defer(function()
+			pcall(Tutorial.start, player)
+		end)
+	end
 end
 
 local function onPlayer(player: Player)
@@ -139,6 +163,9 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	Combat.onPlayerRemoving(player)
 	Sintonia.onPlayerRemoving(player)
+	if Tutorial and Tutorial.onPlayerRemoving then
+		pcall(Tutorial.onPlayerRemoving, player)
+	end
 	Match.onPlayerRemoving(player)
 end)
 
@@ -148,6 +175,9 @@ RunService.Heartbeat:Connect(function(dt)
 	Combat.step(dt)
 	Sintonia.step(dt)
 	Match.step(dt)
+	if Tutorial then
+		Tutorial.step(dt)
+	end
 end)
 
 print("[ARKANA] servidor pronto — Campo de Provas")

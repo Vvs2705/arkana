@@ -40,6 +40,22 @@ local PT: { [string]: string } = {
 	["sintonia.channeling"] = "CANALIZANDO SINTONIA",
 	["sintonia.broken"] = "SINTONIA INTERROMPIDA",
 
+	-- Onboarding / Campo de Provas (3 min). O roteiro INTEIRO da auditoria cabe
+	-- em cinco frases: se o playtest precisar de uma sexta, o problema é de
+	-- design, não de texto. Nada de "clique aqui para continuar".
+	["tutorial.aim"] = "Arraste, mire, solte.",
+	["tutorial.burn"] = "Queime a passagem.",
+	["tutorial.freeze"] = "Congele o lago.",
+	["tutorial.combo"] = "Pingue COMBO.",
+	["tutorial.done"] = "Você já sabe o necessário.",
+	["tutorial.enter"] = "ENTRAR NO ROYALE",
+	--- respeita quem já sabe jogar: sair é um toque, sem confirmação
+	["tutorial.skip"] = "PULAR",
+	--- só aparece quando o elemento na mão não resolve o passo
+	["tutorial.switch"] = "Troque para %s",
+	--- indicador de antecipação: aparece ao ERRAR, some ao acertar
+	["tutorial.lead"] = "MIRE À FRENTE",
+
 	-- Anúncios do servidor (Net.Announce → { key = "...", ... })
 	["announce.match.waiting"] = "Aguardando magos...",
 	["announce.match.start"] = "A prova começou!",
@@ -53,6 +69,16 @@ local PT: { [string]: string } = {
 	["announce.sintonia.ready"] = "Sintonia disponível",
 	["announce.sintonia.proposed"] = "%s propôs Sintonia",
 	["announce.sintonia.fired"] = "SINTONIA — %s",
+
+	-- RETORNO CONTESTÁVEL (raia do revive). Cair não é o fim: vira espírito, e a
+	-- dupla tem um ritual PÚBLICO para trazer de volta — o anúncio do canal é a
+	-- denúncia que dá ao inimigo a chance de contestar.
+	["announce.revive.spirit"] = "Você virou espírito. Seu parceiro pode trazê-lo de volta num Círculo de Invocação.",
+	["announce.revive.carrying"] = "Essência recolhida — leve até um Círculo de Invocação.",
+	["announce.revive.channel"] = "Um ritual de invocação começou!",
+	["announce.revive.done"] = "%s retornou com o kit base.",
+	--- o arrepio é CONTRA-JOGADA: quem é visto pelo espírito sabe que foi visto
+	["announce.spirit.chill"] = "Um arrepio percorre sua espinha — você foi visto.",
 }
 
 local EN: { [string]: string } = {
@@ -77,6 +103,16 @@ local EN: { [string]: string } = {
 	["sintonia.channeling"] = "CHANNELING ATTUNEMENT",
 	["sintonia.broken"] = "ATTUNEMENT BROKEN",
 
+	["tutorial.aim"] = "Drag, aim, release.",
+	["tutorial.burn"] = "Burn the passage.",
+	["tutorial.freeze"] = "Freeze the lake.",
+	["tutorial.combo"] = "Ping COMBO.",
+	["tutorial.done"] = "You already know what you need.",
+	["tutorial.enter"] = "ENTER THE ROYALE",
+	["tutorial.skip"] = "SKIP",
+	["tutorial.switch"] = "Switch to %s",
+	["tutorial.lead"] = "LEAD THE TARGET",
+
 	["announce.match.waiting"] = "Waiting for mages...",
 	["announce.match.start"] = "The trial has begun!",
 	["announce.match.end"] = "Trial over",
@@ -89,6 +125,12 @@ local EN: { [string]: string } = {
 	["announce.sintonia.ready"] = "Attunement available",
 	["announce.sintonia.proposed"] = "%s proposed Attunement",
 	["announce.sintonia.fired"] = "ATTUNEMENT — %s",
+
+	["announce.revive.spirit"] = "You are a spirit now. Your partner can bring you back at a Summoning Circle.",
+	["announce.revive.carrying"] = "Essence collected — carry it to a Summoning Circle.",
+	["announce.revive.channel"] = "A summoning ritual has begun!",
+	["announce.revive.done"] = "%s came back with the base kit.",
+	["announce.spirit.chill"] = "A chill runs down your spine — you have been seen.",
 }
 
 local tables: { [string]: { [string]: string } } = { pt = PT, en = EN }

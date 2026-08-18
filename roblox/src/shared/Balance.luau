@@ -144,6 +144,18 @@ Balance.terrain = {
 -- ============================================================================
 Balance.experiment = {
 	sintoniaVariant = "A", -- "A" | "B"
+	--- Ritmo da partida. O cronograma atual (5 fases × [30s parada + 25s
+	--- fechando]) dá 4min35 — a auditoria externa julgou agressivo demais para
+	--- um jogo que precisa ensinar tempo de viagem, esquiva, terreno E
+	--- coordenação de dupla ao mesmo tempo. Testar contra durações maiores.
+	---   "blitz" = 4min35 (atual) · "media" = 5min30 · "longa" = 7min15
+	zoneVariant = "media",
+}
+
+local ZONE_VARIANTS = {
+	blitz = { holdTime = 30, shrinkTime = 25 }, -- 275 s
+	media = { holdTime = 36, shrinkTime = 30 }, -- 330 s
+	longa = { holdTime = 47, shrinkTime = 40 }, -- 435 s
 }
 
 local SINTONIA_VARIANTS = {
@@ -195,8 +207,10 @@ Balance.match = {
 		startRadius = 170,
 		endRadius = 12,
 		phases = 5,
-		holdTime = 30,
-		shrinkTime = 25,
+		--- resolvidos por `Balance.experiment.zoneVariant` (ver acima): o código
+		--- continua lendo holdTime/shrinkTime e não sabe que existe variante
+		holdTime = (ZONE_VARIANTS[Balance.experiment.zoneVariant] or ZONE_VARIANTS.blitz).holdTime,
+		shrinkTime = (ZONE_VARIANTS[Balance.experiment.zoneVariant] or ZONE_VARIANTS.blitz).shrinkTime,
 		--- dano por segundo fora da zona, sobe a cada fase
 		dpsPerPhase = { 2, 4, 7, 12, 20 },
 	},

@@ -135,7 +135,9 @@ local statsAcc = 0
 -- --- ADIÇÃO ADITIVA DA RAIA R3 (Match/Bots) — nada aqui muda o cálculo de dano
 --- Alvos NÃO-jogadores (bots do Match). `findHit` passa a enxergar quem se
 --- inscreve aqui; sem inscrição, o combate se comporta exatamente como antes.
-local extraTargets: { [Humanoid]: boolean } = {}
+--- valor = elemento do bot (string) quando informado, senão `true`. Os dois são
+--- verdadeiros, então quem só pergunta "é alvo?" não precisa saber disso.
+local extraTargets: { [Humanoid]: string | boolean } = {}
 --- Observadores de dano: chamados DEPOIS de aplicar, com o dano efetivo. O
 --- Match usa para crédito de abate e para os números do Selo do Campeão.
 local damageListeners: { (Humanoid, number, Player?) -> () } = {}
@@ -201,10 +203,190 @@ local cannotAct: { [Player]: boolean } = {}
 --- Chamado pelo Match: `false` na eliminação, `true` no início da partida.
 function Combat.setCanAct(player: Player, canAct: boolean)
 	cannotAct[player] = if canAct then nil else true
+	if not canAct then
+		--- eliminado não leva status para o poleiro de espectador (nem para a
+		--- próxima partida): a limpeza mora aqui porque este é o ponto único por
+		--- onde a eliminação passa. `clearStatus` é definido mais abaixo — em Lua
+		--- o campo é resolvido na CHAMADA, não aqui.
+		local st = states[player]
+		Combat.clearStatus(if st then st.humanoid else nil)
+	end
 end
 
 function Combat.canAct(player: Player): boolean
 	return not cannotAct[player]
+end
+
+-- ==========================================================================
+-- KERNEL DE STATUS (P1 da auditoria externa)
+-- O problema que ele resolve: os combos de Sintonia PROMETIAM "atordoa" e não
+-- atordoavam. Qualquer efeito escrito direto em `Humanoid.WalkSpeed` durava um
+-- frame — o `Combat.step` reescreve a velocidade todo tick e apagava tudo.
+-- Daqui em diante existe UMA tabela de status e UM produto de velocidade
+-- (postura × terreno × status). Nada de efeito por fora.
+--
+-- TETO DURO DE ATORDOAMENTO — 0,6 a 0,8 s. Justificativa da auditoria: com TTK
+-- de ~3 s, CC longo elimina counterplay (o alvo morre sem poder responder). O
+-- teto é CLAMPADO aqui dentro: nenhum chamador consegue passar disso, nem por
+-- engano nem por bug futuro. Mexer neste número é decisão de design, não de
+-- implementação.
+-- ==========================================================================
+--- ponytail: TETO CONHECIDO — o clamp é POR APLICAÇÃO. Dois atordoamentos que
+--- se sobrepõem no tempo não somam (fica quem termina depois, no máximo 0,8 s a
+--- partir dali), mas dois combos de DUPLAS DIFERENTES em sequência (0,79 s + 0,8
+--- s) encadeariam ~1,6 s. Com `sharedCooldown` de 24 s por dupla isso é raro; se
+--- o playtest mostrar chain-stun, o upgrade é uma janela de imunidade
+--- (`stunImmuneUntil` por Humanoid, ~2 s) — 3 linhas, aqui mesmo.
+local STUN_MAX = 0.8
+--- Reveal: informação também precisa de contra-jogada. 1,5–2,0 s dá para
+--- reagir a um flanco; mais que isso vira caçada pelo mapa inteiro.
+local REVEAL_MAX = 2.0
+--- Lentidão de status: teto de duração e PISO de velocidade — lentidão perto de
+--- zero é atordoamento disfarçado e escaparia do teto acima por outra porta.
+local SLOW_MAX = 3.0
+local SLOW_FLOOR = 0.35
+
+local STATUS_MAX: { [string]: number } = { Stun = STUN_MAX, Reveal = REVEAL_MAX, Slow = SLOW_MAX }
+--- Cor do realce por tipo: efeito que o inimigo não enxerga é efeito que não
+--- existe (a mesma auditoria). Stun = âmbar, Reveal = ciano, Slow = terra.
+local STATUS_COLOR: { [string]: Color3 } = {
+	Stun = Color3.fromHex("#FFE066"),
+	Reveal = Color3.fromHex("#8AE9FF"),
+	Slow = Color3.fromHex("#B98A4A"),
+}
+
+type Status = { expires: number, mag: number, fx: Instance? }
+
+--- CHAVES FRACAS (mesmo motivo do Teams): corpo destruído no meio da partida
+--- some sozinho da tabela em vez de segurar a Instance até o fim do servidor —
+--- é a metade "não vaza entre partidas" do requisito.
+local statuses: { [Humanoid]: { [string]: Status } } = setmetatable({}, { __mode = "k" }) :: any
+
+--- Realce replicado pelo servidor. É a fonte VISÍVEL do efeito.
+--- ponytail: TETO CONHECIDO — Highlight replica para TODOS, então o `Reveal`
+--- também aparece para o time de quem foi revelado. Mostrar só ao time inimigo
+--- exige o CLIENTE criar o Highlight (raia de UI); quando ela existir, este é o
+--- ponto único a trocar por um evento S→C. `pcall` porque Highlight é cosmético
+--- e o kernel de status não pode cair por causa de enfeite.
+local function statusFx(humanoid: Humanoid, kind: string): Instance?
+	local char = humanoid.Parent
+	if not char then
+		return nil
+	end
+	local ok, fx = pcall(function()
+		local hl = Instance.new("Highlight")
+		hl.Name = "Status_" .. kind
+		hl.FillColor = STATUS_COLOR[kind] or Color3.new(1, 1, 1)
+		hl.OutlineColor = STATUS_COLOR[kind] or Color3.new(1, 1, 1)
+		hl.FillTransparency = 0.6
+		--- só o Reveal atravessa parede — é literalmente o efeito dele. Stun e
+		--- Slow marcam quem já está à vista, e não podem virar wallhack.
+		hl.DepthMode = if kind == "Reveal"
+			then Enum.HighlightDepthMode.AlwaysOnTop
+			else Enum.HighlightDepthMode.Occluded
+		hl.Adornee = char
+		hl.Parent = char
+		return hl
+	end)
+	return if ok then fx else nil
+end
+
+--- Aplica (ou renova) um status. Devolve a duração EFETIVA, já clampada — é
+--- assim que o chamador descobre que pediu mais do que o teto permite.
+--- `by` é quem causou (opcional, só para a telemetria ter de quem falar).
+function Combat.applyStatus(humanoid: Humanoid, kind: string, duration: number, magnitude: number?, by: Player?): number
+	local cap = STATUS_MAX[kind]
+	--- tudo tratado como hostil: tipo inválido, NaN e negativo não entram
+	if not humanoid or not cap or typeof(duration) ~= "number" or duration ~= duration then
+		return 0
+	end
+	local d = math.clamp(duration, 0, cap)
+	if d <= 0 or humanoid.Health <= 0 then
+		return 0
+	end
+	local mag = tonumber(magnitude) or 1
+	if kind == "Slow" then
+		mag = math.clamp(mag, SLOW_FLOOR, 1)
+	end
+
+	local entry = statuses[humanoid]
+	if not entry then
+		entry = {}
+		statuses[humanoid] = entry
+	end
+	local cur = entry[kind]
+	local now = os.clock()
+	local expires = now + d
+	if cur and cur.expires > now then
+		--- ainda ATIVO: reaplicar ESTENDE (nunca encurta) e fica com o efeito
+		--- mais forte. Empilhar duração seria como burlar o teto por repetição.
+		cur.expires = math.max(cur.expires, expires)
+		cur.mag = math.min(cur.mag, mag)
+	else
+		--- vencido (a varredura do `step` ainda não passou): entra efeito NOVO —
+		--- senão o alvo herdaria a magnitude do efeito anterior para sempre.
+		if cur and cur.fx then
+			cur.fx:Destroy()
+		end
+		entry[kind] = { expires = expires, mag = mag, fx = statusFx(humanoid, kind) }
+	end
+
+	-- TELEMETRIA: `Shared/Events` é do coordenador e não tem nome para status,
+	-- então isto entra no fluxo `damage` com `amount = 0` — o agregador SOMA
+	-- `amount`, logo nenhum número de dano se mexe; só a contagem de eventos
+	-- cresce. `status` é o campo que separa. PEDIDO NO RELATÓRIO:
+	-- `Events.Name.StatusApplied = "status_applied"`.
+	emit(Events.Name.Damage, by or humanoid, {
+		amount = 0,
+		absorbed = 0,
+		status = kind,
+		duration = d,
+		magnitude = mag,
+		--- quanto foi PEDIDO vs. quanto valeu: é assim que o clamp fica auditável
+		--- no dashboard em vez de virar fé no código.
+		requested = duration,
+		clamped = duration > d,
+		target = humanoid,
+		environmental = by == nil,
+	})
+	return d
+end
+
+--- Tempo restante (0 = sem efeito) e a magnitude. Devolver 0 em vez de nil
+--- poupa um `if` em todo chamador: "está atordoado?" é `> 0`.
+function Combat.getStatus(humanoid: Humanoid, kind: string): (number, number)
+	local entry = statuses[humanoid]
+	local s = if entry then entry[kind] else nil
+	if not s then
+		return 0, 1
+	end
+	local left = s.expires - os.clock()
+	return (if left > 0 then left else 0), s.mag
+end
+
+--- Multiplicador de velocidade VINDO DO STATUS. Entra no MESMO produto que a
+--- postura e o terreno (`Combat.step` e `Bots.move`) — é o contrato que impede
+--- o bug original de voltar: ninguém escreve WalkSpeed por fora daquele produto.
+function Combat.statusSpeedMult(humanoid: Humanoid): number
+	if Combat.getStatus(humanoid, "Stun") > 0 then
+		return 0
+	end
+	local left, mag = Combat.getStatus(humanoid, "Slow")
+	return if left > 0 then mag else 1
+end
+
+--- Limpa TUDO de um corpo (respawn, eliminação, saída, fim de partida).
+function Combat.clearStatus(humanoid: Humanoid?)
+	local entry = if humanoid then statuses[humanoid :: Humanoid] else nil
+	if not entry then
+		return
+	end
+	for _, s in pairs(entry) do
+		if s.fx then
+			s.fx:Destroy()
+		end
+	end
+	statuses[humanoid :: Humanoid] = nil
 end
 
 -- -------------------------------------------------------------------- terreno
@@ -331,6 +513,8 @@ function Combat.onPlayerAdded(player: Player)
 end
 
 function Combat.onPlayerRemoving(player: Player)
+	local old = states[player]
+	Combat.clearStatus(if old then old.humanoid else nil)
 	states[player] = nil
 	cannotAct[player] = nil
 	for i = #projectiles, 1, -1 do
@@ -346,6 +530,11 @@ function Combat.onCharacterAdded(player: Player, character: Model, humanoid: Hum
 		Combat.onPlayerAdded(player)
 		st = states[player]
 	end
+	--- CORPO NOVO NASCE LIMPO: status não sobrevive à morte nem à partida
+	--- anterior. Limpa o corpo velho (que ainda pode estar caindo por aí) e o
+	--- novo (o engine reaproveita Humanoid em alguns fluxos de respawn).
+	Combat.clearStatus(st.humanoid)
+	Combat.clearStatus(humanoid)
 	st.character = character
 	st.humanoid = humanoid
 	st.root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -439,6 +628,9 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 	if not st or cannotAct[player] or not isAlive(st) or not st.root or not st.root.Parent then
 		return -- eliminado não conjura (nem do poleiro de espectador)
 	end
+	if Combat.getStatus(st.humanoid :: Humanoid, "Stun") > 0 then
+		return -- ATORDOADO NÃO CONJURA (kernel de status) — teto de 0,8 s
+	end
 	local now = os.clock()
 
 	if kind == "basic" then
@@ -496,6 +688,9 @@ function Combat.handleDodge(player: Player, dir: Vector3?)
 	if not st or cannotAct[player] or not isAlive(st) then
 		return
 	end
+	if Combat.getStatus(st.humanoid :: Humanoid, "Stun") > 0 then
+		return -- atordoado não esquiva (se esquivasse, o Stun não seria Stun)
+	end
 	local root = st.root
 	if not root or not root.Parent then
 		return
@@ -529,13 +724,29 @@ end
 --- Dano roteado (usado por Combat, Sintonia e Match/zona). O ESCUDO absorve
 --- antes da vida (GDD §5) e i-frames de esquiva ignoram tudo.
 --- `strong` só marca o número de dano como forte na HUD — não altera valor.
-function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer: Player?, strong: boolean?)
+--- `fromNpc` é o AUTOR SEM PLAYER (bot): existe só para a telemetria parar de
+--- carimbar tiro de bot como "ambiente" e misturá-lo com zona/terreno (achado
+--- do Telemetry.coverage). Não entra no cálculo de dano nem no crédito de
+--- escudo — bot não evolui escudo — e os `damageListeners` continuam recebendo
+--- `Player?` (o Match credita abate por jogador; mudar isso é raia dele).
+function Combat.applyDamage(
+	targetHumanoid: Humanoid,
+	amount: number,
+	fromPlayer: Player?,
+	strong: boolean?,
+	fromNpc: Humanoid?
+)
 	if amount <= 0 or targetHumanoid.Health <= 0 then
 		return
 	end
 	local character = targetHumanoid.Parent
 	local target = if character then Players:GetPlayerFromCharacter(character) else nil
 	local tState = if target then states[target] else nil
+	--- elemento do autor não-jogador: o `registerTarget` do bot já guarda isso,
+	--- então o dado sai de onde já existe em vez de virar mais um parâmetro.
+	local npcElement = if fromNpc then extraTargets[fromNpc] else nil
+	local author: any = fromPlayer or fromNpc
+	local authorElement = if typeof(npcElement) == "string" then npcElement else nil
 
 	if tState and os.clock() < tState.iframesUntil then
 		-- ESQUIVA PERFEITA. Emitir aqui é o que torna a esquiva MENSURÁVEL: sem
@@ -543,14 +754,15 @@ function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer
 		-- exatamente esse número que motivou o corte de 0,28 s → 0,18 s
 		-- (auditoria externa 18/08). `nullified` marca dano que NÃO aconteceu —
 		-- o agregador não pode somá-lo ao dano real.
-		emit(Events.Name.Damage, fromPlayer or targetHumanoid, {
+		emit(Events.Name.Damage, author or targetHumanoid, {
 			amount = 0,
 			absorbed = 0,
 			blocked = amount,
 			nullified = true,
 			target = targetHumanoid,
 			strong = strong == true,
-			environmental = fromPlayer == nil,
+			element = authorElement,
+			environmental = author == nil,
 		})
 		return
 	end
@@ -577,17 +789,18 @@ function Combat.applyDamage(targetHumanoid: Humanoid, amount: number, fromPlayer
 	-- sem ator (zona/terreno) o sujeito é quem SOFRE — senão o evento não teria
 	-- de quem falar. `absorbed` separa escudo de vida: é o número que diz se o
 	-- Escudo Evolutivo (GDD §5) está segurando demais ou de menos.
-	emit(Events.Name.Damage, fromPlayer or targetHumanoid, {
+	emit(Events.Name.Damage, author or targetHumanoid, {
 		amount = dealt,
 		absorbed = amount - rest,
 		target = targetHumanoid,
 		strong = strong == true,
-		environmental = fromPlayer == nil,
+		element = authorElement,
+		environmental = author == nil,
 	})
 	if targetHumanoid.Health <= 0 then
 		-- KNOCK = o golpe que derrubou. A ELIMINAÇÃO é do Match (é ele que sabe
 		-- se ainda dá para voltar) — os dois eventos existem de propósito.
-		emit(Events.Name.Knock, targetHumanoid, { by = fromPlayer, amount = dealt })
+		emit(Events.Name.Knock, targetHumanoid, { by = author, amount = dealt })
 	end
 
 	local rootPart = targetHumanoid.RootPart
@@ -626,6 +839,22 @@ end
 --- deixar os dois SECOS. É o que faz "combo errado = dupla vulnerável" ser
 --- verdade mecânica, e não texto de design. Costura do coordenador na
 --- integração da R2/R3 — a Sintonia já chamava esta função de forma opcional.
+--- RETORNO CONTESTÁVEL (GDD §16.6): "traz de volta o jogador, NÃO o poder".
+--- Sem isto o revive devolve o escudo evoluído junto com o mago, e a morte vira
+--- irrelevante — que é exatamente o oposto do que a feature existe para fazer.
+--- Chamado pelo Match ao concluir o ritual no altar. Costura do coordenador.
+function Combat.resetProgress(player: Player)
+	local st = states[player]
+	if not st then
+		return
+	end
+	st.evo = 0
+	st.shieldLv = 1
+	st.shield = Balance.shield.caps[1]
+	st.mana = Balance.player.manaMax
+	sendStats(st)
+end
+
 --- Nível do Escudo Evolutivo (1..4). Existe para a telemetria preencher o
 --- `shield_tier` do contexto padrão — sem ele o dashboard não consegue dizer
 --- se o snowball do escudo dourado (risco apontado na auditoria) é real.
@@ -644,12 +873,15 @@ function Combat.drainMana(player: Player)
 end
 
 --- Registra/remove um Humanoid não-jogador (bot) como alvo válido das magias.
-function Combat.registerTarget(humanoid: Humanoid)
-	extraTargets[humanoid] = true
+--- `element` (opcional) é o elemento DELE: guardado aqui, vira o `element` do
+--- evento de dano quando o bot é o autor (`applyDamage(..., fromNpc)`).
+function Combat.registerTarget(humanoid: Humanoid, element: string?)
+	extraTargets[humanoid] = element or true
 end
 
 function Combat.unregisterTarget(humanoid: Humanoid)
 	extraTargets[humanoid] = nil
+	Combat.clearStatus(humanoid) -- bot morto não leva status para o próximo round
 end
 
 --- Assina o fluxo de dano (leitura pura, pós-aplicação).
@@ -744,17 +976,26 @@ function Combat.step(dt: number)
 		-- que importa para o anti-cheat) continuam 100% no servidor. Se o
 		-- playtest mostrar dash "borrachudo", o upgrade é root:SetNetworkOwner(nil)
 		-- durante o dash, ou trocar por um LinearVelocity de duração fixa.
-		if now < st.dashUntil then
+		local stunned = Combat.getStatus(hum, "Stun") > 0
+		if now < st.dashUntil and not stunned then
 			local v = st.dashDir * (Balance.player.dodge.dist / Balance.player.dodge.duration)
 			root.AssemblyLinearVelocity = Vector3.new(v.X, root.AssemblyLinearVelocity.Y, v.Z)
+		elseif stunned then
+			--- WalkSpeed 0 impede ANDAR, não mata o embalo que já existe: sem
+			--- zerar a horizontal, o atordoado desliza e o efeito não lê.
+			local vel = root.AssemblyLinearVelocity
+			root.AssemblyLinearVelocity = Vector3.new(0, vel.Y, 0)
 		end
 
 		-- lama/grama alta mudam a velocidade de andar (GDD §14); correr e
 		-- agachar multiplicam por cima — este é o único lugar que escreve a
 		-- WalkSpeed do jogador, então é aqui que a postura vale de fato.
+		-- O STATUS entra NESTE produto (nunca por fora): foi escrever WalkSpeed
+		-- por fora que fez o atordoamento dos combos não existir até hoje.
 		local want = Balance.player.speed
 			* (terrain.speedMultAt(root.Position) or 1)
 			* stanceMult(st.sprint, st.crouch)
+			* Combat.statusSpeedMult(hum)
 		if math.abs(want - st.walkSpeedSet) > 0.01 then
 			hum.WalkSpeed = want
 			st.walkSpeedSet = want
@@ -820,6 +1061,27 @@ function Combat.step(dt: number)
 
 		if done then
 			table.remove(projectiles, i)
+		end
+	end
+
+	-- --------------------------------------------------------------- status
+	--- `getStatus` já expira sozinho pela conta do relógio; esta varredura existe
+	--- para APAGAR O REALCE e soltar a tabela. Roda sobre um mapa quase sempre
+	--- vazio (só quem está sob efeito aparece), inclusive bots.
+	for hum, entry in pairs(statuses) do
+		local empty = true
+		for kind, s in pairs(entry) do
+			if now >= s.expires or hum.Health <= 0 then
+				if s.fx then
+					s.fx:Destroy()
+				end
+				entry[kind] = nil
+			else
+				empty = false
+			end
+		end
+		if empty then
+			statuses[hum] = nil
 		end
 	end
 
@@ -896,6 +1158,47 @@ function Combat.selfTest()
 	assert(Combat.getElement(ghost) == "Water", "reabilitado volta a agir")
 	Combat.onPlayerRemoving(ghost)
 	assert(Combat.canAct(ghost), "sair do jogo limpa a trava (o id pode voltar)")
+
+	-- KERNEL DE STATUS (P1) — o TETO do atordoamento é a regra que a auditoria
+	-- comprou: com TTK de ~3 s, CC longo apaga o counterplay. Pedir 5 s tem de
+	-- virar o teto, não 5 s.
+	assert(STUN_MAX >= 0.6 and STUN_MAX <= 0.8, "teto de atordoamento fora da janela 0,6–0,8 s da auditoria")
+	assert(REVEAL_MAX >= 1.5 and REVEAL_MAX <= 2.0, "Reveal fora da janela 1,5–2,0 s")
+	local dummy = Instance.new("Humanoid")
+	local got = Combat.applyStatus(dummy, "Stun", 5)
+	assert(got == STUN_MAX, "CLAMP: pedir 5 s de atordoamento tem de devolver o teto, veio " .. got)
+	local left = Combat.getStatus(dummy, "Stun")
+	assert(left > 0 and left <= STUN_MAX, "atordoamento guardado acima do teto: " .. left)
+	assert(Combat.statusSpeedMult(dummy) == 0, "atordoado NÃO anda")
+	assert(Combat.applyStatus(dummy, "Reveal", 99) == REVEAL_MAX, "Reveal também é clampado")
+	assert(Combat.applyStatus(dummy, "Stun", -3) == 0, "duração negativa não vira status")
+	assert(Combat.applyStatus(dummy, "Vertigem", 1) == 0, "tipo de status inexistente é ignorado")
+	-- lentidão tem PISO: senão viraria atordoamento sem passar pelo teto
+	local other = Instance.new("Humanoid")
+	Combat.applyStatus(other, "Slow", 1, 0)
+	assert(Combat.statusSpeedMult(other) >= SLOW_FLOOR, "lentidão não pode chegar a zero (seria Stun disfarçado)")
+	Combat.clearStatus(other)
+	assert(Combat.statusSpeedMult(other) == 1, "clear devolve a velocidade cheia")
+
+	-- STATUS LIMPA NO RESPAWN: o corpo novo não herda o que grudou no velho
+	local ghost2 = ({} :: any) :: Player
+	Combat.onPlayerAdded(ghost2)
+	local body = Instance.new("Model")
+	local reborn = Instance.new("Humanoid")
+	reborn.Parent = body
+	Combat.applyStatus(reborn, "Stun", 5)
+	assert(Combat.getStatus(reborn, "Stun") > 0, "pré-condição: o corpo estava atordoado")
+	Combat.onCharacterAdded(ghost2, body, reborn)
+	assert(Combat.getStatus(reborn, "Stun") == 0, "RESPAWN tem de limpar o status (senão vaza entre partidas)")
+	assert(Combat.statusSpeedMult(reborn) == 1, "corpo novo nasce com velocidade cheia")
+	-- e a ELIMINAÇÃO também limpa (o espectador não fica atordoado no poleiro)
+	Combat.applyStatus(reborn, "Slow", 2, 0.5)
+	Combat.setCanAct(ghost2, false)
+	assert(Combat.statusSpeedMult(reborn) == 1, "eliminar tem de limpar o status")
+	Combat.onPlayerRemoving(ghost2)
+	body:Destroy()
+	dummy:Destroy()
+	other:Destroy()
 
 	print("[Combat] autoteste OK")
 	return true

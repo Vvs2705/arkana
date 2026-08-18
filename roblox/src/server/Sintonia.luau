@@ -71,6 +71,15 @@ local PUSH_UP = 18
 --   · Cortina de Vapor aplica só Água — vapor é fogo APAGADO, não fogo somado.
 -- `strong` = usa a variante tática da reação (Terra ergue muro em ÁREA).
 -- ============================================================================
+--
+-- STATUS DO COMBO (P1 da auditoria): "atordoa" e "revela" agora são MECÂNICA,
+-- não texto de tabela. Quem guarda e aplica é o KERNEL do Combat
+-- (`Combat.applyStatus`) — é ele que entra no mesmo cálculo de WalkSpeed e que
+-- CLAMPA o atordoamento no teto de 0,8 s. Os números abaixo são fantasia/game
+-- feel desta raia; o teto é lei da outra e não dá para furar daqui.
+-- Lamaçal NÃO aparece com `slow`: a lentidão dele já vem do terreno encharcado
+-- (Balance.terrain.mudSlowMult) e duplicar deixaria a poça duas vezes pior.
+-- ============================================================================
 type Recipe = {
 	--- elementos aplicados ao terreno, na ordem
 	apply: { string },
@@ -79,6 +88,13 @@ type Recipe = {
 	scale: number?,
 	--- empurrão horizontal em studs/s (nil = combo não empurra)
 	push: number?,
+	--- atordoamento em segundos (o Combat clampa no teto — pedir mais é inócuo)
+	stun: number?,
+	--- lentidão: duração em segundos + multiplicador de velocidade
+	slow: number?,
+	slowMult: number?,
+	--- revelação em segundos (o Combat clampa em 2,0 s)
+	reveal: number?,
 }
 
 local K = Elements.comboKey
@@ -90,20 +106,27 @@ local EFFECTS: { [string]: Recipe } = {
 	[K("Fire", "Earth")] = { apply = { "Fire" } },
 	-- Explosão de Plasma: burst; o raio ainda conduz por qualquer poça
 	[K("Fire", "Lightning")] = { apply = { "Lightning", "Fire" }, push = 40 },
-	-- Cortina de Vapor: a água escalda e APAGA o incêndio embaixo
-	[K("Fire", "Water")] = { apply = { "Water" } },
-	-- Eletrocussão: só Raio — a água conectada inteira eletriza (flood fill)
-	[K("Water", "Lightning")] = { apply = { "Lightning" } },
+	-- Cortina de Vapor: a água escalda e APAGA o incêndio embaixo. GDD §9 pede
+	-- "névoa escaldante que cega"; cegueira é efeito de CLIENTE (raia de UI), e
+	-- a metade que o servidor consegue garantir é o passo travado no vapor.
+	[K("Fire", "Water")] = { apply = { "Water" }, slow = 2.0, slowMult = 0.55 },
+	-- Eletrocussão: só Raio — a água conectada inteira eletriza (flood fill).
+	-- O ATORDOAMENTO é a promessa da tabela do GDD §9, e agora existe de fato.
+	[K("Water", "Lightning")] = { apply = { "Lightning" }, stun = 0.7 },
 	-- Lamaçal: a água encharca terra/carvão e vira lama (lentidão severa)
 	[K("Water", "Earth")] = { apply = { "Water" } },
 	-- Tempestade Torrencial: o counter do GDD §9 — APAGA fogo e empurra
 	[K("Water", "Wind")] = { apply = { "Water" }, push = 55 },
-	-- Tempestade de Areia: rajada que abafa chama pequena e cega
-	[K("Earth", "Wind")] = { apply = { "Wind" }, push = 30 },
+	-- Tempestade de Areia: rajada que abafa chama pequena e cega. A areia GRUDA
+	-- em quem está dentro — dentro da nuvem, o marcado é o único visível. É a
+	-- leitura jogável de "cegueira em área" com contra-jogada: dura 1,8 s.
+	[K("Earth", "Wind")] = { apply = { "Wind" }, push = 30, reveal = 1.8 },
 	-- Cristais Carregados: cacho de cristais (muros) + carga elétrica. O terreno
 	-- usa METADE do raio de propósito: o GDD pede MINAS, não uma redoma — um
 	-- disco cheio de muros no raio 16 prenderia o alvo por 20s (wallDuration).
-	[K("Earth", "Lightning")] = { apply = { "Earth", "Lightning" }, strong = true, scale = 0.5 },
+	-- (o "atordoam ao quebrar" da tabela do GDD §9 vira atordoamento no estouro
+	-- inicial: 0,6 s, o piso da janela da auditoria — o combo já prende com muros)
+	[K("Earth", "Lightning")] = { apply = { "Earth", "Lightning" }, strong = true, scale = 0.5, stun = 0.6 },
 	-- Nuvem Tempestuosa: descarga que persegue; conduz na água
 	[K("Wind", "Lightning")] = { apply = { "Lightning" }, push = 25 },
 }
@@ -443,6 +466,20 @@ local function fireChannel(ch: Channel)
 		local credit = if i % 2 == 0 then ch.b else ch.a
 		if combat then
 			combat.applyDamage(hum, dmg, credit, true)
+			-- STATUS pelo KERNEL (P1): o Combat é o único que guarda efeito e o
+			-- único que escreve WalkSpeed. Daqui não dá para furar o teto de
+			-- atordoamento — `applyStatus` clampa e devolve o que valeu.
+			if recipe then
+				if recipe.stun then
+					combat.applyStatus(hum, "Stun", recipe.stun, nil, credit)
+				end
+				if recipe.slow then
+					combat.applyStatus(hum, "Slow", recipe.slow, recipe.slowMult, credit)
+				end
+				if recipe.reveal then
+					combat.applyStatus(hum, "Reveal", recipe.reveal, nil, credit)
+				end
+			end
 		end
 		local push = recipe and recipe.push
 		local root = hum.RootPart
@@ -525,6 +562,30 @@ function Sintonia.registerCast(player: Player, elementId: string, pos: Vector3)
 	end
 
 	table.insert(recent, { player = player, element = element, pos = pos, t = now })
+
+	-- A JANELA ABRIU (1,5 s). Até hoje isto era estado interno do servidor e o
+	-- cliente não tinha como desenhar a barra certa — quem podia completar o
+	-- combo não sabia que tinha uma contagem correndo. Vai para quem conjurou e
+	-- para os ALIADOS (são os únicos que podem fundir; avisar o inimigo seria
+	-- entregar o telegrama antes da hora — o dele é a canalização).
+	-- ponytail: TETO CONHECIDO — sai a cada conjuração que impacta (~4/s no
+	-- básico mais rápido), contra os 10 Hz que o StatsUpdate já manda por
+	-- jogador. Cabe. Se o orçamento de rede no celular reclamar, o upgrade é
+	-- limitar a 1 envio por ~0,3 s por jogador — e NÃO mandar só na borda de
+	-- subida, senão a barra "fecha" enquanto a janela real ainda está renovando.
+	local audience: { Player } = { player }
+	for _, mate in ipairs(Teams.matesOf(player)) do
+		if typeof(mate) == "Instance" and mate:IsA("Player") then
+			table.insert(audience, mate)
+		end
+	end
+	announceState({
+		phase = "window",
+		windowLeft = S.window,
+		byUserId = player.UserId,
+		element = element,
+		pos = pos,
+	}, audience)
 end
 
 -- ------------------------------------------------- Ping de Sintonia (§18.7)
@@ -850,6 +911,26 @@ function Sintonia.selfTest()
 	for _, d in ipairs(dummies) do
 		d:Destroy()
 	end
+
+	-- 3.2) ORÇAMENTO DE CC (P1 da auditoria): com TTK de ~3 s, nenhuma receita
+	--      pode PEDIR atordoamento fora da janela 0,6–0,8 s. O Combat clampa de
+	--      qualquer jeito; isto pega a intenção errada aqui, onde ela nasce.
+	local withStun = 0
+	for key, r in pairs(EFFECTS) do
+		if r.stun then
+			withStun += 1
+			assert(r.stun >= 0.6 and r.stun <= 0.8, "atordoamento fora da janela 0,6–0,8 s em " .. key)
+		end
+		if r.reveal then
+			assert(r.reveal >= 1.5 and r.reveal <= 2.0, "Reveal fora da janela 1,5–2,0 s em " .. key)
+		end
+		if r.slow then
+			assert(r.slowMult and r.slowMult > 0.3 and r.slowMult < 1, "lentidão sem multiplicador sadio em " .. key)
+		end
+	end
+	assert(withStun == 2, "só Eletrocussão e Cristais Carregados atordoam, achei " .. withStun)
+	assert(EFFECTS[K("Water", "Lightning")].stun, "Eletrocussão TEM de atordoar (promessa da tabela do GDD §9)")
+	assert(not EFFECTS[K("Water", "Earth")].slow, "Lamaçal já é lento pelo TERRENO: não duplicar no status")
 
 	-- 4) "mais forte que a soma das partes" (GDD §9)
 	local a, b = Balance.elements.Fire.basic.dmg, Balance.elements.Lightning.basic.dmg

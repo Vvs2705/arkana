@@ -381,6 +381,29 @@ local function jitter(s: number, scale: number): number
 	return (math.random() * 2 - 1) * s * scale
 end
 
+--- ACESSIBILIDADE (costura do coordenador, 18/08): as preferências de conforto
+--- existiam mas não chegavam a quem DESENHA — então "reduzir tremor" não
+--- reduzia tremor nenhum. Require preguiçoso e protegido, o mesmo padrão que
+--- este arquivo já usa para o Atmosphere: sem o módulo, tudo vale 1 e o
+--- comportamento é o de antes.
+local a11y: any = nil
+local function pref(name: string): number
+	if a11y == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Accessibility")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		a11y = (ok and m) or false
+	end
+	if a11y and a11y[name] then
+		local ok, v = pcall(a11y[name])
+		if ok and typeof(v) == "number" then
+			return math.clamp(v, 0, 1)
+		end
+	end
+	return 1
+end
+
 local function addTrauma(pos: Vector3, amount: number, range: number)
 	local plr = localPlayer
 	local char = plr and plr.Character
@@ -392,8 +415,9 @@ local function addTrauma(pos: Vector3, amount: number, range: number)
 	if d > range then
 		return
 	end
-	-- impacto pequeno ≠ tática, e longe sacode menos que no colo
-	trauma = math.min(1, trauma + amount * (1 - d / range))
+	-- impacto pequeno ≠ tática, e longe sacode menos que no colo. O fator de
+	-- conforto entra AQUI, na fonte: quem pediu tremor zero não recebe nenhum.
+	trauma = math.min(1, trauma + amount * (1 - d / range) * pref("shake"))
 end
 
 --- Estilhaços com física de verdade (Anchored = false): custam pouco e são o
@@ -483,6 +507,10 @@ local function impact(payload: any)
 	local want = if isLite
 		then (if strong then IMPACT.strongShardsLite else IMPACT.weakShardsLite)
 		else (if strong then IMPACT.strongShards else IMPACT.weakShards)
+	-- intensidade de VFX escolhida pelo jogador (acessibilidade). Piso de 1
+	-- estilhaço: o impacto continua LEGÍVEL mesmo no mínimo — reduzir conforto
+	-- não pode virar desvantagem competitiva.
+	want = math.max(1, math.floor(want * pref("vfx") + 0.5))
 	shards(pos, e.color, want, IMPACT.shardLife, 12)
 
 	addTrauma(pos, if strong then IMPACT.traumaStrong else IMPACT.traumaWeak, IMPACT.shakeRange)

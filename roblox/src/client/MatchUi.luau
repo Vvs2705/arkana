@@ -20,6 +20,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Net = require(Shared:WaitForChild("Net"))
 local Strings = require(Shared:WaitForChild("Strings"))
+local A11y = require(script.Parent:WaitForChild("Accessibility"))
 
 -- ------------------------------------------------------------------ paleta
 local NIGHT = Color3.fromHex("#0B1026")
@@ -31,12 +32,14 @@ local TEXT_DIM = Color3.fromHex("#9A97AD")
 local DANGER = Color3.fromHex("#E04040")
 local ZONE_VIOLET = Color3.fromHex("#8A5CF0")
 
--- ponytail: rótulos locais porque `Shared/Strings` é da raia D e esta raia não
--- pode editá-lo. Quando a raia D adicionar as chaves `match.*`, isto vira
--- Strings.t() e some. Segue o mesmo idioma que o resto da UI já escolheu.
+-- PENDÊNCIA: migrar para Strings. Estes rótulos são locais porque
+-- `Shared/Strings.luau` é da raia de ONBOARDING nesta leva e esta raia não pode
+-- editá-lo. Quando as chaves `match.*` existirem lá, este bloco vira
+-- Strings.t() e some — nada mais neste arquivo muda.
 local L10N = {
 	pt = {
 		alive = "VIVOS",
+		teams = "TIMES",
 		waiting = "AGUARDANDO MAGOS",
 		starting = "COMEÇA EM",
 		hold = "A ZONA FECHA EM",
@@ -57,6 +60,7 @@ local L10N = {
 	},
 	en = {
 		alive = "ALIVE",
+		teams = "TEAMS",
 		waiting = "WAITING FOR MAGES",
 		starting = "STARTS IN",
 		hold = "ZONE CLOSES IN",
@@ -137,6 +141,13 @@ local st = {
 	radius = math.huge,
 	alive = 0,
 	total = 1,
+	--- EM DUOS A INFORMAÇÃO ÚTIL É "TIMES VIVOS", não "jogadores vivos": com
+	--- 4 vivos o jogador precisa saber se são 4 duplas ou 2. O servidor publica
+	--- `teamsAlive` (e, quando tiver, `teamsTotal`) no Net.MatchState.
+	--- `nil` = o campo ainda não veio nesta leva → a barra volta a contar
+	--- JOGADORES em vez de mentir um número de times.
+	teamsAlive = nil :: number?,
+	teamsTotal = nil :: number?,
 	timeLeft = 0,
 	seal = nil :: any,
 }
@@ -157,6 +168,9 @@ local function buildBar(root: ScreenGui)
 		Size = UDim2.fromOffset(L.barW, L.barH),
 	}, root)
 	mk("UIStroke", { Color = GOLD_DIM, Thickness = 1, Transparency = 0.2 }, bar)
+	--- canônico = destro (alto à DIREITA). No HUD canhoto ela troca de lado
+	--- junto com as barras de vida — o A11y espelha o conjunto.
+	A11y.place(bar, Vector2.new(1, 0), UDim2.new(1, -L.barRight, 0, L.barTop))
 
 	local content = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, bar)
 	mk("UIPadding", {
@@ -250,6 +264,9 @@ local function buildOverlay(root: ScreenGui)
 		Visible = false,
 		ZIndex = 10,
 	}, root)
+	-- fundo de tela cheia não escala junto com a preferência de tamanho: crescer
+	-- 130% só o faria vazar da tela (o card interno já tem UISizeConstraint)
+	overlay:SetAttribute("A11yNoScale", true)
 
 	local card = mk("Frame", {
 		Name = "Seal",
@@ -410,6 +427,7 @@ function MatchUi.init(player: Player)
 	buildBar(root)
 	buildWarning(root)
 	buildOverlay(root)
+	A11y.attach(root)
 	warnText.Text = tr.outside
 	warnSub.Text = tr.outsideSub
 
@@ -422,9 +440,14 @@ function MatchUi.init(player: Player)
 			st.state = tostring(p.state or st.state)
 			st.phase = tonumber(p.phase) or st.phase
 			st.phases = tonumber(p.phases) or st.phases
+			local wasShrinking = st.shrinking
 			st.shrinking = p.shrinking == true
 			st.alive = tonumber(p.alive) or 0
 			st.total = math.max(1, tonumber(p.total) or 1)
+			--- FALLBACK SILENCIOSO: `tonumber(nil)` é `nil`, então enquanto a raia
+			--- do Match não publicar estes campos a barra segue contando jogadores.
+			st.teamsAlive = tonumber(p.teamsAlive)
+			st.teamsTotal = tonumber(p.teamsTotal)
 			st.timeLeft = tonumber(p.timeLeft) or 0
 			if typeof(p.zoneCenter) == "Vector3" then
 				st.center = p.zoneCenter
@@ -443,6 +466,12 @@ function MatchUi.init(player: Player)
 					hideSeal()
 				end
 			end
+
+			-- LEGENDA: "a zona começou a fechar" é um cue que hoje só existe na
+			-- cor do relógio. Quem joga sem som (ou sem reparar no canto) lê aqui.
+			if st.shrinking and not wasShrinking then
+				A11y.caption(tr.shrink, ZONE_VIOLET, 2.2)
+			end
 		end)
 	)
 end
@@ -454,7 +483,16 @@ function MatchUi.update(dt: number)
 	st.timeLeft = math.max(0, st.timeLeft - dt)
 
 	-- ------------------------------------------------------------- barra
-	aliveLabel.Text = string.format("%s %d/%d", tr.alive, st.alive, st.total)
+	--- Em duos o que decide a jogada é QUANTOS TIMES restam. Sem `teamsTotal` a
+	--- barra mostra só o contador — melhor um número certo sem denominador do
+	--- que "4/8" com o 8 inventado aqui.
+	if st.teamsAlive then
+		aliveLabel.Text = if st.teamsTotal
+			then string.format("%s %d/%d", tr.teams, st.teamsAlive, st.teamsTotal)
+			else string.format("%s %d", tr.teams, st.teamsAlive)
+	else
+		aliveLabel.Text = string.format("%s %d/%d", tr.alive, st.alive, st.total)
+	end
 	if st.state == "Lobby" then
 		zoneLabel.Text = string.format("%s %s", tr.starting, clock(st.timeLeft))
 		zoneLabel.TextColor3 = TEXT
@@ -471,6 +509,7 @@ function MatchUi.update(dt: number)
 	end
 
 	-- ----------------------------------------------- fora da zona (só aviso)
+	local wasOutside = outside
 	outside = false
 	if st.state == "Playing" then
 		local char = localPlayer and (localPlayer :: Player).Character
@@ -484,8 +523,15 @@ function MatchUi.update(dt: number)
 	end
 	warn.Visible = outside
 	if outside then
+		-- LEGENDA só na ENTRADA: fora da zona é estado contínuo e a faixa é para
+		-- "aconteceu isto agora" — repetir por frame viraria ruído.
+		if not wasOutside then
+			A11y.caption(tr.outside, DANGER, 2.0)
+		end
 		pulse = (pulse + dt * L.warnHz) % 1
-		local a = 0.15 + 0.35 * (1 - math.cos(pulse * math.pi * 2)) / 2
+		--- "reduzir flashes": com o pulso em 0 o aviso fica ACESO e fixo em vez
+		--- de sumir — reduzir piscada nunca pode reduzir informação.
+		local a = 0.15 + 0.35 * (1 - math.cos(pulse * math.pi * 2)) / 2 * A11y.flash()
 		warnText.TextTransparency = a
 		warnSub.TextTransparency = a * 0.6
 	end

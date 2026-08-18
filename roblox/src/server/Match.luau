@@ -5,12 +5,22 @@
 -- Escopo do GDD §19.2: 20 jogadores, partidas curtas (4–6 min).
 --
 -- AUTORIDADE (docs/ROBLOX.md §3): a partida INTEIRA é decidida aqui. O cliente
--- só recebe Net.MatchState/Net.Announce e apresenta. Nenhum remote C→S entra
--- neste módulo — não existe intenção de cliente capaz de mudar a partida.
+-- só recebe Net.MatchState/Net.Announce e apresenta. A ÚNICA intenção C→S que
+-- entra aqui é o "arrepio" do espírito (Match.spiritPing) — e ela não muda a
+-- partida: marca uma posição. Roteada no próprio `init`, pelo mesmo motivo que
+-- o Combat roteia a postura: o remote não está em Net.Names (Shared é do
+-- COORDENADOR) e Net.event aceita nome livre. Oficializar depois.
 --
 -- FRONTEIRA DE DANO: a zona NUNCA escreve em Humanoid.Health. Ela calcula o DPS
 -- da fase e manda Combat.applyDamage decidir (escudo, i-frames, número na tela)
 -- — a mesma fronteira que o Terrain respeita com `hazardAt`.
+--
+-- RETORNO CONTESTÁVEL (GDD §16.6 + §18.6): morrer cedo não encerra a sessão.
+-- Quem cai vira ESPÍRITO (não conjura, acompanha a dupla, dá UM arrepio); o
+-- parceiro recolhe a ESSÊNCIA e canaliza num ALTAR fixo e visível. O ritual é
+-- denunciado (cor + anúncio), só vale ANTES da fase final da zona e UMA vez por
+-- dupla, e devolve o jogador com KIT BASE. Traz o jogador de volta sem tornar a
+-- morte irrelevante — e cria disputa por altar em vez de menu de espectador.
 --
 -- Ciclo: Lobby → Playing → Ended → Lobby (o servidor nunca "acaba").
 -- ============================================================================
@@ -60,7 +70,39 @@ local TUNE = {
 	maxBots = 11,
 } :: { [string]: number }
 
+-- --- RITUAL DE RESSURREIÇÃO (GDD §16.6 + §18.6) -----------------------------
+--- Regra do projeto: "números viram dados; o código lê dados". Estes ainda não
+--- têm campo em Balance (`Balance.match.revive` é do COORDENADOR), então a
+--- leitura JÁ está pronta e o padrão daqui só vale enquanto o campo não existe.
+--- Rebalancear o ritual = criar `Balance.match.revive`, sem tocar neste arquivo.
+local RV: any = (M :: any).revive or {}
+local REVIVE = {
+	--- canalização no altar. O GDD §16.6 diz 7 s; a auditoria pediu ~6 s —
+	--- longo o bastante para ser contestável, curto o bastante para tentar.
+	channel = RV.channel or 6.0,
+	--- raio do altar: sair daqui ZERA a canalização (não pausa)
+	radius = RV.radius or 12,
+	--- distância para o aliado recolher a essência do chão
+	pickup = RV.pickup or 10,
+	--- quantos altares nascem no mapa. Pontos FIXOS (GDD §16.6): o inimigo sabe
+	--- onde o revive vai acontecer — é isso que transforma o ritual em disputa.
+	altars = RV.altars or 4,
+	--- fração do raio inicial da zona onde o anel de altares fica
+	ringFrac = RV.ringFrac or 0.45,
+	--- altura em que o espírito flutua sobre a essência. Projétil voa na
+	--- HORIZONTAL na altura do peito: lá em cima o espírito não vira escudo.
+	hoverY = RV.hoverY or 12,
+	--- alcance do arrepio, medido a partir do próprio espírito (não do mapa)
+	pingRange = RV.pingRange or 70,
+	--- segundos que o inimigo revelado fica marcado para a dupla (GDD §18.6)
+	pingHold = RV.pingHold or 2.0,
+}
+
 local ZONE_COLOR = Color3.fromHex("#8A5CF0")
+local ALTAR_COLOR = Color3.fromHex("#C9A227")
+--- cor do altar EM RITUAL: a denúncia visual que o inimigo lê de longe
+local ALTAR_HOT = Color3.fromHex("#FF3B6B")
+local ESSENCE_COLOR = Color3.fromHex("#7FE8FF")
 
 -- ------------------------------------------------------------------- estado
 type PlayerStat = {
@@ -70,6 +112,24 @@ type PlayerStat = {
 	elements: { [string]: boolean },
 	combos: { string },
 }
+
+--- Estado de um caído que ainda PODE voltar. Existe do knock até o retorno (ou
+--- até a fase final fechar o ritual). Um por jogador — uma dupla tem no máximo
+--- um retorno, e é `revivesUsed` que garante isso.
+type Spirit = {
+	--- time no instante da queda (o limite é POR DUPLA, não por jogador)
+	team: number?,
+	--- a essência: objeto do mundo, é ela que o aliado carrega
+	orb: BasePart?,
+	--- quem está levando (nil = caída no chão, esperando ser recolhida)
+	carrier: Player?,
+	--- segundos acumulados de canalização no altar
+	channel: number,
+	--- arrepios restantes (GDD §18.6: UM)
+	ping: number,
+}
+
+type Altar = { pos: Vector3, pad: BasePart, beam: BasePart, hot: boolean }
 
 local Match = {}
 
@@ -107,12 +167,20 @@ local deathWired: { [Humanoid]: boolean } = {}
 local champion: any = nil
 local seal: any = nil
 
+--- caídos que ainda podem voltar, e as duplas que JÁ gastaram o retorno
+local spirits: { [Player]: Spirit } = {}
+local revivesUsed: { [number]: boolean } = {}
+local altars: { Altar } = {}
+--- nº de bots fixado pelo harness de playtest (Match.forceStart); nil = normal
+local forcedBots: number? = nil
+
 local stateAcc = 0
 local zoneAcc = 0
 local rng = Random.new()
 
 local evState: RemoteEvent
 local evAnnounce: RemoteEvent
+local evSpirit: RemoteEvent
 
 -- ------------------------------------------------------------------ helpers
 local function flatDist(a: Vector3, b: Vector3): number
@@ -227,6 +295,42 @@ end
 
 local function aliveCount(): number
 	return #alivePlayers() + Bots.aliveCount()
+end
+
+--- Os vivos como MEMBROS DE TIME. Não dá para reaproveitar `aliveEntities`: a
+--- chave de time de um jogador é o Player, e a de um bot é o Humanoid.
+local function aliveMembers(): { Teams.Member }
+	local list: { Teams.Member } = {}
+	for _, player in ipairs(alivePlayers()) do
+		table.insert(list, player)
+	end
+	for _, bot in ipairs(Bots.list()) do
+		if bot.humanoid.Health > 0 and bot.root.Parent then
+			table.insert(list, bot.humanoid)
+		end
+	end
+	return list
+end
+
+--- Quantos TIMES distintos há nesta lista. Em duos é esta a informação útil
+--- ("3 times restantes" > "5 magos vivos") — a UI mostra isto, não o outro.
+--- Recebe a lista de fora só para o autoteste conseguir chamá-la sem partida.
+local function countTeams(members: { Teams.Member }): number
+	local seen: { [number]: boolean } = {}
+	local count = 0
+	local loose = 0
+	for _, member in ipairs(members) do
+		local id = Teams.teamOf(member)
+		if id == nil then
+			--- fora de partida (lobby) ninguém tem time: cada um conta por si,
+			--- senão a UI anunciaria "0 times" com gente viva na tela
+			loose += 1
+		elseif not seen[id] then
+			seen[id] = true
+			count += 1
+		end
+	end
+	return count + loose
 end
 
 -- --------------------------------------------------------------------- zona
@@ -381,6 +485,312 @@ local function nameOf(hum: Humanoid): string
 	return if char then char.Name else "?"
 end
 
+-- ============================================================================
+-- RITUAL DE RESSURREIÇÃO — Espírito → Essência → Altar → Retorno
+-- (GDD §16.6 "Círculo de Invocação" + §18.6 "Espírito Errante")
+--
+-- POR QUE ISTO EXISTE: sem retorno, morrer aos 40 s de uma partida de 5 min
+-- termina a sessão do jogador — e um jogo que quer ENSINAR coordenação de dupla
+-- não pode tirar metade da dupla do ar no primeiro erro. Free Fire, Apex e
+-- Fortnite resolvem com retorno CONTESTÁVEL: quem volta, volta porque o
+-- parceiro atravessou o mapa e sobreviveu a um ritual denunciado.
+--
+-- OS QUATRO FREIOS que impedem "morte não importa": custo de tempo (6 s parado),
+-- custo de posição (altar é ponto FIXO — dá para campear), custo de progresso
+-- (volta com kit base) e teto duro (uma vez por dupla, e nunca na fase final).
+-- ============================================================================
+
+--- Peça de mundo do ritual (altar e essência). Sem colisão e sem query: nada
+--- aqui empurra jogador nem explode projétil — o ritual é ALVO, não obstáculo.
+local function neonPart(name: string, size: Vector3, cf: CFrame, transparency: number): BasePart
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = Enum.Material.Neon
+	p.Color = ALTAR_COLOR
+	p.Transparency = transparency
+	p.Size = size
+	p.CFrame = cf
+	p.Parent = Workspace
+	return p
+end
+
+--- Ponto ANDÁVEL mais próximo, caminhando em direção ao centro da arena (mesmo
+--- truque do `spawnPoints`). Altar dentro de uma rocha seria altar inalcançável
+--- — e o mapa é sorteado a cada partida, então isto não é caso raro.
+local function walkableNear(pos: Vector3): Vector3
+	local toCenter = Vector3.new(-pos.X, 0, -pos.Z)
+	local step = if toCenter.Magnitude > 1e-3
+		then toCenter.Unit * Grid.CELL_SIZE
+		else Vector3.new(Grid.CELL_SIZE, 0, 0)
+	local p = pos
+	for _ = 0, 10 do
+		local cx, cy = Grid.worldToCell(p)
+		if Grid.inBounds(cx, cy) and not terrain.isBlocking(cx, cy) then
+			return Grid.cellToWorld(cx, cy)
+		end
+		p += step
+	end
+	return pos
+end
+
+local function clearAltars()
+	for _, a in ipairs(altars) do
+		a.pad:Destroy()
+		a.beam:Destroy()
+	end
+	table.clear(altars)
+end
+
+--- Anel FIXO de altares. Fixo é o ponto do design: o inimigo aprende os quatro
+--- lugares do mapa onde alguém pode voltar, e passa a vigiá-los.
+local function buildAltars()
+	clearAltars()
+	local r = Z.startRadius * REVIVE.ringFrac
+	for i = 1, REVIVE.altars do
+		local a = (i - 0.5) / REVIVE.altars * math.pi * 2
+		local at = walkableNear(Vector3.new(math.cos(a) * r, Grid.FLOOR_Y, math.sin(a) * r))
+		local d = REVIVE.radius * 2
+		-- círculo no chão: a ÁREA em que o ritual acontece, do tamanho exato do
+		-- raio de canalização (o jogador lê a regra sem tutorial).
+		local pad = neonPart(
+			"CirculoDeInvocacao",
+			Vector3.new(0.4, d, d),
+			CFrame.new(at.X, Grid.FLOOR_Y + 0.3, at.Z) * CFrame.Angles(0, 0, math.pi / 2),
+			0.45
+		)
+		pad.Shape = Enum.PartType.Cylinder
+		-- pilar: é o que se vê do outro lado do mapa ("visível" do GDD §16.6)
+		local beam = neonPart(
+			"FarolDoAltar",
+			Vector3.new(2, 90, 2),
+			CFrame.new(at.X, Grid.FLOOR_Y + 45, at.Z),
+			0.62
+		)
+		table.insert(altars, { pos = at, pad = pad, beam = beam, hot = false })
+	end
+end
+
+--- Acende/apaga o altar. Só escreve na TRANSIÇÃO: pulsar a transparência todo
+--- frame replicaria 4 propriedades × 60 Hz para 20 clientes por nada.
+local function setAltarHot(a: Altar, hot: boolean)
+	if a.hot == hot then
+		return
+	end
+	a.hot = hot
+	local color = if hot then ALTAR_HOT else ALTAR_COLOR
+	a.pad.Color = color
+	a.beam.Color = color
+	a.beam.Transparency = if hot then 0.15 else 0.62
+	a.pad.Transparency = if hot then 0.15 else 0.45
+end
+
+--- O retorno ainda é possível para esta dupla? PURA de propósito (o autoteste
+--- chama sem partida): a fase da zona e o teto de uma vez por dupla são os dois
+--- limites que impedem o revive de tornar a morte irrelevante.
+--- O corte é por FASE (`zone.phase`), NUNCA por segundo absoluto — assim ele
+--- significa a mesma coisa nas três variantes de ritmo do Balance.
+local function reviveAllowed(team: number?): boolean
+	return zone.phase < Z.phases and team ~= nil and not revivesUsed[team]
+end
+
+--- Corpo de ESPÍRITO: translúcido, sem colisão e ANCORADO. Ancorar não é
+--- economia — é o que impede o morto de virar batedor voando pelo mapa. Ele só
+--- acompanha a própria essência, e a altura o mantém fora do alcance dos
+--- projéteis (que voam na horizontal): espírito não serve de escudo humano.
+local function ghostify(player: Player)
+	local char = player.Character
+	if not char then
+		return
+	end
+	for _, d in ipairs(char:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanQuery = false
+			d.Anchored = true
+			if d.Transparency < 0.65 then
+				d.Transparency = 0.65
+			end
+		end
+	end
+end
+
+local function clearSpirit(player: Player)
+	local sp = spirits[player]
+	if not sp then
+		return
+	end
+	if sp.orb then
+		sp.orb:Destroy()
+	end
+	spirits[player] = nil
+end
+
+local function clearAllSpirits()
+	for player in pairs(spirits) do
+		clearSpirit(player)
+	end
+end
+
+--- Queda de quem ainda pode voltar: nasce a essência no lugar do corpo. Se a
+--- dupla já gastou o retorno (ou a zona entrou na fase final), NÃO nasce nada e
+--- o jogador segue o caminho antigo — espectador no poleiro.
+local function makeSpirit(player: Player, at: Vector3)
+	local team = Teams.teamOf(player)
+	if not reviveAllowed(team) then
+		return
+	end
+	local orb = neonPart("EssenciaArcana", Vector3.new(2.5, 2.5, 2.5), CFrame.new(at + Vector3.new(0, 3, 0)), 0.15)
+	orb.Shape = Enum.PartType.Ball
+	orb.Color = ESSENCE_COLOR
+	spirits[player] = { team = team, orb = orb, carrier = nil, channel = 0, ping = 1 }
+	announceTo(player, "announce.revive.spirit")
+end
+
+--- Altar em que este jogador está pisando (nil = fora de qualquer área).
+local function altarNear(player: Player): Altar?
+	local _, root = livePlayer(player)
+	if not root then
+		return nil
+	end
+	for _, a in ipairs(altars) do
+		if flatDist(root.Position, a.pos) <= REVIVE.radius then
+			return a
+		end
+	end
+	return nil
+end
+
+--- Ritual concluído: o jogador VOLTA, o poder não (GDD §16.6).
+local function completeRevive(player: Player, sp: Spirit, at: Vector3)
+	local carrier = sp.carrier
+	local team = sp.team
+	if team then
+		revivesUsed[team] = true -- teto duro: uma vez por dupla, por partida
+	end
+	clearSpirit(player)
+	unmarkEliminated(player) -- volta a poder conjurar (a trava é do Combat)
+
+	-- KIT BASE: sem escudo evoluído, sem progresso. Quem sabe de escudo/evolução
+	-- é o Combat — o Match só PEDE. Chamado ANTES do corpo novo de propósito: o
+	-- `onCharacterAdded` do Combat enche o escudo no cap do nível ATUAL, que
+	-- depois deste reset já é o nível 1.
+	-- ponytail: TETO CONHECIDO — enquanto a raia de combate não expuser
+	-- `Combat.resetProgress`, o revivido volta com o nível de escudo que
+	-- conquistou e o freio "volta o jogador, não o poder" fica só no papel.
+	if combat.resetProgress then
+		combat.resetProgress(player)
+	end
+
+	task.spawn(function()
+		player:LoadCharacter()
+		local char = player.Character
+		if char then
+			char:PivotTo(CFrame.new(at + Vector3.new(0, 4, 0)))
+		end
+	end)
+
+	announceAll("announce.revive.done", player.DisplayName)
+	emit(Events.Name.ReviveComplete, player, {
+		by = carrier,
+		team = team,
+		zone_phase = zone.phase,
+		channel = REVIVE.channel,
+	})
+end
+
+--- Um passo do ritual. É o ÚNICO lugar que mexe em `spirits` durante a partida:
+--- recolhimento, transporte, canalização e retorno moram juntos porque são o
+--- mesmo estado — separar em módulos daria três lugares para dessincronizar.
+local function stepRevive(dt: number)
+	local open = zone.phase < Z.phases
+	local hot: { [Altar]: boolean } = {}
+
+	for player, sp in pairs(spirits) do
+		local orb = sp.orb
+		if not player.Parent or not (orb and orb.Parent) then
+			clearSpirit(player)
+			continue
+		end
+
+		-- carregador precisa continuar VIVO e em jogo; se cair, a essência fica
+		-- onde ele estava (é o momento em que o revive vira contra-ataque).
+		local carrier = sp.carrier
+		if carrier and not (carrier.Parent and not eliminated[carrier] and (livePlayer(carrier))) then
+			sp.carrier = nil
+			sp.channel = 0
+		end
+
+		if sp.carrier then
+			local _, root = livePlayer(sp.carrier :: Player)
+			if root then
+				orb.CFrame = root.CFrame * CFrame.new(0, 5, 0)
+			end
+		else
+			-- no chão: qualquer ALIADO VIVO que chegue perto recolhe. Sem botão:
+			-- num jogo de polegar, "chegar perto" já é a intenção.
+			for _, mate in ipairs(Teams.matesOf(player)) do
+				if typeof(mate) == "Instance" and mate:IsA("Player") and not eliminated[mate] then
+					local _, root = livePlayer(mate)
+					if root and flatDist(root.Position, orb.Position) <= REVIVE.pickup then
+						sp.carrier = mate
+						announceTo(mate, "announce.revive.carrying")
+						break
+					end
+				end
+			end
+		end
+
+		-- o espírito flutua sobre a própria essência: antes de recolhida, sobre
+		-- o corpo; depois, junto do parceiro. Uma posição só para as duas coisas.
+		local char = player.Character
+		local _, ghostRoot = livePlayer(player)
+		if char and ghostRoot then
+			char:PivotTo(CFrame.new(orb.Position + Vector3.new(0, REVIVE.hoverY, 0)))
+		end
+
+		local altar = if open and sp.carrier then altarNear(sp.carrier :: Player) else nil
+		if altar then
+			if sp.channel <= 0 then
+				-- ÁREA DENUNCIADA: o altar acende e TODO MUNDO ouve. O ritual não
+				-- é escapatória silenciosa — é um convite para brigar aqui.
+				announceAll("announce.revive.channel")
+				emit(Events.Name.ReviveStart, sp.carrier, {
+					spirit = player,
+					team = sp.team,
+					zone_phase = zone.phase,
+					channel = REVIVE.channel,
+				})
+			end
+			hot[altar] = true
+			sp.channel += dt
+			if sp.channel >= REVIVE.channel then
+				completeRevive(player, sp, altar.pos)
+			end
+		elseif sp.channel > 0 then
+			sp.channel = 0 -- saiu da área: recomeça do zero, não pausa
+		end
+	end
+
+	for _, a in ipairs(altars) do
+		setAltarHot(a, hot[a] == true)
+	end
+
+	-- FASE FINAL: o ritual fecha para todo mundo e os espíritos pendentes viram
+	-- espectadores. É o mesmo corte por FASE do `reviveAllowed` — aplicado
+	-- continuamente, ele também é o prazo de validade da essência.
+	if not open and next(spirits) ~= nil then
+		for player in pairs(spirits) do
+			clearSpirit(player)
+			perch(player)
+		end
+	end
+end
+
 local function buildSeal(): any
 	if not champion then
 		return nil
@@ -417,6 +827,20 @@ local function buildSeal(): any
 		duration = math.floor(os.clock() - matchStartedAt),
 		total = totalAtStart,
 	}
+end
+
+--- FIM DE PARTIDA EM DUOS (decisão do coordenador, 18/08): a partida acaba
+--- quando resta UMA DUPLA, não um jogador. Com a contagem antiga, a última
+--- dupla viva ficava esperando a zona matar um dos dois — o vencedor tinha de
+--- perder o parceiro para ganhar, o que é o oposto de um jogo sobre cooperar.
+--- Cai para a contagem de jogadores quando não há times montados (solo/lobby).
+local function matchOver(): boolean
+	local members = aliveMembers()
+	local teams = countTeams(members)
+	if teams > 0 then
+		return teams <= 1
+	end
+	return #members <= 1
 end
 
 local function finish()
@@ -464,9 +888,20 @@ local function onDeath(hum: Humanoid)
 		return
 	end
 	local victim = hum.Parent and Players:GetPlayerFromCharacter(hum.Parent :: Instance)
+	-- QUEM JÁ SAIU NÃO SAI DE NOVO. O corpo de espectador/espírito continua
+	-- sujeito ao perigo de célula (o hazard do terreno é por célula e ignora
+	-- altura), e sem este guard cada morte repetida contaria colocação, abate e
+	-- `place` — envenenando exatamente o dado que a auditoria quer ler.
+	if victim and eliminated[victim] then
+		return
+	end
 	if victim then
 		markEliminated(victim) -- e a partir daqui ele não conjura mais
 		announceTo(victim, "announce.death")
+		-- ESPÍRITO (GDD §18.6): se a dupla ainda tem retorno e a zona não chegou
+		-- na fase final, a essência fica no chão e a sessão dele continua.
+		local root = hum.RootPart
+		makeSpirit(victim, if root then root.Position else zone.center)
 	end
 
 	local credit = lastHit[hum]
@@ -489,7 +924,7 @@ local function onDeath(hum: Humanoid)
 		zone_phase = zone.phase,
 	})
 
-	if stateT >= TUNE.startGrace and aliveCount() <= 1 then
+	if stateT >= TUNE.startGrace and matchOver() then
 		finish()
 	end
 end
@@ -514,6 +949,8 @@ local function startMatch()
 	table.clear(stats)
 	table.clear(lastHit)
 	clearEliminated() -- todo mundo volta a poder agir
+	clearAllSpirits()
+	table.clear(revivesUsed) -- o teto de retorno é POR PARTIDA
 	champion = nil
 	seal = nil
 	Bots.clear()
@@ -527,10 +964,16 @@ local function startMatch()
 	beginPhase(1)
 	syncZonePart()
 	Bots.setZone(zone.center, zone.radius)
+	-- altares DEPOIS do terreno: são objetos do Workspace, não células, e o
+	-- `walkableNear` precisa da grade já construída para desviar de rocha/água.
+	buildAltars()
 
 	local humans = Players:GetPlayers()
 	local botCount = 0
-	if M.fillWithBots then
+	if forcedBots then
+		botCount = math.clamp(forcedBots, 0, TUNE.maxBots) -- harness de playtest
+		forcedBots = nil
+	elseif M.fillWithBots then
 		botCount = math.clamp(M.maxPlayers - #humans, 0, TUNE.maxBots)
 	end
 	totalAtStart = #humans + botCount
@@ -603,6 +1046,8 @@ local function toLobby()
 	lobbyLeft = M.lobbyWait
 	champion = nil
 	seal = nil
+	clearAllSpirits()
+	clearAltars()
 	Bots.clear()
 	Bots.setZone(Vector3.zero, math.huge)
 	if zonePart then
@@ -644,10 +1089,28 @@ local function broadcast()
 		zoneNextRadius = zone.toRadius,
 		zoneDps = zone.dps,
 		alive = aliveCount(),
+		--- TIMES vivos, não magos vivos: em duos "3 times restantes" é a
+		--- informação que muda a decisão do jogador. `alive` continua indo para
+		--- a UI não perder o número fino.
+		teamsAlive = countTeams(aliveMembers()),
 		total = math.max(totalAtStart, 1),
 		timeLeft = timeLeft,
 		seal = seal,
 	}
+
+	-- Progresso do ritual por jogador ENVOLVIDO (o que canaliza e o que volta).
+	-- Uma passada só: sem isto o carregador encara 6 s de tela parada sem saber
+	-- se está funcionando, e o ritual vira bug aos olhos de quem testa.
+	local channelOf: { [Player]: number } = {}
+	for dead, sp in pairs(spirits) do
+		if sp.channel > 0 then
+			local k = math.clamp(sp.channel / REVIVE.channel, 0, 1)
+			channelOf[dead] = k
+			if sp.carrier then
+				channelOf[sp.carrier] = k
+			end
+		end
+	end
 
 	-- PRESENÇA DA DUPLA (costura do coordenador, 18/08). Antes isto era um
 	-- FireAllClients cego e o cliente só descobria o parceiro DEPOIS do primeiro
@@ -665,14 +1128,22 @@ local function broadcast()
 					userId = m.UserId,
 					name = m.DisplayName,
 					element = if combat and combat.getElement then combat.getElement(m) else nil,
-					hp = if hum then hum.Health else 0,
+					--- caído tem 0 de vida no painel, mesmo com corpo de espírito
+					--- respirando no servidor: senão a HUD mostraria "100 HP" para
+					--- um parceiro que está morto na tela.
+					hp = if hum and not eliminated[m] then hum.Health else 0,
 					hpMax = if hum then hum.MaxHealth else 0,
 					alive = hum ~= nil and not eliminated[m],
+					--- caiu MAS ainda dá para trazer de volta: é este bit que
+					--- transforma "perdi o parceiro" em "vai buscar a essência"
+					spirit = spirits[m] ~= nil,
 				}
 				break
 			end
 		end
 		payload.mate = mate
+		payload.spirit = spirits[player] ~= nil
+		payload.reviveChannel = channelOf[player] or 0
 		evState:FireClient(player, payload)
 	end
 end
@@ -683,6 +1154,14 @@ function Match.init(terrainModule: any, combatModule: any)
 	combat = combatModule
 	evState = Net.event(Net.Names.MatchState)
 	evAnnounce = Net.event(Net.Names.Announce)
+	--- ARREPIO do espírito (GDD §18.6). O nome não está em Net.Names porque
+	--- Shared/Net é do COORDENADOR — mesmo caminho que o Combat usou para a
+	--- postura. C→S: { pos: Vector3 } · S→C: { pos: Vector3, hold: number }.
+	--- PENDÊNCIA: oficializar como Net.Names.SpiritPing e rotear pelo Main.
+	evSpirit = Net.event("SpiritPing")
+	evSpirit.OnServerEvent:Connect(function(player, payload)
+		Match.spiritPing(player, if typeof(payload) == "table" then (payload :: any).pos else nil)
+	end)
 
 	Bots.init(terrain, combat, aliveEntities)
 
@@ -706,7 +1185,11 @@ function Match.init(terrainModule: any, combatModule: any)
 			wireDeath(hum)
 		end
 		if state == "Playing" and eliminated[player] then
-			perch(player) -- renasceu eliminado: vira espectador, não competidor
+			if spirits[player] then
+				ghostify(player) -- ESPÍRITO: acompanha a dupla, não compete
+			else
+				perch(player) -- eliminado de vez: espectador, não competidor
+			end
 		end
 	end
 
@@ -737,12 +1220,110 @@ function Match.noteCombo(player: Player, comboName: string)
 	table.insert(statOf(player).combos, comboName)
 end
 
+--- ARREPIO (GDD §18.6): o espírito revela UM inimigo perto da própria dupla.
+--- Intenção do cliente tratada como HOSTIL: só espírito pinga, só uma vez, e a
+--- posição pedida tem de estar ao alcance do PRÓPRIO espírito — sem esse teste
+--- o morto viraria radar do mapa inteiro, que é o oposto de contra-jogável.
+--- Público para o COORDENADOR poder mover o roteamento para o Main depois.
+function Match.spiritPing(player: Player, rawPos: any)
+	local sp = spirits[player]
+	if state ~= "Playing" or not sp or sp.ping <= 0 or typeof(rawPos) ~= "Vector3" then
+		return
+	end
+	local orb = sp.orb
+	if not (orb and orb.Parent) or flatDist(rawPos, orb.Position) > REVIVE.pingRange then
+		return
+	end
+
+	local best: Bots.Target? = nil
+	local bestD = REVIVE.pingRange
+	for _, e in ipairs(aliveEntities()) do
+		local char = e.humanoid.Parent
+		local owner = if char then Players:GetPlayerFromCharacter(char) else nil
+		local member: any = owner or e.humanoid
+		if Teams.teamOf(member) ~= sp.team then
+			local d = flatDist(e.root.Position, rawPos)
+			if d < bestD then
+				best, bestD = e, d
+			end
+		end
+	end
+	if not best then
+		return
+	end
+
+	sp.ping -= 1
+	local marked = (best :: Bots.Target).root.Position
+	local mark = { pos = marked, hold = REVIVE.pingHold }
+	evSpirit:FireClient(player, mark)
+	for _, mate in ipairs(Teams.matesOf(player)) do
+		if typeof(mate) == "Instance" and mate:IsA("Player") then
+			evSpirit:FireClient(mate, mark)
+		end
+	end
+	-- CONTRA-JOGADA (GDD §18.6): o revelado SENTE o arrepio. Marcação sem aviso
+	-- seria wallhack de graça para quem morreu.
+	local revealed = (best :: Bots.Target).humanoid.Parent
+	local victim = if revealed then Players:GetPlayerFromCharacter(revealed) else nil
+	if victim then
+		announceTo(victim, "announce.spirit.chill")
+	end
+end
+
+-- --------------------------------------------------- controles do harness
+--- Começa a partida AGORA, sem lobby (Playtest.luau). `bots` fixa quantos bots
+--- entram; `nil` mantém o preenchimento normal do Balance. Sem isto o harness
+--- só conseguia EMPURRAR o lobby mexendo em Balance.match, e não conseguia
+--- encerrar nada — era a pendência declarada no cabeçalho do Playtest.
+function Match.forceStart(bots: number?): boolean
+	if state == "Playing" then
+		return false
+	end
+	forcedBots = if typeof(bots) == "number" then math.max(0, math.floor(bots)) else nil
+	startMatch()
+	return true
+end
+
+--- Encerra a partida em andamento: fecha o relatório de telemetria e cai na
+--- tela de fim, exatamente como uma vitória (sem reiniciar o Studio).
+function Match.forceEnd(): boolean
+	if state ~= "Playing" then
+		return false
+	end
+	finish()
+	return true
+end
+
 function Match.onPlayerRemoving(player: Player)
 	unmarkEliminated(player)
+	clearSpirit(player)
 	stats[player] = nil
-	if state == "Playing" and stateT >= TUNE.startGrace and aliveCount() <= 1 then
+	if state == "Playing" and stateT >= TUNE.startGrace and matchOver() then
 		finish()
 	end
+end
+
+--- Alguém está no onboarding? Require preguiçoso e protegido (padrão do
+--- projeto): se o módulo faltar, a resposta é "não" e a partida segue normal.
+local tutorialMod: any = nil
+local tutorialChecked = false
+local function tutorialActive(): boolean
+	if not tutorialChecked then
+		tutorialChecked = true
+		local mod = ServerModules:FindFirstChild("Tutorial")
+		local ok, m = pcall(require, mod :: ModuleScript)
+		tutorialMod = ok and m or nil
+	end
+	if not tutorialMod or not tutorialMod.active then
+		return false
+	end
+	for _, player in ipairs(Players:GetPlayers()) do
+		local ok, yes = pcall(tutorialMod.active, player)
+		if ok and yes then
+			return true
+		end
+	end
+	return false
 end
 
 function Match.step(dt: number)
@@ -753,6 +1334,15 @@ function Match.step(dt: number)
 		-- com bots ligados, UM mago já forma partida (GDD §19.6: o novato joga
 		-- na hora); sem bots, respeita minPlayersToStart.
 		local ready = n >= M.minPlayersToStart or (M.fillWithBots and n >= 1)
+		-- ONBOARDING TEM PRIORIDADE (costura do coordenador, 18/08): o Campo de
+		-- Provas de 3 min é a primeira coisa que um jogador de fora vê, e
+		-- `startMatch` reconstrói o terreno e recarrega personagens — começar a
+		-- partida por cima do tutorial destruiria a sessão de quem está
+		-- aprendendo. Enquanto alguém estiver no tutorial, o lobby ESPERA.
+		if ready and tutorialActive() then
+			ready = false
+			lobbyLeft = math.max(lobbyLeft, 3) -- retoma a contagem com folga
+		end
 		if ready then
 			lobbyLeft -= dt
 			if lobbyLeft <= 0 then
@@ -769,11 +1359,12 @@ function Match.step(dt: number)
 			applyZoneDamage()
 			-- rede de segurança a 2 Hz (o caso instantâneo já é tratado no
 			-- Died): cobre quem saiu do servidor ou sumiu sem morrer.
-			if stateT >= TUNE.startGrace and aliveCount() <= 1 then
+			if stateT >= TUNE.startGrace and matchOver() then
 				finish()
 			end
 		end
 		if state == "Playing" then
+			stepRevive(dt)
 			Bots.step(dt)
 		end
 	elseif state == "Ended" then
@@ -813,6 +1404,10 @@ function Match.selfTest()
 		assert(flatDist(c, from) + r1 <= r0 + 1e-6, "círculo novo saiu do anterior")
 	end
 
+	-- RITMO DA PARTIDA: `holdTime`/`shrinkTime` já saem RESOLVIDOS pela variante
+	-- (Balance.experiment.zoneVariant = blitz 4:35 / media 5:30 / longa 7:15).
+	-- O Match não sabe que existe experimento — só confere que o cronograma
+	-- resultante cabe na janela jogável.
 	local total = Z.phases * (Z.holdTime + Z.shrinkTime)
 	assert(total >= 120 and total <= 480, "partida fora da janela de 2–8 min: " .. total)
 
@@ -829,6 +1424,31 @@ function Match.selfTest()
 	assert(#Teams.matesOf(roster[1]) == 1, "num duo cada um tem exatamente 1 parceiro")
 	assert(Teams.teamOf(roster[5]) ~= nil, "o ímpar tem time próprio (não fica sem time)")
 	assert(#Teams.matesOf(roster[5]) == 0, "o ímpar não tem com quem fundir — e é isso mesmo")
+
+	-- CONTAGEM DE TIMES (o número que a UI mostra em duos)
+	assert(countTeams(roster) == 3, "5 membros em duos = 3 times vivos")
+	assert(countTeams({ roster[1], roster[2] }) == 1, "uma dupla inteira conta como UM time")
+	assert(countTeams({ roster[1], roster[3] }) == 2, "um de cada dupla = 2 times")
+	assert(countTeams({ roster[1] }) == 1, "sobrevivente sozinho ainda é um time")
+	assert(countTeams({}) == 0, "ninguém vivo = 0 times")
+
+	-- RITUAL DE RESSURREIÇÃO: os dois freios que impedem a morte de virar
+	-- detalhe. O corte é por FASE — se um dia virar segundos, este teste
+	-- continua passando e a regra muda de significado quando o ritmo mudar.
+	local savedPhase, savedUsed = zone.phase, revivesUsed[7]
+	zone.phase = 1
+	assert(reviveAllowed(7), "antes da fase final a dupla pode voltar")
+	assert(not reviveAllowed(nil), "sem time não há retorno (lobby/espectador)")
+	revivesUsed[7] = true
+	assert(not reviveAllowed(7), "cada dupla volta no MÁXIMO uma vez por partida")
+	revivesUsed[7] = nil
+	zone.phase = Z.phases
+	assert(not reviveAllowed(7), "na fase final da zona o ritual fecha para todos")
+	zone.phase = math.max(1, Z.phases - 1)
+	assert(reviveAllowed(7), "a fase anterior à final ainda permite o retorno")
+	zone.phase, revivesUsed[7] = savedPhase, savedUsed
+	assert(REVIVE.channel > 0 and REVIVE.radius > 0, "o ritual precisa de tempo e de área")
+
 	Teams.clear()
 	assert(Teams.teamOf(roster[1]) == nil, "clear apaga os times")
 	for _, d in ipairs(roster) do
@@ -836,7 +1456,17 @@ function Match.selfTest()
 		dummy:Destroy()
 	end
 
-	print(string.format("[Match] autoteste OK — partida cheia dura ~%ds", total))
+	print(
+		string.format(
+			"[Match] autoteste OK — partida cheia ~%ds (%d fases de %ds parada + %ds fechando) · ritual %.1fs em %d altares",
+			total,
+			Z.phases,
+			Z.holdTime,
+			Z.shrinkTime,
+			REVIVE.channel,
+			REVIVE.altars
+		)
+	)
 	return true
 end
 

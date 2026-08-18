@@ -27,6 +27,19 @@ Net.Names = {
 	--- de WalkSpeed. Está aqui para o `initServer` criá-lo cedo e para o contrato
 	--- ficar visível; NÃO adicionar um segundo handler no Main (dupla escuta).
 	Stance = "Stance",
+	--- o cliente conta em que aparelho está rodando: { tier: "low"|"mid"|"high",
+	--- touch: boolean }. É SÓ telemetria — nada de jogo depende disto, então
+	--- mentir aqui não dá vantagem nenhuma. Sem este dado, "60 fps no aparelho
+	--- alvo" vira sensação em vez de número (gate mobile da auditoria).
+	DeviceInfo = "DeviceInfo",
+	--- "arrepio" do espírito (GDD §18.6): o caído marca UMA posição para a dupla.
+	--- Roteado dentro do Match (que é quem sabe quem é espírito), como a postura
+	--- é roteada dentro do Combat. Validado lá: só espírito, uma vez, e a posição
+	--- tem de estar perto do PRÓPRIO espírito — senão o morto vira radar do mapa.
+	SpiritPing = "SpiritPing",
+	--- fluxo do onboarding (Campo de Provas de 3 min): { step: string } C→S para
+	--- registrar progresso/abandono por passo, e S→C para conduzir o roteiro.
+	Tutorial = "Tutorial",
 	ProposeSintonia = "ProposeSintonia", -- { pos: Vector3 } (Ping de Sintonia, GDD §18.7)
 	AcceptSintonia = "AcceptSintonia", -- { fromUserId: number }
 

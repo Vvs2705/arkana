@@ -14,6 +14,7 @@
 -- ============================================================================
 
 local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
@@ -22,6 +23,11 @@ local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
+
+--- Times: o bot preenche partida (GDD §19.6) e, em duo ímpar, vira PARCEIRO de
+--- um humano. Sem esta consulta a lista de alvos era global e ele metralhava o
+--- próprio parceiro. Require direto (o Teams não depende de ninguém).
+local Teams = require((script.Parent :: Instance):WaitForChild("Teams") :: ModuleScript)
 
 local B = Balance.bots
 
@@ -134,6 +140,23 @@ local function randomDir(): Vector3
 	return Vector3.new(math.cos(a), 0, math.sin(a))
 end
 
+-- --------------------------------------------------------------------- times
+--- Membro de time de um Humanoid. ATENÇÃO à assimetria do roster (Match): para
+--- HUMANO quem entra no time é o PLAYER — o Humanoid dele não está na tabela —,
+--- para bot é o próprio Humanoid. Perguntar com a chave errada devolve "sem
+--- time", e sem time todo mundo vira inimigo (que é exatamente o bug de hoje).
+local function memberOf(hum: Humanoid): Teams.Member
+	local char = hum.Parent
+	local player = if char then Players:GetPlayerFromCharacter(char :: Instance) else nil
+	return player or hum
+end
+
+--- É inimigo? No LOBBY (nenhum time montado) `areAllies` é falso para todos e o
+--- bot se comporta como antes — lado seguro do erro: nunca deixa de reagir.
+local function isFoe(bot: Bot, hum: Humanoid): boolean
+	return not Teams.areAllies(memberOf(bot.humanoid), memberOf(hum))
+end
+
 -- ------------------------------------------------------------- corpo blocky
 --- Rig R6 montado à mão: 7 parts + 6 Motor6D. Nomes são contrato do engine
 --- (Humanoid exige HumanoidRootPart/Torso/Head) — não renomear.
@@ -216,6 +239,9 @@ local function nearestTarget(bot: Bot): Target?
 		if t.humanoid == bot.humanoid or t.humanoid.Health <= 0 or not t.root.Parent then
 			continue
 		end
+		if not isFoe(bot, t.humanoid) then
+			continue -- PARCEIRO DE DUO não é alvo (a lista do Match é global)
+		end
 		local d = flatDist(pos, t.root.Position)
 		if d < bestD and d <= sightRadiusFor(t.root.Position) then
 			best, bestD = t, d
@@ -281,9 +307,12 @@ end
 
 local function shotImpact(shot: Shot, hit: Humanoid?)
 	if hit then
-		-- o dano SEMPRE passa pelo Combat (escudo, i-frames, número na tela)
+		-- o dano SEMPRE passa pelo Combat (escudo, i-frames, número na tela).
+		-- O 5º argumento é o AUTOR sem Player: sem ele, tiro de bot chegava na
+		-- telemetria como "ambiente" e se misturava com zona e terreno (achado do
+		-- Telemetry.coverage). O elemento sai do `registerTarget` do próprio bot.
 		local before = hit.Health
-		combat.applyDamage(hit, B.dmg, nil, false)
+		combat.applyDamage(hit, B.dmg, nil, false, shot.bot.humanoid)
 		-- crédito para o Selo caso o campeão seja um bot. Mede só a perda de
 		-- VIDA: o que o escudo do alvo absorveu não entra (contagem conservadora).
 		local dealt = before - hit.Health
@@ -305,6 +334,11 @@ local function shotHit(shot: Shot): Humanoid?
 	local reach = B.projRadius + TUNE.hitPad
 	for _, t in ipairs(frameTargets) do
 		if t.humanoid == shot.bot.humanoid or t.humanoid.Health <= 0 or not t.root.Parent then
+			continue
+		end
+		--- o tiro ATRAVESSA o aliado: mirar longe do parceiro não basta se ele
+		--- cruzar a linha de fogo um segundo depois (é o mesmo bug, com atraso).
+		if not isFoe(shot.bot, t.humanoid) then
 			continue
 		end
 		if (t.root.Position - shot.pos).Magnitude < reach then
@@ -351,7 +385,13 @@ end
 
 -- --------------------------------------------------------------------- FSM
 local function move(bot: Bot, dir: Vector3, speedMult: number)
-	bot.humanoid.WalkSpeed = B.speed * speedMult * (terrain.speedMultAt(bot.root.Position) or 1)
+	--- MESMO produto do jogador (Combat.step): base × terreno × status. O bot é o
+	--- inimigo que o playtest tem de sobra — se a lentidão dos combos não valesse
+	--- aqui, ela seria invisível na maior parte das partidas.
+	bot.humanoid.WalkSpeed = B.speed
+		* speedMult
+		* (terrain.speedMultAt(bot.root.Position) or 1)
+		* combat.statusSpeedMult(bot.humanoid)
 	if bot.moveAcc < TUNE.moveRefresh then
 		return
 	end
@@ -375,6 +415,13 @@ local function stepBot(bot: Bot, dt: number, now: number)
 		if hum.Health <= 0 then
 			return
 		end
+	end
+
+	-- PRIORIDADE 0: ATORDOADO não anda e não atira (kernel de status do Combat).
+	-- Dura no máximo 0,8 s pelo teto da auditoria, então nem a zona perde muito.
+	if combat.getStatus(hum, "Stun") > 0 then
+		hum.WalkSpeed = 0
+		return
 	end
 
 	-- PRIORIDADE 1: estar fora da zona mata mais rápido que qualquer inimigo
@@ -527,8 +574,9 @@ function Bots.spawn(count: number, points: { Vector3 }): { Bot }
 		table.insert(bots, bot)
 		table.insert(created, bot)
 
-		-- o bot vira ALVO VÁLIDO das magias dos jogadores (registro do Combat)
-		combat.registerTarget(hum)
+		-- o bot vira ALVO VÁLIDO das magias dos jogadores (registro do Combat). O
+		-- elemento vai junto: é dali que sai a atribuição do dano DELE.
+		combat.registerTarget(hum, element)
 		hum.Died:Connect(function()
 			combat.unregisterTarget(hum)
 			Debris:AddItem(model, TUNE.corpseLife)
@@ -579,6 +627,37 @@ function Bots.step(dt: number)
 		end
 	end
 	stepShots(dt)
+end
+
+-- ============================================================================
+-- AUTOTESTE — cole no Command Bar do Studio (servidor):
+--   require(game.ServerScriptService.Server.Bots).selfTest()
+-- Cobre a única regra daqui que não dá para ver a olho: quem é ALVO. O resto da
+-- FSM se vê andando na arena.
+-- ⚠ RODE NO LOBBY: monta e limpa o Teams DE VERDADE.
+-- ============================================================================
+function Bots.selfTest()
+	--- os membros são Humanoids de mentira: para o Teams, bot e jogador são
+	--- membros iguais, e é essa simetria que o filtro depende.
+	local hums: { Humanoid } = {}
+	for _ = 1, 4 do
+		table.insert(hums, Instance.new("Humanoid"))
+	end
+	Teams.build(hums :: any, 2) -- duos: {1,2} · {3,4}
+
+	local bot = { humanoid = hums[1] } :: any
+	assert(not isFoe(bot, hums[2]), "PARCEIRO DE DUO não pode ser alvo (o bug de hoje)")
+	assert(isFoe(bot, hums[3]), "quem é de outro time continua sendo alvo")
+	assert(isFoe(bot, hums[4]), "o outro duo inteiro é inimigo")
+
+	Teams.clear()
+	assert(isFoe(bot, hums[2]), "sem times (lobby) o bot reage a todo mundo — lado seguro do erro")
+	for _, h in ipairs(hums) do
+		h:Destroy()
+	end
+
+	print("[Bots] autoteste OK — alvo filtrado por time")
+	return true
 end
 
 return Bots

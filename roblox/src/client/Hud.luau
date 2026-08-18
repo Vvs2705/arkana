@@ -32,6 +32,7 @@ local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
 local Net = require(Shared:WaitForChild("Net"))
 local Strings = require(Shared:WaitForChild("Strings"))
+local A11y = require(script.Parent:WaitForChild("Accessibility"))
 local Badge = require(script.Parent:WaitForChild("HudBadge"))
 
 -- ------------------------------------------------------------------ paleta
@@ -178,6 +179,8 @@ local pips: { Frame } = {}
 local seal: Frame
 local gems: { Frame } = {}
 local announce: TextLabel
+local statsPanel: Frame
+local readyPill: Frame
 local partnerPanel: Frame
 local partnerName: TextLabel
 local partnerBadge: Frame
@@ -290,6 +293,10 @@ local function buildPanel(root: ScreenGui)
 		Position = L.panelPos,
 		Size = L.panelSize,
 	}, root)
+	statsPanel = panel
+	--- canônico = destro (alto à ESQUERDA). O espelho canhoto é do A11y: quem
+	--- joga com a esquerda no ataque quer a leitura no lado que o polegar não tapa.
+	A11y.place(panel, Vector2.new(0, 0), L.panelPos)
 	mk("UIStroke", { Color = GOLD_DIM, Thickness = 1, Transparency = 0.2 }, panel)
 	mk("UISizeConstraint", { MinSize = L.panelMin, MaxSize = L.panelMax }, panel)
 
@@ -394,6 +401,60 @@ local function buildSeal(root: ScreenGui)
 	}, seal)
 end
 
+--- INDICADOR DE COMBO DISPONÍVEL (auditoria de 18/08). As gemas do Selo já
+--- acendem, mas gema acesa é sutil demais para quem está vendo o jogo pela
+--- primeira vez em tela de celular. A pílula DIZ a coisa, com palavra + losango
+--- (cor + FORMA, GDD §10) — e some sozinha quando a fusão deixa de existir.
+--- Estática de propósito: pisca-pisca aqui seria o oposto de acessível.
+--- Hoje a Sintonia É a "ultimate" do jogo; se um dia existir uma suprema
+--- separada, ela ganha a mesma pílula com outra cor.
+local function buildReadyPill(root: ScreenGui)
+	readyPill = mk("Frame", {
+		Name = "ComboReady",
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = NIGHT,
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0.5, 0, 0, L.sealTop + L.sealSize + 4),
+		--- LARGURA PELO CONTEÚDO (recurso nativo): a pílula fica só do tamanho da
+		--- frase, em qualquer idioma. Largura fixa encostaria na faixa do
+		--- parceiro (alto à direita) em viewport estreita.
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 20),
+		Visible = false,
+	}, root)
+	mk("UIStroke", { Color = GOLD, Thickness = 1, Transparency = 0.15 }, readyPill)
+	mk("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 6),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, readyPill)
+	mk("UIPadding", {
+		PaddingLeft = UDim.new(0, 8),
+		PaddingRight = UDim.new(0, 8),
+	}, readyPill)
+
+	mk("Frame", {
+		BackgroundColor3 = GOLD,
+		BorderSizePixel = 0,
+		LayoutOrder = 1,
+		Rotation = 45,
+		Size = UDim2.fromOffset(9, 9),
+	}, readyPill)
+	mk("TextLabel", {
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 14),
+		Font = Enum.Font.GothamBold,
+		Text = string.upper(Strings.t("announce.sintonia.ready")),
+		TextColor3 = GOLD,
+		TextSize = 12, -- fixo: `TextScaled` brigaria com o AutomaticSize
+	}, readyPill)
+end
+
 --- Faixa do parceiro: nome + elemento (cor + FORMA) + vida. Escondida enquanto
 --- não houver dupla — campo vazio no HUD é ruído, não informação.
 local function buildPartner(root: ScreenGui)
@@ -408,6 +469,9 @@ local function buildPartner(root: ScreenGui)
 		Visible = false,
 	}, root)
 	mk("UIStroke", { Color = ALLY, Thickness = 1, Transparency = 0.3 }, partnerPanel)
+	--- espelha junto com o painel de vida: a dupla e as barras trocam de lado
+	--- em bloco, senão o HUD canhoto vira uma tela remendada
+	A11y.place(partnerPanel, Vector2.new(1, 0), UDim2.new(1, -L.partnerRight, 0, L.partnerTop))
 
 	local content = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, partnerPanel)
 	mk("UIPadding", {
@@ -465,7 +529,11 @@ end
 --- fusão continua sendo o servidor.
 local function refreshGems(dt: number)
 	gemPulse = if fuseReady then (gemPulse + dt * 2.2) % 1 else 0
-	local beat = (1 - math.cos(gemPulse * math.pi * 2)) / 2
+	--- "reduzir flashes": a AMPLITUDE do pulso encolhe, a leitura não. Com o
+	--- pulso em 0 as gemas do par ficam acesas e FIXAS — quem não suporta
+	--- piscada continua vendo que o combo está disponível.
+	local beat = (1 - math.cos(gemPulse * math.pi * 2)) / 2 * A11y.flash()
+	readyPill.Visible = fuseReady and A11y.readyCue()
 	for i, gem in ipairs(gems) do
 		local id: any = Elements.Order[i]
 		local lit = fuseReady and (id == myElement or id == mateElement)
@@ -507,6 +575,20 @@ local function updatePartner()
 	if element ~= paintedElement then
 		paintedElement = element
 		Badge.paint(partnerBadge, element)
+	end
+
+	--- REVELAÇÃO É PARA O INIMIGO VER (kernel de status, 18/08). O `Highlight` do
+	--- servidor REPLICA para todos, então hoje o meu parceiro revelado aparece
+	--- em ciano para MIM — que já sei onde ele está. Apagar aqui é local (mudar
+	--- instância replicada no cliente não volta para o servidor) e resolve o
+	--- caso inteiro em duos: o único aliado que eu tenho é ele. O alvo continua
+	--- vendo o próprio realce, e os inimigos também — que é o efeito.
+	--- Ver RELATÓRIO: o Highlight do servidor NÃO pode ser removido antes de
+	--- existir um sinal S→C de status; ele é hoje o único aviso de "Reveal ativo".
+	local mateChar = mp.Character
+	local revealFx = if mateChar then mateChar:FindFirstChild("Status_Reveal") else nil
+	if revealFx and revealFx:IsA("Highlight") and revealFx.Enabled then
+		revealFx.Enabled = false
 	end
 
 	local mateRoot, hum = bodyOf(mp)
@@ -582,6 +664,7 @@ function Hud.init(player: Player)
 
 	buildPanel(root)
 	buildSeal(root)
+	buildReadyPill(root)
 	buildPartner(root)
 	buildArrow(root)
 	announce = mk("TextLabel", {
@@ -599,6 +682,10 @@ function Hud.init(player: Player)
 		TextStrokeTransparency = 1,
 	}, root)
 	mk("UITextSizeConstraint", { MaxTextSize = 22 }, announce)
+
+	--- escala da UI, alto contraste e o espelho canhoto passam a valer para tudo
+	--- que está (e que ainda vai entrar) nesta ScreenGui
+	A11y.attach(root)
 
 	hpLabel.Text = Strings.t("hud.hp")
 	manaLabel.Text = Strings.t("hud.mana")

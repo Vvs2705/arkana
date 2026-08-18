@@ -35,6 +35,7 @@ local Elements = require(Shared:WaitForChild("Elements"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
 local Strings = require(Shared:WaitForChild("Strings"))
+local A11y = require(script.Parent:WaitForChild("Accessibility"))
 local Badge = require(script.Parent:WaitForChild("HudBadge"))
 
 -- ------------------------------------------------------------------ paleta
@@ -65,6 +66,22 @@ local L = {
 	bannerH = 46,
 	pad = 8,
 }
+
+--- CEGUEIRA DOS COMBOS (GDD §9): Tempestade de Areia e Cortina de Vapor
+--- prometem "cegar". O servidor entrega o que ele pode garantir (dano, Reveal,
+--- Lentidão); a metade visual é do cliente, porque cegueira é o que ESTA tela
+--- mostra e mais nada. É COSMÉTICO — nada de jogo depende dele, então não há
+--- nada a burlar aqui: a área e o dano continuam sendo do servidor.
+--- CALIBRAÇÃO: `blindLife` é o knob se o véu incomodar no playtest.
+local BLIND: { [string]: boolean } = {
+	[Elements.comboKey("Earth", "Wind")] = true, -- Tempestade de Areia
+	[Elements.comboKey("Fire", "Water")] = true, -- Cortina de Vapor
+}
+local BLIND_LIFE = 1.5
+--- opacidade de PICO do véu. Multiplicada pela preferência de flashes: quem
+--- pediu menos flash NÃO pode ser cegado de verdade (menu de acessibilidade), e
+--- em 0 o véu some — a legenda com o nome do combo continua dizendo o que houve.
+local BLIND_PEAK = 0.62
 
 --- Distância até onde a canalização de OUTRA dupla ainda me interessa na faixa
 --- do topo. Mais longe que isto o telegrama continua no MUNDO (pilar de luz),
@@ -143,6 +160,7 @@ local SintoniaUi = {}
 
 local localPlayer: Player? = nil
 local gui: ScreenGui? = nil
+local blindGui: ScreenGui? = nil
 local fxFolder: Folder? = nil
 local conns: { RBXScriptConnection } = {}
 
@@ -158,6 +176,7 @@ local declineBtn: TextButton
 local banner: Frame
 local bannerLabel: TextLabel
 local bannerFill: Frame
+local veil: Frame
 
 --- meu elemento ativo (Net.StatsUpdate) — sem ele não dá para dizer QUAL combo
 --- sai da dupla, que é o que transforma "aceitar?" em decisão informada
@@ -178,10 +197,18 @@ type Proposal = {
 }
 --- `mine` = eu conjuro ou estou perto o bastante para a faixa do topo valer
 type Channel = { comboKey: string, pos: Vector3, radius: number, left: number, total: number, mine: boolean }
+--- A JANELA DE 1,5 s (GDD §9): depois do pacto, os dois têm este tempo para
+--- conjurar JUNTOS. O servidor é dono do relógio e publica `windowLeft` na fase
+--- `window` do Net.SintoniaState; aqui é só a barra que mostra o prazo REAL em
+--- vez de um palpite do cliente.
+type Window = { left: number, total: number, mine: boolean }
 
 local proposal: Proposal? = nil
 local channel: Channel? = nil
+local window: Window? = nil
 local flashLeft = 0
+local veilLeft = 0
+local veilPeak = 0
 --- espelho COSMÉTICO do anti-spam de ping. A autoridade é o servidor: se este
 --- número mentir, o ping simplesmente não sai.
 local pingLockLeft = 0
@@ -293,13 +320,21 @@ local function layout()
 	local ping = math.floor(L.ping * k)
 	local cardW, cardH = math.floor(L.cardW * k), math.floor(L.cardH * k)
 
+	--- POSIÇÃO pelo A11y: o canônico é a faixa central ESQUERDA (destro, com o
+	--- polegar direito nos botões da raia C). No HUD canhoto o par ping+card
+	--- espelha para a direita — e chamar `place` de novo a cada relayout mantém
+	--- o espelho válido depois de trocar o tamanho da viewport.
 	pingBtn.Size = UDim2.fromOffset(ping, ping)
-	pingBtn.Position = UDim2.new(0, math.floor(L.pingX * k), 0.5, 0)
+	A11y.place(pingBtn, Vector2.new(0, 0.5), UDim2.new(0, math.floor(L.pingX * k), 0.5, 0))
 
 	card.Size = UDim2.fromOffset(cardW, cardH)
 	--- o card encosta EM CIMA do botão de ping: os dois ficam no mesmo alcance
 	--- de polegar, e o "ACEITAR" nunca nasce onde o dedo já está apoiado
-	card.Position = UDim2.new(0, math.floor(L.pingX * k), 0.5, -math.floor((L.ping / 2 + L.cardGap) * k))
+	A11y.place(
+		card,
+		Vector2.new(0, 1),
+		UDim2.new(0, math.floor(L.pingX * k), 0.5, -math.floor((L.ping / 2 + L.cardGap) * k))
+	)
 	--- ACEITAR ocupa o resto da largura; o × fica no canto, longe o bastante
 	--- para o polegar não confundir os dois
 	local decline = math.floor(L.declineW * k)
@@ -497,6 +532,55 @@ local function build(root: ScreenGui)
 	}, barBg)
 end
 
+--- Véu de cegueira em ScreenGui PRÓPRIA, com DisplayOrder BAIXO de propósito:
+--- ele cega o MUNDO, não o HUD. Tapar a própria vida, a mana e os botões da
+--- raia C transformaria um efeito tático em "o jogo travou" — e em celular o
+--- jogador não tem como conferir de outro jeito.
+--- `Active = false`: o véu não engole toque nenhum.
+local function buildVeil(root: ScreenGui)
+	veil = mk("Frame", {
+		Name = "Blind",
+		Active = false,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+	}, root)
+	veil:SetAttribute("A11yNoScale", true)
+end
+
+--- Estou dentro da área de um combo que CEGA? A área e o raio são os do GDD §9
+--- (Shared/Elements) — o cliente não inventa alcance, só pergunta à mesma
+--- tabela que o servidor usou para calcular o dano.
+local function blindMe(payload: any, key: string)
+	local me = localPlayer
+	if not me or not BLIND[key] then
+		return
+	end
+	-- os dois conjuradores ficam de fora, igual ao dano (Sintonia.luau)
+	if payload.byUserId == me.UserId or payload.withUserId == me.UserId then
+		return
+	end
+	local combo = Elements.Combos[key]
+	local char = me.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not combo or not root or not root:IsA("BasePart") or typeof(payload.pos) ~= "Vector3" then
+		return
+	end
+	if (root.Position - payload.pos).Magnitude > combo.radius then
+		return
+	end
+	veilPeak = BLIND_PEAK * A11y.flash()
+	if veilPeak <= 0.01 then
+		return -- flashes reduzidos a zero: fica só a legenda, ninguém cega de fato
+	end
+	veil.BackgroundColor3 = combo.color
+	veil.BackgroundTransparency = 1 - veilPeak
+	veil.Visible = true
+	veilLeft = BLIND_LIFE
+end
+
 -- --------------------------------------------------------------- servidor → UI
 --- O CONVITE. Card claro: quem chamou, os DOIS elementos (cor + forma), o nome
 --- do combo que sai disso e dois alvos de dedo. Nada mais.
@@ -588,6 +672,9 @@ local function onState(payload: any)
 			bannerFill.BackgroundColor3 = ALLY
 			banner.Visible = true
 			flashLeft = 0
+			if me and (payload.byUserId == me.UserId or payload.withUserId == me.UserId) then
+				A11y.caption(Strings.t("sintonia.together"), ALLY, 2.4)
+			end
 		elseif me and payload.byUserId == me.UserId then
 			-- meu ping saiu: confirmação curta, sem roubar a tela
 			bannerLabel.Text = Strings.t("sintonia.marked")
@@ -596,6 +683,31 @@ local function onState(payload: any)
 			bannerFill.Size = UDim2.fromScale(1, 1)
 			banner.Visible = true
 			flashLeft = 1.6
+		end
+	elseif phase == "window" then
+		--- A JANELA REAL (1,5 s do GDD §9), com o relógio do SERVIDOR. Fallback
+		--- silencioso: se a fase nunca chegar, `window` fica nulo e a faixa
+		--- continua no comportamento antigo (barra do pacto) sem um erro sequer.
+		local left = tonumber(payload.windowLeft)
+		if not left or left <= 0 then
+			return
+		end
+		--- o servidor pode reemitir a fase com o prazo já correndo: o TOTAL é o
+		--- maior valor visto, senão a barra reiniciaria cheia no meio da janela.
+		local w = window
+		local total = if w and left <= w.total then w.total else math.max(left, 0.05)
+		--- `mine` é SEMPRE verdadeiro aqui: o servidor manda esta fase só para a
+		--- audiência da dupla (conjurador + aliados). Refazer o teste de
+		--- distância só criaria o caso em que a janela chega e a barra não sobe.
+		window = { left = left, total = total, mine = true }
+		bannerLabel.Text = Strings.t("sintonia.together")
+		bannerLabel.TextColor3 = ALLY
+		bannerFill.BackgroundColor3 = ALLY
+		banner.Visible = true
+		flashLeft = 0
+		-- legenda só na ABERTURA da janela: reemissão não repete o aviso
+		if not w then
+			A11y.caption(Strings.t("sintonia.together"), ALLY, math.min(left + 0.4, 2.4))
 		end
 	elseif phase == "channeling" then
 		if typeof(payload.pos) ~= "Vector3" or typeof(payload.comboKey) ~= "string" then
@@ -611,6 +723,7 @@ local function onState(payload: any)
 			total = math.max(total, 0.05),
 			mine = mine,
 		}
+		window = nil -- a janela cumpriu o papel: agora o relógio é o da canalização
 		showBeacon(payload.pos, payload.comboKey)
 		if mine then
 			bannerLabel.Text = Strings.t("sintonia.channeling")
@@ -618,10 +731,15 @@ local function onState(payload: any)
 			bannerFill.BackgroundColor3 = comboColor(payload.comboKey)
 			banner.Visible = true
 			flashLeft = 0
+			A11y.caption(Strings.t("sintonia.channeling"), comboColor(payload.comboKey), total + 0.4)
 		end
 	elseif phase == "fired" then
 		channel = nil
+		window = nil
 		clearBeacon()
+		if typeof(payload.comboKey) == "string" then
+			blindMe(payload, payload.comboKey)
+		end
 		--- o pacto só se encerra para QUEM conjurou: o combo de outra dupla não
 		--- pode apagar o alvo que eu marquei com o meu aliado
 		local me = localPlayer
@@ -637,9 +755,11 @@ local function onState(payload: any)
 			bannerFill.Size = UDim2.fromScale(1, 1)
 			banner.Visible = true
 			flashLeft = 2.4
+			A11y.caption(comboName(payload.comboKey), comboColor(payload.comboKey), 2.4)
 		end
 	elseif phase == "failed" then
 		channel = nil
+		window = nil
 		clearBeacon()
 		if concernsMe(payload) then
 			bannerLabel.Text = Strings.t("sintonia.broken")
@@ -648,6 +768,7 @@ local function onState(payload: any)
 			bannerFill.Size = UDim2.fromScale(0, 1)
 			banner.Visible = true
 			flashLeft = 2.0
+			A11y.caption(Strings.t("sintonia.broken"), DANGER, 2.0)
 		end
 	end
 end
@@ -675,7 +796,18 @@ function SintoniaUi.init(player: Player)
 	folder.Parent = Workspace
 	fxFolder = folder
 
+	local blind = mk("ScreenGui", {
+		Name = "ArkanaBlind",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = true, -- cegueira cobre a tela toda, inclusive a barra
+		DisplayOrder = 1, -- ABAIXO do HUD (4), dos botões (5) e desta UI (6)
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	}, playerGui)
+	blindGui = blind
+
 	build(root)
+	buildVeil(blind)
+	A11y.attach(root)
 	layout()
 
 	table.insert(conns, pingBtn.Activated:Connect(sendPropose))
@@ -751,7 +883,9 @@ function SintoniaUi.update(dt: number)
 		end
 		local pillar = beaconPillar
 		if pillar then
-			pillar.Transparency = 0.75 - 0.35 * math.abs(math.sin(os.clock() * 9)) -- pulso
+			--- "reduzir flashes": o pilar continua LÁ (é o telegrama que dá ao
+			--- inimigo a chance de interromper, GDD §9) — só para de pulsar.
+			pillar.Transparency = 0.75 - 0.35 * math.abs(math.sin(os.clock() * 9)) * A11y.flash()
 		end
 		--- rede de borracha: se o "fired"/"failed" do servidor não chegar, a
 		--- tela não pode ficar travada em canalização eterna
@@ -763,10 +897,36 @@ function SintoniaUi.update(dt: number)
 		end
 	end
 
-	-- faixa do topo, por prioridade: canalização que me atinge > pacto aberto >
-	-- último anúncio apagando.
+	-- véu de cegueira: abre no pico e clareia. Quadrático porque o fim precisa
+	-- devolver a visão rápido — cegueira longa vira punição, não telegrama.
+	if veilLeft > 0 then
+		veilLeft -= dt
+		if veilLeft <= 0 then
+			veil.Visible = false
+			veil.BackgroundTransparency = 1
+		else
+			local k = veilLeft / BLIND_LIFE
+			veil.BackgroundTransparency = 1 - veilPeak * k * k
+		end
+	end
+
+	-- janela de 1,5 s: o servidor manda o prazo, aqui só corre o relógio entre
+	-- pacotes. Expirou sem canalizar = a dupla perdeu a janela e a barra some.
+	local w = window
+	if w then
+		w.left -= dt
+		if w.left <= 0 then
+			window = nil
+			w = nil
+		end
+	end
+
+	-- faixa do topo, por prioridade: canalização que me atinge > janela de
+	-- conjuração > pacto aberto > último anúncio apagando.
 	if ch and ch.mine then
 		bannerFill.Size = UDim2.fromScale(math.clamp(1 - ch.left / ch.total, 0, 1), 1)
+	elseif w and w.mine then
+		bannerFill.Size = UDim2.fromScale(math.clamp(w.left / w.total, 0, 1), 1)
 	elseif p and p.withUserId ~= nil then
 		bannerFill.Size = UDim2.fromScale(math.clamp(p.left / p.total, 0, 1), 1)
 	elseif flashLeft > 0 then
@@ -795,10 +955,16 @@ function SintoniaUi.destroy()
 		gui:Destroy()
 		gui = nil
 	end
+	if blindGui then
+		blindGui:Destroy()
+		blindGui = nil
+	end
 	proposal = nil
 	channel = nil
+	window = nil
 	myElement = nil
 	declinedFrom = nil
+	veilLeft, veilPeak = 0, 0
 end
 
 return SintoniaUi
