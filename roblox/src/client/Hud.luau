@@ -212,6 +212,15 @@ local myElement: any = nil
 local mateUserId: number? = nil
 local mateName = ""
 local mateElement: any = nil
+--- VIDA E ESTADO DO PARCEIRO PELO SERVIDOR. O corpo replicado NÃO serve de
+--- fonte: quando o parceiro cai ele vira ESPÍRITO e o corpo do espírito continua
+--- replicando vida > 0, então ler só o corpo mostrava "parceiro vivo, barra
+--- cheia" no exato momento em que ele precisava de socorro. O servidor zera
+--- `hp` e manda `alive = false` nesse caso (Match.broadcast). `nil` = o pacote
+--- ainda não veio nesta leva → cai no corpo replicado, como era antes.
+local mateAliveSrv: boolean? = nil
+local mateHp: number? = nil
+local mateHpMax: number? = nil
 --- Enquanto esse campo não existe: quem fechou PACTO comigo. O servidor só
 --- manda `withUserId` para os DOIS envolvidos (Sintonia.accept), então isso é
 --- fato dele, não palpite meu — e é exatamente a dupla que a missão mede.
@@ -592,16 +601,23 @@ local function updatePartner()
 	end
 
 	local mateRoot, hum = bodyOf(mp)
-	mateAlive = hum ~= nil and hum.Health > 0
+	--- O SERVIDOR MANDA, o HUD mostra — inclusive aqui. Ver o comentário de
+	--- `mateAliveSrv`: o corpo do espírito mente, o pacote da partida não.
+	mateAlive = if mateAliveSrv ~= nil then mateAliveSrv else (hum ~= nil and hum.Health > 0)
+	local hpFrac = 0
+	if mateAlive then
+		if mateHp and mateHpMax and mateHpMax > 0 then
+			hpFrac = clamp01(mateHp / mateHpMax)
+		elseif hum then
+			hpFrac = clamp01(hum.Health / math.max(hum.MaxHealth, 1))
+		end
+	end
 	partnerName.Text = if mateAlive
 		then (if mateName ~= "" then mateName else mp.DisplayName)
 		else Strings.t("hud.partner.down")
 	partnerName.TextColor3 = if mateAlive then ALLY else DANGER
 	partnerFill.BackgroundColor3 = if mateAlive then ALLY else DANGER
-	partnerFill.Size = UDim2.fromScale(
-		if mateAlive then clamp01(hum.Health / math.max(hum.MaxHealth, 1)) else 0,
-		1
-	)
+	partnerFill.Size = UDim2.fromScale(hpFrac, 1)
 
 	local myRoot = bodyOf(localPlayer)
 	if not (mateAlive and mateRoot and myRoot and cam and gui) then
@@ -731,7 +747,10 @@ function Hud.init(player: Player)
 			if typeof(key) ~= "string" then
 				return
 			end
-			local args = (isTable and p.args) or { ... }
+			--- `p.args` vem da rede: se não for tabela, `table.unpack` ERRA dentro do
+			--- handler e o anúncio some sem deixar rastro. Vale o texto sem os args.
+			local raw = isTable and p.args
+			local args = if typeof(raw) == "table" then raw else { ... }
 			showAnnounce(Strings.t(key, table.unpack(args)))
 		end)
 	)
@@ -749,8 +768,13 @@ function Hud.init(player: Player)
 				mateUserId = tonumber(m.userId)
 				mateName = tostring(m.name or "")
 				mateElement = if Elements.isValid(m.element) then m.element else nil
+				--- estes três o servidor já mandava e o HUD jogava fora
+				mateAliveSrv = if typeof(m.alive) == "boolean" then m.alive else nil
+				mateHp = tonumber(m.hp)
+				mateHpMax = tonumber(m.hpMax)
 			else
 				mateUserId, mateName, mateElement = nil, "", nil
+				mateAliveSrv, mateHp, mateHpMax = nil, nil, nil
 			end
 		end)
 	)
@@ -835,6 +859,7 @@ function Hud.destroy()
 	table.clear(gems)
 	table.clear(elementSeen)
 	mateUserId, mateName, mateElement, paintedElement, pactUserId = nil, "", nil, nil, nil
+	mateAliveSrv, mateHp, mateHpMax = nil, nil, nil
 	mateAlive, fuseReady = false, false
 	localPlayer = nil
 	if gui then

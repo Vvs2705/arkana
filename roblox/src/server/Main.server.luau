@@ -42,8 +42,19 @@ end
 if Tutorial then
 	-- o cliente avisa quando quer PULAR — é a única intenção do tutorial, e
 	-- pular é sempre permitido (respeitar quem já sabe jogar é parte da spec)
+	-- CONTRATO DE SAÍDA DO TUTORIAL. Este handler nasceu esperando
+	-- `payload.skip`, mas o cliente manda `{ step = "skip" }` nos DOIS botões
+	-- (PULAR e ENTRAR NO ROYALE). Resultado: `Tutorial.skip` nunca era chamado,
+	-- a sessão não terminava, `Tutorial.active` ficava true para sempre e o
+	-- lobby — que eu mesmo mandei esperar o tutorial — segurava a partida.
+	-- NENHUMA PARTIDA COMEÇAVA, em nenhum servidor. Achado na revisão cruzada.
+	-- Agora aceita as duas formas; `skip` é idempotente, escuta dupla é inócua.
 	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
-		if typeof(payload) == "table" and (payload :: any).skip then
+		if typeof(payload) ~= "table" then
+			return
+		end
+		local p = payload :: any
+		if p.skip == true or p.step == "skip" or p.step == "enter" or p.step == "done" then
 			pcall(Tutorial.skip, player)
 		end
 	end)

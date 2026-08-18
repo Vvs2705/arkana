@@ -574,10 +574,14 @@ local function sintonia(payload: any)
 	addTrauma(pos, SINTONIA.trauma, SINTONIA.shakeRange)
 
 	-- 4) a tela inteira toma a cor do combo por um instante (Atmosphere é dono
-	-- do color grading; se ele não estiver carregado, o resto continua valendo)
+	-- do color grading; se ele não estiver carregado, o resto continua valendo).
+	-- A FORÇA vem da preferência "FLASHES": este é o MAIOR flash do jogo (tela
+	-- inteira) e era o único lugar que ignorava o menu de acessibilidade — ia
+	-- com 1 fixo. Em 0 o `Atmosphere.pulse` não acende nada; o pilar, o domo e a
+	-- legenda continuam contando que a Sintonia saiu.
 	local a = atmosphere()
 	if a and a.pulse then
-		pcall(a.pulse, col, 1, 0.75)
+		pcall(a.pulse, col, pref("flash"), 0.75)
 	end
 end
 

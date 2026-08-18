@@ -255,6 +255,22 @@ local function pactMark(a: Player, b: Player): Vector3?
 	return markBetween(a.UserId, b.UserId) or markBetween(b.UserId, a.UserId)
 end
 
+--- Sela o pacto. O PRIMEIRO aceite vale e mais nenhum: reaceitar a mesma
+--- proposta esticava `expires` para `now + PACT_TTL` a cada chamada, e o
+--- `AcceptSintonia` não tem cooldown — uma dupla que spamasse o remote ficava
+--- com o alvo marcado PARA SEMPRE (o pacto é o que deixa as duas conjurações
+--- fundirem LONGE uma da outra, então o TTL de 12 s é limitador de jogo, não
+--- enfeite) e cada chamada ainda custava dois FireClient. Devolve `false`
+--- quando não havia o que selar — é assim que o `accept` sai barato.
+local function sealPact(prop: Proposal, withUserId: number, now: number): boolean
+	if prop.withUserId ~= nil then
+		return false -- já selado: o primeiro aceite é o que vale
+	end
+	prop.withUserId = withUserId
+	prop.expires = now + PACT_TTL
+	return true
+end
+
 --- "Mesmo alvo/área" (GDD §9). Devolve o EPICENTRO do combo, ou nil.
 --- ponytail: o pacto do Ping dá a única vantagem MECÂNICA do ping — as duas
 --- conjurações valem se as duas caírem perto do ALVO COMBINADO, ainda que
@@ -682,10 +698,11 @@ function Sintonia.accept(player: Player, fromUserId: any)
 		return -- aceitar do outro lado do mapa não é combinar
 	end
 
-	--- o `expires` vira PACT_TTL na linha seguinte: mede antes de sobrescrever
+	--- o `expires` vira PACT_TTL dentro do `sealPact`: mede antes de sobrescrever
 	local proposedAt = prop.expires - PROPOSAL_TTL
-	prop.withUserId = player.UserId
-	prop.expires = os.clock() + PACT_TTL
+	if not sealPact(prop, player.UserId, os.clock()) then
+		return -- pacto já selado: nada a anunciar, nada a renovar
+	end
 	announceState({
 		phase = "proposed",
 		byUserId = fromUserId,
@@ -729,8 +746,19 @@ end
 
 --- Existe alvo de OUTRO time ao alcance do epicentro? Bot conta (o Teams dá
 --- time ao Humanoid dele), e quem está sem time conta como inimigo.
-local function enemyNear(pos: Vector3, teamId: number?, skip: { Player }): boolean
-	for _, hum in ipairs(humanoidsIn(pos, S.targetRadius, skip)) do
+--- ALCANCE DA OPORTUNIDADE (correção do coordenador, 18/08 — achado do harness
+--- headless: 0 oportunidades em 191 s de partida, com a dupla junta atirando no
+--- mesmo alvo). A varredura usava `S.targetRadius` (14 studs), que é o raio que
+--- decide se duas magias caíram NO MESMO ALVO — critério certo para FUNDIR,
+--- errado para "havia chance de fundir": o inimigo teria de estar praticamente
+--- em cima do ponto médio da dupla, e projétil voa até 90 studs. Com o
+--- denominador zerado, a taxa de conversão do funil — a resposta à pergunta V1
+--- do projeto — ficava impossível de calcular.
+--- CALIBRAÇÃO: é este número se o denominador vier inflado no playtest.
+local OPP_RANGE = PING_RANGE
+
+local function enemyNear(pos: Vector3, teamId: number?, skip: { Player }, radius: number?): boolean
+	for _, hum in ipairs(humanoidsIn(pos, radius or S.targetRadius, skip)) do
 		local char = hum.Parent
 		local asPlayer = if char then Players:GetPlayerFromCharacter(char :: Instance) else nil
 		if Teams.teamOf(asPlayer or hum) ~= teamId then
@@ -763,7 +791,8 @@ local function scanOpportunities()
 				-- elementos IGUAIS não fundem (GDD §9): não é oportunidade
 				if elA and elB and elA ~= elB and ra and rb and (ra.Position - rb.Position).Magnitude <= PING_HEAR then
 					mid = flat((ra.Position + rb.Position) / 2)
-					open = enemyNear(mid :: Vector3, Teams.teamOf(a), { a, b })
+					-- alcance de ENGAJAMENTO, não de fusão (ver OPP_RANGE acima)
+					open = enemyNear(mid :: Vector3, Teams.teamOf(a), { a, b }, OPP_RANGE)
 				end
 			end
 
@@ -820,6 +849,20 @@ function Sintonia.step(dt: number)
 			fireChannel(ch)
 		end
 	end
+end
+
+--- FIM DE PARTIDA (costura do coordenador, 18/08): zera TODO o estado social e
+--- de cooldown. Sem isto, o cooldown compartilhado de 24 s atravessava para a
+--- partida seguinte e quem canalizou no fim entrava travado na próxima — estado
+--- de uma partida contaminando a medição de outra. Chamado pelo Match no
+--- `toLobby`. Não toca em nada do mundo: quem limpa arena é o Terrain.
+function Sintonia.resetMatch()
+	table.clear(recent)
+	table.clear(channels)
+	table.clear(proposals)
+	table.clear(readyAt)
+	table.clear(busy)
+	table.clear(pingReadyAt)
 end
 
 function Sintonia.onPlayerRemoving(player: Player)
@@ -931,6 +974,16 @@ function Sintonia.selfTest()
 	assert(withStun == 2, "só Eletrocussão e Cristais Carregados atordoam, achei " .. withStun)
 	assert(EFFECTS[K("Water", "Lightning")].stun, "Eletrocussão TEM de atordoar (promessa da tabela do GDD §9)")
 	assert(not EFFECTS[K("Water", "Earth")].slow, "Lamaçal já é lento pelo TERRENO: não duplicar no status")
+
+	-- 3.3) PACTO DO PING: só o PRIMEIRO aceite sela. Sem isto, `AcceptSintonia`
+	--      (que não tem cooldown) renovava o TTL a cada chamada e o alvo marcado
+	--      — que é o que permite fundir de LONGE — virava permanente.
+	local fakeProp: any = { player = nil, element = "Fire", pos = o, expires = os.clock() + PROPOSAL_TTL }
+	assert(sealPact(fakeProp, 7, os.clock()), "o primeiro aceite tem de selar o pacto")
+	local sealedUntil = fakeProp.expires
+	assert(not sealPact(fakeProp, 8, os.clock() + 5), "PACTO JÁ SELADO não pode ser reselado (aceite spamado = marca eterna)")
+	assert(fakeProp.expires == sealedUntil, "reaceitar não pode esticar o TTL do pacto")
+	assert(fakeProp.withUserId == 7, "quem aceitou primeiro é quem fica no pacto")
 
 	-- 4) "mais forte que a soma das partes" (GDD §9)
 	local a, b = Balance.elements.Fire.basic.dmg, Balance.elements.Lightning.basic.dmg

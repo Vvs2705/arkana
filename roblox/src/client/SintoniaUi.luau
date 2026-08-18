@@ -29,6 +29,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Elements = require(Shared:WaitForChild("Elements"))
@@ -827,6 +828,27 @@ function SintoniaUi.init(player: Player)
 					refreshCard()
 				end
 			end
+		end)
+	)
+
+	--- ARREPIO DO ESPÍRITO (GDD §18.6) — costura do coordenador, 18/08.
+	--- O servidor já mandava este remote para o caído e para a dupla, e NENHUM
+	--- módulo do cliente escutava: o morto apertava o botão, o servidor fazia
+	--- tudo certo e a tela não mostrava nada. Era o único recurso de quem caiu.
+	--- Desenho: coluna curta na cor do time, no lugar denunciado, que apaga
+	--- sozinha em `hold` segundos (o servidor manda a duração).
+	table.insert(
+		conns,
+		Net.event(Net.Names.SpiritPing).OnClientEvent:Connect(function(p: any)
+			if typeof(p) ~= "table" or typeof(p.pos) ~= "Vector3" or not fxFolder then
+				return
+			end
+			local hold = math.clamp(tonumber(p.hold) or 2, 0.5, 8)
+			local pos = p.pos :: Vector3
+			local mark = fxPart(fxFolder, Vector3.new(1.6, 26, 1.6), pos + Vector3.new(0, 13, 0), ALLY, 0.35)
+			local base = fxPart(fxFolder, Vector3.new(7, 0.4, 7), pos + Vector3.new(0, 0.3, 0), ALLY, 0.5)
+			Debris:AddItem(mark, hold)
+			Debris:AddItem(base, hold)
 		end)
 	)
 

@@ -91,6 +91,16 @@ local TUNE = {
 	--- o parceiro "responde" ao ping (não é instantâneo: parece resposta)
 	partnerAnswer = 0.7,
 	beaconHeight = 60,
+	--- TETO ABSOLUTO DA SESSÃO (s). O roteiro inteiro soma 150 s de tetos por
+	--- passo, mas o ÚLTIMO passo ("done") não tem teto de propósito — quem chegou
+	--- lá decide quando entrar no Royale. Só que "decide" pressupõe alguém no
+	--- teclado: um jogador AFK (ou um cliente que nunca mandou a intenção de
+	--- sair) ficava em `sessions` PARA SEMPRE, `Tutorial.active` respondia true
+	--- para sempre e o lobby do Match — que espera o onboarding terminar — não
+	--- começava partida NENHUMA. Bloqueio de servidor inteiro por causa de um
+	--- jogador parado. Este teto é a rede de segurança que fecha a sessão de
+	--- qualquer jeito; 210 s = os 180 s do roteiro com folga.
+	sessionCap = 210,
 } :: { [string]: number }
 
 --- noite do GDD §10 (o manto do boneco é a cor do elemento puxada para ela)
@@ -117,6 +127,8 @@ type Session = {
 	index: number,
 	--- tempo dentro do passo atual
 	t: number,
+	--- os.clock() da abertura da sessão — base do teto absoluto (TUNE.sessionCap)
+	startedAt: number,
 	center: Vector3,
 	--- cobertura inflamável escolhida (a "passagem") e o lago escolhido
 	burn: { Cell },
@@ -699,6 +711,18 @@ local function onCast(player: Player)
 	s.missAt = now + TUNE.missGrace
 end
 
+--- O cliente pediu para SAIR do Campo de Provas? Aceita as DUAS formas em
+--- circulação: a documentada no cabeçalho e roteada pelo Main (`{ skip = true }`)
+--- e a que o TutorialUi realmente manda nos dois botões (`{ step = "skip" }`).
+--- Payload é HOSTIL até prova em contrário — daí o teste de tipo.
+local function wantsOut(payload: any): boolean
+	if typeof(payload) ~= "table" then
+		return false
+	end
+	local p = payload :: any
+	return p.skip == true or p.step == "skip"
+end
+
 local function wire()
 	if wired then
 		return
@@ -709,6 +733,40 @@ local function wire()
 	-- para o roteiro. Nenhum dado do cliente vira estado sem validação.
 	Net.event(Net.Names.CastSpell).OnServerEvent:Connect(onCast)
 	Net.event(Net.Names.ProposeSintonia).OnServerEvent:Connect(onPing)
+
+	--- SAÍDA DO CAMPO DE PROVAS — COSTURA QUEBRADA ENTRE AS RAIAS (18/08).
+	--- O Main roteia este remote esperando `payload.skip`; o TutorialUi manda
+	--- `{ step = "skip" }` nos DOIS botões (PULAR e ENTRAR NO ROYALE). Com os
+	--- contratos em desacordo, `Tutorial.skip` nunca era chamado: ninguém saía do
+	--- onboarding, `Tutorial.active` ficava true e o lobby do Match travava para
+	--- o servidor inteiro. Aceitar as duas formas AQUI conserta a saída sem tocar
+	--- em Main nem no cliente (arquivos de outros donos). A escuta dupla com o
+	--- Main é inofensiva: `skip` não faz nada sem sessão aberta.
+	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
+		if wantsOut(payload) then
+			Tutorial.skip(player)
+		end
+	end)
+end
+
+--- Partida em andamento? Require preguiçoso e protegido (o mesmo padrão que o
+--- Match usa para perguntar do tutorial). Quem entra NO MEIO da partida já nasce
+--- eliminado — não conjura, não derruba alvo, não conclui passo nenhum — e a
+--- sessão presa ainda seguraria o lobby DEPOIS que a partida acabasse.
+local matchMod: any = nil
+local matchChecked = false
+local function matchRunning(): boolean
+	if not matchChecked then
+		matchChecked = true
+		local mod = ServerModules:FindFirstChild("Match")
+		local ok, m = pcall(require, mod :: ModuleScript)
+		matchMod = ok and m or nil
+	end
+	if not matchMod or not matchMod.isPlaying then
+		return false
+	end
+	local ok, yes = pcall(matchMod.isPlaying)
+	return ok and yes == true
 end
 
 -- --------------------------------------------------------- checagem por passo
@@ -783,6 +841,13 @@ function Tutorial.start(player: Player): boolean
 	if sessions[player] or seen[player] then
 		return false
 	end
+	--- NÃO no meio de uma partida: o Main chama isto em TODO corpo novo, e
+	--- `startMatch` recarrega personagem. Sem esta guarda, quem entra no meio da
+	--- prova (ou o próprio começo da partida) abria um Campo de Provas com alvos
+	--- dentro da arena viva e passos impossíveis de concluir.
+	if matchRunning() then
+		return false
+	end
 	local root = rootOf(player)
 	if not root then
 		return false
@@ -799,6 +864,7 @@ function Tutorial.start(player: Player): boolean
 		player = player,
 		index = 1,
 		t = 0,
+		startedAt = os.clock(),
 		center = center :: Vector3,
 		burn = burn,
 		lake = lake,
@@ -849,6 +915,14 @@ function Tutorial.step(dt: number)
 		if not player.Parent or not rootOf(player) then
 			-- saiu (ou morreu de vez): o passo em aberto conta como abandono
 			finish(s, false, "left")
+			continue
+		end
+		-- TETO ABSOLUTO: nenhuma sessão fica aberta para sempre. Sem isto um
+		-- jogador AFK no último passo (que não tem teto próprio) segurava o lobby
+		-- do servidor inteiro. Quem chegou ao fim do roteiro conta como CONCLUÍDO
+		-- mesmo estourando o relógio — ele viu tudo, só não apertou o botão.
+		if now - s.startedAt >= TUNE.sessionCap then
+			finish(s, s.index >= #ORDER, "timeout")
 			continue
 		end
 		s.t += dt
@@ -921,6 +995,41 @@ function Tutorial.selfTest(): boolean
 		warn("[Tutorial] selfTest: matriz de Sintonia vazia")
 		ok = false
 	end
+
+	-- ------------------------------------------------------- SAÍDA DO CAMPO
+	-- O BUG QUE TRAVAVA O SERVIDOR INTEIRO (18/08): o TutorialUi manda
+	-- `{ step = "skip" }` nos dois botões e o roteamento do Main só entendia
+	-- `{ skip = true }` — ninguém saía do onboarding, `Tutorial.active` ficava
+	-- true e o lobby do Match nunca começava partida. O primeiro assert
+	-- reprovaria antes da correção.
+	assert(wantsOut({ step = "skip" }), "o payload REAL do TutorialUi tem de tirar o jogador do Campo de Provas")
+	assert(wantsOut({ skip = true }), "o payload documentado no Main continua valendo")
+	assert(not wantsOut({ step = "combo" }), "passo qualquer não é pedido de saída")
+	assert(not wantsOut(nil) and not wantsOut("skip"), "payload hostil não tira ninguém do tutorial")
+
+	-- ---------------------------------------------------- TETO ABSOLUTO (AFK)
+	-- O último passo não tem teto próprio DE PROPÓSITO (quem chegou lá decide
+	-- quando entrar no Royale) — então a sessão só fecha sozinha por este número.
+	-- Sem ele, um jogador parado segura o lobby de todo mundo para sempre.
+	local scripted = 0
+	for _, name in ipairs(ORDER) do
+		local lim = LIMIT[name]
+		if lim and lim < math.huge then
+			scripted += lim
+		end
+	end
+	assert(
+		TUNE.sessionCap ~= nil and TUNE.sessionCap < math.huge,
+		"sem teto absoluto de sessão um jogador AFK trava o lobby do servidor para sempre"
+	)
+	assert(
+		TUNE.sessionCap > scripted,
+		string.format(
+			"teto absoluto (%ds) menor que o roteiro (%ds): cortaria quem ainda está jogando",
+			TUNE.sessionCap,
+			scripted
+		)
+	)
 	print(string.format("[Tutorial] selfTest %s — %d passos", if ok then "OK" else "FALHOU", #ORDER))
 	return ok
 end

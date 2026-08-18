@@ -57,9 +57,20 @@ RunService.RenderStepped:Connect(function(dt)
 	Controls.update(dt)
 	Hud.update(dt)
 	Vfx.update(dt)
-	for _, m in ipairs(extras) do
+	--- O `init` dos opcionais já era protegido; o `update` não era. Um erro no
+	--- meio do laço ABORTAVA o frame inteiro dali para a frente: quebrar a
+	--- SintoniaUi congelava, calada, a MatchUi e a TutorialUi que vêm depois —
+	--- e repetia 60x/s. Aqui o módulo que quebra SAI DE CENA (aviso uma vez) e
+	--- os seguintes continuam desenhando. Percorre de trás para a frente para o
+	--- `table.remove` não pular o vizinho.
+	for i = #extras, 1, -1 do
+		local m = extras[i]
 		if m.update then
-			m.update(dt)
+			local ok, err = pcall(m.update, dt)
+			if not ok then
+				table.remove(extras, i)
+				warn("[ARKANA] módulo opcional saiu do laço após erro: " .. tostring(err))
+			end
 		end
 	end
 end)

@@ -145,6 +145,9 @@ local matchId: string? = nil
 local matchStartedAt = 0
 local matchEndedAt = 0
 local running = false
+--- true depois de um matchEnd: impede que evento residual reabra a janela e
+--- apague o relatório da partida que acabou (ver Telemetry.emit).
+local ended = false
 
 --- instante do primeiro dano da partida (tempo até o primeiro combate)
 local firstDamageAt: number? = nil
@@ -591,6 +594,16 @@ function Telemetry.emit(name: string, subject: any, payload: any?)
 		if name == N.MatchEnd then
 			return
 		end
+		-- NÃO REABRIR APÓS O FIM (achado do harness headless, 18/08): depois do
+		-- `matchEnd` ainda chegam eventos residuais — fogo do terreno queimando,
+		-- dano de zona no frame seguinte. Abrir uma "partida implícita" com eles
+		-- ZERAVA os agregados da partida que acabou, e `Playtest.report()` — o
+		-- fluxo documentado para o Diretor — devolvia relatório vazio logo
+		-- depois de jogar. O relatório da partida encerrada é preservado; o
+		-- resíduo é descartado.
+		if ended then
+			return
+		end
 		local id = if typeof(payload) == "table" then (payload :: any).match_id else nil
 		Telemetry.matchStart(if typeof(id) == "string" then id else "implicita")
 	end
@@ -715,6 +728,7 @@ function Telemetry.matchStart(id: string?)
 	matchStartedAt = os.clock()
 	matchEndedAt = 0
 	running = true
+	ended = false
 	pcall(scanTerrain, true)
 	print(string.format("[Telemetry] coleta ABERTA — partida %s (variante Sintonia %s)", matchId, tostring(Balance.experiment.sintoniaVariant)))
 end
@@ -727,6 +741,7 @@ function Telemetry.matchEnd()
 	pcall(scanTerrain, false)
 	matchEndedAt = os.clock()
 	running = false
+	ended = true
 	print(Telemetry.report())
 end
 

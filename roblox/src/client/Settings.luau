@@ -74,12 +74,17 @@ local L10N = {
 }
 
 local L = {
-	openSize = 34,
+	--- 48dp é o MÍNIMO do GDD §10 que o cabeçalho deste arquivo cita — e este
+	--- botão estava em 34, o único alvo de dedo do cliente abaixo da régua.
+	--- Em celular ele fica entre o Selo e a barra da partida: errar o toque aqui
+	--- é errar a porta de entrada da acessibilidade inteira.
+	openSize = 48,
 	openTop = 12,
 	--- à DIREITA do Selo de Arkana (72px centrado no topo): o Selo vai até +36,
-	--- a barra da partida começa a 202px da borda direita. CALIBRAÇÃO: é este
-	--- número se o botão encostar na barra em tela estreita.
-	openX = 56,
+	--- a barra da partida começa a 202px da borda direita. Subiu junto com o
+	--- `openSize`: com 48dp e o antigo 56 o botão encostaria no Selo (+36).
+	--- CALIBRAÇÃO: é este número se o botão encostar na barra em tela estreita.
+	openX = 62,
 	rowH = 56,
 	chipW = 62,
 	chipH = 48,

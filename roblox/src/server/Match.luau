@@ -64,6 +64,11 @@ local TUNE = {
 	zoneTransparency = 0.86,
 	--- raio (em fração do raio da zona) onde os competidores nascem
 	spawnRingFrac = 0.62,
+	--- teto de quanto tempo o lobby SEGURA a partida por causa do onboarding
+	--- (ver `Match.step`). Maior que o teto absoluto do próprio tutorial: no
+	--- caminho normal a sessão fecha sozinha e este número nunca é alcançado —
+	--- ele só existe para o caso de gente entrando sem parar.
+	tutorialHoldMax = 240,
 	--- ponytail: TETO CONHECIDO — 20 Humanoids de servidor em aparelho fraco
 	--- (GDD §19.2) nunca foi medido. O preenchimento vai até `maxPlayers` mas
 	--- para neste teto. Sobe para `M.maxPlayers - 1` quando o playtest medir.
@@ -163,7 +168,12 @@ local eliminated: { [Player]: boolean } = {}
 local stats: { [Player]: PlayerStat } = {}
 --- último jogador a acertar cada humanoid (crédito de abate)
 local lastHit: { [Humanoid]: { player: Player, at: number } } = {}
-local deathWired: { [Humanoid]: boolean } = {}
+--- CHAVES FRACAS (mesmo motivo do Teams): a marca de "já liguei o Died deste
+--- humanoid" só some quando ele morre. Corpo que a partida trocou sem morrer —
+--- todo jogador a cada `startMatch`, todo bot que o `Bots.clear` destrói —
+--- ficava aqui para sempre, e segurar um Humanoid segura o Model inteiro junto:
+--- ~20 personagens vazando por partida num servidor que nunca reinicia.
+local deathWired: { [Humanoid]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local champion: any = nil
 local seal: any = nil
 
@@ -176,6 +186,8 @@ local forcedBots: number? = nil
 
 local stateAcc = 0
 local zoneAcc = 0
+--- há quanto tempo o lobby está segurando a partida por causa do onboarding
+local tutorialHold = 0
 local rng = Random.new()
 
 local evState: RemoteEvent
@@ -679,9 +691,10 @@ local function completeRevive(player: Player, sp: Spirit, at: Vector3)
 	-- é o Combat — o Match só PEDE. Chamado ANTES do corpo novo de propósito: o
 	-- `onCharacterAdded` do Combat enche o escudo no cap do nível ATUAL, que
 	-- depois deste reset já é o nível 1.
-	-- ponytail: TETO CONHECIDO — enquanto a raia de combate não expuser
-	-- `Combat.resetProgress`, o revivido volta com o nível de escudo que
-	-- conquistou e o freio "volta o jogador, não o poder" fica só no papel.
+	-- (o TETO CONHECIDO que estava anotado aqui caiu: `Combat.resetProgress` já
+	-- existe e zera evolução, nível e carga do escudo — o freio "volta o jogador,
+	-- não o poder" é mecânico agora, não mais promessa de documento. A guarda
+	-- fica porque a chamada é opcional por contrato entre as raias.)
 	if combat.resetProgress then
 		combat.resetProgress(player)
 	end
@@ -753,7 +766,13 @@ local function stepRevive(dt: number)
 			char:PivotTo(CFrame.new(orb.Position + Vector3.new(0, REVIVE.hoverY, 0)))
 		end
 
-		local altar = if open and sp.carrier then altarNear(sp.carrier :: Player) else nil
+		-- TETO POR DUPLA aplicado TAMBÉM aqui, não só no nascimento da essência:
+		-- `makeSpirit` barra a segunda queda, mas uma essência que já estava no
+		-- chão quando o retorno foi gasto continuava canalizável. Em duos isso
+		-- nunca acontece (só há um parceiro para carregar); em qualquer time
+		-- maior que 2 é a brecha do segundo revive. `reviveAllowed` é a mesma
+		-- regra pura que o teste cobre — um lugar só para a lei.
+		local altar = if reviveAllowed(sp.team) and sp.carrier then altarNear(sp.carrier :: Player) else nil
 		if altar then
 			if sp.channel <= 0 then
 				-- ÁREA DENUNCIADA: o altar acende e TODO MUNDO ouve. O ritual não
@@ -843,6 +862,45 @@ local function matchOver(): boolean
 	return #members <= 1
 end
 
+--- Sujeito do Selo por trás de um Humanoid: o Player quando existe, senão o bot.
+--- Devolve nil para corpo que não é competidor (alvo de tutorial, por exemplo).
+local function subjectOf(hum: Humanoid): any
+	local char = hum.Parent
+	local player = if char then Players:GetPlayerFromCharacter(char :: Instance) else nil
+	if player then
+		return player
+	end
+	for _, bot in ipairs(Bots.list()) do
+		if bot.humanoid == hum then
+			return bot
+		end
+	end
+	return nil
+end
+
+--- Ordena candidatos a campeão: abate pesa mais que dano, dano desempata.
+--- Player e bot têm os mesmos dois números — só moram em lugares diferentes.
+local function championScore(subject: any): number
+	if typeof(subject) == "Instance" then
+		local s = statOf(subject :: Player)
+		return s.kills * 1000 + s.damage
+	end
+	return (subject.kills or 0) * 1000 + (subject.damage or 0)
+end
+
+--- Campeão entre os sobreviventes. Recebe a lista pronta (e não a partida) só
+--- para o autoteste conseguir chamá-la sem Studio — mesmo truque do `countTeams`.
+local function pickChampion(subjects: { any }): any
+	local best, who = -1, nil
+	for _, subject in ipairs(subjects) do
+		local score = championScore(subject)
+		if score > best then
+			best, who = score, subject
+		end
+	end
+	return who
+end
+
 local function finish()
 	if state ~= "Playing" then
 		return
@@ -850,23 +908,20 @@ local function finish()
 	state = "Ended"
 	stateT = 0
 
-	local survivors = aliveEntities()
-	champion = nil
-	if #survivors == 1 then
-		local hum = survivors[1].humanoid
-		local char = hum.Parent
-		local player = if char then Players:GetPlayerFromCharacter(char :: Instance) else nil
-		if player then
-			champion = player
-		else
-			for _, bot in ipairs(Bots.list()) do
-				if bot.humanoid == hum then
-					champion = bot
-					break
-				end
-			end
+	-- CAMPEÃO NO FIM POR DUPLA (costura quebrada, 18/08): desde que `matchOver`
+	-- passou a contar TIMES, o desfecho NORMAL do jogo deixa DOIS vivos. A
+	-- checagem antiga (`#survivors == 1`) só nomeava campeão no caso raro do
+	-- sobrevivente solitário — na vitória mais comum o Selo do Campeão (GDD
+	-- §18.6) simplesmente não existia e a tela de fim mostrava "sem campeão".
+	-- Agora o Selo sai do MELHOR sobrevivente (abates, depois dano).
+	local subjects: { any } = {}
+	for _, e in ipairs(aliveEntities()) do
+		local subject = subjectOf(e.humanoid)
+		if subject then
+			table.insert(subjects, subject)
 		end
 	end
+	champion = pickChampion(subjects)
 	seal = buildSeal()
 	emit(Events.Name.MatchEnd, champion, {
 		match_id = matchId,
@@ -1054,6 +1109,19 @@ local function toLobby()
 		zonePart:Destroy()
 		zonePart = nil
 	end
+	-- PROGRESSO NÃO ATRAVESSA PARTIDA (achado da revisão de combate, 18/08). O
+	-- Escudo Evolutivo é conquistado DENTRO de uma prova: sem este reset, quem
+	-- terminou a partida 1 no nível 4 começava a 2 já dourado, e o snowball que a
+	-- auditoria apontou virava vantagem acumulada de sessão — envenenando a
+	-- leitura de TTK justamente no formato do playtest (partidas em sequência).
+	-- Vem ANTES do `LoadCharacter`: o `onCharacterAdded` do Combat enche o escudo
+	-- no cap do nível ATUAL, que depois deste reset já é o nível 1.
+	if combat and combat.resetProgress then
+		for _, player in ipairs(Players:GetPlayers()) do
+			combat.resetProgress(player)
+		end
+	end
+
 	for player in pairs(eliminated) do
 		-- tira o espectador do poleiro com um corpo NOVO (soltar a âncora o faria
 		-- despencar 120 studs). Ele volta a competir na próxima partida.
@@ -1068,6 +1136,18 @@ local function toLobby()
 	-- no lobby ninguém tem time: sem aliado, a Sintonia não dispara enquanto a
 	-- próxima partida não montar os duos (lado seguro do erro).
 	Teams.clear()
+	-- O COOLDOWN COMPARTILHADO DA SINTONIA TAMBÉM NÃO ATRAVESSA (achado da mesma
+	-- revisão): são 24 s, e quem fundiu no fim da partida entrava na próxima
+	-- ainda travado — a dupla perdia o pilar do jogo nos primeiros segundos e o
+	-- funil de Sintonia media um bloqueio herdado. Require preguiçoso e protegido
+	-- (padrão do projeto): se a raia R2 ainda não expôs `resetMatch`, isto vira
+	-- no-op e o lobby segue igual.
+	-- FindFirstChild (não WaitForChild): isto roda dentro do Heartbeat e um
+	-- módulo ausente não pode fazer o loop mestre ficar esperando.
+	local okS, S = pcall(require, ServerModules:FindFirstChild("Sintonia") :: ModuleScript)
+	if okS and S and (S :: any).resetMatch then
+		pcall((S :: any).resetMatch)
+	end
 	announceAll("announce.match.waiting")
 end
 
@@ -1326,6 +1406,26 @@ local function tutorialActive(): boolean
 	return false
 end
 
+--- Tira TODO MUNDO do Campo de Provas pela porta normal (o mesmo `skip` do
+--- botão): a sessão fecha, os alvos e o pilar somem e a telemetria registra o
+--- abandono. Só é chamado quando o lobby já esperou o teto — sem isto, o único
+--- jeito de destravar um servidor segurado pelo onboarding é reiniciá-lo.
+local function tutorialSkipAll()
+	if not tutorialMod or not tutorialMod.skip then
+		return
+	end
+	for _, player in ipairs(Players:GetPlayers()) do
+		pcall(tutorialMod.skip, player)
+	end
+end
+
+--- A partida está em andamento? O Tutorial pergunta antes de montar o Campo de
+--- Provas — quem entra no meio da prova nasce eliminado e não concluiria passo
+--- nenhum. Leitura pura: ninguém muda estado por aqui.
+function Match.isPlaying(): boolean
+	return state == "Playing"
+end
+
 function Match.step(dt: number)
 	stateT += dt
 
@@ -1339,17 +1439,37 @@ function Match.step(dt: number)
 		-- `startMatch` reconstrói o terreno e recarrega personagens — começar a
 		-- partida por cima do tutorial destruiria a sessão de quem está
 		-- aprendendo. Enquanto alguém estiver no tutorial, o lobby ESPERA.
-		if ready and tutorialActive() then
-			ready = false
-			lobbyLeft = math.max(lobbyLeft, 3) -- retoma a contagem com folga
-		end
-		if ready then
-			lobbyLeft -= dt
-			if lobbyLeft <= 0 then
-				startMatch()
+		--
+		-- MAS COM TETO. Duas correções aqui: (1) a espera não pode REINICIAR os
+		-- 25 s do lobby a cada quadro — era o que o `else` fazia, apagando o
+		-- `math.max(lobbyLeft, 3)` da linha anterior; (2) num playtest com gente
+		-- chegando o tempo todo, cada novo jogador abre um tutorial novo e a
+		-- espera nunca terminaria. Passado o teto, quem ainda estiver no Campo de
+		-- Provas é convidado a sair pela porta normal (`skip`, que fecha a sessão
+		-- e registra abandono na telemetria) e a partida começa.
+		local holding = ready and tutorialActive()
+		if holding then
+			tutorialHold += dt
+			if tutorialHold >= TUNE.tutorialHoldMax then
+				tutorialSkipAll() -- destrava: o lobby não espera para sempre
+				holding = false
+			else
+				-- a contagem PARA onde está, com piso de 3 s (o `else` de baixo a
+				-- reiniciava para 25 s a cada quadro, apagando esta linha)
+				lobbyLeft = math.max(math.min(lobbyLeft, M.lobbyWait), 3)
 			end
 		else
-			lobbyLeft = M.lobbyWait
+			tutorialHold = 0
+		end
+		if not holding then
+			if ready then
+				lobbyLeft -= dt
+				if lobbyLeft <= 0 then
+					startMatch()
+				end
+			else
+				lobbyLeft = M.lobbyWait
+			end
 		end
 	elseif state == "Playing" then
 		stepZone(dt)
@@ -1448,6 +1568,22 @@ function Match.selfTest()
 	assert(reviveAllowed(7), "a fase anterior à final ainda permite o retorno")
 	zone.phase, revivesUsed[7] = savedPhase, savedUsed
 	assert(REVIVE.channel > 0 and REVIVE.radius > 0, "o ritual precisa de tempo e de área")
+
+	-- SELO DO CAMPEÃO NO FIM POR DUPLA. O ASSERT QUE PAGA A CORREÇÃO DE 18/08:
+	-- desde que a partida passou a acabar quando resta UM TIME, o desfecho normal
+	-- deixa DOIS vivos — e a checagem antiga (`#survivors == 1`) devolvia campeão
+	-- nil, ou seja, a vitória mais comum do jogo terminava sem Selo na tela.
+	local solo = { name = "Solo", kills = 1, damage = 500 }
+	local ace = { name = "Ace", kills = 3, damage = 100 }
+	assert(pickChampion({ solo, ace }) ~= nil, "vitória de DUPLA (2 vivos) tem de ter campeão")
+	assert(pickChampion({ solo, ace }) == ace, "campeão é quem tem mais abates; dano só desempata")
+	assert(pickChampion({ solo }) == solo, "sobrevivente solitário continua sendo campeão")
+	assert(pickChampion({}) == nil, "sem sobrevivente não há campeão (o servidor não inventa um)")
+
+	-- TETO DA ESPERA PELO ONBOARDING: o lobby segura enquanto alguém está no
+	-- Campo de Provas, mas segurar PARA SEMPRE trava o servidor inteiro (era o
+	-- comportamento antigo — sem teto, com jogador AFK ou entrando sem parar).
+	assert(TUNE.tutorialHoldMax < math.huge, "a espera pelo tutorial precisa de teto, senão o lobby nunca começa")
 
 	Teams.clear()
 	assert(Teams.teamOf(roster[1]) == nil, "clear apaga os times")

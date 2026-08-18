@@ -384,7 +384,16 @@ local function buildAimMarker()
 	folder.Parent = workspace
 end
 
+--- A seta fica ESCONDIDA quase o tempo todo, e `hideAimMarker` roda todo frame.
+--- Sem esta trava eram 12 escritas de propriedade por frame (720/s) para repetir
+--- o valor que já estava lá — desperdício exatamente no aparelho mais fraco.
+local aimShown = false
+
 local function hideAimMarker()
+	if not aimShown then
+		return
+	end
+	aimShown = false
 	for _, p in ipairs(trail) do
 		p.Transparency = 1
 	end
@@ -394,6 +403,7 @@ local function hideAimMarker()
 end
 
 local function drawAimMarker(from: Vector3, dir: Vector3)
+	aimShown = true
 	local e = (Elements.ById :: any)[element]
 	--- alcance visual = alcance da assistência (Balance). CALIBRAÇÃO: é o único
 	--- número de "alcance" que existe nos dados; se as magias ganharem alcance
@@ -504,9 +514,8 @@ function Controls.init(p: Player)
 	remCast = Net.event(Net.Names.CastSpell)
 	remSwitch = Net.event(Net.Names.SwitchElement)
 	remDodge = Net.event(Net.Names.Dodge)
-	--- PENDÊNCIA PARA O COORDENADOR: nome cru porque Shared/Net não é desta
-	--- raia. Vira Net.Names.Stance quando ele oficializar.
-	remStance = Net.event("Stance")
+	--- o coordenador já oficializou o nome em Shared/Net — a string solta saiu
+	remStance = Net.event(Net.Names.Stance)
 
 	buildAimMarker()
 
@@ -547,7 +556,15 @@ function Controls.init(p: Player)
 			local left = (cds :: any)[kind]
 			if typeof(left) == "number" and left >= 0 then
 				cdUntil[kind] = os.clock() + left
-				cdTotal[kind] = math.max(cdTotal[kind], left)
+				--- O servidor JÁ manda o total junto (`tacticTotal`/`dodgeTotal` em
+				--- Combat.sendStats) e este código o ignorava: o anel do botão enchia
+				--- sobre um total ADIVINHADO (o maior valor já visto), que nunca
+				--- encolhe e por isso nunca mais bate. Fica pior com o escudo nível 4,
+				--- que MULTIPLICA o cooldown da tática. Palpite só se o campo faltar.
+				local total = (cds :: any)[kind .. "Total"]
+				cdTotal[kind] = if typeof(total) == "number" and total > 0
+					then total
+					else math.max(cdTotal[kind], left)
 			end
 		end
 	end)

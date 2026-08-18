@@ -419,7 +419,13 @@ function MatchUi.init(player: Player)
 		Name = "ArkanaMatch", -- raia D usa "ArkanaHud", raia C "ArkanaControls"
 		ResetOnSpawn = false, -- sobrevive à morte: a tela de fim não pode sumir
 		IgnoreGuiInset = false,
-		DisplayOrder = 6, -- acima do HUD e dos botões: o fim de partida cobre tudo
+		--- COLISÃO CORRIGIDA: a SintoniaUi também declarava 6 ("o aceite não pode
+		--- ser tapado") e o Roblox não define quem ganha o empate — a tela de fim
+		--- de partida e o card de ACEITAR podiam se cobrir em ordem aleatória.
+		--- Esta ScreenGui é a que diz "cobre tudo", então ela sobe: acima do HUD
+		--- (4), dos botões (5), da Sintonia (6), do tutorial (7) e das legendas
+		--- (8); abaixo do menu de acessibilidade (20), que é modal.
+		DisplayOrder = 10,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, playerGui)
 	gui = root

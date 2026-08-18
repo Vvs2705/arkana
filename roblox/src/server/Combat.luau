@@ -27,6 +27,13 @@ local Events = require(Shared:WaitForChild("Events"))
 local Grid = require(Shared:WaitForChild("Grid"))
 local Net = require(Shared:WaitForChild("Net"))
 
+--- Times: quem é ALIADO. Require direto (o Teams não depende de ninguém, então
+--- não há ciclo) — mesmo padrão da Sintonia e do Bots. O combate precisa disso
+--- para UMA coisa só: dano em aliado não alimenta o Escudo Evolutivo (GDD §169
+--- "anti-farm"). Sem esta linha, uma dupla evolui os dois escudos atirando um no
+--- outro no canto do mapa.
+local Teams = require((script.Parent :: Instance):WaitForChild("Teams") :: ModuleScript)
+
 -- --- constantes de sensação/varredura (NÃO são balanceamento) ---------------
 --- alcance máximo de qualquer projétil. 2D: 720 px ÷ 8 px/stud = 90 studs.
 local MAX_RANGE = 720 / Balance.PX_PER_STUD
@@ -73,6 +80,25 @@ local CROUCH_MULT = 0.5
 --- visível em R6 pede animação de rig, não outro número aqui.
 local CROUCH_HIP_MULT = 0.5
 
+-- --- RATE LIMIT das intenções SEM cooldown de jogo (anti-flood) -------------
+-- Conjurar e esquivar já têm cadência/cooldown do próprio jogo: quem dispara o
+-- remote 1000x/s só recebe 1000 `return` baratos. TROCAR DE ELEMENTO e AGACHAR
+-- não tinham freio nenhum, e cada um custa REDE:
+--   · troca de elemento → um `sendStats` (FireClient) por chamada;
+--   · agachar → uma escrita em `Humanoid.HipHeight`, que REPLICA para a sala
+--     inteira (1000 alternâncias/s = tempestade de replicação para todos).
+-- O gate só é cobrado quando o valor MUDA de verdade, então repetir a mesma
+-- postura/elemento (o cliente reenvia o estado inteiro) nunca gasta orçamento.
+-- KNOB DE CALIBRAÇÃO — 20 Hz de propósito, e não 10: a regra é NUNCA derrubar
+-- entrada de gente honesta. Toque duplo humano no mesmo botão não desce de
+-- ~80 ms, então 50 ms passa folgado, e ainda assim corta um flood de 1000/s em
+-- 50x. Se o playtest mostrar troca de elemento "engasgando", AFROUXE aqui.
+-- ponytail: TETO CONHECIDO — isto é limite POR INTENÇÃO, não por conexão. Um
+-- limitador genérico por jogador pertence ao `Net` (do COORDENADOR); enquanto
+-- ele não existe, cada handler segura o seu.
+local SWITCH_MIN_GAP = 0.05
+local CROUCH_MIN_GAP = 0.05
+
 --- Multiplicador de velocidade da postura. Agachar VENCE correr: quem segura
 --- o agachar não corre por acidente.
 local function stanceMult(sprint: boolean, crouch: boolean): number
@@ -108,6 +134,12 @@ type State = {
 	crouch: boolean,
 	--- HipHeight de pé do rig (R6 e R15 têm bases diferentes)
 	hipBase: number,
+	--- RATE LIMIT das duas intenções que não têm cooldown de jogo (ver
+	--- SWITCH_MIN_GAP / CROUCH_MIN_GAP). Moram no State de propósito: o State já
+	--- é criado no PlayerAdded e apagado no PlayerRemoving, então o limitador
+	--- não vira mais uma tabela para alguém esquecer de limpar.
+	nextSwitch: number,
+	nextCrouch: number,
 }
 
 type Projectile = {
@@ -137,7 +169,12 @@ local statsAcc = 0
 --- inscreve aqui; sem inscrição, o combate se comporta exatamente como antes.
 --- valor = elemento do bot (string) quando informado, senão `true`. Os dois são
 --- verdadeiros, então quem só pergunta "é alvo?" não precisa saber disso.
-local extraTargets: { [Humanoid]: string | boolean } = {}
+--- CHAVES FRACAS (mesmo motivo do `statuses` e do Teams): esta tabela é varrida
+--- por `findHit` a cada sub-passo de CADA projétil. Quem esquecer de chamar
+--- `unregisterTarget` (corpo do tutorial de quem saiu no meio, bot removido por
+--- outro caminho) deixaria aqui um Humanoid morto para sempre — vazamento entre
+--- partidas E custo por tiro. Com chave fraca a entrada some com o corpo.
+local extraTargets: { [Humanoid]: string | boolean } = setmetatable({}, { __mode = "k" }) :: any
 --- Observadores de dano: chamados DEPOIS de aplicar, com o dano efetivo. O
 --- Match usa para crédito de abate e para os números do Selo do Campeão.
 local damageListeners: { (Humanoid, number, Player?) -> () } = {}
@@ -147,10 +184,11 @@ local evSpawned: RemoteEvent
 local evImpact: RemoteEvent
 local evStats: RemoteEvent
 local evDamage: RemoteEvent
---- POSTURA (correr/agachar). O nome NÃO está em Net.Names porque Shared/Net é
---- do COORDENADOR — Net.event aceita nome livre e cria o RemoteEvent no
---- servidor / espera no cliente. PENDÊNCIA: oficializar como
---- Net.Names.Stance = "Stance" e rotear pelo Main, como as outras intenções.
+--- POSTURA (correr/agachar). O COORDENADOR já oficializou o nome em
+--- `Net.Names.Stance`, com o roteamento aqui dentro (e NÃO no Main: o servidor
+--- precisa aplicar a postura dentro do mesmo produto de WalkSpeed do `step`).
+--- Ler de Net.Names em vez do literal antigo garante que um rename lá não deixe
+--- dois nomes de remote convivendo — o cliente ficaria mudo sem erro nenhum.
 local evStance: RemoteEvent
 
 -- ------------------------------------------------------------------ Sintonia
@@ -304,7 +342,14 @@ function Combat.applyStatus(humanoid: Humanoid, kind: string, duration: number, 
 	if d <= 0 or humanoid.Health <= 0 then
 		return 0
 	end
+	--- NaN é um `number` para o `typeof`/`tonumber`, então ele passaria por aqui
+	--- e viraria `mag = NaN`. Num Slow isso faz `statusSpeedMult` devolver NaN, e
+	--- aí `math.abs(want - walkSpeedSet) > 0.01` é FALSO para sempre: a WalkSpeed
+	--- congela no último valor e o jogador nunca mais muda de velocidade.
 	local mag = tonumber(magnitude) or 1
+	if mag ~= mag then
+		mag = 1
+	end
 	if kind == "Slow" then
 		mag = math.clamp(mag, SLOW_FLOOR, 1)
 	end
@@ -478,9 +523,9 @@ function Combat.init(terrainModule: any)
 	evDamage = Net.event(Net.Names.DamageNumber)
 
 	-- intenção de POSTURA: payload tratado como hostil (só dois booleanos saem
-	-- dele). O Main roteia as outras intenções; esta se auto-roteia enquanto o
-	-- nome não entra em Net.Names.
-	evStance = Net.event("Stance")
+	-- dele). O Main roteia as outras intenções; esta se auto-roteia (contrato
+	-- registrado em Net.Names.Stance — NÃO adicionar um segundo handler no Main).
+	evStance = Net.event(Net.Names.Stance)
 	evStance.OnServerEvent:Connect(function(player, payload)
 		Combat.handleStance(player, payload)
 	end)
@@ -509,6 +554,8 @@ function Combat.onPlayerAdded(player: Player)
 		sprint = false,
 		crouch = false,
 		hipBase = 0,
+		nextSwitch = 0,
+		nextCrouch = 0,
 	}
 end
 
@@ -573,9 +620,25 @@ function Combat.handleStance(player: Player, payload: any)
 	if not st or typeof(payload) ~= "table" then
 		return
 	end
+	--- ELIMINADO NÃO AGE (mesma trava do handleCast/handleDodge/handleSwitch):
+	--- sem isto o espectador continuava correndo e agachando do poleiro, e o
+	--- agachar ainda replicava HipHeight de um corpo que não está na partida.
+	if cannotAct[player] then
+		return
+	end
 	st.sprint = (payload :: any).sprint == true
 	local wants = (payload :: any).crouch == true
 	local hum = st.humanoid
+	--- ANTI-FLOOD: só a MUDANÇA de agachamento escreve HipHeight (que replica
+	--- para a sala toda), então só a mudança paga o pedágio. Reenviar a mesma
+	--- postura — que é o que o cliente honesto faz — não gasta orçamento.
+	if wants ~= st.crouch then
+		local now = os.clock()
+		if now < st.nextCrouch then
+			return -- alternância em rajada: ignora e mantém a postura atual
+		end
+		st.nextCrouch = now + CROUCH_MIN_GAP
+	end
 	if wants ~= st.crouch and hum and hum.Parent then
 		if wants then
 			--- mede o quadril DE PÉ no instante de agachar, não no nascimento do
@@ -678,6 +741,18 @@ function Combat.handleSwitch(player: Player, elementId: any)
 	if not st or cannotAct[player] or not Elements.isValid(elementId) then
 		return
 	end
+	--- ANTI-FLOOD: cada troca custa um `sendStats` (FireClient). Reenviar o
+	--- elemento que já está ativo não muda nada e não gasta rede; alternar em
+	--- rajada é barrado pelo gate. As duas guardas juntas transformam
+	--- "1000 SwitchElement/s" em, no máximo, 20 pacotes por segundo.
+	if st.element == elementId then
+		return
+	end
+	local now = os.clock()
+	if now < st.nextSwitch then
+		return
+	end
+	st.nextSwitch = now + SWITCH_MIN_GAP
 	st.element = elementId :: Elements.Id
 	sendStats(st)
 end
@@ -736,7 +811,12 @@ function Combat.applyDamage(
 	strong: boolean?,
 	fromNpc: Humanoid?
 )
-	if amount <= 0 or targetHumanoid.Health <= 0 then
+	--- `not (amount > 0)` e não `amount <= 0`: NaN falha TODA comparação, então
+	--- `NaN <= 0` é falso e o dano passava direto. Depois disso
+	--- `Health -= NaN` deixa o Humanoid com vida NaN — ele nunca mais morre, a
+	--- barra de vida some da HUD e a partida não termina. Entrada de NaN existe:
+	--- `hazardDps` faz `tonumber` de um campo do Terrain.
+	if not (amount > 0) or targetHumanoid.Health <= 0 then
 		return
 	end
 	local character = targetHumanoid.Parent
@@ -812,9 +892,14 @@ function Combat.applyDamage(
 		sendStats(tState)
 	end
 
-	-- evolução do Escudo por dano CAUSADO (GDD §5). Dano em aliado sendo
-	-- revivido não conta (anti-farm) — o estado "derrubado" chega no R3.
-	if fromPlayer and fromPlayer ~= target then
+	-- evolução do Escudo por dano CAUSADO (GDD §5). NÃO conta dano em si mesmo
+	-- nem em ALIADO (GDD §169, anti-farm). O comentário antigo adiava a metade
+	-- "aliado" para o R3 — o R3 chegou (Teams/Match/revive) e a trava nunca foi
+	-- ligada: como `findHit` e o combo da Sintonia não filtram time, uma dupla
+	-- podia subir os DOIS escudos até o nível 4 atirando um no outro num canto,
+	-- sem risco nenhum. `target or targetHumanoid` porque o alvo é Player quando
+	-- é gente e Humanoid quando é bot — o Teams aceita os dois como membro.
+	if fromPlayer and fromPlayer ~= target and not Teams.areAllies(fromPlayer, target or targetHumanoid) then
 		local st = states[fromPlayer]
 		if st then
 			st.evo += dealt
@@ -927,7 +1012,10 @@ local function findHit(p: Projectile): Humanoid?
 	local reach = p.radius + HIT_PAD
 	local reach2 = reach * reach
 	for player, st in pairs(states) do
-		if player == p.owner or not isAlive(st) then
+		-- eliminado não é alvo: o corpo do espectador/espírito continua existindo,
+		-- e sem esta guarda um projétil perdido "acerta" quem já saiu da partida
+		-- (achado da revisão cruzada, 18/08 — hoje só a altura salvava)
+		if player == p.owner or cannotAct[player] or not isAlive(st) then
 			continue
 		end
 		local root = st.root
@@ -999,6 +1087,16 @@ function Combat.step(dt: number)
 		if math.abs(want - st.walkSpeedSet) > 0.01 then
 			hum.WalkSpeed = want
 			st.walkSpeedSet = want
+		end
+
+		-- ELIMINADO NÃO TOMA DANO DE TERRENO (achado da revisão cruzada, 18/08):
+		-- `hazardAt` é por CÉLULA e ignora a altura, então o corpo do espectador
+		-- no poleiro (Y=120) ou do espírito (Y+12) sobre uma célula em chamas
+		-- morria em laço de respawn — e cada morte ainda mexia nos números da
+		-- partida. Quem está fora da partida não interage com o mundo.
+		if cannotAct[st.player] then
+			st.hazardAcc = 0
+			continue
 		end
 
 		-- perigos do terreno em ticks fixos — o Terrain nunca aplica dano sozinho
@@ -1102,6 +1200,9 @@ end
 --   require(game.ServerScriptService.Server.Combat).selfTest()
 -- Cobre a lógica que não dá para ver a olho: absorção pelo escudo e a escada
 -- de evolução do GDD §5. Falha = erro no output, com a linha exata.
+-- ⚠ RODE NO LOBBY: o teste de anti-farm monta e limpa o Teams DE VERDADE (no
+-- meio de uma partida isto apagaria os duos e desligaria a Sintonia) e passa um
+-- jogador de mentira pelos observadores de dano do Match.
 -- ============================================================================
 function Combat.selfTest()
 	local caps, thr = Balance.shield.caps, Balance.shield.thresholds
@@ -1156,6 +1257,13 @@ function Combat.selfTest()
 	Combat.setCanAct(ghost, true)
 	Combat.handleSwitch(ghost, "Water")
 	assert(Combat.getElement(ghost) == "Water", "reabilitado volta a agir")
+
+	-- RATE LIMIT da troca de elemento: sem gate, 1000 SwitchElement/s viravam
+	-- 1000 StatsUpdate/s saindo do servidor para aquele cliente.
+	Combat.handleSwitch(ghost, "Earth")
+	assert(Combat.getElement(ghost) == "Water", "ANTI-FLOOD: troca de elemento em rajada tem de ser barrada")
+	Combat.handleSwitch(ghost, "Water")
+	assert(Combat.getElement(ghost) == "Water", "reenviar o elemento JÁ ativo não é troca (e não gasta rede)")
 	Combat.onPlayerRemoving(ghost)
 	assert(Combat.canAct(ghost), "sair do jogo limpa a trava (o id pode voltar)")
 
@@ -1168,7 +1276,14 @@ function Combat.selfTest()
 	local got = Combat.applyStatus(dummy, "Stun", 5)
 	assert(got == STUN_MAX, "CLAMP: pedir 5 s de atordoamento tem de devolver o teto, veio " .. got)
 	local left = Combat.getStatus(dummy, "Stun")
-	assert(left > 0 and left <= STUN_MAX, "atordoamento guardado acima do teto: " .. left)
+	-- FOLGA DE PONTO FLUTUANTE (achado do harness headless, 18/08): o status
+	-- guarda `os.clock() + d` e devolve `expires - os.clock()`. A ida e volta
+	-- por um relógio grande reintroduz erro de arredondamento — com uptime 12 s
+	-- o teto de 0,8 volta como 0.8000000000000007 e o assert reprovava. No
+	-- Studio `os.clock()` é o uptime do servidor, então isto FALHARIA de forma
+	-- intermitente em rodada real. O teto de jogo continua exato; só a
+	-- comparação do teste ganha epsilon.
+	assert(left > 0 and left <= STUN_MAX + 1e-6, "atordoamento guardado acima do teto: " .. left)
 	assert(Combat.statusSpeedMult(dummy) == 0, "atordoado NÃO anda")
 	assert(Combat.applyStatus(dummy, "Reveal", 99) == REVEAL_MAX, "Reveal também é clampado")
 	assert(Combat.applyStatus(dummy, "Stun", -3) == 0, "duração negativa não vira status")
@@ -1179,6 +1294,14 @@ function Combat.selfTest()
 	assert(Combat.statusSpeedMult(other) >= SLOW_FLOOR, "lentidão não pode chegar a zero (seria Stun disfarçado)")
 	Combat.clearStatus(other)
 	assert(Combat.statusSpeedMult(other) == 1, "clear devolve a velocidade cheia")
+	-- NaN não pode entrar na conta de velocidade: `math.abs(NaN - x) > 0.01` é
+	-- falso, então a WalkSpeed congelaria no último valor escrito, para sempre.
+	local nan = 0 / 0
+	Combat.applyStatus(other, "Slow", 1, nan)
+	local mult = Combat.statusSpeedMult(other)
+	assert(mult == mult, "magnitude NaN não pode contaminar o multiplicador de velocidade")
+	assert(mult >= SLOW_FLOOR and mult <= 1, "multiplicador de lentidão fora da faixa sadia: " .. mult)
+	Combat.clearStatus(other)
 
 	-- STATUS LIMPA NO RESPAWN: o corpo novo não herda o que grudou no velho
 	local ghost2 = ({} :: any) :: Player
@@ -1191,14 +1314,55 @@ function Combat.selfTest()
 	Combat.onCharacterAdded(ghost2, body, reborn)
 	assert(Combat.getStatus(reborn, "Stun") == 0, "RESPAWN tem de limpar o status (senão vaza entre partidas)")
 	assert(Combat.statusSpeedMult(reborn) == 1, "corpo novo nasce com velocidade cheia")
+
+	-- POSTURA: agachar é intenção do cliente APLICADA AQUI (o quadril desce de
+	-- verdade e replica). Alternar em rajada precisa ser barrado: cada troca
+	-- escreve HipHeight, que replica para a sala inteira.
+	local standing = reborn.HipHeight
+	Combat.handleStance(ghost2, { crouch = true })
+	assert(states[ghost2].crouch, "agachar tem de valer no servidor")
+	assert(reborn.HipHeight < standing or standing == 0, "agachado abaixa o quadril")
+	Combat.handleStance(ghost2, { crouch = false })
+	assert(states[ghost2].crouch, "ANTI-FLOOD: alternar agachar em rajada tem de ser ignorado")
+
 	-- e a ELIMINAÇÃO também limpa (o espectador não fica atordoado no poleiro)
 	Combat.applyStatus(reborn, "Slow", 2, 0.5)
 	Combat.setCanAct(ghost2, false)
 	assert(Combat.statusSpeedMult(reborn) == 1, "eliminar tem de limpar o status")
+	Combat.handleStance(ghost2, { sprint = true })
+	assert(not states[ghost2].sprint, "ELIMINADO NÃO CORRE do poleiro de espectador")
 	Combat.onPlayerRemoving(ghost2)
 	body:Destroy()
 	dummy:Destroy()
 	other:Destroy()
+
+	-- ESCUDO EVOLUTIVO / ANTI-FARM (GDD §169): dano em ALIADO não evolui. Nem
+	-- `findHit` nem o combo da Sintonia filtram time, então sem esta trava uma
+	-- dupla sobe os DOIS escudos ao nível 4 atirando um no outro num canto.
+	local mage = ({} :: any) :: Player
+	Combat.onPlayerAdded(mage)
+	local dummyBody = Instance.new("Model")
+	local victim = Instance.new("Humanoid")
+	victim.Parent = dummyBody
+
+	Teams.build({ mage :: any, victim :: any }, 1) -- size 1: cada um no seu time
+	Combat.applyDamage(victim, 40, mage)
+	assert(states[mage].evo == 40, "pré-condição: dano em INIMIGO evolui o escudo")
+
+	Teams.build({ mage :: any, victim :: any }, 2) -- duo: agora são aliados
+	Combat.applyDamage(victim, 40, mage)
+	assert(states[mage].evo == 40, "ANTI-FARM: dano em ALIADO não pode evoluir o escudo")
+
+	-- NaN nunca encosta na vida: `NaN <= 0` é falso, então o dano passava direto
+	-- e o Humanoid ficava com Health NaN — imortal, e a partida nunca terminava.
+	local hpBefore = victim.Health
+	Combat.applyDamage(victim, 0 / 0, mage)
+	assert(victim.Health == hpBefore, "dano NaN não pode encostar na vida")
+	assert(states[mage].evo == 40, "dano NaN não pode evoluir escudo")
+
+	Teams.clear()
+	Combat.onPlayerRemoving(mage)
+	dummyBody:Destroy()
 
 	print("[Combat] autoteste OK")
 	return true
