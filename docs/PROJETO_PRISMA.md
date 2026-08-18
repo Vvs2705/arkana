@@ -219,7 +219,15 @@ Flamejante = hélice de vento + núcleo de fogo). A forma É o tell competitivo.
 - [x] PRISMA-1 — fundação de render 2D, CONCLUÍDO 17/08/2026 (v0.1.2, commit
       49ac98e). Diagnóstico pós-teste: teto do 2D procedural atingido; serviu
       de manual de padrões para o 3D (§8).
-- [ ] **DECISÃO DE ROTA (§2) — aguardando o Diretor** (default: Rota A).
+- [x] **DECISÃO DE ROTA (Diretor, 17/08/2026): Rota D primeiro** — "Arkana:
+      Campo de Provas" no Roblox, terceira pessoa, estética blocky
+      (referência: Pixel Gun 3D — legível, barata, nativa da plataforma).
+      Produto de VALIDAÇÃO com checklist fechado; a régua Spell Arena da §1 e
+      o style guide da §3 ficam RESERVADOS para o jogo premium first-person
+      (ex-Rota B), que inicia após a validação. O anti-meta "nada de voxel"
+      da §3 NÃO se aplica ao produto Roblox — são duas direções de arte, um GDD.
+      Regra dura no Roblox: zero modelos da Toolbox (qualidade/segurança);
+      sistemas nativos da plataforma, sim.
 - [ ] PRISMA-2 → absorvido na §4 (retratos/key art por IA — independe de engine,
       pode iniciar imediatamente).
 - [ ] PRISMA-3 (Spine/animação 2D) → **substituído** pela rota 3D (personagens

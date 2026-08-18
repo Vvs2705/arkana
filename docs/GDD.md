@@ -207,6 +207,17 @@ Cada degrau é um jogo lançável que financia e valida o próximo — e o unive
 ## 9. DECISÕES OFICIAIS + Sistema de Conjuração Combinada
 
 ### Decisões travadas
+- **Estratégia de plataforma (Diretor, 17/08/2026):** o próximo produto é
+  **"Arkana: Campo de Provas" no ROBLOX** — terceira pessoa, estética blocky
+  (referência visual: **Pixel Gun 3D**), aproveitando os sistemas nativos da
+  plataforma (multiplayer/replicação, avatares, física, câmera). Papel:
+  **produto de validação** — provar Sintonia com duplas reais, TTK, meta do
+  terreno reativo e equilíbrio de classes com jogadores de verdade a custo de
+  infra zero. A visão **first-person premium no Android** (qualidade régua
+  Spell Arena, PROJETO_PRISMA §1) fica como destino, e só inicia quando o
+  checklist de validação do Roblox fechar. Nada técnico migra do Roblox — o
+  GDD é a única fonte que serve os dois produtos. Modelos da Toolbox são
+  proibidos (qualidade/segurança); sistemas da plataforma, incentivados.
 - **Nome:** `Arkana: Magos Battle Royale` no lançamento → encurta para `Arkana Royale` quando a marca se sustentar (caminho Free Fire).
 - **Descrição curta (80c):** *"Caia do castelo voador, domine os 5 elementos e seja o último mago de pé."*
 - **Posicionamento:** não é clone — esqueleto comprovado do gênero + camada de inovação elemental própria. A pergunta-guia do design: **"qual é a invenção que vão copiar DE NÓS?"** Resposta: a Conjuração Combinada.
