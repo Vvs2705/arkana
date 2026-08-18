@@ -78,7 +78,9 @@ local fpsAcc, fpsFrames, warm = 0, 0, 0
 local started = false
 
 local GRADE = {
-	brightness = 0.0,
+	-- brightness levemente positivo: junto com o Lighting mais claro do
+	-- default.project.json, devolve a visibilidade que o Diretor cobrou
+	brightness = 0.03,
 	contrast = 0.14,
 	saturation = 0.16,
 	tint = Color3.fromRGB(255, 247, 235), -- leve calor de fim de tarde
@@ -112,7 +114,7 @@ local function buildSky()
 	end
 	local s = ensure("Sky", "ArkanaSky") :: Sky
 	s.CelestialBodiesShown = true
-	s.SunAngularSize = 16 -- sol grande e baixo: entardecer
+	s.SunAngularSize = 14 -- sol presente; a hora (14.5) mantém o mundo iluminado
 	s.MoonAngularSize = 9
 	s.StarCount = 1800 -- já pintam no fim do dia arcano
 end
@@ -122,8 +124,12 @@ local function buildAir()
 	a.Offset = 0.2
 	a.Color = GOLD -- a névoa perto do horizonte puxa dourado…
 	a.Decay = NIGHT -- …e decai para o azul-noite lá em cima
-	a.Glare = 0.4
-	a.Haze = 1.6
+	a.Glare = 0.3
+	-- FEEDBACK DO DIRETOR (18/08): "a área está escura, o sol não clareia quase
+	-- nada". A bruma alta (1.6) somada ao sol baixo comia a visibilidade. O
+	-- clima de entardecer agora vem da COR (Color/Decay/grading), não da falta
+	-- de luz — a referência Pixel Gun é CLARA e saturada. Valor antigo: 1.6.
+	a.Haze = 0.7
 	air = a
 end
 
@@ -163,7 +169,7 @@ local function applyQuality()
 	if air then
 		-- Modo Névoa literal: sem pós-processamento, a névoa engrossa e segura
 		-- a leitura de distância (de quebra esconde o pop-in do terreno).
-		air.Density = if isLite then 0.42 else 0.28
+		air.Density = if isLite then 0.3 else 0.18
 	end
 	if grade then
 		-- sem bloom, a cor precisa gritar um pouco mais para o jogo não apagar
