@@ -2,11 +2,19 @@
 
 > **Caia do castelo voador, domine os 5 elementos e seja o último mago de pé.**
 
-Battle royale de magos em primeira pessoa na visão completa; hoje, um protótipo
-jogável top-down em 2D que valida o combate elemental e o **terreno reativo**.
+Battle royale de magos. A visão completa é em primeira pessoa; hoje o jogo existe
+em duas frentes que compartilham o mesmo GDD.
 
-**Estado atual:** `v0.1 — Campo de Provas` · protótipo PC completo e testado ·
-Fase 1 do roadmap concluída em 17/08/2026.
+**Estado atual (18/08/2026):**
+
+| Frente | O que é | Estado |
+|---|---|---|
+| **Campo de Provas (Roblox)** | 3ª pessoa, estética blocky — **produto de validação**, foco atual | jogável: terreno reativo, Sintonia, loop de BR, bots · aguardando playtest |
+| Protótipo 2D (Phaser) | top-down, laboratório de mecânica | completo, APK compilado, testado em aparelho |
+
+👉 **[docs/PROJETO.md](docs/PROJETO.md) conta a história inteira** — da ideia às
+decisões, ao que funciona hoje e ao que falta.
+Para jogar a versão Roblox: **[docs/COMO_JOGAR.md](docs/COMO_JOGAR.md)**.
 
 ---
 
@@ -113,6 +121,8 @@ A avaliação de engine e o gatilho para reconsiderar Godot estão em
 | [docs/GDD.md](docs/GDD.md) | **Fonte da verdade** do produto: classes, magos, balanceamento, monetização, roadmap |
 | [docs/HISTORICO.md](docs/HISTORICO.md) | Como o protótipo foi construído, decisões técnicas e armadilhas conhecidas |
 | [docs/PROJETO_PRISMA.md](docs/PROJETO_PRISMA.md) | Estratégia para elevar o gráfico ao nível comercial |
+| [docs/ROBLOX.md](docs/ROBLOX.md) | Plano, perguntas de validação e como testar a versão Roblox |
+| [docs/COMO_JOGAR.md](docs/COMO_JOGAR.md) | Controles e o que observar no playtest |
 | [docs/EQUIPE.md](docs/EQUIPE.md) | Blueprint de estúdio: setores, cargos e o roster de agentes por fase |
 | [docs/ART.md](docs/ART.md) | Paleta, tipografia e regras visuais |
 | [docs/AUDIO.md](docs/AUDIO.md) | Direção sonora e síntese procedural |
@@ -127,7 +137,14 @@ A avaliação de engine e o gatilho para reconsiderar Godot estão em
       evolutivo, bots *(concluída)*
 - [x] **Fase 2** — APK Android via Capacitor + controles de toque *(código completo;
       compilar o APK exige Android Studio/JDK 17 — ver [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md))*
-- [ ] **Fase 3** — v0.2: Sintonia com bot aliado, tela de queda, Selo do Campeão, Presságios
+- [x] **Campo de Provas no Roblox (R0–R4)** — 3ª pessoa, servidor autoritativo: terreno
+      reativo, os 10 combos de Sintonia, loop de battle royale com zona e bots, comandos
+      básicos completos e atmosfera *(aguardando playtest — ver [docs/ROBLOX.md](docs/ROBLOX.md))*
+- [ ] **Validação com jogadores reais** — responder V1–V5 (Sintonia diverte? TTK certo?
+      terreno vira jogada?) e calibrar pelos dados
+- [ ] **Produto premium** — first-person Android na régua Spell Arena, após a validação
+- [ ] **Fase 3 (2D)** — v0.2: Sintonia com bot aliado, tela de queda, Presságios *(congelada:
+      a validação migrou para o Roblox)*
 - [x] **Projeto Prisma — PRISMA-1** — fundação de render: iluminação dinâmica, autotiling,
       pós-processamento (bloom/vinheta/grading), personagens animados e VFX/juice
       *(PRISMA-2 a 4 — arte autoral, animação esqueletal e otimização mobile — pendentes)*
