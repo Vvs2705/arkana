@@ -859,14 +859,60 @@ local function applyWater(cx: number, cy: number, r: number)
 			setState(i, restState(i), 0) -- material preservado: apagar não carboniza
 		elseif cell.material == "Water" and (cell.state == "Normal" or cell.state == "Electrified") then
 			setState(i, "Frozen", T.freezeDuration) -- congelar também corta a condução
-		elseif cell.state == "Burned" or (cell.material == "Dirt" and cell.state == "Normal") then
+		-- `Silt` (lodo da baixada) entra JUNTO com `Dirt`: é o mesmo chão de
+		-- terra com outra cor, e a baixada é justamente onde "Água + terra =
+		-- lamaçal" (§14) é a jogada da casa. Deixá-lo de fora apagaria a
+		-- interação no único POI construído em volta dela.
+		elseif
+			cell.state == "Burned"
+			or ((cell.material == "Dirt" or cell.material == "Silt") and cell.state == "Normal")
+		then
 			setState(i, "Mud", T.mudDuration)
 		end
 	end)
 end
 
---- TERRA: ergue muro destrutível. Não nasce muro sobre água, rocha ou árvore.
+--- ANTI-GRIEFING G2 (R9) — quem está DE PÉ em cada célula da área.
+--- O muro de Terra é um bloco maciço de `Grid.WALL_HEIGHT` studs: nascer NA
+--- célula de um personagem o enterra dentro da pedra. O caso que fecha o alpha
+--- é o parceiro (duas pessoas estranhas em dupla), mas a regra vale para TODOS
+--- — assim ela não precisa saber quem conjurou (o `applyElement` não carrega
+--- autor, e inventar esse parâmetro custaria a assinatura em 4 raias) e não vira
+--- vantagem competitiva de ninguém: emparedar inimigo por `wallDuration` também
+--- nunca foi jogada de design, é um botão de deletar.
+--- ponytail: TETO CONHECIDO — a célula do ROOT, não o volume do corpo. Quem
+--- estiver rente à divisa pode ver o muro subir encostado nele (o motor empurra,
+--- não enterra). Se o playtest reclamar, o upgrade é marcar também a célula do
+--- canto mais próximo.
+local function standingCells(cx: number, cy: number, r: number): { [number]: boolean }
+	local out: { [number]: boolean } = {}
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	-- a arena inteira fora: senão a esfera devolve centenas de parts de piso
+	params.FilterDescendantsInstances = if folder then { folder :: Instance } else {}
+	local center = Grid.cellToWorld(cx, cy)
+	-- +2 células de folga: pega o corpo fora do centro e quem está no ar
+	for _, part in ipairs(Workspace:GetPartBoundsInRadius(center, (r + 2) * CELL, params)) do
+		local model = part:FindFirstAncestorOfClass("Model")
+		local hum = if model then model:FindFirstChildOfClass("Humanoid") else nil
+		local root = if hum and hum.Health > 0 then hum.RootPart else nil
+		if root then
+			local ox, oy = Grid.worldToCell(root.Position)
+			if Grid.inBounds(ox, oy) then
+				out[idxOf(ox, oy)] = true
+			end
+		end
+	end
+	return out
+end
+
+--- TERRA: ergue muro destrutível. Não nasce muro sobre água, rocha ou árvore —
+--- nem em cima de gente (G2).
 local function applyEarth(cx: number, cy: number, r: number, strong: boolean)
+	--- resolvido PREGUIÇOSAMENTE: a consulta espacial só sai quando algum muro
+	--- de verdade ia subir (basic de Terra impacta ~4x/s e a maioria bate em
+	--- água/rocha/árvore ou em muro já erguido)
+	local standing: { [number]: boolean }? = nil
 	local function raiseWall(i: number)
 		local cell = cells[i]
 		if cell.state == "Wall" then
@@ -875,6 +921,14 @@ local function applyEarth(cx: number, cy: number, r: number, strong: boolean)
 		local m = cell.material
 		if m == "Water" or m == "Rock" or m == "Tree" then
 			return
+		end
+		local occupied = standing
+		if occupied == nil then
+			occupied = standingCells(cx, cy, r)
+			standing = occupied
+		end
+		if occupied[i] then
+			return -- G2: ninguém é emparedado dentro da própria célula
 		end
 		cell.wallHp = T.wallHp
 		setState(i, "Wall", T.wallDuration) -- a terra sela o chão: sufoca fogo e lama
@@ -1239,6 +1293,79 @@ function Terrain.selfTest()
 		worst = math.max(worst, lit)
 		sum += lit
 	end
+
+	-- -------------------------------------------- MURO NÃO EMPAREDA (G2, R9)
+	-- O muro da Terra nascia sem olhar quem estava de pé na célula: dava para
+	-- enterrar o próprio parceiro dentro de pedra por `wallDuration` (20 s) com
+	-- uma tática de Terra — griefing puro entre estranhos pareados em dupla.
+	-- O teste cobra as DUAS metades da correção: a célula de quem está de pé
+	-- fica LIVRE **e** as outras viram muro (a proteção não pode custar poder;
+	-- o muro continua sendo jogada tática de verdade).
+	local WR = 2 -- o maior disco de muro do jogo: tática de Terra e Cristais Carregados
+	local wx, wy = 0, 0
+	for cy = WR + 1, Grid.ROWS - WR - 2 do
+		for cx = WR + 1, Grid.COLS - WR - 2 do
+			local free = true
+			forDisc(cx, cy, WR, function(_, cell)
+				local m = cell.material
+				if m == "Water" or m == "Rock" or m == "Tree" or cell.state ~= "Normal" then
+					free = false
+				end
+			end)
+			if free then
+				wx, wy = cx, cy
+				break
+			end
+		end
+		if wx > 0 then
+			break
+		end
+	end
+	assert(wx > 0, "não achei disco de terreno livre para testar o muro")
+
+	local rig = Instance.new("Model")
+	rig.Name = "TerrainTesteMuro"
+	local rigRoot = Instance.new("Part")
+	rigRoot.Name = "HumanoidRootPart"
+	rigRoot.Anchored = true
+	rigRoot.Position = Grid.cellToWorld(wx, wy) + Vector3.new(0, 3, 0)
+	rigRoot.Parent = rig
+	local rigHum = Instance.new("Humanoid")
+	rigHum.Health = 100 -- vivo: cadáver não segura muro (a regra olha Health > 0)
+	rigHum.Parent = rig
+	rig.Parent = Workspace
+
+	applyEarth(wx, wy, WR, true) -- o disco inteiro EM CIMA dele
+	assert(
+		cells[idxOf(wx, wy)].state ~= "Wall",
+		string.format("MURO EM CIMA DE QUEM ESTÁ DE PÉ em (%d,%d): dá para prender o parceiro dentro da pedra", wx, wy)
+	)
+	local raised = 0
+	forDisc(wx, wy, WR, function(i)
+		if cells[i].state == "Wall" then
+			raised += 1
+			setState(i, restState(i), 0) -- o autoteste não entrega a arena murada
+		end
+	end)
+	rig:Destroy()
+	assert(raised >= 8, "o muro tem de continuar subindo em volta — proteção não pode virar nerf (" .. raised .. ")")
+
+	-- ------------------------------------- LODO AINDA VIRA LAMAÇAL (R9, item 5)
+	-- O lodo da baixada deixou de ser `Dirt` para ganhar cor própria. As regras
+	-- dele têm de ser as mesmas: se `applyWater` esquecer o material novo, a
+	-- baixada continua BONITA e para de fazer lamaçal — o POI inteiro foi
+	-- construído em volta dessa interação (§14) e a perda seria silenciosa.
+	local silt = 0
+	for i, cell in ipairs(cells) do
+		if cell.material == "Silt" and cell.state == "Normal" then
+			silt = i
+			break
+		end
+	end
+	assert(silt > 0, "a baixada não tem lodo: o POI sudeste sumiu do layout")
+	applyWater(cells[silt].cx, cells[silt].cy, 0)
+	assert(cells[silt].state == "Mud", "Água no lodo parou de fazer lamaçal (§14) — a cor nova levou a regra junto")
+	setState(silt, restState(silt), 0) -- o autoteste não entrega a arena molhada
 
 	local parts = if folder then #folder:GetDescendants() else 0
 	assert(parts <= 4000, "orçamento de parts do GDD §19.2 estourado: " .. parts)

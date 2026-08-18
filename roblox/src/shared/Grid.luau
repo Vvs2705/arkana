@@ -25,7 +25,12 @@ Grid.WIDTH_STUDS = Grid.COLS * Grid.CELL_SIZE
 Grid.DEPTH_STUDS = Grid.ROWS * Grid.CELL_SIZE
 
 -- Materiais (imutáveis por célula) — espelham o protótipo 2D
-export type Material = "Grass" | "TallGrass" | "Tree" | "Water" | "Rock" | "Dirt" | "Road"
+--- `Slab` e `Silt` existem para os dois POIs terem COR PRÓPRIA (R9): a laje das
+--- ruínas nascia como `Road` e o lodo da baixada como `Dirt`, então os dois
+--- lugares mais característicos da arena se pintavam com a cor do caminho e a do
+--- barro comum. As regras deles são as do material que substituem — o que muda
+--- é a paleta, e é só por isso que valem entrada nova.
+export type Material = "Grass" | "TallGrass" | "Tree" | "Water" | "Rock" | "Dirt" | "Road" | "Slab" | "Silt"
 
 -- Estados (mutáveis — é aqui que a magia age)
 export type State = "Normal" | "Burning" | "Burned" | "Frozen" | "Mud" | "Electrified" | "Wall"
@@ -53,6 +58,8 @@ Grid.FLAMMABLE = {
 	Rock = false,
 	Dirt = false,
 	Road = false,
+	Slab = false,
+	Silt = false,
 } :: { [Material]: boolean }
 
 --- materiais que bloqueiam movimento no estado normal
@@ -64,6 +71,8 @@ Grid.BLOCKING = {
 	TallGrass = false,
 	Dirt = false,
 	Road = false,
+	Slab = false,
+	Silt = false,
 } :: { [Material]: boolean }
 
 --- paleta blocky por material (GDD §10 + direção Pixel Gun: cores chapadas)
@@ -75,6 +84,15 @@ Grid.COLORS = {
 	Rock = Color3.fromHex("#6E6E78"),
 	Dirt = Color3.fromHex("#7A5A38"),
 	Road = Color3.fromHex("#8A7A62"),
+	--- LAJE DAS RUÍNAS (POI noroeste): pedra TRABALHADA. Separada nos três eixos
+	--- de quem ela encosta — mais clara que a rocha (#6E6E78), mais fria que o
+	--- caminho (#8A7A62) —, senão a praça das ruínas lê como uma estrada larga.
+	Slab = Color3.fromHex("#8E8C9A"),
+	--- LODO DA BAIXADA (POI sudeste): limo, não barro. Verde-oliva contra o
+	--- marrom quente da terra (#7A5A38); e quando a Água entra, o estado `Mud`
+	--- (#4A3A24) pinta por cima — o lodo ESCURECE ao molhar, que é a leitura
+	--- certa. Manter a cor da terra aqui apagava o POI inteiro.
+	Silt = Color3.fromHex("#5C5A32"),
 } :: { [Material]: Color3 }
 
 --- cor por estado (sobrepõe a do material quando o estado não é Normal)
@@ -102,6 +120,8 @@ Grid.HEIGHTS = {
 	Rock = 9,
 	Dirt = 1,
 	Road = 1,
+	Slab = 1,
+	Silt = 1,
 } :: { [Material]: number }
 
 Grid.WALL_HEIGHT = 10
@@ -126,5 +146,26 @@ end
 
 --- vizinhança-4 (a propagação de fogo do protótipo usa esta vizinhança)
 Grid.NEIGHBORS4 = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+--- MATERIAL NOVO SÓ VALE COMPLETO. As quatro tabelas são lidas por chave
+--- (`Grid.HEIGHTS[cell.material]`, `Grid.FLAMMABLE[m] == true`, ...), então
+--- esquecer uma delas não dá erro: dá altura 1 onde devia haver relevo, ou chão
+--- atravessável onde devia haver parede — falha CALADA, no meio do mapa. Este
+--- teste compara os conjuntos de chaves e é o motivo de as quatro tabelas
+--- poderem continuar sendo literais simples.
+function Grid.selfTest()
+	for m in pairs(Grid.COLORS) do
+		assert(Grid.HEIGHTS[m] ~= nil, "material sem altura: " .. tostring(m))
+		assert(Grid.FLAMMABLE[m] ~= nil, "material sem regra de fogo: " .. tostring(m))
+		assert(Grid.BLOCKING[m] ~= nil, "material sem regra de bloqueio: " .. tostring(m))
+	end
+	for _, t in ipairs({ Grid.HEIGHTS, Grid.FLAMMABLE, Grid.BLOCKING }) do
+		for m in pairs(t) do
+			assert(Grid.COLORS[m] ~= nil, "material sem cor: " .. tostring(m))
+		end
+	end
+	print("[Grid] autoteste OK — 9 materiais, 4 tabelas completas")
+	return true
+end
 
 return Grid

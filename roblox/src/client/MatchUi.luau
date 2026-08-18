@@ -32,6 +32,14 @@ local TEXT_DIM = Color3.fromHex("#9A97AD")
 local DANGER = Color3.fromHex("#E04040")
 local ZONE_VIOLET = Color3.fromHex("#8A5CF0")
 
+--- MOTIVO (do servidor) → CHAVE DE TEXTO. Nenhuma frase mora no código de UI
+--- (regra dura do projeto): o servidor manda o motivo, esta tabela escolhe a
+--- chave e o Strings escreve — inclusive em inglês.
+local SPECTATE_WHY: { [string]: string } = {
+	late = "match.spectating.late",
+	out = "match.spectating.out",
+}
+
 local L = {
 	barTop = 12,
 	barRight = 12,
@@ -75,6 +83,10 @@ local phaseLabel: TextLabel
 local warn: Frame
 local warnText: TextLabel
 local warnSub: TextLabel
+local spectate: Frame
+local spectTitle: TextLabel
+local spectWhy: TextLabel
+local spectNext: TextLabel
 local overlay: Frame
 local sealTitle: TextLabel
 local sealName: TextLabel
@@ -100,6 +112,10 @@ local st = {
 	teamsTotal = nil :: number?,
 	timeLeft = 0,
 	seal = nil :: any,
+	--- POR QUE estou assistindo: "late" (entrei com a prova em andamento) ou
+	--- "out" (caí nesta prova). `nil` = não sou espectador — inclusive o ESPÍRITO,
+	--- que o servidor mantém fora daqui de propósito: ele ainda volta pelo altar.
+	spectateKind = nil :: string?,
 }
 local outside = false
 local pulse = 0
@@ -201,6 +217,74 @@ local function buildWarning(root: ScreenGui)
 		TextStrokeTransparency = 0.3,
 	}, warn)
 	mk("UITextSizeConstraint", { MaxTextSize = 16 }, warnSub)
+end
+
+--- PLACA DE ESPECTADOR — a primeira impressão do estranho num alpha público.
+--- Quem entra com a prova em andamento nasce no poleiro a 120 studs do chão; sem
+--- esta placa ele olha o mapa de cima e conclui que o jogo travou. Por isso é
+--- PERMANENTE enquanto durar o estado, e não um toast que some antes de o
+--- cliente dele terminar de carregar.
+---
+--- ALTO E CENTRAL: não disputa espaço com a barra (alto à direita), com a HUD
+--- (alto à esquerda) nem com os botões (metade de baixo), e fica ACIMA do aviso
+--- de fora da zona (0.30), que de qualquer forma nunca acende para quem está
+--- ancorado no centro. ZIndex 12 contra os 10 da tela de fim: é justamente no
+--- fim da prova que "próxima partida" precisa continuar legível.
+local function buildSpectate(root: ScreenGui)
+	spectate = mk("Frame", {
+		Name = "Spectating",
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = NIGHT,
+		BackgroundTransparency = 0.2,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0.5, 0, 0.06, 0),
+		Size = UDim2.new(0.56, 0, 0, 66),
+		Visible = false,
+		ZIndex = 12,
+	}, root)
+	mk("UISizeConstraint", { MinSize = Vector2.new(210, 66), MaxSize = Vector2.new(420, 66) }, spectate)
+	mk("UIStroke", { Color = GOLD_DIM, Thickness = 1, Transparency = 0.2 }, spectate)
+	mk("UIPadding", {
+		PaddingLeft = UDim.new(0, 10),
+		PaddingRight = UDim.new(0, 10),
+		PaddingTop = UDim.new(0, 4),
+	}, spectate)
+
+	spectTitle = mk("TextLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 22),
+		Font = Enum.Font.GothamBlack,
+		Text = "",
+		TextColor3 = GOLD,
+		TextScaled = true,
+		ZIndex = 13,
+	}, spectate)
+	mk("UITextSizeConstraint", { MaxTextSize = 22 }, spectTitle)
+
+	--- A LINHA QUE MUDA TUDO: "você entra na próxima" × "você caiu nesta prova".
+	spectWhy = mk("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0, 23),
+		Size = UDim2.new(1, 0, 0, 19),
+		Font = Enum.Font.GothamBold,
+		Text = "",
+		TextColor3 = TEXT,
+		TextScaled = true,
+		ZIndex = 13,
+	}, spectate)
+	mk("UITextSizeConstraint", { MaxTextSize = 18 }, spectWhy)
+
+	spectNext = mk("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0, 43),
+		Size = UDim2.new(1, 0, 0, 15),
+		Font = Enum.Font.Gotham,
+		Text = "",
+		TextColor3 = TEXT_DIM,
+		TextScaled = true,
+		ZIndex = 13,
+	}, spectate)
+	mk("UITextSizeConstraint", { MaxTextSize = 14 }, spectNext)
 end
 
 --- Tela de fim: o card do GDD §18.6. Chapado, dourado, pronto para print.
@@ -381,6 +465,7 @@ function MatchUi.init(player: Player)
 
 	buildBar(root)
 	buildWarning(root)
+	buildSpectate(root)
 	buildOverlay(root)
 	A11y.attach(root)
 	warnText.Text = Strings.t("match.outside")
@@ -404,6 +489,9 @@ function MatchUi.init(player: Player)
 			st.teamsAlive = tonumber(p.teamsAlive)
 			st.teamsTotal = tonumber(p.teamsTotal)
 			st.timeLeft = tonumber(p.timeLeft) or 0
+			--- Só string entra: pacote sem o campo (ou com lixo) apaga o painel em
+			--- vez de deixar a placa velha de pé sobre uma partida nova.
+			st.spectateKind = if typeof(p.spectateKind) == "string" then p.spectateKind else nil
 			if typeof(p.zoneCenter) == "Vector3" then
 				st.center = p.zoneCenter
 			end
@@ -489,6 +577,35 @@ function MatchUi.update(dt: number)
 		local a = 0.15 + 0.35 * (1 - math.cos(pulse * math.pi * 2)) / 2 * A11y.flash()
 		warnText.TextTransparency = a
 		warnSub.TextTransparency = a * 0.6
+	end
+
+	-- --------------------------------------------------- placa de espectador
+	--- TRÊS ESTADOS, e a placa só existe no terceiro: jogando (o servidor manda
+	--- `spectateKind` nil) · ESPÍRITO (também nil — quem ainda volta pelo altar
+	--- não é espectador, e é o servidor que decide isso) · POLEIRO.
+	local kind = st.spectateKind
+	spectate.Visible = kind ~= nil
+	if kind then
+		spectTitle.Text = Strings.t("match.spectating")
+		spectWhy.Text = Strings.t(SPECTATE_WHY[kind] or "match.spectating.out")
+		--- TEMPO ATÉ A PRÓXIMA — SEM RELÓGIO INVENTADO. Ninguém sabe em que segundo
+		--- esta prova acaba: a última dupla pode vencer no quadro seguinte ou a zona
+		--- pode levar mais três fases. O teto de duração que o servidor guarda é
+		--- TETO, não previsão — uma contagem regressiva a partir dele erraria por
+		--- minutos, e número inventado destrói a confiança em todos os outros
+		--- números da tela. Então a linha mostra o que É verdade e vem do servidor:
+		--- em que FASE a zona está e quantos TIMES sobraram (2 = está acabando).
+		--- Terminada a prova, ela vira o rótulo da próxima — e o relógio REAL dela
+		--- é o da barra logo acima, que aí sim conta um tempo conhecido.
+		if st.state == "Playing" then
+			local line = Strings.t("match.phase", st.phase, st.phases)
+			if st.teamsAlive then
+				line ..= string.format("   %s %d", Strings.t("match.teams"), st.teamsAlive)
+			end
+			spectNext.Text = line
+		else
+			spectNext.Text = Strings.t("match.spectating.next")
+		end
 	end
 
 	-- ------------------------------------------------------ tela de fim

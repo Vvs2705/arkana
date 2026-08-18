@@ -10,7 +10,13 @@
 -- REGRA DESTE MÓDULO: ele NÃO desenha jogo. Ele guarda a escolha, aplica o que
 -- é do cliente (escala da UI, contraste, espelho canhoto/destro, blur/DOF,
 -- legendas) e EXPÕE o resto como número para quem desenha (Vfx: tremor, flash,
--- intensidade). O `Settings.luau` é só a tela que mexe nestes valores.
+-- intensidade) ou toca (Audio: volume). O `Settings.luau` é só a tela que mexe
+-- nestes valores.
+--
+-- UMA LOJA SÓ (R9): o volume era a exceção — o `Audio` guardava e persistia a
+-- própria cópia, sem knob nenhum na tela. Agora a PREFERÊNCIA mora aqui (é uma
+-- escolha de conforto como qualquer outra) e o `Audio` só a APLICA. Um dono
+-- escreve, um dono persiste; ninguém sincroniza nada.
 --
 -- PLATAFORMA PRIMEIRO (docs/ROBLOX.md §2): o que o Roblox já resolve não é
 -- recriado aqui —
@@ -102,7 +108,18 @@ local DEFAULTS: { [string]: any } = {
 	blur = true, -- blur/DOF ligado
 	captions = true,
 	readyCue = true,
+	--- VOLUME (0..1) é preferência de primeira classe, na MESMA loja das outras:
+	--- mesmo atributo `Arkana_`, mesmos `listeners`, mesmo `set`. Quem TOCA é o
+	--- `Audio`; ele RECEBE daqui e não guarda cópia persistida — uma loja só.
+	--- Estes padrões espelham o mix de fábrica do `Audio` (VOL_DEFAULT) e o
+	--- `selfTest` reprova se os dois números se separarem.
+	volMaster = 1,
+	volWorld = 0.9,
 }
+
+--- chave da loja → categoria do mixer. Só estas duas: `Ui`/`Music` ficam no mix
+--- de fábrica (knob que ninguém mexe só ocupa tela).
+local VOLUME_CAT: { [string]: string } = { volMaster = "Master", volWorld = "World" }
 
 local ATTR = "Arkana_"
 local prefs: { [string]: any } = {}
@@ -266,6 +283,34 @@ local function applyBlur()
 	end
 end
 
+-- ------------------------------------------------------------------ volume
+--- Require preguiçoso e protegido (mesmo padrão do `Audio` com o `Atmosphere`):
+--- se o módulo de som faltar ou explodir, a loja de preferências e a partida
+--- continuam de pé. ÁUDIO NUNCA DECIDE JOGO — nem por omissão.
+local audioMod: any = nil
+local function audio(): any
+	if audioMod == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Audio")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		audioMod = (ok and m) or false
+	end
+	return audioMod or nil
+end
+
+--- Empurra a preferência para o mixer. É o ÚNICO caminho do volume até o som:
+--- o `Audio` não lê atributo nenhum, então não existe cópia para divergir.
+local function applyVolume()
+	local a = audio()
+	if not a or not a.setVolume then
+		return
+	end
+	for key, cat in pairs(VOLUME_CAT) do
+		pcall(a.setVolume, cat, tonumber(prefs[key]) or DEFAULTS[key])
+	end
+end
+
 -- ------------------------------------------------------------------ legendas
 --- FAIXA DE LEGENDAS: um lugar só, sempre o mesmo, para os cues críticos —
 --- "SINTONIA CANALIZANDO", "FORA DA ZONA". Quem joga sem som (ou no ônibus, que
@@ -412,12 +457,18 @@ local function applyAll()
 		end
 	end
 	applyBlur()
+	applyVolume()
 end
 
 function A11y.set(key: string, value: any)
 	ensureLoaded()
 	if DEFAULTS[key] == nil or typeof(value) ~= typeof(DEFAULTS[key]) then
 		return -- chave/tipo desconhecido: ignora em silêncio, nunca corrompe a loja
+	end
+	if VOLUME_CAT[key] then
+		-- limita AQUI, não só no mixer: guardar 4 e tocar 1 é exatamente a
+		-- divergência que esta raia veio matar
+		value = math.clamp(value, 0, 1)
 	end
 	if prefs[key] == value then
 		return
@@ -436,6 +487,13 @@ function A11y.set(key: string, value: any)
 	end
 	for _, fn in ipairs(listeners) do
 		task.spawn(fn, key)
+	end
+	-- MUDO NÃO PODE CUSTAR INFORMAÇÃO (GDD §10): "SINTONIA CANALIZANDO" e "FORA
+	-- DA ZONA" existem no som E na faixa de legendas. Quem zera o volume ganha a
+	-- faixa ligada na hora — LIGAR, não travar: desligar depois continua sendo
+	-- escolha do jogador, e aí é escolha informada.
+	if VOLUME_CAT[key] and value == 0 and prefs.captions ~= true then
+		A11y.set("captions", true)
 	end
 end
 
@@ -514,7 +572,37 @@ function A11y.selfTest()
 
 	prefs.leftHanded = was
 	probe:Destroy()
-	print("[Accessibility] autoteste OK — espelho canhoto/destro")
+
+	-- ------------------------------------------------------------- volume
+	-- UMA LOJA SÓ. As três coisas que quebram caladas aqui:
+	local a = audio()
+	assert(a and a.defaultVolume, "Audio não encontrado: o volume ficaria sem quem o aplique")
+
+	-- 1) o padrão daqui TEM de ser o do mixer. Se alguém afinar o VOL_DEFAULT do
+	-- `Audio` e esquecer desta tabela, o menu abre com "CHEIO" aceso num valor
+	-- que não é o cheio — ou pior, com NENHUM chip aceso.
+	for key, cat in pairs(VOLUME_CAT) do
+		assert(a.defaultVolume(cat) == DEFAULTS[key], "padrão de volume divergiu do mixer: " .. key)
+	end
+
+	-- 2) a preferência CHEGA no mixer (o gancho é o motivo desta raia existir) e
+	-- é limitada a 0..1 na loja, não só lá dentro.
+	local wasVol, wasCap = A11y.get("volMaster"), A11y.get("captions")
+	A11y.set("volMaster", 0.5)
+	assert(a.getVolume("Master") == 0.5, "o mixer não recebeu a preferência de volume")
+	A11y.set("volMaster", 4)
+	assert(A11y.get("volMaster") == 1, "volume fora de 0..1 entrou na loja")
+	assert(a.getVolume("Master") == 1, "loja e mixer divergiram")
+
+	-- 3) MUDO NÃO CUSTA INFORMAÇÃO: zerar o volume liga as legendas dos avisos.
+	A11y.set("captions", false)
+	A11y.set("volMaster", 0)
+	assert(A11y.get("captions") == true, "mudo deixou o jogador sem legendas nem som")
+
+	A11y.set("volMaster", wasVol)
+	A11y.set("captions", wasCap)
+
+	print("[Accessibility] autoteste OK — espelho canhoto/destro · volume (loja única, mudo↔legendas)")
 	return true
 end
 

@@ -2,6 +2,59 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.3.0-roblox — 2026-08-18 — R9: robustez com teste, anti-griefing e a tela do estranho
+
+Fase de **preparo para o alpha público**. Nada de feature nova: o alvo foi o que
+quebra quando o jogador é um desconhecido e o servidor é de verdade.
+
+**Os 6 travamentos da R8 viraram teste** (`roblox/tools/scenarios.luau`) — eles
+estavam corrigidos e sem uma linha de cobertura, ou seja, a próxima fase podia
+reintroduzir qualquer um em silêncio. S1 tutorial atropelado pela largada · S2
+spam de arrepio · S3 bot preso em geometria · S4 servidor esvazia (seguia
+`Playing` com 8 bots para plateia nenhuma) · S5 `Playing` eterno (a fase final da
+zona PARA e segura; o teto tem de **derivar** do cronograma, e o teste separa
+"tem um número grande" de "acompanha a variante de ritmo") · S6 `forceStart` de
+`Ended` vazando escudo e cooldown. Cada cenário foi validado **reintroduzindo o
+defeito**: 10 mutações, 10 vermelhos. Portão do projeto: 35 → **43 verificações**.
+
+**Griefing entre estranhos pareados em dupla** — mesma razão que desligou o fogo
+amigo na R8 (um desconhecido arruína a sessão do outro e a pergunta V1 fica
+ilegível):
+- A canalização de Sintonia só é cancelável morrendo ou saindo, e o cooldown
+  compartilhado é cobrado no INÍCIO — então bastava o parceiro morrer de
+  propósito para tirar 24 s do pilar do jogo do outro. Agora a interrupção
+  **devolve o cooldown a quem continua vivo**; quem caiu ou saiu segue pagando.
+  O limitador do GDD §9 fica inteiro: **o combo que DISPARA continua cobrando os
+  dois** — é esse que impede o spam. (Corrige a regra como descrita em R2.)
+- O muro de Terra nascia sem olhar quem estava de pé na célula: dava para
+  enterrar o parceiro dentro de 10 studs de pedra por 20 s. Muro não sobe em
+  célula ocupada — regra uniforme, porque o GDD §14 define o muro como
+  **cobertura destrutível**, não como botão de deletar alguém.
+
+**A primeira impressão de quem entra no meio da prova.** Num servidor público
+essa é a experiência da maioria, e ela estava muda: o jogador nascia espectador a
+120 studs do chão sem uma palavra na tela. Agora há três estados distintos —
+jogando · **espírito** (fora da contagem, não da partida: ainda volta pelo altar)
+· espectador — e quem chegou agora lê "você entra na próxima" em vez de "você
+está fora". Sem relógio de próxima partida: o teto de duração é teto, não
+previsão, e erraria por minutos; a tela mostra fase da zona e times restantes,
+que são exatos.
+
+**Volume.** O jogo saiu do silêncio na R8 mas o jogador não tinha como baixá-lo —
+`Audio.setVolume` era loja órfã, sem controle na tela. A preferência passou a
+morar no `Accessibility` (uma loja só; o `Audio` apenas aplica) com dois
+controles em opções. Zerar o volume liga as legendas dos avisos: mudo não pode
+custar informação que só existe no som.
+
+**Laje das ruínas e lodo ganharam cor própria** (`Slab`/`Silt`): os dois POIs mais
+característicos da arena se pintavam com a cor da estrada e a do barro comum. As
+regras são as mesmas — inclusive "Água + terra = lamaçal" (§14) no lodo, que é a
+jogada da casa da baixada e agora tem teste próprio.
+
+Gates: 39 arquivos Luau sem erro de sintaxe · `rojo build` limpo · harness
+**43/43** · varredura de 12 partidas sem regressão (TTK 5/5 no alvo, régua de
+dano/mana 1,17× contra teto de 1,25×). **Nenhum número de `Balance` foi tocado.**
+
 ## v0.2.0-roblox — 2026-08-18 — "Campo de Provas" no Roblox (R0–R3)
 
 Primeira versão da vertente **Roblox** (produto de validação — GDD §9 "Decisões
@@ -33,7 +86,9 @@ nunca dano).
 **R2 · Sintonia (o pilar de inovação, GDD §9)** — os 10 combos com dano em área
 e reação de terreno coerente; janela de 1,5s, canalização interrompível de 1s e
 **cooldown compartilhado cobrado no início** (combo interrompido não devolve o
-custo — é o que impede spam); Ping de Sintonia (GDD §18.7) para combinar sem
+custo — é o que impede spam; **revisto na R9**: quem continua VIVO é reembolsado,
+senão o parceiro tira 24 s do outro de graça — o combo que dispara segue cobrando
+os dois, que é onde o anti-spam realmente mora); Ping de Sintonia (GDD §18.7) para combinar sem
 microfone; mana dos dois conjuradores drenada.
 
 **R3 · Loop de battle royale** — `Lobby → Playing → Ended`, zona arcana em 5

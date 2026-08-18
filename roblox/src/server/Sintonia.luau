@@ -494,11 +494,27 @@ local function releaseChannel(ch: Channel)
 	busy[uidOf(ch.b)] = nil
 end
 
---- INTERROMPIDA (GDD §9): um dos dois morreu, saiu ou foi eliminado no meio. O
---- custo já foi cobrado — a dupla fica seca. Ponto único para os dois caminhos
---- (tick e saída do jogador) contarem a MESMA coisa no funil.
+--- INTERROMPIDA (GDD §9): um dos dois morreu, saiu ou foi eliminado no meio.
+--- Ponto único para os dois caminhos (tick e saída do jogador) contarem a MESMA
+--- coisa no funil.
+---
+--- ANTI-GRIEFING G1 (R9) — QUEM CONTINUA DE PÉ NÃO PAGA. O cooldown é
+--- COMPARTILHADO e cobrado no INÍCIO (GDD §9): sem esta linha, um parceiro
+--- hostil — ou que só deslogou no meio — tirava 24 s do pilar do jogo do outro
+--- com um ato unilateral, e o alpha pareia ESTRANHOS em dupla. A devolução vai
+--- só para os participantes ainda VIVOS; quem caiu/saiu continua pagando.
+--- IMPOSSÍVEL DE CONTORNAR: a única forma de cancelar uma canalização é MORRER
+--- ou SAIR, e ninguém provoca o próprio reembolso — só o do parceiro, que fica
+--- sozinho e sem com quem fundir. O limitador do GDD §9 continua inteiro: o
+--- combo que SAI cobra os dois (é ele que impede o spam), e o combo ERRADO
+--- (fusão indesejada que dispara) segue deixando a dupla seca.
 local function failChannel(ch: Channel, reason: string)
 	releaseChannel(ch)
+	for _, m in ipairs({ ch.a, ch.b }) do
+		if isAlive(m) then
+			readyAt[uidOf(m)] = nil
+		end
+	end
 	announceState({
 		phase = "failed",
 		comboKey = ch.combo.key,
@@ -1150,11 +1166,15 @@ function Sintonia.selfTest()
 	assert(busy[uidA] == true and busy[uidB] == true, "os dois participantes ficam ocupados canalizando")
 	assert(onCooldown(humA) and onCooldown(humB), "cooldown compartilhado cobrado NO INÍCIO, nos dois (GDD §9)")
 
-	-- canalização INTERROMPÍVEL: bot morre no meio → failed, custo NÃO volta
+	-- canalização INTERROMPÍVEL: bot morre no meio → failed.
+	-- ANTI-GRIEFING G1 (R9): quem CAIU continua pagando o cooldown compartilhado;
+	-- quem ficou DE PÉ é reembolsado. É o que tira do parceiro hostil (ou do que
+	-- só deslogou) o poder de deixar o outro 24 s sem o pilar do jogo.
 	humB.Health = 0
 	Sintonia.step(0)
 	assert(#channels == 0, "bot morto no meio INTERROMPE a canalização (GDD §9)")
-	assert(onCooldown(humA), "interromper NÃO devolve o cooldown compartilhado")
+	assert(not onCooldown(humA), "G1: quem continuou DE PÉ não paga a canalização que o parceiro não terminou")
+	assert(onCooldown(humB), "G1: quem CAIU no meio continua pagando — é o que mantém o anti-spam do GDD §9")
 	assert(not busy[uidA] and not busy[uidB], "canal interrompido solta os dois")
 
 	-- fusão completa: revive o bot, zera o cooldown e deixa o canal DISPARAR
@@ -1165,6 +1185,9 @@ function Sintonia.selfTest()
 	channels[1].fireAt = 0 -- adianta o relógio do canal: dispara neste step
 	Sintonia.step(0)
 	assert(#channels == 0 and not busy[uidA] and not busy[uidB], "fusão com parceiro BOT dispara e libera os dois")
+	-- o reembolso do G1 vale SÓ para canalização interrompida: o combo que SAI
+	-- continua cobrando os dois, senão o limitador anti-spam do GDD §9 cai junto
+	assert(onCooldown(humA) and onCooldown(humB), "combo DISPARADO cobra os DOIS (custo do GDD §9 intacto)")
 
 	combat.unregisterTarget(humB)
 	Sintonia.resetMatch()

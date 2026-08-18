@@ -160,6 +160,22 @@ local function amount(parent: Instance, order: number, key: string, name: string
 	})
 end
 
+--- VOLUME é fração 0..1 igual a `shake`/`flash`/`vfx` — então usa O MESMO
+--- widget e a mesma gramática de três respostas. Um slider de arrastar seria um
+--- SEGUNDO idioma de controle na mesma tela (e o pior deles no celular: alvo
+--- fino, precisa de precisão e não perdoa o dedo).
+--- O "cheio" NÃO é 1 fixo: é o padrão da loja, que espelha o mix de fábrica do
+--- `Audio`. Assim o chip aceso ao abrir o menu bate com o que o jogo está
+--- tocando, em vez de mentir "CHEIO" num volume que ninguém escolheu.
+local function volumeRow(key: string): { Option }
+	local full = tonumber(A11y.defaults()[key]) or 1
+	return {
+		{ label = Strings.t("a11y.audio.mute"), value = 0 },
+		{ label = Strings.t("a11y.half"), value = full / 2 },
+		{ label = Strings.t("a11y.full"), value = full },
+	}
+end
+
 -- ------------------------------------------------------------------ build
 local function buildOpen(root: ScreenGui)
 	local btn = mk("TextButton", {
@@ -292,6 +308,25 @@ local function buildPanel(root: ScreenGui)
 	toggle(list, 7, "blur", Strings.t("a11y.blur"))
 	toggle(list, 8, "captions", Strings.t("a11y.captions"))
 	toggle(list, 9, "readyCue", Strings.t("a11y.readycue"))
+
+	--- ÚNICO rótulo de seção da tela: som é o bloco que o jogador procura POR
+	--- NOME ("cadê o volume?"), e num alpha público é o que decide entre baixar
+	--- o volume e fechar o jogo. Fica no fim porque quem chega até aqui rolando
+	--- já leu o resto — e o rótulo em dourado marca o corte.
+	mk("UITextSizeConstraint", { MaxTextSize = 13 }, mk("TextLabel", {
+		BackgroundTransparency = 1,
+		LayoutOrder = 10,
+		Size = UDim2.new(1, 0, 0, 26),
+		Font = Enum.Font.GothamBold,
+		Text = Strings.t("a11y.audio"),
+		TextColor3 = GOLD,
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Bottom,
+	}, list))
+
+	choiceRow(list, 11, "volMaster", Strings.t("a11y.audio.master"), volumeRow("volMaster"))
+	choiceRow(list, 12, "volWorld", Strings.t("a11y.audio.world"), volumeRow("volWorld"))
 end
 
 -- ------------------------------------------------------------------ API
@@ -338,6 +373,44 @@ function Settings.destroy()
 		gui:Destroy()
 		gui = nil
 	end
+end
+
+-- ============================================================================
+-- AUTOTESTE — roda no harness (roblox/tools/run.sh) e no Studio:
+--   require(game.Players.LocalPlayer.PlayerScripts.Client.Settings).selfTest()
+-- Não desenha nada. Cobre as três coisas que fazem uma linha desta tela mentir
+-- SEM erro nenhum no console: chip que nunca acende, mudo que sumiu e chave de
+-- texto que não existe (vira o próprio nome da chave na cara do jogador).
+-- ============================================================================
+function Settings.selfTest()
+	-- alvo de toque: regra dura do GDD §10, reprovada em teste de aparelho
+	assert(L.chipH >= 48 and L.openSize >= 48, "alvo de toque abaixo de 48dp")
+
+	for _, key in ipairs({ "volMaster", "volWorld" }) do
+		local def = tonumber(A11y.defaults()[key])
+		assert(def, "chave de volume sumiu da loja de preferências: " .. key)
+		local hasMute, hasDefault = false, false
+		for _, opt in ipairs(volumeRow(key)) do
+			local v = tonumber(opt.value) or -1
+			assert(v >= 0 and v <= def, key .. ": chip fora do intervalo 0..padrão")
+			hasMute = hasMute or v == 0
+			hasDefault = hasDefault or v == def
+		end
+		-- MUDO é o motivo de esta tela existir para o alpha público
+		assert(hasMute, key .. " sem chip de MUDO")
+		-- sem um chip no valor padrão, o menu abre com a linha APAGADA e o
+		-- jogador conclui que a opção está quebrada
+		assert(hasDefault, key .. ": nenhum chip bate com o padrão da loja")
+	end
+
+	-- `Strings.t` devolve a PRÓPRIA CHAVE quando ela não existe: sem este teste,
+	-- uma chave faltando estreia como "a11y.audio.master" escrito no menu.
+	for _, key in ipairs({ "a11y.audio", "a11y.audio.master", "a11y.audio.world", "a11y.audio.mute" }) do
+		assert(Strings.t(key) ~= key, "chave de texto faltando em Strings: " .. key)
+	end
+
+	print("[Settings] autoteste OK — volume: mudo + padrão aceso · alvos 48dp · textos por chave")
+	return true
 end
 
 return Settings

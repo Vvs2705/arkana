@@ -103,6 +103,16 @@ local PT: { [string]: string } = {
 	["match.combos"] = "SINTONIAS",
 	["match.duration"] = "DURAÇÃO",
 
+	--- ESPECTADOR (R9). Duas situações MUITO diferentes que o jogador precisa
+	--- distinguir sem ler manual: quem entrou com a prova em andamento (não
+	--- perdeu nada, entra na próxima) e quem foi eliminado de vez (perdeu esta).
+	--- Sem esta distinção o estranho que entra no minuto 3 de um alpha público
+	--- acha que o jogo está quebrado — é a primeira impressão da maioria.
+	["match.spectating"] = "ASSISTINDO",
+	["match.spectating.late"] = "VOCÊ ENTRA NA PRÓXIMA",
+	["match.spectating.out"] = "VOCÊ CAIU NESTA PROVA",
+	["match.spectating.next"] = "PRÓXIMA PARTIDA",
+
 	-- ------------------------------------------------- ACESSIBILIDADE (menu)
 	-- Vieram do bloco `L10N` local do Settings (débito 2). O menu é o do
 	-- `Accessibility.luau`; aqui só existe o que o jogador LÊ.
@@ -127,6 +137,15 @@ local PT: { [string]: string } = {
 	["a11y.size.3"] = "G",
 	["a11y.size.4"] = "GG",
 	["a11y.hint"] = "O tamanho do texto e a vibração seguem as opções do seu Roblox.",
+
+	--- ÁUDIO (R9). Duas barras e não quatro: `Master` é o botão que o jogador
+	--- procura quando quer silêncio, e `World` é o que ele baixa quando o combate
+	--- fica cansativo sem querer perder a interface. `Ui`/`Music` continuam nos
+	--- padrões — knob que ninguém mexe é knob que só ocupa tela.
+	["a11y.audio"] = "SOM",
+	["a11y.audio.master"] = "VOLUME GERAL",
+	["a11y.audio.world"] = "SONS DO JOGO",
+	["a11y.audio.mute"] = "MUDO",
 
 	-- ------------------------------------------------------------ GRIMÓRIO
 	-- (GDD §18.3) Progressão por EXPERIMENTAÇÃO, não por poder: cada página é
@@ -236,6 +255,11 @@ local EN: { [string]: string } = {
 	["match.combos"] = "ATTUNEMENTS",
 	["match.duration"] = "TIME",
 
+	["match.spectating"] = "SPECTATING",
+	["match.spectating.late"] = "YOU'RE IN THE NEXT ONE",
+	["match.spectating.out"] = "YOU'RE OUT OF THIS TRIAL",
+	["match.spectating.next"] = "NEXT MATCH",
+
 	["a11y.title"] = "ACCESSIBILITY & COMFORT",
 	["a11y.uisize"] = "UI SIZE",
 	["a11y.lefthanded"] = "LEFT-HANDED HUD",
@@ -255,6 +279,11 @@ local EN: { [string]: string } = {
 	["a11y.size.3"] = "L",
 	["a11y.size.4"] = "XL",
 	["a11y.hint"] = "Text size and vibration follow your Roblox settings.",
+
+	["a11y.audio"] = "SOUND",
+	["a11y.audio.master"] = "MASTER VOLUME",
+	["a11y.audio.world"] = "GAME SOUNDS",
+	["a11y.audio.mute"] = "MUTED",
 
 	-- GRIMOIRE (GDD §18.3) — see the PT block for the writing rule.
 	["grimoire.title"] = "BOOK OF DISCOVERIES",

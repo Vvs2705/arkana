@@ -519,6 +519,26 @@ if okReport then
 	print("--------------------------------------------------------")
 end
 
+-- ============================================ FASE 4 — CENÁRIOS DE ROBUSTEZ
+--- Os seis travamentos que a R8 achou e corrigiu, cada um num SERVIDOR NOVO
+--- (harness próprio, seed própria — mesmo truque do sweep). Rodam no caminho
+--- PADRÃO de propósito: correção sem teste tem prazo de validade, e teste que
+--- só roda quando alguém lembra não é portão. `run.sh scenarios` roda só estes.
+print("")
+print("== FASE 4 — CENÁRIOS DE ROBUSTEZ (S1–S6, um servidor novo por cenário) ==")
+do
+	local ok, scenarios = xpcall(function()
+		return assert(loadstring(SOURCES["tools/scenarios.luau"], "@roblox/tools/scenarios.luau"))(SOURCES)
+	end, trace)
+	if ok then
+		scenarios(function(name, passed, detail)
+			record("cenário", name, passed, detail)
+		end)
+	else
+		record("cenário", "carregar scenarios.luau", false, tostring(scenarios))
+	end
+end
+
 -- ================================================================= RESUMO
 print("")
 print("== RESUMO ==")

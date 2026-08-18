@@ -163,8 +163,12 @@ local conns: { RBXScriptConnection } = {}
 local groups: { [string]: SoundGroup } = {}
 local oneShots, loopsAlive = 0, 0
 
---- volumes por categoria (0..1). Persistem em atributo do LocalPlayer, mesmo
---- prefixo `Arkana_` do Accessibility — um sweep futuro de DataStore pega tudo.
+--- MIX DE FÁBRICA por categoria (0..1) — o "cheio" de cada uma. É a mixagem do
+--- GDD §13, não a preferência do jogador: quem GUARDA a escolha é o
+--- `Accessibility` (loja única, atributo `Arkana_volMaster`/`Arkana_volWorld`).
+--- Aqui embaixo `volume` é só o ganho APLICADO agora — estado do mixer, nunca
+--- persistido. Sem Accessibility (módulo fora do build, erro no require) o som
+--- toca no mix de fábrica: o áudio nunca depende de outra raia para existir.
 local VOL_DEFAULT: { [string]: number } = { Master = 1, World = 0.9, Ui = 0.7, Music = 0.6 }
 local volume: { [string]: number } = table.clone(VOL_DEFAULT)
 
@@ -579,23 +583,25 @@ local function hookButton(d: Instance)
 end
 
 -- ------------------------------------------------------------------ volume
---- Gancho para a tela de opções (raia da UI): `Audio.setVolume("World", 0.5)`.
---- Categorias: Master · World · Ui · Music.
+--- APLICA o volume — não o guarda. Quem chama é o `Accessibility` (dono da
+--- preferência do jogador), a cada mudança e no init. Categoria desconhecida é
+--- ignorada em silêncio. Categorias: Master · World · Ui · Music.
 function Audio.setVolume(category: string, value: number)
 	if VOL_DEFAULT[category] == nil then
 		return
 	end
-	local v = math.clamp(tonumber(value) or 1, 0, 1)
-	volume[category] = v
-	local p = localPlayer or Players.LocalPlayer
-	if p then
-		p:SetAttribute("Arkana_vol" .. category, v)
-	end
+	volume[category] = math.clamp(tonumber(value) or 1, 0, 1)
 	Audio.applyVolumes()
 end
 
 function Audio.getVolume(category: string): number
 	return volume[category] or VOL_DEFAULT[category] or 1
+end
+
+--- O "cheio" de fábrica da categoria. O `Accessibility` lê daqui em vez de
+--- carregar um segundo número que pode divergir do mixer.
+function Audio.defaultVolume(category: string): number
+	return VOL_DEFAULT[category] or 1
 end
 
 function Audio.categories(): { string }
@@ -610,10 +616,9 @@ function Audio.init(player: Player)
 	localPlayer = player
 	ensureGroups()
 
-	for cat, def in pairs(VOL_DEFAULT) do
-		local stored = player:GetAttribute("Arkana_vol" .. cat)
-		volume[cat] = if typeof(stored) == "number" then math.clamp(stored, 0, 1) else def
-	end
+	-- sem leitura de atributo aqui: o `Accessibility.init` (que roda antes, ver
+	-- Main.client) já empurrou a preferência salva para dentro do `volume`. Ler
+	-- de novo seria a segunda loja voltando pela porta dos fundos.
 	Audio.applyVolumes()
 
 	table.insert(conns, Net.event(Net.Names.SpellSpawned).OnClientEvent:Connect(onCast))
@@ -779,14 +784,26 @@ function Audio.selfTest()
 	end
 	oneShots, loopsAlive = wasOne, wasLoop
 
-	-- 4) volume: categoria desconhecida não corrompe a loja
+	-- 4) volume: categoria desconhecida não corrompe o mixer
 	Audio.setVolume("NaoExiste", 0.5)
 	assert(Audio.getVolume("NaoExiste") == 1, "categoria inventada entrou na loja")
 	Audio.setVolume("World", 2)
 	assert(Audio.getVolume("World") == 1, "volume não foi limitado a 0..1")
+
+	-- 5) UMA LOJA SÓ (R9): quem PERSISTE volume é o `Accessibility`. Se este
+	-- módulo voltar a escrever o atributo, passam a existir dois donos da mesma
+	-- chave e a preferência do jogador vira corrida entre eles — reprova aqui.
+	local p = localPlayer or Players.LocalPlayer
+	if p then
+		local sentinel = -7 -- valor que NENHUM caminho legítimo escreveria
+		p:SetAttribute("Arkana_volWorld", sentinel)
+		Audio.setVolume("World", 0.3)
+		assert(p:GetAttribute("Arkana_volWorld") == sentinel, "o Audio voltou a persistir volume")
+		p:SetAttribute("Arkana_volWorld", nil)
+	end
 	Audio.setVolume("World", VOL_DEFAULT.World)
 
-	print("[Audio] autoteste OK — 10 assets embutidos · 5 elementos distintos · teto de vozes")
+	print("[Audio] autoteste OK — 10 assets embutidos · 5 elementos distintos · teto de vozes · volume sem dono duplo")
 	return true
 end
 

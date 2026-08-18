@@ -189,7 +189,16 @@ local function weakKeyed(): any
 end
 
 local matchId = ""
-local eliminated: { [Player]: boolean } = {}
+--- Quem está FORA da contagem desta prova — e POR QUÊ. O valor é o motivo, não
+--- um `true`: "late" = entrou com a prova em andamento (não perdeu nada, joga a
+--- próxima) · "out" = caiu nesta prova. As duas situações são opostas para quem
+--- lê a tela, e um booleano não tem como dizer qual é. Toda leitura antiga
+--- continua valendo sem mudar uma linha (string não-vazia é verdadeira em Lua),
+--- e o motivo NÃO é estado novo por jogador: mora na mesma tabela que já é
+--- limpa nas duas portas de partida nova (`startMatch` e `toLobby`, ambas por
+--- `clearEliminated`) — que é exatamente onde os três vazamentos anteriores do
+--- projeto passaram.
+local eliminated: { [Player]: string } = {}
 local stats: { [Player]: PlayerStat } = {}
 --- último jogador a acertar cada humanoid (crédito de abate).
 --- CHAVES FRACAS (mesmo motivo do `deathWired`): quem leva um tiro e depois SAI
@@ -265,9 +274,27 @@ end
 --- quem foi eliminado é ESTE módulo; quem barra a intenção é o Combat. Toda
 --- escrita em `eliminated` passa por aqui — é o único jeito de os dois nunca
 --- discordarem.
-local function markEliminated(player: Player)
-	eliminated[player] = true
+local function markEliminated(player: Player, reason: string)
+	eliminated[player] = reason
 	combat.setCanAct(player, false)
+end
+
+--- O QUE A TELA DESTE JOGADOR MOSTRA: `nil` = está jogando · "late" = entrou no
+--- meio da prova · "out" = caiu nesta prova.
+---
+--- ESPÍRITO NÃO É ESPECTADOR — é o terceiro estado, e é por isso que esta função
+--- existe em vez de o `broadcast` ler `eliminated` direto. Quem caiu mas ainda
+--- pode voltar pelo altar está fora da CONTAGEM, não fora da PARTIDA: dizer
+--- "você caiu nesta prova" para ele seria mentir sobre a única coisa que ainda
+--- depende do parceiro atravessar o mapa. O espírito tem a própria apresentação
+--- (essência, arrepio, painel da dupla) e nunca cai no painel de poleiro.
+---
+--- PURA de propósito: é assim que o autoteste cobre os três estados sem partida.
+local function spectateKind(reason: string?, isSpirit: boolean): string?
+	if isSpirit then
+		return nil
+	end
+	return reason
 end
 
 local function unmarkEliminated(player: Player)
@@ -999,7 +1026,7 @@ local function onDeath(hum: Humanoid)
 		return
 	end
 	if victim then
-		markEliminated(victim) -- e a partir daqui ele não conjura mais
+		markEliminated(victim, "out") -- e a partir daqui ele não conjura mais
 		announceTo(victim, "announce.death")
 		-- ESPÍRITO (GDD §18.6): se a dupla ainda tem retorno e a zona não chegou
 		-- na fase final, a essência fica no chão e a sessão dele continua.
@@ -1284,14 +1311,21 @@ local function broadcast()
 			end
 		end
 		payload.mate = mate
-		payload.spirit = spirits[player] ~= nil
-		--- ESPECTADOR: quem entrou NO MEIO da prova (nasce eliminado) e quem já
-		--- caiu de vez. Sem este bit o cliente não tem como distinguir "estou
-		--- jogando" de "estou no poleiro esperando a próxima" — e alguém que entra
-		--- num alpha público no minuto 3 fica olhando o mapa de cima sem nenhuma
-		--- explicação na tela. PENDÊNCIA para o COORDENADOR: falta a string
-		--- `announce.match.spectating` em Shared/Strings para o aviso sair escrito.
-		payload.spectating = eliminated[player] == true
+		local isSpirit = spirits[player] ~= nil
+		payload.spirit = isSpirit
+		--- TRÊS ESTADOS, NUNCA DOIS: jogando (`spectating` falso, `spirit` falso) ·
+		--- ESPÍRITO (`spirit` verdadeiro — acompanha a dupla e ainda volta pelo
+		--- altar; nunca é poleiro) · ESPECTADOR de poleiro (`spectating`).
+		---
+		--- `spectating` continua sendo o bit que LIGA o painel; `spectateKind` diz
+		--- QUAL das duas frases entra nele. Um bit sozinho junta duas situações
+		--- opostas — "entrei agora, não perdi nada, jogo a próxima" e "caí de vez,
+		--- perdi ESTA prova" — e num servidor público a primeira é a experiência
+		--- da MAIORIA de quem entra. (A pendência da string caiu:
+		--- `announce.match.spectating` existe e sai no `onCharacter`.)
+		local kind = spectateKind(eliminated[player], isSpirit)
+		payload.spectating = kind ~= nil
+		payload.spectateKind = kind
 		payload.reviveChannel = channelOf[player] or 0
 		evState:FireClient(player, payload)
 	end
@@ -1303,11 +1337,13 @@ function Match.init(terrainModule: any, combatModule: any)
 	combat = combatModule
 	evState = Net.event(Net.Names.MatchState)
 	evAnnounce = Net.event(Net.Names.Announce)
-	--- ARREPIO do espírito (GDD §18.6). O nome não está em Net.Names porque
-	--- Shared/Net é do COORDENADOR — mesmo caminho que o Combat usou para a
-	--- postura. C→S: { pos: Vector3 } · S→C: { pos: Vector3, hold: number }.
-	--- PENDÊNCIA: oficializar como Net.Names.SpiritPing e rotear pelo Main.
-	evSpirit = Net.event("SpiritPing")
+	--- ARREPIO do espírito (GDD §18.6). C→S: { pos: Vector3 } · S→C:
+	--- { pos: Vector3, hold: number }. Roteado AQUI e não no Main — mesmo padrão
+	--- da postura no Combat: quem sabe quem é espírito é este módulo.
+	--- (A pendência que morava neste comentário caiu na R6: o coordenador
+	--- oficializou o nome em Net.Names. A chamada é que continuava com a string
+	--- crua, o que deixava o contrato com dois donos — corrigido na R9.)
+	evSpirit = Net.event(Net.Names.SpiritPing)
 	evSpirit.OnServerEvent:Connect(function(player, payload)
 		Match.spiritPing(player, if typeof(payload) == "table" then (payload :: any).pos else nil)
 	end)
@@ -1338,13 +1374,27 @@ function Match.init(terrainModule: any, combatModule: any)
 				ghostify(player) -- ESPÍRITO: acompanha a dupla, não compete
 			else
 				perch(player) -- eliminado de vez: espectador, não competidor
+				-- O aviso escrito sai AQUI, e não no PlayerAdded: no PlayerAdded o
+				-- cliente dele ainda pode não ter ligado o OnClientEvent do Announce
+				-- e o toast sairia para ninguém. Aqui é também o instante exato em
+				-- que a câmera sobe 120 studs — é quando a explicação é necessária.
+				-- Só para quem CHEGOU AGORA: quem caiu já ouviu `announce.death`, e
+				-- repetir "você entra na próxima" por cima seria trocar o luto dele
+				-- por um aviso que não é o dele.
+				if eliminated[player] == "late" then
+					announceTo(player, "announce.match.spectating")
+				end
 			end
 		end
 	end
 
 	local function onPlayer(player: Player)
 		if state == "Playing" then
-			markEliminated(player) -- entrou no meio da prova: assiste esta
+			-- ENTROU NO MEIO DA PROVA. Não se injeta gente num battle royale já
+			-- começado — mas o motivo "late" (e não "out") é o que separa, na tela
+			-- dele, "não perdi nada" de "perdi esta prova". O painel permanente
+			-- sai do `broadcast`; o toast, do `onCharacter` logo acima.
+			markEliminated(player, "late")
 		end
 		player.CharacterAdded:Connect(function(char)
 			onCharacter(player, char)
@@ -1701,6 +1751,25 @@ function Match.selfTest()
 		string.format("o teto (%ds) não pode cortar partida ainda dentro do cronograma da zona (%ds)", matchTimeLimit(), total)
 	)
 	assert(mustEndNow(2, matchTimeLimit()), "passado o teto a prova termina mesmo com todo mundo parado")
+
+	-- ======================= TRÊS ESTADOS NA TELA (alpha público) =======================
+	-- jogando · ESPÍRITO · ESPECTADOR de poleiro. O bit `spectating` sozinho
+	-- juntava duas situações OPOSTAS: quem entrou agora (não perdeu nada, joga a
+	-- próxima) e quem caiu de vez (perdeu ESTA prova). Num servidor público a
+	-- primeira é a experiência da MAIORIA de quem entra — e sem a distinção ela
+	-- chega no cliente como "você está fora", que é o contrário da verdade.
+	assert(spectateKind(nil, false) == nil, "quem está jogando não é espectador")
+	assert(spectateKind("late", false) == "late", "quem entrou no meio da prova assiste ESTA e joga a próxima")
+	assert(spectateKind("out", false) == "out", "quem caiu de vez perdeu ESTA prova")
+	assert(
+		spectateKind("late", false) ~= spectateKind("out", false),
+		"os dois espectadores não podem chegar IGUAIS no cliente: um não perdeu nada, o outro perdeu a prova"
+	)
+	-- ESPÍRITO NÃO É ESPECTADOR: está fora da contagem, não fora da partida —
+	-- ainda volta pelo altar enquanto o parceiro atravessa o mapa. Mandá-lo para
+	-- o painel de poleiro é dizer "você caiu nesta prova" para quem ainda joga.
+	assert(spectateKind("out", true) == nil, "espírito acompanha a dupla — não é espectador de poleiro")
+	assert(spectateKind("late", true) == nil, "espírito nunca vira painel de poleiro, seja qual for o motivo")
 
 	-- ARREPIO: fronteira de confiança C→S. O gasto só acontece quando ACHA
 	-- alguém, então sem janela mínima um pedido vazio varria a lista de vivos de

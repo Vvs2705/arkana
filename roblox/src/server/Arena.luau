@@ -371,10 +371,12 @@ function Arena.generate(): Layout
 				if wall then
 					layout[cy][cx] = "Rock"
 				else
-					-- laje da praça, com o mato retomando parte (quebra a chapa)
+					-- laje da praça, com o mato retomando parte (quebra a chapa).
+					-- `Slab` e não `Road`: mesmas regras, cor própria (R9) — a
+					-- praça deixou de se pintar com a cor da estrada.
 					layout[cy][cx] = if hash01(cx, cy, SALT_MOSS) < RUIN_MOSS
 						then "Grass"
-						else "Road"
+						else "Slab"
 				end
 			end
 		end
@@ -399,7 +401,10 @@ function Arena.generate(): Layout
 						then
 							layout[cy][cx] = "TallGrass" -- juncos: emboscada no lodo
 						else
-							layout[cy][cx] = "Dirt" -- lodo: Água aqui vira lamaçal (§14)
+							-- lodo: Água aqui vira lamaçal (§14). `Silt` e não
+							-- `Dirt`: mesmas regras (o lamaçal continua valendo,
+							-- ver Terrain.applyWater), cor própria (R9).
+							layout[cy][cx] = "Silt"
 						end
 					end
 				end
