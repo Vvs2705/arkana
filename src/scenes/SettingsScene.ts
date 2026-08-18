@@ -6,7 +6,7 @@
 // Dono: WORKER A (UX/UI + gameplay).
 // ============================================================================
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, SCENE, FONTS, TEX, COLORS } from '../core/config';
+import { GAME_WIDTH, GAME_HEIGHT, SCENE, FONTS, TEX, COLORS, TOUCH } from '../core/config';
 import { t } from '../core/strings';
 import { Settings, type GameSettings, type KeyAction } from '../core/settings';
 import { Audio } from '../core/audio';
@@ -249,30 +249,87 @@ export class SettingsScene extends Phaser.Scene {
   private buildControls(): void {
     const c = Settings.get().controls;
 
-    let y = 168;
+    let y = 160;
     this.rowLabel(y, t('settings.sens.mouse'), 16);
     this.makeSlider(y, 0.1, 10, 0.1, c.mouseSens, 1, (val) => {
       Settings.update({ controls: { ...Settings.get().controls, mouseSens: val } });
     });
 
-    y = 212;
+    y = 198;
     this.rowLabel(y, t('settings.sens.aim'), 16);
     this.makeSlider(y, 0.1, 3, 0.1, c.aimSens, 1, (val) => {
       Settings.update({ controls: { ...Settings.get().controls, aimSens: val } });
     });
 
-    y = 254;
+    y = 234;
     this.rowLabel(y, t('settings.inverty'), 16);
     this.makeToggle(y, c.invertY, (val) => {
       Settings.update({ controls: { ...Settings.get().controls, invertY: val } });
     });
-    this.separator(y + 24);
+    this.separator(y + 22);
 
-    // remapeamento — uma linha por ação; clicar captura a próxima tecla
-    this.keep(this.add.text(LABEL_X, 294, t('settings.keys').toUpperCase(), {
+    // ---- controles de toque (Fase 2 — GDD 19.3)
+    y = 278;
+    const touchModes: GameSettings['controls']['touch']['mode'][] = ['auto', 'on', 'off'];
+    this.rowLabel(y, t('settings.touch'), 16);
+    this.makeSelect(
+      y,
+      [t('settings.touch.auto'), t('settings.on'), t('settings.off')],
+      touchModes.indexOf(c.touch.mode),
+      (i) => {
+        Settings.update({
+          controls: { ...Settings.get().controls, touch: { ...Settings.get().controls.touch, mode: touchModes[i] } },
+        });
+      },
+    );
+    this.note(y + 19, t('settings.touch.note'));
+
+    y = 316;
+    const schemes: GameSettings['controls']['touch']['scheme'][] = ['simple', 'advanced'];
+    this.rowLabel(y, t('settings.touch.scheme'), 16);
+    this.makeSelect(
+      y,
+      [t('settings.touch.scheme.simple'), t('settings.touch.scheme.adv')],
+      schemes.indexOf(c.touch.scheme),
+      (i) => {
+        Settings.update({
+          controls: { ...Settings.get().controls, touch: { ...Settings.get().controls.touch, scheme: schemes[i] } },
+        });
+      },
+    );
+
+    y = 352;
+    this.rowLabel(y, t('settings.touch.scale'), 16);
+    this.makeSlider(y, TOUCH.scaleMin, TOUCH.scaleMax, 0.05, c.touch.scale, 2, (val) => {
+      Settings.update({
+        controls: { ...Settings.get().controls, touch: { ...Settings.get().controls.touch, scale: val } },
+      });
+    });
+
+    y = 388;
+    const editBtn = this.keep(this.add.text(LABEL_X, y, t('settings.touch.edit'), {
+      fontFamily: FONTS.ui, fontSize: '16px', color: css(COLORS.gold),
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }));
+    editBtn.on('pointerover', () => { editBtn.setColor('#ffffff'); Audio.playSfx('ui_hover'); });
+    editBtn.on('pointerout', () => editBtn.setColor(css(COLORS.gold)));
+    editBtn.on('pointerdown', () => {
+      if (this.capturing) return;
+      Audio.playSfx('ui_click');
+      this.scene.start(SCENE.TOUCH_LAYOUT, { from: this.from });
+    });
+    this.separator(y + 20);
+
+    // remapeamento em DUAS colunas (4 ações por coluna); clicar captura a tecla
+    this.keep(this.add.text(LABEL_X, 428, t('settings.keys').toUpperCase(), {
       fontFamily: FONTS.ui, fontSize: '13px', color: css(COLORS.textDim), letterSpacing: 3,
     }).setOrigin(0, 0.5));
-    KEY_ACTIONS.forEach((action, i) => this.makeKeyRow(322 + i * 33, action));
+    KEY_ACTIONS.forEach((action, i) => {
+      const col = Math.floor(i / 4);
+      const rowY = 456 + (i % 4) * 34;
+      const labelX = col === 0 ? LABEL_X : P_CX + 16;
+      const boxCx = col === 0 ? P_CX - 140 : CTRL_R - 75;
+      this.makeKeyRow(rowY, action, labelX, boxCx);
+    });
   }
 
   private buildGame(): void {
@@ -452,14 +509,14 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   /** linha de remapeamento: rótulo + tecla atual (clique = capturar nova) */
-  private makeKeyRow(y: number, action: KeyAction): void {
-    this.keep(this.add.text(LABEL_X, y, t(`settings.key.${action}`), {
+  private makeKeyRow(y: number, action: KeyAction, labelX: number = LABEL_X, boxCx: number = CTRL_R - 100): void {
+    this.keep(this.add.text(labelX, y, t(`settings.key.${action}`), {
       fontFamily: FONTS.ui, fontSize: '15px', color: css(COLORS.text),
     }).setOrigin(0, 0.5));
-    const bg = this.keep(this.add.rectangle(CTRL_R - 100, y, 200, 26, COLORS.panelLight, 1)
+    const bg = this.keep(this.add.rectangle(boxCx, y, 150, 26, COLORS.panelLight, 1)
       .setStrokeStyle(1, COLORS.goldDim, 0.8)
       .setInteractive({ useHandCursor: true }));
-    const keyText = this.keep(this.add.text(CTRL_R - 100, y, formatKey(Settings.key(action)), {
+    const keyText = this.keep(this.add.text(boxCx, y, formatKey(Settings.key(action)), {
       fontFamily: FONTS.ui, fontSize: '15px', color: css(COLORS.text),
     }).setOrigin(0.5));
     bg.on('pointerover', () => {

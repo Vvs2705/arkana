@@ -51,6 +51,7 @@ export const SCENE = {
   CREDITS: 'Credits',
   ARENA: 'Arena',
   PAUSE: 'Pause',
+  TOUCH_LAYOUT: 'TouchLayout',
 } as const;
 
 // Chaves de textura geradas por src/core/textures.ts (generateAllTextures)
@@ -89,6 +90,13 @@ export const TEX = {
   SEAL: 'ui-seal',
   PARTICLE: 'ui-particle',
   PIXEL: 'ui-pixel',
+  // controles de toque (Fase 2 — GDD 19.3)
+  STICK_BASE: 'touch-stick-base',
+  STICK_THUMB: 'touch-stick-thumb',
+  BTN_ATTACK: 'touch-btn-attack',
+  BTN_TACTIC: 'touch-btn-tactic',
+  BTN_DODGE: 'touch-btn-dodge',
+  BTN_PAUSE: 'touch-btn-pause',
 } as const;
 
 export const PROJ_TEX: Record<Element, string> = {
@@ -123,3 +131,42 @@ export const FONTS = {
   ui: '"Chakra Petch", "Segoe UI", sans-serif',
   body: '"Inter", "Segoe UI", sans-serif',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Controles de toque (Fase 2 — GDD 19.3). Posições em px do canvas 1280×720;
+// o Scale.FIT projeta p/ a tela. Tamanhos = raios base ANTES da escala do
+// jogador (Settings.controls.touch.scale).
+// ---------------------------------------------------------------------------
+export type TouchControlId = 'stick' | 'attack' | 'tactic' | 'dodge' | 'carousel';
+
+export const TOUCH = {
+  /** alvo mínimo de toque em dp (1dp ≈ 1px CSS; devicePixelRatio já está
+   *  embutido no tamanho CSS do canvas — conversão p/ px do canvas em runtime) */
+  minDp: 48,
+  scaleMin: 0.7,
+  scaleMax: 1.5,
+  /** posições padrão — zonas de polegar: movimento à esquerda, ações à direita */
+  defaults: {
+    stick: { x: 170, y: 540 },
+    attack: { x: 1150, y: 600 },
+    tactic: { x: 1044, y: 654 },
+    dodge: { x: 1064, y: 514 },
+    carousel: { x: 1060, y: 420 },
+  },
+  /** raios/tamanhos base em px do canvas */
+  size: {
+    stickBase: 70,
+    stickThumb: 30,
+    attack: 48,
+    tactic: 34,
+    dodge: 34,
+    icon: 44,
+    iconGap: 54,
+    pause: 26,
+  },
+} as const;
+
+/** cópia mutável das posições padrão (p/ DEFAULT_SETTINGS e "Restaurar padrão") */
+export function defaultTouchLayout(): Record<TouchControlId, { x: number; y: number }> {
+  return structuredClone(TOUCH.defaults) as unknown as Record<TouchControlId, { x: number; y: number }>;
+}

@@ -385,6 +385,90 @@ function uiPixel(scene: Phaser.Scene): void {
   bake(g, TEX.PIXEL, 2, 2);
 }
 
+// ------------------------------------------------- controles de toque (19.3)
+// Botões redondos com ÍCONE distinto por forma (nunca só cor — daltonismo).
+// Desenhados em 112×112 (raio 52) e escalados via setDisplaySize.
+
+function touchBtnBase(g: G, border: number): void {
+  g.fillStyle(0x141a36, 0.72);
+  g.fillCircle(56, 56, 52);
+  g.lineStyle(4, border, 0.9);
+  g.strokeCircle(56, 56, 50);
+}
+
+/** base do joystick: anel duplo translúcido 160×160 */
+function touchStickBase(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  g.fillStyle(0x141a36, 0.35);
+  g.fillCircle(80, 80, 78);
+  g.lineStyle(3, 0xf0c75e, 0.55);
+  g.strokeCircle(80, 80, 76);
+  g.lineStyle(1, 0xffffff, 0.22);
+  g.strokeCircle(80, 80, 46);
+  bake(g, TEX.STICK_BASE, 160, 160);
+}
+
+function touchStickThumb(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  g.fillStyle(0xf0c75e, 0.8);
+  g.fillCircle(32, 32, 30);
+  g.fillStyle(0xffffff, 0.4);
+  g.fillCircle(26, 26, 10);
+  bake(g, TEX.STICK_THUMB, 64, 64);
+}
+
+/** ataque: estrela de conjuração de 4 pontas */
+function touchBtnAttack(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  touchBtnBase(g, 0xf0c75e);
+  g.fillStyle(0xf0c75e);
+  g.fillTriangle(56, 20, 48, 56, 64, 56);
+  g.fillTriangle(56, 92, 48, 56, 64, 56);
+  g.fillTriangle(20, 56, 56, 48, 56, 64);
+  g.fillTriangle(92, 56, 56, 48, 56, 64);
+  g.fillStyle(0xffffff, 0.9);
+  g.fillCircle(56, 56, 7);
+  bake(g, TEX.BTN_ATTACK, 112, 112);
+}
+
+/** tática: losango (runa) */
+function touchBtnTactic(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  touchBtnBase(g, 0x8fe8c9);
+  g.lineStyle(5, 0x8fe8c9, 1);
+  g.beginPath();
+  g.moveTo(56, 26); g.lineTo(84, 56); g.lineTo(56, 86); g.lineTo(28, 56);
+  g.closePath();
+  g.strokePath();
+  g.fillStyle(0x8fe8c9, 0.85);
+  g.fillCircle(56, 56, 8);
+  bake(g, TEX.BTN_TACTIC, 112, 112);
+}
+
+/** esquiva: chevrons duplos (movimento) */
+function touchBtnDodge(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  touchBtnBase(g, 0x2aa7ff);
+  g.lineStyle(6, 0x2aa7ff, 1);
+  g.beginPath();
+  g.moveTo(34, 34); g.lineTo(58, 56); g.lineTo(34, 78);
+  g.strokePath();
+  g.beginPath();
+  g.moveTo(58, 34); g.lineTo(82, 56); g.lineTo(58, 78);
+  g.strokePath();
+  bake(g, TEX.BTN_DODGE, 112, 112);
+}
+
+/** pausa: duas barras */
+function touchBtnPause(scene: Phaser.Scene): void {
+  const g = gfx(scene);
+  touchBtnBase(g, 0x9a97ad);
+  g.fillStyle(0xe8e6f0, 0.95);
+  g.fillRect(42, 36, 10, 40);
+  g.fillRect(60, 36, 10, 40);
+  bake(g, TEX.BTN_PAUSE, 112, 112);
+}
+
 // ------------------------------------------------------------------ entrada
 const STEPS: ((s: Phaser.Scene) => void)[] = [
   tileGrass, tileTallGrass, tileDirt, tileRock, tileWater, tileTree,
@@ -396,6 +480,8 @@ const STEPS: ((s: Phaser.Scene) => void)[] = [
   projFire, projWater, projEarth, projWind, projLightning,
   iconFire, iconWater, iconEarth, iconWind, iconLightning,
   uiSeal, uiParticle, uiPixel,
+  touchStickBase, touchStickThumb,
+  touchBtnAttack, touchBtnTactic, touchBtnDodge, touchBtnPause,
 ];
 
 /**

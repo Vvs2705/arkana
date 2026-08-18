@@ -124,7 +124,8 @@ A avaliação de engine e o gatilho para reconsiderar Godot estão em
 
 - [x] **Fase 1** — Protótipo PC: boot, menus, arena, 5 elementos, terreno reativo, escudo
       evolutivo, bots *(concluída)*
-- [ ] **Fase 2** — APK Android via Capacitor + controles de toque
+- [x] **Fase 2** — APK Android via Capacitor + controles de toque *(código completo;
+      compilar o APK exige Android Studio/JDK 17 — ver [docs/BUILD_ANDROID.md](docs/BUILD_ANDROID.md))*
 - [ ] **Fase 3** — v0.2: Sintonia com bot aliado, tela de queda, Selo do Campeão, Presságios
 - [ ] **Projeto Prisma** — salto de qualidade gráfica (iluminação dinâmica, autotiling,
       pós-processamento, personagens animados)

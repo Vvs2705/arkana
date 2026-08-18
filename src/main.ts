@@ -14,6 +14,7 @@ import { SettingsScene } from './scenes/SettingsScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { ArenaScene } from './scenes/ArenaScene';
 import { PauseScene } from './scenes/PauseScene';
+import { TouchLayoutScene } from './scenes/TouchLayoutScene';
 
 const s = Settings.get();
 const fpsLimit = s.video.fpsLimit;
@@ -28,6 +29,8 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  // multi-toque: joystick + mira + botão simultâneos (Fase 2 — GDD 19.3)
+  input: { activePointers: 4 },
   fps: fpsLimit > 0 ? { limit: fpsLimit } : undefined,
   physics: {
     default: 'arcade',
@@ -42,6 +45,7 @@ const config: Phaser.Types.Core.GameConfig = {
     CreditsScene,
     ArenaScene,
     PauseScene,
+    TouchLayoutScene,
   ],
 };
 

@@ -17,10 +17,12 @@ import {
 } from '../core/types';
 import { ARENA_COLS, ARENA_ROWS, SCENE, TILE } from '../core/config';
 import { Audio } from '../core/audio';
+import { touchControlsEnabled } from '../core/settings';
 import { TerrainGrid } from '../terrain/TerrainGrid';
 import { Bot } from '../entities/Bot';
 import { Dummy } from '../entities/Dummy';
 import { HUD } from '../ui/HUD';
+import { TouchControls } from '../ui/TouchControls';
 import { Player } from '../entities/Player';
 import { ProjectilePool } from '../entities/Projectile';
 
@@ -53,6 +55,9 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
 
   /** exposto pelo contrato ArenaApi (consumido por Bot/Dummy/HUD/pool) */
   terrain!: ITerrainGrid;
+
+  /** camada de toque (Fase 2 — GDD 19.3); undefined = desktop puro */
+  touch?: TouchControls;
 
   private player!: Player;
   private dummy!: Dummy;
@@ -114,6 +119,15 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
     // HUD por último: lê getPlayerStats/getEntities já populados
     this.hud = new HUD(this);
 
+    // camada de toque (Auto detecta o hardware; "Ligado" testa no desktop).
+    // Desligado = nenhum overlay, nenhum listener — desktop 100% intacto.
+    if (touchControlsEnabled()) {
+      this.touch = new TouchControls(this, this, {
+        onPause: () => this.onEsc(),
+        onElement: (el) => this.player.setElement(el),
+      });
+    }
+
     // pausa (a PauseScene de outra raia cuida do resto)
     this.input.keyboard?.on('keydown-ESC', this.onEsc, this);
     this.events.on(Phaser.Scenes.Events.RESUME, this.onResume, this);
@@ -134,6 +148,7 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
     this.dummy.update(time, delta);
     this.pool.update(time, delta);
     this.hud.update(time, delta);
+    this.touch?.update();
   }
 
   // --------------------------------------------------------------- ArenaApi
@@ -191,6 +206,7 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
   /** ao acordar da pausa, re-zera estados de input pendurados */
   private onResume(): void {
     this.player.clearInputState();
+    this.touch?.clearState(); // pointerups perdidos durante a pausa
   }
 
   private onPlayerDied(): void {
@@ -198,6 +214,12 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
     // `once` DENTRO do handler de morte: só existe 1 listener por morte e
     // o shutdown do teclado limpa tudo entre restarts (sem duplicados)
     this.input.keyboard?.once('keydown-ENTER', () => this.scenePlugin.restart());
+    // com toque ativo não há ENTER: qualquer toque na tela reinicia
+    if (this.touch) {
+      this.time.delayedCall(600, () => {
+        if (this.ready) this.input.once('pointerdown', () => this.scenePlugin.restart());
+      });
+    }
   }
 
   private onShutdown(): void {
@@ -205,6 +227,8 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
     this.events.off(EVT.PLAYER_DIED, this.onPlayerDied, this);
     this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this);
     // teclado limpa os próprios listeners no shutdown do Phaser
+    this.touch?.destroy();
+    this.touch = undefined;
     this.hud.destroy();
     this.pool.destroy();
     for (const b of this.bots) b.destroy();

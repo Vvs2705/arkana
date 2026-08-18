@@ -125,4 +125,17 @@ export const BAL = {
     hp: 100000,
     resetAfterIdleMs: 4000,
   },
+
+  // Controles de toque (Fase 2 — GDD 19.3)
+  touch: {
+    /** esquema "Simples": a mira gruda no inimigo mais próximo dentro de um
+     *  cone na direção do arrasto/última mira */
+    aimAssist: {
+      coneDeg: 30,
+      rangePx: 520,
+    },
+    /** zona morta do joystick e do arrasto de mira (fração do raio / px) */
+    stickDeadzone: 0.15,
+    aimDeadzonePx: 14,
+  },
 } as const;

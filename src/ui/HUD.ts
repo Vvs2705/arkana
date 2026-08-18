@@ -12,7 +12,7 @@ import {
   TEX, ICON_TEX, DEPTH, SHIELD_COLORS, ELEMENT_COLORS, COLORS, FONTS,
   GAME_WIDTH, GAME_HEIGHT, TILE, ARENA_COLS, ARENA_ROWS,
 } from '../core/config';
-import { Settings } from '../core/settings';
+import { Settings, touchControlsEnabled } from '../core/settings';
 import { t } from '../core/strings';
 
 // ---------------------------------------------------------------- layout fixo
@@ -82,6 +82,15 @@ export class HUD {
   private scene: Phaser.Scene;
   /** todos os objetos fixos do HUD (p/ destroy em lote) */
   private all: Phaser.GameObjects.GameObject[] = [];
+
+  /**
+   * Modo toque (Fase 2 — GDD 19.3): o TouchControls assume o canto inferior
+   * direito (carrossel + cooldowns nos botões) e o joystick vive embaixo à
+   * esquerda — o painel de vida/mana sobe p/ o topo-esquerdo (zona segura).
+   */
+  private readonly touchMode = touchControlsEnabled();
+  /** deslocamento vertical do painel esquerdo no modo toque */
+  private readonly blDy = this.touchMode ? -(L.blY - 34) : 0;
 
   // barras (redesenhadas por frame num único Graphics)
   private barsG!: Phaser.GameObjects.Graphics;
@@ -157,10 +166,12 @@ export class HUD {
 
   private buildPanels(): void {
     // azul-noite alpha ~0.55, borda dourada fina
-    for (const [x, y, w, h] of [
-      [L.blX, L.blY, L.blW, L.blH],
-      [L.brX, L.brY, L.brW, L.brH],
-    ] as const) {
+    const panels: (readonly [number, number, number, number])[] = [
+      [L.blX, L.blY + this.blDy, L.blW, L.blH],
+    ];
+    // modo toque: o canto inferior direito pertence aos botões de toque
+    if (!this.touchMode) panels.push([L.brX, L.brY, L.brW, L.brH]);
+    for (const [x, y, w, h] of panels) {
       const panel = this.fix(this.scene.add.rectangle(x, y, w, h, COLORS.night, 0.55).setOrigin(0));
       panel.setStrokeStyle(1, COLORS.goldDim, 0.8);
     }
@@ -168,13 +179,14 @@ export class HUD {
 
   private buildBars(): void {
     this.barsG = this.fix(this.scene.add.graphics());
-    this.hpText = this.makeText(L.hpTextX, L.hpY + L.hpH / 2, 12, hex(COLORS.text));
+    this.hpText = this.makeText(L.hpTextX, L.hpY + this.blDy + L.hpH / 2, 12, hex(COLORS.text));
     this.hpText.setOrigin(0, 0.5);
-    this.shieldLabel = this.makeText(L.barX, L.shieldLabelY, 11, hex(COLORS.textDim));
-    this.manaLabel = this.makeText(L.barX, L.manaLabelY, 11, hex(COLORS.textDim));
+    this.shieldLabel = this.makeText(L.barX, L.shieldLabelY + this.blDy, 11, hex(COLORS.textDim));
+    this.manaLabel = this.makeText(L.barX, L.manaLabelY + this.blDy, 11, hex(COLORS.textDim));
   }
 
   private buildElements(): void {
+    if (this.touchMode) return; // o carrossel de toque substitui estes ícones
     this.glowG = this.fix(this.scene.add.graphics());
     this.icons = {} as Record<Element, Phaser.GameObjects.Image>;
     for (const el of ELEMENTS) {
@@ -250,7 +262,9 @@ export class HUD {
     const stats = this.api.getPlayerStats();
 
     this.drawBarsAndCooldowns(stats);
-    if (stats.element !== this.lastElement) this.refreshElementIcons(stats.element);
+    if (!this.touchMode && stats.element !== this.lastElement) {
+      this.refreshElementIcons(stats.element);
+    }
 
     // minimapa: terreno a cada ~500ms, dots por frame
     this.mapTimer += delta;
@@ -287,35 +301,39 @@ export class HUD {
 
   private drawBarsAndCooldowns(stats: PlayerStats): void {
     const g = this.barsG;
+    const dy = this.blDy;
     g.clear();
 
     // VIDA: verde → vermelha conforme cai
     const hpFrac = stats.maxHp > 0 ? stats.hp / stats.maxHp : 0;
-    this.drawBar(g, L.barX, L.hpY, L.barW, L.hpH, hpFrac, lerpColor(COLORS.danger, HP_GREEN, hpFrac));
+    this.drawBar(g, L.barX, L.hpY + dy, L.barW, L.hpH, hpFrac, lerpColor(COLORS.danger, HP_GREEN, hpFrac));
 
     // ESCUDO: cor do nível atual
     const shFrac = stats.shieldMax > 0 ? stats.shield / stats.shieldMax : 0;
     const shColor = SHIELD_COLORS[stats.shieldLevel] ?? SHIELD_COLORS[1];
-    this.drawBar(g, L.barX, L.shieldY, L.barW, L.shieldH, shFrac, shColor);
+    this.drawBar(g, L.barX, L.shieldY + dy, L.barW, L.shieldH, shFrac, shColor);
 
     // mini-barra de progresso de evolução (só quando há próximo nível)
     if (stats.evoNext > 0) {
       const evoFrac = stats.evoProgress / stats.evoNext;
       g.fillStyle(COLORS.nightDeep, 0.8);
-      g.fillRect(L.barX, L.evoY, L.barW, L.evoH);
+      g.fillRect(L.barX, L.evoY + dy, L.barW, L.evoH);
       g.fillStyle(COLORS.gold, 0.9);
-      g.fillRect(L.barX, L.evoY, Math.max(0, L.barW * Phaser.Math.Clamp(evoFrac, 0, 1)), L.evoH);
+      g.fillRect(L.barX, L.evoY + dy, Math.max(0, L.barW * Phaser.Math.Clamp(evoFrac, 0, 1)), L.evoH);
     }
 
     // MANA: azul (tom do elemento Água — paleta do config)
     const mnFrac = stats.manaMax > 0 ? stats.mana / stats.manaMax : 0;
-    this.drawBar(g, L.barX, L.manaY, L.barW, L.manaH, mnFrac, ELEMENT_COLORS[Element.WATER]);
+    this.drawBar(g, L.barX, L.manaY + dy, L.barW, L.manaH, mnFrac, ELEMENT_COLORS[Element.WATER]);
 
-    // cooldowns circulares: TÁTICA (cor do elemento) e ESQUIVA (dourado)
-    this.drawCooldown(g, L.tacticX, L.tacticY, L.tacticR,
-      stats.tacticCdRemaining, stats.tacticCdTotal, ELEMENT_COLORS[stats.element]);
-    this.drawCooldown(g, L.dodgeX, L.dodgeY, L.dodgeR,
-      stats.dodgeCdRemaining, stats.dodgeCdTotal, COLORS.gold);
+    // cooldowns circulares: TÁTICA (cor do elemento) e ESQUIVA (dourado).
+    // Modo toque: os próprios botões de toque desenham os cooldowns.
+    if (!this.touchMode) {
+      this.drawCooldown(g, L.tacticX, L.tacticY, L.tacticR,
+        stats.tacticCdRemaining, stats.tacticCdTotal, ELEMENT_COLORS[stats.element]);
+      this.drawCooldown(g, L.dodgeX, L.dodgeY, L.dodgeR,
+        stats.dodgeCdRemaining, stats.dodgeCdTotal, COLORS.gold);
+    }
   }
 
   private drawBar(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, frac: number, color: number): void {

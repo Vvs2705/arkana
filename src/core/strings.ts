@@ -87,6 +87,19 @@ const PT: Record<string, string> = {
   'settings.on': 'Ligado',
   'settings.off': 'Desligado',
 
+  // Controles de toque (Fase 2 — GDD 19.3)
+  'settings.touch': 'Controles de toque',
+  'settings.touch.auto': 'Auto',
+  'settings.touch.note': 'Aplicado ao entrar na arena',
+  'settings.touch.scheme': 'Esquema de mira',
+  'settings.touch.scheme.simple': 'Simples (assistida)',
+  'settings.touch.scheme.adv': 'Avançado (manual)',
+  'settings.touch.scale': 'Escala dos botões',
+  'settings.touch.edit': 'Editar layout ›',
+  'touch.edit.title': 'EDITAR LAYOUT',
+  'touch.edit.hint': 'Arraste os controles para reposicionar',
+  'touch.edit.done': 'CONCLUIR',
+
   // Pausa
   'pause.title': 'PAUSA',
   'pause.resume': 'RETOMAR',
@@ -190,6 +203,19 @@ const EN: Record<string, string> = {
   'settings.combotips': 'Combo tips',
   'settings.on': 'On',
   'settings.off': 'Off',
+
+  // Touch controls (Phase 2 — GDD 19.3)
+  'settings.touch': 'Touch controls',
+  'settings.touch.auto': 'Auto',
+  'settings.touch.note': 'Applied when entering the arena',
+  'settings.touch.scheme': 'Aim scheme',
+  'settings.touch.scheme.simple': 'Simple (assisted)',
+  'settings.touch.scheme.adv': 'Advanced (manual)',
+  'settings.touch.scale': 'Button scale',
+  'settings.touch.edit': 'Edit layout ›',
+  'touch.edit.title': 'EDIT LAYOUT',
+  'touch.edit.hint': 'Drag the controls to reposition them',
+  'touch.edit.done': 'DONE',
 
   'pause.title': 'PAUSED',
   'pause.resume': 'RESUME',

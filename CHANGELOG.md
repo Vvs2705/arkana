@@ -2,6 +2,37 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.1.1 — 2026-08-17 — Fase 2: pipeline Android + controles de toque
+
+Entrega o escopo da Fase 2 (GDD seções 19.3–19.5), executada em 2 raias paralelas:
+
+1. **Pipeline web→APK (Capacitor 8.5)** — `capacitor.config.ts`
+   (`br.com.vstack.arkana`), projeto nativo em `android/` com orientação
+   landscape travada e tela cheia, script `npm run build:android` e guia
+   completo de compilação em `docs/BUILD_ANDROID.md`.
+2. **Controles de toque (GDD 19.3)** — `src/ui/TouchControls.ts`: joystick
+   virtual (zona esquerda), mira por arrasto (zona direita), botões de
+   Ataque (segurar = fogo contínuo), Tática e Esquiva com cooldown desenhado
+   no próprio botão, carrossel dos 5 elementos (cor + forma), botão de pausa
+   e alvos ≥ 48dp.
+3. **Dois esquemas de mira** — Simples (assistida por cone) e Avançado
+   (manual), escolhíveis em Configurações › Controles.
+4. **Layout editável e escalável** — slider de escala (0.7–1.5) e modo
+   "Editar layout" (`src/scenes/TouchLayoutScene.ts`) com arrastar-e-soltar,
+   persistência e "Restaurar padrão".
+5. **Ativação Auto/Ligado/Desligado** — auto-detecção por `maxTouchPoints`;
+   "Ligado" permite testar toque no desktop. Com toque desligado, o desktop
+   permanece 100% intacto.
+6. **HUD mobile** — painéis realocados para zonas seguras dos polegares;
+   `index.html` endurecido para WebView (viewport fixo, sem long-press/zoom).
+
+### Limitações conhecidas
+
+- **APK não compilado nesta máquina** — falta JDK/Android SDK; o passo a
+  passo está em `docs/BUILD_ANDROID.md` (o build é 1 comando após instalar).
+- Mudanças de modo/escala/layout de toque aplicam ao (re)entrar na arena.
+- Ergonomia real dos polegares deve ser conferida no aparelho físico.
+
 ## v0.1.0 — 2026-08-17 — Protótipo "Campo de Provas" (Fase 1)
 
 Primeira versão jogável. Entrega o Definition of Done da seção 15 do GDD:

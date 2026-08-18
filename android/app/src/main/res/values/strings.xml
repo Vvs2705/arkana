@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Arkana</string>
+    <string name="title_activity_main">Arkana</string>
+    <string name="package_name">br.com.vstack.arkana</string>
+    <string name="custom_url_scheme">br.com.vstack.arkana</string>
+</resources>

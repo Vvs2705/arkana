@@ -137,11 +137,18 @@ export class Player {
     const dt = dtMs / 1000;
     this.tickTimers(dtMs);
 
-    // mira: worldX/Y só atualiza no movimento do mouse — com câmera seguindo
-    // o player é preciso reprojetar todo frame
+    // mira: toque ativo usa o arrasto do lado direito (com assistência no
+    // esquema Simples); senão, mouse. worldX/Y só atualiza no movimento do
+    // mouse — com câmera seguindo o player é preciso reprojetar todo frame
+    const touch = this.scene.touch;
     const p = this.scene.input.activePointer;
-    p.updateWorldPoint(this.scene.cameras.main);
-    this.aimAngle = Math.atan2(p.worldY - this.y, p.worldX - this.x);
+    if (touch) {
+      const a = touch.getAimAngle(this.x, this.y);
+      if (a !== null) this.aimAngle = a;
+    } else {
+      p.updateWorldPoint(this.scene.cameras.main);
+      this.aimAngle = Math.atan2(p.worldY - this.y, p.worldX - this.x);
+    }
 
     // movimento: dash tem prioridade sobre o andar
     if (this.dashLeft > 0) this.dashStep(dtMs);
@@ -165,9 +172,16 @@ export class Player {
     // mana regenera devagar (GDD regra global 2)
     this.mana = Math.min(BAL.player.manaMax, this.mana + BAL.player.manaRegen * dt);
 
-    // ataques (botões seguráveis)
-    if (p.leftButtonDown()) this.tryBasic();
-    if (p.rightButtonDown()) this.tryTactic();
+    // ataques (botões seguráveis) — com toque ativo, o mouse é ignorado
+    // (tocar o joystick também é um pointer down e dispararia magias)
+    if (touch) {
+      if (touch.attackHeld) this.tryBasic();
+      if (touch.tacticHeld) this.tryTactic();
+      if (touch.consumeDodge()) this.tryDodge();
+    } else {
+      if (p.leftButtonDown()) this.tryBasic();
+      if (p.rightButtonDown()) this.tryTactic();
+    }
 
     this.updateVisuals();
     this.syncRef();
@@ -187,18 +201,26 @@ export class Player {
   private walk(dt: number): void {
     let mx = 0;
     let my = 0;
-    const held = (a: KeyAction): boolean => this.keysDown.has(Settings.key(a));
-    if (held('left')) mx -= 1;
-    if (held('right')) mx += 1;
-    if (held('up')) my -= 1;
-    if (held('down')) my += 1;
-    if (mx === 0 && my === 0) return;
+    // joystick de toque tem prioridade (analógico: módulo ≤ 1); senão, teclas
+    const tv = this.scene.touch?.getMove();
+    if (tv && (tv.x !== 0 || tv.y !== 0)) {
+      mx = tv.x;
+      my = tv.y;
+    } else {
+      const held = (a: KeyAction): boolean => this.keysDown.has(Settings.key(a));
+      if (held('left')) mx -= 1;
+      if (held('right')) mx += 1;
+      if (held('up')) my -= 1;
+      if (held('down')) my += 1;
+      if (mx === 0 && my === 0) return;
+      const inv = 1 / Math.hypot(mx, my);
+      mx *= inv;
+      my *= inv;
+    }
 
-    const inv = 1 / Math.hypot(mx, my);
-    mx *= inv;
-    my *= inv;
-    this.lastMoveX = mx;
-    this.lastMoveY = my;
+    const mag = Math.hypot(mx, my);
+    this.lastMoveX = mx / mag;
+    this.lastMoveY = my / mag;
 
     const cell = this.scene.terrain.worldToCell(this.x, this.y);
     const v = BAL.player.speed * this.scene.terrain.getSpeedMult(cell.cx, cell.cy);
@@ -304,9 +326,15 @@ export class Player {
   // ---------------------------------------------------------------- esquiva
   private tryDodge(): void {
     if (!this.alive || this.dodgeCd > 0 || this.dashLeft > 0) return;
-    // direção do movimento; parado, esquiva na direção da mira
-    const moving = this.keysDownHasMovement();
-    if (moving) {
+    // direção do movimento (joystick de toque > teclas); parado, mira
+    const tv = this.scene.touch?.getMove();
+    const touchMoving = tv !== undefined && (tv.x !== 0 || tv.y !== 0);
+    const moving = touchMoving || this.keysDownHasMovement();
+    if (touchMoving && tv) {
+      const inv = 1 / Math.hypot(tv.x, tv.y);
+      this.dashDirX = tv.x * inv;
+      this.dashDirY = tv.y * inv;
+    } else if (moving) {
       this.dashDirX = this.lastMoveX;
       this.dashDirY = this.lastMoveY;
     } else {
@@ -325,12 +353,18 @@ export class Player {
   }
 
   // --------------------------------------------------------------- elemento
-  private cycleElement(): void {
-    const i = ELEMENTS.indexOf(this.element);
-    this.element = ELEMENTS[(i + 1) % ELEMENTS.length];
+  /** troca direta (carrossel de toque); a tecla Q continua ciclando */
+  setElement(el: Element): void {
+    if (!this.alive || el === this.element) return;
+    this.element = el;
     this.staff.setTint(ELEMENT_COLORS[this.element]);
     Audio.playSfx('element_switch');
     this.scene.events.emit(EVT.ELEMENT_CHANGED, this.element);
+  }
+
+  private cycleElement(): void {
+    const i = ELEMENTS.indexOf(this.element);
+    this.setElement(ELEMENTS[(i + 1) % ELEMENTS.length]);
   }
 
   // ------------------------------------------------ Escudo de Magia Evolutivo

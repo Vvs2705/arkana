@@ -4,10 +4,23 @@
 // no empacotamento Tauri/Electron da Fase 2 migra para arquivo real).
 // ============================================================================
 import { setLanguage, type Lang } from './strings';
+import { defaultTouchLayout, type TouchControlId } from './config';
 
 export type KeyAction =
   | 'up' | 'down' | 'left' | 'right'
   | 'dodge' | 'element' | 'supreme' | 'scoreboard';
+
+/** controles de toque (Fase 2 — GDD 19.3) */
+export interface TouchSettings {
+  /** 'auto' liga quando o dispositivo tem toque; 'on' força (teste no desktop) */
+  mode: 'auto' | 'on' | 'off';
+  /** Simples = mira assistida (cone) · Avançado = mira 100% manual */
+  scheme: 'simple' | 'advanced';
+  /** multiplicador de escala dos controles (TOUCH.scaleMin..scaleMax) */
+  scale: number;
+  /** posições em px do canvas 1280×720 — editáveis no modo "Editar layout" */
+  layout: Record<TouchControlId, { x: number; y: number }>;
+}
 
 export interface GameSettings {
   video: {
@@ -35,6 +48,7 @@ export interface GameSettings {
     invertY: boolean;
     /** KeyboardEvent.code por ação (ex.: 'KeyW', 'Space') */
     keys: Record<KeyAction, string>;
+    touch: TouchSettings;
   };
   game: {
     language: Lang;
@@ -67,6 +81,12 @@ export const DEFAULT_SETTINGS: GameSettings = {
       element: 'KeyQ',
       supreme: 'KeyR',
       scoreboard: 'Tab',
+    },
+    touch: {
+      mode: 'auto',
+      scheme: 'simple',
+      scale: 1.0,
+      layout: defaultTouchLayout(),
     },
   },
   game: { language: 'pt', colorblind: 'off', damageNumbers: true, comboTips: true },
@@ -143,3 +163,14 @@ class SettingsManager {
 
 /** singleton global — importar de qualquer raia */
 export const Settings = new SettingsManager();
+
+/**
+ * Camada de toque ativa? (GDD 19.3) — 'auto' detecta pelo hardware,
+ * 'on' permite testar no desktop, 'off' desliga sempre.
+ */
+export function touchControlsEnabled(): boolean {
+  const mode = Settings.get().controls.touch.mode;
+  if (mode === 'on') return true;
+  if (mode === 'off') return false;
+  return typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+}
