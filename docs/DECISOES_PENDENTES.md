@@ -1,6 +1,27 @@
 # DECISÕES PENDENTES — as que só o Diretor pode tomar
 
-> **Para que este documento existe:** a equipe acumulou cinco pontos que ela
+> ## ✅ AS CINCO FORAM DECIDIDAS EM 19/08 — este documento virou HISTÓRICO
+>
+> O Diretor delegou as decisões à equipe (*"você toma a decisão mais viável e
+> segue"*), e as cinco foram tomadas e **coladas no `docs/GDD.md`** no mesmo dia.
+> O que valia como pergunta agora vale como registro do raciocínio.
+>
+> | # | Decisão tomada | Onde foi parar |
+> |---|---|---|
+> | 1 | **As duas réguas de TTK estavam certas** — medem alvos diferentes (vida base × vida + escudo nv1). Medido: 5/5 dentro nas DUAS. Nenhum número de `Balance` mudou | GDD §5, linha do TTK |
+> | 2 | **Gesto único promovido**, e teclado/mouse declarado esquema DIFERENTE, não adaptação | GDD §19.3 |
+> | 3 | **Android começa pelo Degrau 3 (top-down)**, não pelo first-person — a escada da §8 vale | GDD §9 |
+> | 4 | **Antecipação em duas velocidades**: o que não depende de V1–V5 anda; design de combate espera o playtest | GDD §9 |
+> | 5 | **Público-alvo 10+** — o questionário IARC é respondido pelo Diretor e a nota é dos órgãos | GDD §9 |
+>
+> **A decisão 1 não precisou de escolha:** a suspeita registrada abaixo (de que a
+> faixa antiga fora calibrada antes do escudo existir) estava ERRADA. A varredura
+> passou a medir contra os dois alvos e mostrou que nunca houve conflito — o
+> defeito era o relatório comparar a faixa do GDD com o número do escudo.
+>
+> ---
+>
+> **Para que este documento existiu:** a equipe acumulou cinco pontos que ela
 > **não pode** decidir sozinha — três porque contrariam decisões travadas do GDD
 > (que é a fonte da verdade e só o Diretor emenda), e dois porque são escolhas de
 > produto, não de engenharia.

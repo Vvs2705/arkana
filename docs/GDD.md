@@ -165,7 +165,16 @@ Formato: **Passiva / Tática / Suprema** + ⚖️ limitadores (o "preço" de cad
 | 3 | Roxo | 100 | 400 |
 | 4 | Dourado | 125 | 900 |
 
-- Vida base: 100. TTK alvo: ~1,5–2,5s em duelo parelho (mobile-friendly, um pouco mais rápido que Apex).
+- Vida base: 100. TTK alvo: **~1,5–2,5s contra a VIDA BASE** em duelo parelho
+  (mobile-friendly, um pouco mais rápido que Apex).
+  **Contra alvo já escudado no nível 1 (EHP 150) a faixa equivalente é ~2,75–3,5s** —
+  é a mesma régua vista de outro alvo, não uma segunda régua. O escudo soma 50 sobre
+  100 de vida: +50% de alvo, 1,5× mais tempo com a mesma arma.
+  *(Explicitado em 19/08 por delegação do Diretor. Os dois números conviviam no
+  projeto sem dizer contra o quê mediam, e o relatório comparava a faixa daqui com o
+  número do escudo — de onde saíam "5/5 no alvo" e "0/5 no alvo" para o mesmo jogo.
+  Medido: os 5 elementos estão DENTRO das duas leituras. Nenhum número de `Balance`
+  foi alterado.)*
 - Dano em escudos de aliados sendo revividos **não** conta para evolução (anti-farm).
 - Nível 4 adiciona um perk pequeno (ex.: recarga tática 20% mais rápida) — como o Red Evo.
 
@@ -214,10 +223,28 @@ Cada degrau é um jogo lançável que financia e valida o próximo — e o unive
   **produto de validação** — provar Sintonia com duplas reais, TTK, meta do
   terreno reativo e equilíbrio de classes com jogadores de verdade a custo de
   infra zero. A visão **first-person premium no Android** (qualidade régua
-  Spell Arena, PROJETO_PRISMA §1) fica como destino, e só inicia quando o
-  checklist de validação do Roblox fechar. Nada técnico migra do Roblox — o
+  Spell Arena, PROJETO_PRISMA §1) fica como destino. Nada técnico migra do Roblox — o
   GDD é a única fonte que serve os dois produtos. Modelos da Toolbox são
   proibidos (qualidade/segurança); sistemas da plataforma, incentivados.
+- **EMENDA (Diretor, 19/08) — a frente Android começa ANTES de o checklist fechar,
+  em duas velocidades.** O que **não** depende das perguntas V1–V5 anda agora:
+  encanamento de build, identidade no aparelho, conta de loja, ficha, conformidade.
+  O que **depende** — design de combate, números de `Balance`, formato de partida —
+  **espera o playtest**. Motivo de manter o freio na segunda metade: a V4 já enganou
+  o projeto uma vez com dado de piloto automático (a "dominância do Fogo" de 1,42×
+  era taxa de acerto do bot; no eixo do `Balance`, 1,06×).
+- **ORDEM DA FRENTE ANDROID (Diretor, 19/08): a escada da §8 vale — Degrau 3
+  (mini-BR top-down) ANTES do Degrau 4 (first-person).** O top-down já compila em
+  APK hoje e é escopo de dev solo; o first-person é escopo de estúdio e continua
+  sendo o destino, não o próximo passo. Cada degrau é um jogo lançável que financia
+  e valida o próximo (§8).
+- **PÚBLICO-ALVO ETÁRIO: 10+ (Diretor, 19/08).** Combate de fantasia sem sangue,
+  sem gore e sem caixa aleatória (§19.1). É a faixa que a ficha de loja declara e a
+  base para o questionário IARC/ClassInd — **o questionário é respondido pelo Diretor
+  e a classificação final é atribuída pelos órgãos, não por nós**. Postura de dados
+  coerente com a faixa: o protótipo 2D não faz nenhuma chamada de rede, então a
+  declaração é "nenhuma coleta" — e mantê-la assim é a forma mais barata de cumprir
+  o ECA Digital.
 - **Nome:** `Arkana: Magos Battle Royale` no lançamento → encurta para `Arkana Royale` quando a marca se sustentar (caminho Free Fire).
 - **Descrição curta (80c):** *"Caia do castelo voador, domine os 5 elementos e seja o último mago de pé."*
 - **Posicionamento:** não é clone — esqueleto comprovado do gênero + camada de inovação elemental própria. A pergunta-guia do design: **"qual é a invenção que vão copiar DE NÓS?"** Resposta: a Conjuração Combinada.
@@ -532,7 +559,19 @@ O inimigo nº 1 de um projeto solo/equipe pequena é feature demais. Regras dura
 - Toda feature nova responde antes: "funciona num toque de polegar em tela de 6 polegadas? roda no aparelho fraco?" Se não, vai para o backlog de futuro, não para o build.
 
 ### 19.3 Controles de toque (spec para o teste de APK)
-- Joystick virtual esquerdo (movimento) · lado direito: mirar arrastando + botões de Ataque, Tática, Esquiva, Suprema · troca de elemento em carrossel acima dos botões
+- **TOQUE — mira e disparo em UM gesto (obrigatório):** joystick virtual esquerdo
+  (movimento); do lado direito, **arrastar a partir do botão da magia mira e soltar
+  dispara**; toque curto dispara na direção da câmera; voltar ao centro cancela.
+  Tática, Esquiva e Suprema seguem o mesmo padrão · troca de elemento em carrossel
+  acima dos botões.
+  *(Promovido em 19/08 por delegação do Diretor, vindo do que funcionou no Roblox.
+  Dois gestos separados — mirar e depois atirar — foram REPROVADOS em aparelho real
+  no teste de APK de 17/08; ver PROJETO_PRISMA §0. Esta linha é a ponte oficial: sem
+  ela, a correção não podia atravessar para o Android pela regra da §9.)*
+- **TECLADO/MOUSE é um esquema DIFERENTE, não uma adaptação do de toque** (Diretor,
+  19/08): no PC a mira é contínua pelo cursor e o disparo é um botão próprio. Não se
+  força um esquema no outro — o que se compartilha é a REGRA do jogo (dano, mana,
+  cooldown, alcance), nunca o gesto.
 - Alvos de toque ≥ 48dp, HUD com zonas seguras para os polegares, layout dos botões **editável e escalável** pelo jogador (padrão dos BRs mobile)
 - **Dois esquemas:** Simples (conjuração assistida leve ao tocar) e Avançado (mira 100% manual, maior teto de habilidade) — ambos gratuitos para todos, competitivo pareia por esquema. Habilidade decide, sempre.
 

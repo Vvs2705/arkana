@@ -340,6 +340,22 @@ local function shotImpact(shot: Shot, hit: Humanoid?)
 	local cx, cy = Grid.worldToCell(shot.pos)
 	if Grid.inBounds(cx, cy) then
 		local terrainRadius = Balance.elements[shot.element].basic.terrainRadius
+		--- SEM AUTOR, DE PROPÓSITO (R13, pergunta V3). O 6º parâmetro existe e
+		--- foi preenchido na Sintonia e no Tutorial; aqui fica vazio e a decisão
+		--- é de medição, não esquecimento:
+		---   · a V3 pergunta se GENTE transforma o mapa em jogada. O recorte é
+		---     humano (`is_bot = false`), e desfecho de bot cairia só na coluna
+		---     `all` — a mesma coluna que a lição registrada do projeto proíbe
+		---     de decretar balanceamento ("dado de bot não decreta");
+		---   · o bot não tem a INTENÇÃO que o desfecho mede: a FSM dele só
+		---     conhece terreno para FUGIR do fogo. Contar "cobertura destruída"
+		---     dele criaria a ilusão de que o pilar tático já acontece;
+		---   · custo: o impacto de bot é a maioria dos impactos da partida
+		---     (~4/s por bot). Seria uma tabela `Cast` por tiro para um número
+		---     que ninguém pode usar para decidir nada.
+		--- Se um dia a pergunta virar "quem EXPLOROU a mudança?" em vez de "quem
+		--- a FEZ", o lugar de mudar é o sujeito do evento no Combat — não esta
+		--- linha, e não sem que o `used_by` vire o ator.
 		terrain.applyElement(cx, cy, shot.element, terrainRadius, false)
 	end
 	evImpact:FireAllClients({ id = shot.id, element = shot.element, pos = shot.pos, strong = false })

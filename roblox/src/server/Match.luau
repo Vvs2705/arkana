@@ -1512,6 +1512,37 @@ function Match.isPlaying(): boolean
 	return state == "Playing"
 end
 
+--- CENSO DAS TABELAS DESTE MÓDULO (cenário S7 — maratona). Um alpha público é
+--- um servidor rodando por HORAS com dezenas de jogadores entrando e saindo, e
+--- as tabelas daqui são indexadas por Player e por partida: se uma delas não
+--- for limpa, o defeito não dá erro — dá servidor lento que cai no meio do
+--- playtest. Estado que atravessa partida já vazou TRÊS vezes neste projeto e
+--- as três foram achadas POR ACASO; sem uma régua, a quarta também será.
+---
+--- Devolve CONTAGEM DE CHAVES, nunca as chaves: quem mede não ganha referência
+--- para jogador nenhum (uma régua que segura Player seria ela própria o
+--- vazamento). Leitura pura — não escreve em nada.
+---
+--- `lastHit` e `deathWired` ficam FORA de propósito: são de chave fraca, e o
+--- que sobra nelas depende do coletor de lixo, não deste código. Contá-las aqui
+--- convidaria a próxima fase a cravar um número que o GC decide.
+function Match.stateCounts(): { [string]: number }
+	local function keys(t: any): number
+		local n = 0
+		for _ in pairs(t) do
+			n += 1
+		end
+		return n
+	end
+	return {
+		eliminated = keys(eliminated),
+		stats = keys(stats),
+		spirits = keys(spirits),
+		revivesUsed = keys(revivesUsed),
+		altars = #altars,
+	}
+end
+
 function Match.step(dt: number)
 	stateT += dt
 

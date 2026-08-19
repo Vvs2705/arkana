@@ -40,6 +40,37 @@ local FPS_HIGH = 55
 --- "high" (celular em paisagem raramente passa disto)
 local TALL = 800
 
+-- ------------------------------------------------------ ESQUEMA DE CONTROLE
+--- GDD §19.3 (redação de 19/08): "a mecânica no computador é DIFERENTE da
+--- mecânica no celular". Quem responde "qual esquema esta sessão está jogando"
+--- é ESTE arquivo, e só ele — a pergunta já existia em três redações diferentes
+--- (Controls olhava só `TouchEnabled`; aqui e no Atmosphere/Vfx era
+--- `TouchEnabled and not KeyboardEnabled`) e foi essa divergência que fez o
+--- notebook com tela sensível receber os botões de celular POR CIMA do esquema
+--- de mouse — os dois ao mesmo tempo, disparando duas vezes.
+---
+--- A regra, pura para o autoteste:
+---   · TOQUE  = tem dedo e NÃO é um PC. "É um PC" exige teclado E mouse juntos;
+---     um só dos dois pode ser acessório de celular (teclado bluetooth) e não
+---     pode tirar da pessoa os botões que ela usa para jogar.
+---   · PC     = tem teclado OU mouse. É ADITIVO de propósito: o celular com
+---     teclado bluetooth continua no esquema de toque E ganha os atalhos.
+--- Os dois podem valer ao mesmo tempo; o que NUNCA pode é um esquema herdar o
+--- gesto do outro (o tiro do PC sai na direção do CURSOR, o do toque sai do
+--- ARRASTO — nunca o contrário).
+function Device.schemeFor(touch: boolean, keyboard: boolean, mouse: boolean): (boolean, boolean)
+	return touch and not (keyboard and mouse), keyboard or mouse
+end
+
+--- (esquemaDeToque, esquemaDePc) do aparelho de agora.
+function Device.schemes(): (boolean, boolean)
+	return Device.schemeFor(
+		UserInputService.TouchEnabled,
+		UserInputService.KeyboardEnabled,
+		UserInputService.MouseEnabled
+	)
+end
+
 --- Classe do aparelho a partir do que o CLIENTE sabe. Pura de propósito: é a
 --- única regra deste arquivo e o autoteste no fim cobre ela.
 function Device.tier(fps: number, touch: boolean, viewportY: number): string
@@ -88,7 +119,12 @@ function Device.update(dt: number)
 	end)
 	local fps = if ok and typeof(phys) == "number" and phys > 0 then math.min(render, phys) else render
 
-	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	--- `touch` do relatório é "esta sessão JOGOU no esquema de toque", não "este
+	--- aparelho tem digitalizador". É essa a pergunta que o bloco ENTRADA DO
+	--- DISPARO faz (Telemetry): notebook com tela sensível responde pelo mouse e
+	--- não pode entrar no recorte de celular; celular com teclado bluetooth JOGA
+	--- com o dedo e tem de entrar.
+	local touch = Device.schemes()
 	local cam = Workspace.CurrentCamera
 	local viewportY = if cam then cam.ViewportSize.Y else 640
 
@@ -124,6 +160,25 @@ function Device.selfTest()
 	assert(Device.tier(60, false, 1080) == "high", "desktop folgado tem de ser high")
 	assert(Device.tier(60, false, 600) == "mid", "tela pequena sem toque não é high")
 	assert(Device.tier(48, false, 1080) == "mid", "fps intermediário é mid")
+
+	-- --------------------------------------------------- esquema de controle
+	--- (touch, keyboard, mouse) → (esquemaDeToque, esquemaDePc). É a conta que
+	--- decide QUAL mecânica a pessoa recebe; errar aqui é entregar celular a um
+	--- PC (ou o contrário), que é exatamente o que o GDD §19.3 proíbe.
+	local function scheme(t: boolean, k: boolean, m: boolean): string
+		local touchOn, pcOn = Device.schemeFor(t, k, m)
+		return (if touchOn then "T" else "-") .. (if pcOn then "P" else "-")
+	end
+	assert(scheme(true, false, false) == "T-", "celular puro: só o esquema de toque")
+	assert(scheme(false, true, true) == "-P", "PC puro: só o esquema de mouse/teclado")
+	--- O DEFEITO QUE ISTO PEGA: notebook com tela sensível recebia os botões de
+	--- celular POR CIMA do esquema de PC — dois esquemas vivos, o mesmo clique
+	--- disparando pelo botão de tela E pelo M1 segurado.
+	assert(scheme(true, true, true) == "-P", "notebook com tela sensível é PC, não celular")
+	--- ...e o contrário: teclado bluetooth não pode APAGAR os botões de quem
+	--- está com o celular na mão. Ganha os atalhos, mantém o gesto.
+	assert(scheme(true, true, false) == "TP", "celular com teclado bluetooth joga nos DOIS")
+	assert(scheme(false, false, false) == "--", "sem dedo, teclado ou mouse não há esquema nenhum")
 
 	-- ------------------------------------------------- o relato SAI do cliente
 	--- Metade do contrato mora aqui: o cliente TEM de emitir, UMA vez, com a

@@ -241,12 +241,39 @@ end
 --- quase custou um nerf errado na R8 (1,34x medido contra 1,64x real).
 --- O payload NUNCA leva `cells`: no coletor esse campo é o tamanho de uma
 --- FRENTE DE INCÊNDIO, e um desfecho tático não é uma frente.
+--- Require preguiçoso e protegido do Tutorial (mesmo padrão da Sintonia): se o
+--- módulo faltar, a resposta é "não está treinando" e o desfecho conta normal —
+--- nunca o contrário, e nunca derrubando a partida.
+local tutorialMod: any = nil
+local function inTutorial(player: any): boolean
+	if tutorialMod == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Tutorial")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		tutorialMod = (ok and m) or false
+	end
+	if not tutorialMod or not tutorialMod.active then
+		return false
+	end
+	local ok, active = pcall(tutorialMod.active, player)
+	return ok and active == true
+end
+
 local function emitTerrainOutcome(outcome: string, by: any, element: string?, extra: { [string]: any })
 	if by == nil then
 		return -- sem autor não há jogada: o `terrain_state_change` já conta o mundo
 	end
 	extra.outcome = outcome
 	extra.element = element
+	--- DESFECHO DE TREINO NÃO É RESPOSTA DA V3. Os passos `burn`/`freeze` do
+	--- Campo de Provas são magias REAIS do jogador — chegam aqui com `p.owner`,
+	--- ou seja, na coorte HUMANA. Sem este carimbo, o aluno queimando a árvore
+	--- que o tutorial mandou queimar entra no numerador de "o jogador usou o
+	--- terreno de propósito", junto com quem descobriu sozinho. É o mesmo
+	--- raciocínio que a R11.1 aplicou ao ping da Sintonia — e, como lá,
+	--- CARIMBAR e não suprimir: o evento existe, quem decide o funil é o coletor.
+	extra.tutorial = inTutorial(by)
 	emit(Events.Name.TerrainTacticalOutcome, by, extra)
 end
 
@@ -726,7 +753,11 @@ end
 --- é a única coisa neste arquivo que o cliente declara sobre si mesmo. Existe
 --- porque o requisito de celular (mira e disparo em UM gesto) reprovou no teste
 --- do APK 2D e até aqui não havia como medir se a correção pegou.
-function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: string?)
+--- `aim` ("assist"|"manual") é o ESQUEMA do GDD §19.3, e é TELEMETRIA como o
+--- `input`: a assistência já foi aplicada no cliente antes do envio, então
+--- declarar qual esquema estava valendo não concede nada. Sem ele, a V2 do
+--- playtest mede duas populações misturadas.
+function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: string?, aim: string?)
 	local st = states[player]
 	if not st or cannotAct[player] or not isAlive(st) or not st.root or not st.root.Parent then
 		return -- eliminado não conjura (nem do poleiro de espectador)
@@ -754,6 +785,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 			pos = (st.root :: BasePart).Position,
 			mana_left = st.mana,
 			input = input,
+			aim = aim,
 		})
 	elseif kind == "tactic" then
 		-- GDD §4 regra 2: TÁTICA usa COOLDOWN, nunca mana
@@ -772,6 +804,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 			pos = (st.root :: BasePart).Position,
 			cooldown = cd,
 			input = input,
+			aim = aim,
 		})
 	end
 	sendStats(st)

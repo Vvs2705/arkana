@@ -1101,6 +1101,25 @@ function H.removePlayer(pl)
 	if svcp.PlayerRemoving then
 		SIG.Fire(svcp.PlayerRemoving, pl)
 	end
+	--- DESPARENTA, como o engine faz depois do PlayerRemoving. Sem isto o
+	--- harness MENTIA sobre quem saiu: `player.Parent` continuava verdadeiro
+	--- para sempre, e o projeto usa exatamente esse teste como "ainda está
+	--- conectado" em pelo menos três lugares do Match (`toLobby`, `stepRevive`,
+	--- crédito de abate no `onDeath`). Nenhum deles jamais rodou o ramo de
+	--- saída num teste — e é o ramo que um servidor de alpha percorre o dia
+	--- inteiro. Depois do Fire, não antes: dentro do handler o engine ainda
+	--- entrega o jogador parentado, e é lá que os `onPlayerRemoving` rodam.
+	pl.Parent = nil
+	--- E O CORPO VAI JUNTO, como o engine faz. Sem isto o Workspace do harness
+	--- acumulava um Model por jogador que já passou pelo servidor (medido: 3 por
+	--- prova numa maratona de 14) — corpos que continuavam aparecendo nas
+	--- varreduras espaciais (`GetPartBoundsInRadius`, que a Sintonia e o Terrain
+	--- usam) e distorciam a simulação de quem fica muito tempo no ar. Era o
+	--- harness inventando cadáver, não o jogo deixando um.
+	local ch = rawget(pl, "_p").Character
+	if ch then
+		M.Destroy(ch)
+	end
 end
 
 -- ----------------------------------------------------------------------- game

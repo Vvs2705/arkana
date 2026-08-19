@@ -5,6 +5,13 @@
 -- Só desenha e reporta toque. Toda a REGRA do gesto (mirar-arrastando, tap
 -- rápido, cancelar) vive em Controls.luau — aqui é pintura e alvo de dedo.
 --
+-- ESTA TELA SÓ EXISTE NO ESQUEMA DE TOQUE (`Device.schemes()`). Não é "o HUD do
+-- celular que o PC também recebe": no PC a mira é o cursor e o disparo é botão
+-- de mouse, e um botão de tela ali só rouba pixel e dispara em duplicidade.
+-- O ramo de MouseButton1 abaixo é o que mantém estes botões testáveis no
+-- emulador de aparelho do Studio — em máquina de verdade ele não é alcançável,
+-- porque teclado+mouse juntos já tiraram esta ScreenGui de cena.
+--
 -- REQUISITO Nº 2 (reprovado no teste do Diretor): a troca de elemento tem de
 -- responder ao toque. Por isso:
 --   · o slot do elemento é um TextButton de 58dp × 64dp (mín. do GDD é 48dp);
@@ -21,6 +28,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Strings = require(Shared:WaitForChild("Strings"))
 local Elements = require(Shared:WaitForChild("Elements"))
 
 --- GDD §10
@@ -220,13 +228,13 @@ function Touch.build(
 	end
 
 	local first = Elements.ById[Elements.Order[1]]
-	actionButton("basic", "ATQ", BASIC, first.color)
-	actionButton("tactic", "TÁT", TACTIC, first.glow)
-	actionButton("dodge", "ESQ", DODGE, GOLD)
+	actionButton("basic", Strings.t("controls.basic"), BASIC, first.color)
+	actionButton("tactic", Strings.t("controls.tactic"), TACTIC, first.glow)
+	actionButton("dodge", Strings.t("controls.dodge"), DODGE, GOLD)
 	-- comandos básicos: sem eles não tem jogo (teste do Diretor)
-	actionButton("jump", "PULAR", JUMP, GOLD, true)
-	actionButton("sprint", "CORRER", SPRINT, STEEL, true)
-	actionButton("crouch", "AGACHAR", CROUCH, STEEL, true)
+	actionButton("jump", Strings.t("controls.jump"), JUMP, GOLD, true)
+	actionButton("sprint", Strings.t("controls.sprint"), SPRINT, STEEL, true)
+	actionButton("crouch", Strings.t("controls.crouch"), CROUCH, STEEL, true)
 
 	-- ------------------------------------------------- carrossel de elementos
 	local row = Instance.new("Frame")
@@ -367,11 +375,24 @@ function Touch.build(
 		a.stroke.Transparency = if on then 0 else 0.7
 	end
 
+	--- ANEL ARMADO: aceso = soltar o dedo AGORA dispara · apagado = soltar não
+	--- faz nada (voltou para dentro da deadzone e o tiro rápido já expirou).
+	--- Quem decide é `Controls.willFire` — a MESMA conta que dispara —, aqui é
+	--- só pintura. É o feedback do CANCELAR, que separa "mirei errado" de
+	--- "atirei errado" para o polegar, sem depender da seta no mundo (que fica
+	--- longe do dedo e pode estar atrás do personagem).
+	--- O Controls repinta isto TODO FRAME (o estado muda com o relógio, não só
+	--- com o dedo), então escrita repetida é proibida: 60 gravações/s por botão
+	--- para repetir o valor que já estava lá é a mesma conta que a seta de mira
+	--- já pagou uma vez, no aparelho mais fraco.
+	local pressed: { [string]: boolean } = {}
 	local function setPressed(kind: string, on: boolean)
 		local a = actions[kind]
-		if a then
-			a.stroke.Transparency = if on then 0 else 0.7
+		if not a or pressed[kind] == on then
+			return
 		end
+		pressed[kind] = on
+		a.stroke.Transparency = if on then 0 else 0.7
 	end
 
 	local function setCooldown(kind: string, remaining: number, total: number)

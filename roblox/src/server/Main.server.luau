@@ -116,7 +116,7 @@ Net.event(Net.Names.CastSpell).OnServerEvent:Connect(function(player, payload)
 	--- NÃO ENTRA EM DECISÃO NENHUMA: o Combat recebe como 4º argumento e o
 	--- ignora até publicar a assinatura nova (ver relatório da raia B/R10).
 	local input = Events.sanitizeInput((payload :: any).input)
-	Combat.handleCast(player, kind, dir, input)
+	Combat.handleCast(player, kind, dir, input, Events.sanitizeAim((payload :: any).aim))
 end)
 
 --- RELATO DO APARELHO (Net.Names.DeviceInfo). O cliente MANDA isto desde a R5

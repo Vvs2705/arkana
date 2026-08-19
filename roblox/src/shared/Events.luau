@@ -103,6 +103,22 @@ Events.CONTEXT_FIELDS = {
 ---   key  = teclado/mouse (PC)
 Events.INPUT_KINDS = { drag = true, tap = true, key = true }
 
+--- ESQUEMA DE MIRA (GDD §19.3) — "Simples" (assistido) × "Avancado" (manual).
+--- Os dois existem no cliente e o servidor NUNCA soube qual estava valendo: a
+--- assistência é aplicada 100% no cliente antes do envio. Consequência medida na
+--- auditoria da R13: o `p50` de TTK humano do playtest misturaria DUAS
+--- populações — quem mira com ajuda e quem mira sem —, e a pergunta V2 ("o TTK
+--- está certo com humanos mirando?") sairia sem sentido. Mesma solução do
+--- `input`: viaja no `spell_cast` que já existe, é telemetria pura, e mentir
+--- aqui não dá vantagem (a assistência já foi aplicada, ou não, antes do envio).
+Events.AIM_SCHEMES = { assist = true, manual = true }
+
+--- Fora da lista vira `nil`, nunca "unknown": esquema inventado por cliente
+--- hostil não pode criar coluna no relatório do Diretor.
+function Events.sanitizeAim(raw: any): string?
+	return if typeof(raw) == "string" and Events.AIM_SCHEMES[raw] then raw else nil
+end
+
 --- Só o que está na lista entra no dado. Entrada desconhecida vira `nil` (e não
 --- "unknown"): categoria inventada por cliente hostil não pode criar coluna no
 --- relatório do Diretor.

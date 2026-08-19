@@ -449,9 +449,11 @@ end
 --- dentro. Qual vale e' decisao do DIRETOR; o relatorio nao escolhe por ele, e
 --- passou a mostrar as DUAS com a origem no nome. Numero que finge conclusao
 --- destroi a confianca em todos os outros do relatorio.
-local function mirrorTtk(Balance, el)
+--- `ehpOverride` permite medir contra a VIDA BASE (sem escudo). E' isso que
+--- reconcilia as duas reguas: elas medem alvos diferentes, nao jogos diferentes.
+local function mirrorTtk(Balance, el, ehpOverride)
 	local spec = Balance.elements[el].basic
-	local ehp = Balance.player.hp + Balance.shield.caps[1]
+	local ehp = ehpOverride or (Balance.player.hp + Balance.shield.caps[1])
 	local mana, t, dmg, nextShot = Balance.player.manaMax, 0, 0, 0
 	local step = 1 / 60
 	while dmg < ehp and t < 120 do
@@ -651,9 +653,11 @@ w("partidas ......... %d rodadas · %d terminaram · %d falharam no boot", #reco
 
 w("")
 w("-- V2: TTK (1o dano sofrido -> queda) --------------------------------")
-w("   DUAS REGUAS (elas discordam — a escolha e' do Diretor, R10):")
-w("     GDD linha 168 (design, FONTE DA VERDADE) ... 1,50s a 2,50s")
-w("     auditoria externa (recomendacao) ........... 2,75s a 3,50s")
+w("   DUAS REGUAS, E ELAS NAO SE CONTRADIZEM (resolvido na R13): medem ALVOS")
+w("   diferentes. O escudo nivel 1 soma 50 de EHP sobre 100 de vida, ou seja")
+w("   +50% de alvo -- e a mesma arma leva 1,5x mais tempo para derrubar.")
+w("     GDD linha 168 ... 1,50s a 2,50s   contra a VIDA BASE (100)")
+w("     auditoria ....... 2,75s a 3,50s   contra VIDA + ESCUDO nivel 1 (150)")
 w("   human_only    %4d amostras   p10 %6.2fs   p50 %6.2fs   p90 %6.2fs", #ttkH, percentile(ttkH, 0.1), percentile(ttkH, 0.5), percentile(ttkH, 0.9))
 w("   all_entities  %4d amostras   p10 %6.2fs   p50 %6.2fs   p90 %6.2fs", #ttkA, percentile(ttkA, 0.1), percentile(ttkA, 0.5), percentile(ttkA, 0.9))
 w("   (amostras vem de partidas com bots — incluem fogo cruzado e zona;")
@@ -662,17 +666,23 @@ w("   TTK TEORICO de duelo espelho (Balance puro: so' basico, tudo acerta,")
 w("   sem esquiva/tatica/viagem — limite INFERIOR do real; EHP=%d):", Balance.player.hp + Balance.shield.caps[1])
 for _, el in ipairs({ "Fire", "Water", "Earth", "Wind", "Lightning" }) do
 	local t = mirrorTtk(Balance, el)
-	local function verdict(lo, hi)
-		return if t >= lo and t <= hi then "DENTRO" elseif t < lo then "ABAIXO" else "ACIMA"
+	local function verdictOf(v, lo, hi)
+		return if v >= lo and v <= hi then "DENTRO" elseif v < lo then "ABAIXO" else "ACIMA"
 	end
-	local gdd, audit = verdict(1.5, 2.5), verdict(2.75, 3.5)
+	--- MEDIDO CONTRA ALVOS DIFERENTES. `t` e' contra EHP = vida + escudo nivel 1
+	--- (150); `tBase` e' contra a VIDA BASE (100), que e' o alvo que o GDD 168
+	--- descreve ("vida base: 100. TTK alvo ~1,5-2,5s"). Comparar a faixa do GDD
+	--- com o numero do escudo e' comparar coisas diferentes -- foi assim que
+	--- "5/5 no alvo" e "0/5 no alvo" conviveram no mesmo projeto.
+	local tBase = mirrorTtk(Balance, el, Balance.player.hp)
+	local gdd, audit = verdictOf(tBase, 1.5, 2.5), verdictOf(t, 2.75, 3.5)
 	w(
-		"     %-10s %6.2fs   GDD: %-6s   auditoria: %-6s%s",
+		"     %-10s  vida base %5.2fs GDD: %-6s  ·  com escudo %5.2fs auditoria: %-6s",
 		el,
-		t,
+		tBase,
 		gdd,
-		audit,
-		if gdd ~= audit then "   << as reguas DISCORDAM" else ""
+		t,
+		audit
 	)
 end
 

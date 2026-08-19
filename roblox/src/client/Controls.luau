@@ -24,6 +24,17 @@
 -- O bug era literal: BindAction do Espaço devolvia Sink e ENGOLIA o pulo,
 -- então quem caía no lago (rebaixo de 2,5 studs) não subia mais.
 --
+-- DOIS ESQUEMAS, NÃO UM ADAPTADO (GDD §19.3, redação de 19/08 do Diretor):
+-- "a mecânica no computador é DIFERENTE da mecânica no celular". O que se
+-- compartilha é a REGRA (dano, mana, cooldown, alcance — tudo do servidor);
+-- o GESTO nunca. Na prática, dentro deste arquivo:
+--   TOQUE  mira e disparo no MESMO gesto (arrastar do botão, soltar dispara,
+--          voltar ao centro cancela). Nunca lê o cursor.
+--   PC     mira CONTÍNUA pelo cursor + botão próprio de disparo (M1 básico,
+--          M2 tática). Nunca usa a direção da câmera como substituto de mira,
+--          nunca desenha botão de tela.
+-- Quem responde "qual esquema esta sessão joga" é `Device.schemes()`, e só ele.
+--
 -- MOVIMENTO E CÂMERA SÃO NATIVOS. O thumbstick de toque e o WASD vêm prontos
 -- no PlayerModule do Roblox e a câmera de 3ª pessoa também: "aproveitar os
 -- sistemas da plataforma" (docs/ROBLOX.md §2). Aqui só ajustamos o zoom para
@@ -47,6 +58,10 @@ local Net = require(Shared:WaitForChild("Net"))
 --- descarta é rótulo que vira buraco calado no relatório.
 local Events = require(Shared:WaitForChild("Events"))
 local ControlsTouch = require(script.Parent:WaitForChild("ControlsTouch"))
+--- `Device.schemes()` é a ÚNICA resposta para "toque ou PC" no cliente. Ver o
+--- bloco ESQUEMA DE CONTROLE lá: a pergunta já existiu em três redações
+--- diferentes e a divergência entregava os dois esquemas ao mesmo aparelho.
+local Device = require(script.Parent:WaitForChild("Device"))
 
 local Controls = {}
 
@@ -206,7 +221,15 @@ local function doCast(kind: string, dir: Vector3, input: string)
 	if kind == "tactic" and not ready("tactic") then
 		return
 	end
-	(remCast :: RemoteEvent):FireServer({ kind = kind, dir = assisted(from, dir), input = input })
+	--- `aim` CARIMBA O ESQUEMA (GDD §19.3: Simples assistido × Avancado manual).
+	--- A assistência é aplicada UMA LINHA ACIMA, no cliente, e o servidor recebe a
+	--- direção já corrigida — ou seja, sem este campo ele NUNCA soube qual dos
+	--- dois estava valendo. Num playtest com metade assistida, o p50 de TTK
+	--- humano mistura duas populações e a pergunta V2 ("o TTK está certo com
+	--- humanos mirando?") sai sem sentido. Telemetria pura, como o `input`:
+	--- mentir aqui não dá vantagem nenhuma, porque a assistência já aconteceu.
+	local aim = if aimAssist then "assist" else "manual"
+	;(remCast :: RemoteEvent):FireServer({ kind = kind, dir = assisted(from, dir), input = input, aim = aim })
 	if kind == "tactic" then
 		startCooldown("tactic", (Balance.elements :: any)[element].tactic.cooldown)
 	else
@@ -301,11 +324,30 @@ end
 
 -- ------------------------------------------------------- máquina do gesto
 
+--- O QUE ACONTECE SE O DEDO SOLTAR AGORA. Uma conta só, usada por dois:
+--- `release` (dispara ou não) e o anel do botão (acende ou não). Eram duas
+--- verdades antes — a decisão morava no `release` e o anel só dizia "tem dedo
+--- em cima", então o CANCELAR era invisível para o polegar: a pessoa que
+--- arrastou, voltou ao centro e soltou não tinha como saber se errou a mira ou
+--- errou o tiro. É a distinção que o Diretor cobrou por escrito.
+--- Pura, para o autoteste.
+function Controls.willFire(dir: Vector3?, held: number): boolean
+	return dir ~= nil or held < Balance.controls.tapMaxDuration
+end
+
+--- Anel do botão = "solta e sai magia". Apagado = "solta e não sai nada".
+local function showArmed(g: Gesture)
+	if touchUi then
+		(touchUi :: TouchHandle).setPressed(g.kind, Controls.willFire(g.dir, os.clock() - g.startedAt))
+	end
+end
+
 local function updateDrag(g: Gesture, input: InputObject)
 	local delta = Vector2.new(input.Position.X, input.Position.Y) - g.origin
 	g.dragPx = delta.Magnitude
 	-- de volta ao centro = mira desarmada (soltar aí em diante CANCELA)
 	g.dir = if g.dragPx >= Balance.controls.aimDeadzonePx then screenToWorld(delta) else nil
+	showArmed(g)
 end
 
 --- MODO DE ENTRADA do disparo, decidido no GESTO e não no aparelho: telefone
@@ -323,12 +365,22 @@ function Controls.inputKind(input: any, dragged: boolean): string
 	return "key"
 end
 
-local function release(g: Gesture)
+--- SAÍDA ÚNICA do gesto: tira do rastreio E apaga o anel. Eram dois caminhos
+--- (o InputEnded normal e a varredura de toque cancelado pelo sistema) e só um
+--- apagava o anel — app em segundo plano no meio do arrasto deixava o botão
+--- aceso para sempre. Invariante por ESTRUTURA: quem encerra passa por aqui.
+local function endGesture(g: Gesture)
+	active[g.input] = nil
 	if touchUi then
 		(touchUi :: TouchHandle).setPressed(g.kind, false)
 	end
+end
+
+local function release(g: Gesture)
+	local held = os.clock() - g.startedAt
+	endGesture(g)
 	local dir = g.dir
-	if not dir and os.clock() - g.startedAt >= Balance.controls.tapMaxDuration then
+	if not Controls.willFire(dir, held) then
 		return -- segurou e voltou ao centro: CANCELA
 	end
 	if g.kind == "dodge" then
@@ -343,7 +395,7 @@ end
 
 --- Chamado pelo botão de toque no instante em que o dedo desce.
 local function beginGesture(kind: string, input: InputObject)
-	active[input] = {
+	local g: Gesture = {
 		kind = kind,
 		input = input,
 		origin = Vector2.new(input.Position.X, input.Position.Y),
@@ -351,21 +403,27 @@ local function beginGesture(kind: string, input: InputObject)
 		dragPx = 0,
 		dir = nil,
 	}
-	if touchUi then
-		(touchUi :: TouchHandle).setPressed(kind, true)
-	end
+	active[input] = g
+	showArmed(g) -- dedo acabou de descer: soltar agora é tiro rápido, anel aceso
 end
 
 --- Gesto que está mirando agora (o que desenha a seta no mundo). Também varre
 --- toque cancelado pelo sistema (app em segundo plano), que não gera
 --- InputEnded — senão a seta ficaria presa na tela.
+--- E REPINTA O ANEL: `willFire` muda com o RELÓGIO (o tiro rápido expira em
+--- tapMaxDuration), então um dedo parado dentro da deadzone passa de "vai
+--- disparar" para "vai cancelar" sem gerar evento nenhum de entrada. Sem esta
+--- passada o anel mentiria justamente para quem hesitou.
 local function aimingGesture(): Gesture?
 	local found: Gesture? = nil
-	for input, g in pairs(active) do
+	for _, g in pairs(active) do
 		if g.input.UserInputState == Enum.UserInputState.End then
-			active[input] = nil
-		elseif g.dir and not found then
-			found = g
+			endGesture(g)
+		else
+			showArmed(g)
+			if g.dir and not found then
+				found = g
+			end
 		end
 	end
 	return found
@@ -451,26 +509,70 @@ local function drawAimMarker(from: Vector3, dir: Vector3)
 	end
 end
 
--- ------------------------------------------------------------- PC (teclado)
+-- ------------------------------------------------- PC (teclado E MOUSE: um esquema só)
+
+--- Raio da tela → plano do chão na altura do personagem → direção plana. Usar o
+--- PLANO (e não `Mouse.Hit`) é o que impede a mira de grudar em parede/árvore.
+--- `fallback` responde os três casos sem interseção útil: raio paralelo ao
+--- chão, interseção ATRÁS da câmera, e o cursor EM CIMA do próprio personagem.
+--- Este último era o furo: caía no `flat`, cujo padrão é a constante de MUNDO
+--- (0,0,-1) — escrita para o caminho da câmera, onde ela nunca aparece. No
+--- cursor ela aparecia como um tiro para o norte do mapa, ignorando para onde a
+--- pessoa olhava. Pura, para o autoteste.
+function Controls.groundAim(from: Vector3, origin: Vector3, direction: Vector3, fallback: Vector3): Vector3
+	if math.abs(direction.Y) > 1e-4 then
+		local t = (from.Y - origin.Y) / direction.Y
+		if t > 0 then
+			local to = (origin + direction * t) - from
+			local f = Vector3.new(to.X, 0, to.Z)
+			if f.Magnitude > 1e-3 then
+				return f.Unit
+			end
+		end
+	end
+	return fallback
+end
 
 local function pcAimDirection(from: Vector3): Vector3
 	local loc = UserInputService:GetMouseLocation()
 	local ray = camera:ScreenPointToRay(loc.X, loc.Y)
-	--- intersecta o plano do chão na altura do personagem (Mouse.Hit erraria a
-	--- direção sempre que houvesse parede/árvore perto)
-	if math.abs(ray.Direction.Y) > 1e-4 then
-		local t = (from.Y - ray.Origin.Y) / ray.Direction.Y
-		if t > 0 then
-			return flat((ray.Origin + ray.Direction * t) - from)
-		end
-	end
-	return facing()
+	return Controls.groundAim(from, ray.Origin, ray.Direction, facing())
 end
 
-local function bindKeyboard()
+--- M1 SEGURADO arma o tiro contínuo do PC — mas só se o clique não foi
+--- consumido pela interface. O disparo do PC era o único lido por SONDAGEM
+--- (`IsMouseButtonPressed` todo frame), e sondagem não sabe o que a UI comeu:
+--- clicar em "Grimório", "Opções" ou no botão do tutorial soltava uma magia
+--- junto, com mana e cooldown de verdade — e ainda entrava no relatório como
+--- um `key` que ninguém quis. A tática (M2) já era imune porque nasce no
+--- InputBegan, que recebe `gameProcessedEvent`; o básico só faltava herdar a
+--- mesma porta. Soltar SEMPRE desarma, inclusive soltando em cima da UI.
+--- Pura, para o autoteste.
+function Controls.armPcFire(down: boolean, processed: boolean): boolean
+	return down and not processed
+end
+
+local m1Armed = false
+
+--- "O PC está atirando agora?" O engate exige as DUAS coisas: o clique começou
+--- no mundo (`m1Armed`) E o botão continua fisicamente apertado. A segunda
+--- metade é de graça e cobre o alt-tab segurando o botão — sem ela o disparo
+--- contínuo seguiria com a janela em segundo plano.
+local function pcFiring(): boolean
+	return m1Armed and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+end
+
+local function bindPc()
 	-- NENHUM BindAction aqui. O Espaço é do pulo nativo e sinká-lo foi
 	-- exatamente o que reprovou a build anterior.
 	UserInputService.InputBegan:Connect(function(input, processed)
+		--- ANTES do filtro de `processed`: o M1 precisa VER o clique comido pela
+		--- UI para poder recusá-lo (é a única forma de desarmar o disparo
+		--- contínuo em cima de um painel).
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			m1Armed = Controls.armPcFire(true, processed)
+			return
+		end
 		if processed then
 			return
 		end
@@ -499,6 +601,9 @@ local function bindKeyboard()
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			m1Armed = Controls.armPcFire(false, false) -- soltar desarma sempre
+		end
 		if input.KeyCode == Enum.KeyCode.LeftShift then
 			setSprint(false) -- correr é SEGURAR, como em todo BR de PC
 		end
@@ -506,8 +611,9 @@ local function bindKeyboard()
 
 	-- roda do mouse cicla o elemento (papel que era do Q).
 	-- ponytail: a roda também dá zoom na câmera nativa e isso fica assim — o
-	-- zoom está preso entre 14 e 26 studs no init, então o efeito colateral tem
-	-- 12 studs de tamanho e não vale um ContextActionService só para ele.
+	-- CameraRig prende o zoom entre 8 e 16 studs, então o efeito colateral tem 8
+	-- studs de tamanho e não vale um ContextActionService só para ele. Se o
+	-- playtest reclamar, é aqui que entra o Sink da roda.
 	-- `processed` é ignorado de propósito: a câmera nativa marca a roda como
 	-- processada e o ciclo morreria calado.
 	UserInputService.InputChanged:Connect(function(input)
@@ -526,12 +632,12 @@ end
 function Controls.init(p: Player)
 	player = p
 
-	-- câmera de 3ª pessoa NATIVA, só afastada para caber o combate na tela.
-	-- ponytail: o Roblox não expõe API suportada para o ângulo inicial — o
-	-- zoom é o knob real de leitura de combate. Ajustar no playtest.
+	-- câmera de 3ª pessoa NATIVA. A FAIXA DE ZOOM é do CameraRig e só dele: as
+	-- duas linhas que moravam aqui (14/26) eram escritas mortas — o CameraRig
+	-- inicializa depois e as substitui por 8/16 — e um segundo lugar guardando o
+	-- mesmo knob de calibração é como o comentário da roda do mouse ficou
+	-- citando uma faixa que não existe mais.
 	p.CameraMode = Enum.CameraMode.Classic
-	p.CameraMaxZoomDistance = 26
-	p.CameraMinZoomDistance = 14
 
 	remCast = Net.event(Net.Names.CastSpell)
 	remSwitch = Net.event(Net.Names.SwitchElement)
@@ -541,11 +647,16 @@ function Controls.init(p: Player)
 
 	buildAimMarker()
 
-	if UserInputService.TouchEnabled then
+	--- OS DOIS ESQUEMAS, cada um pelo seu critério (GDD §19.3). Podem coexistir
+	--- (celular com teclado bluetooth); o que não pode é o de PC receber botão de
+	--- tela — era `TouchEnabled` sozinho aqui, e notebook com tela sensível
+	--- ganhava o celular inteiro por cima do mouse.
+	local touchScheme, pcScheme = Device.schemes()
+	if touchScheme then
 		touchUi = ControlsTouch.build(p, beginGesture, setElement, onSimpleTouch)
 	end
-	if UserInputService.KeyboardEnabled then
-		bindKeyboard()
+	if pcScheme then
+		bindPc()
 	end
 
 	-- o arrasto sai do botão no primeiro pixel: seguir o InputObject global é a
@@ -559,8 +670,7 @@ function Controls.init(p: Player)
 	UserInputService.InputEnded:Connect(function(input)
 		local g = active[input]
 		if g then
-			active[input] = nil
-			release(g)
+			release(g) -- `endGesture` lá dentro é quem tira do rastreio
 		end
 	end)
 
@@ -608,28 +718,20 @@ end
 function Controls.update(_dt: number)
 	local from = rootPosition()
 
-	-- PC: M1 segurado atira continuamente na direção do mouse (o fireRate real
+	-- PC: M1 segurado atira continuamente na direção do CURSOR (o fireRate real
 	-- é do servidor; aqui só evitamos inundar o remote)
-	if
-		from
-		and UserInputService.MouseEnabled
-		and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-		and not UserInputService:GetFocusedTextBox()
-	then
+	local firing = from ~= nil and pcFiring() and not UserInputService:GetFocusedTextBox()
+	if firing and from then
 		if os.clock() - lastBasic >= (Balance.elements :: any)[element].basic.fireRate then
 			doCast("basic", pcAimDirection(from), "key") -- M1 segurado: PC
 		end
 	end
 
-	-- seta de mira: gesto de toque em curso, ou o mouse do PC enquanto atira
+	-- seta de mira: gesto de toque em curso, ou o cursor do PC enquanto atira
 	local g = aimingGesture()
 	if from and g and g.dir then
 		drawAimMarker(from, assisted(from, g.dir :: Vector3))
-	elseif
-		from
-		and UserInputService.MouseEnabled
-		and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-	then
+	elseif from and firing then
 		drawAimMarker(from, assisted(from, pcAimDirection(from)))
 	else
 		hideAimMarker()
@@ -657,8 +759,10 @@ end
 -- ============================================================================
 -- AUTOTESTE — cole no Command Bar do Studio (cliente):
 --   require(game.Players.LocalPlayer.PlayerScripts.Client.Controls).selfTest()
--- Cobre o CARIMBO DO MODO DE ENTRADA. Não cobre a máquina do gesto (que precisa
--- de dedo de verdade) — cobre a classificação, que é o que vira número.
+-- Cobre o que SEPARA OS DOIS ESQUEMAS e vira número: o carimbo do modo de
+-- entrada, a decisão disparar-ou-cancelar do gesto de toque, a projeção do
+-- cursor do PC e a porta que impede o clique de UI de virar magia. Não cobre
+-- pintura nem o dedo em si — cobre as contas.
 -- ============================================================================
 function Controls.selfTest()
 	local finger = { UserInputType = Enum.UserInputType.Touch }
@@ -677,7 +781,48 @@ function Controls.selfTest()
 		assert(Events.sanitizeInput(kind) == kind, "rótulo fora de Events.INPUT_KINDS: " .. kind)
 	end
 
-	print("[Controls] autoteste OK — modo de entrada (drag/tap/key)")
+	-- ------------------------------------- TOQUE: disparar ou CANCELAR (§19.3)
+	--- A conta que o `release` usa E que acende o anel do botão. O CANCELAR é o
+	--- que separa "mirei errado" de "atirei errado"; se ele parar de existir, o
+	--- gesto único vira "toda vez que encosto sai magia" — o defeito do APK 2D.
+	local tap = Balance.controls.tapMaxDuration
+	local aim = Vector3.new(1, 0, 0)
+	assert(Controls.willFire(nil, tap * 0.5), "toque curto sem arrasto é o tiro rápido")
+	assert(Controls.willFire(aim, tap * 0.5), "arrastou e soltou rápido: dispara na direção mirada")
+	assert(Controls.willFire(aim, 5), "segurou mirando e soltou: dispara, sem prazo")
+	assert(not Controls.willFire(nil, tap * 2), "voltou ao centro e segurou: CANCELA, nada é enviado")
+	assert(not Controls.willFire(nil, tap), "no limiar exato o tiro rápido já expirou")
+
+	-- ------------------------------------------- PC: o cursor no plano do chão
+	--- A mira do PC é CONTÍNUA e sai do cursor. Aqui só se verifica o caso
+	--- degenerado — cursor em cima do próprio personagem —, que caía na
+	--- constante de MUNDO do `flat` e virava tiro para o norte do mapa,
+	--- ignorando a câmera. A matemática da projeção NÃO foi tocada.
+	local me = Vector3.new(10, 5, -20)
+	local fallback = Vector3.new(0, 0, 1)
+	local straightDown = Controls.groundAim(me, me + Vector3.new(0, 30, 0), Vector3.new(0, -1, 0), fallback)
+	assert(straightDown == fallback, "cursor em cima do personagem tem de cair no fallback da CÂMERA")
+	assert(
+		Controls.groundAim(me, me + Vector3.new(0, 30, 0), Vector3.new(0, 1, 0), fallback) == fallback,
+		"raio subindo nunca cruza o chão: fallback"
+	)
+	assert(
+		Controls.groundAim(me, me + Vector3.new(0, 30, 0), Vector3.new(1, 0, 0), fallback) == fallback,
+		"raio paralelo ao chão: fallback"
+	)
+	local ahead = Controls.groundAim(me, me + Vector3.new(0, 30, 0), Vector3.new(0, -30, 12).Unit, fallback)
+	assert(ahead.Y == 0 and math.abs(ahead.Magnitude - 1) < 1e-4, "a direção sai plana e unitária")
+	assert(ahead.Z > 0.99, "cursor à frente aponta à frente")
+
+	-- ------------------------------- PC: clique de INTERFACE não vira conjuração
+	--- O disparo contínuo do PC era lido por sondagem e não sabia o que a UI
+	--- tinha comido: clicar em "Grimório"/"Opções" soltava magia junto.
+	assert(Controls.armPcFire(true, false) == true, "clique no mundo arma o disparo contínuo")
+	assert(Controls.armPcFire(true, true) == false, "clique consumido pela UI NÃO arma disparo")
+	assert(Controls.armPcFire(false, false) == false, "soltar desarma")
+	assert(Controls.armPcFire(false, true) == false, "soltar em cima da UI também desarma")
+
+	print("[Controls] autoteste OK — entrada (drag/tap/key) · cancelar do gesto · mira do cursor · clique de UI")
 	return true
 end
 

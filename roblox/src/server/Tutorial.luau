@@ -679,6 +679,21 @@ local function beginCombo(s: Session)
 	})
 end
 
+--- AUTOR DO TERRENO MEXIDO PELO CAMPO DE PROVAS (R13, pergunta V3) — o MESMO
+--- raciocínio do carimbo de tutorial no ping da Sintonia (R11.1): CARIMBAR, não
+--- SUPRIMIR. O terreno aqui muda de verdade (é o que torna o passo honesto), e
+--- passar autor NENHUM apagaria o desfecho — tirando do Diretor a medida de
+--- quantas pessoas praticam a fusão. Mas quem está sendo ENSINADO não está
+--- respondendo "queimar a floresta vira jogada?": o combo do Campo é roteirado,
+--- o parceiro é um boneco e o jogador nunca conjurou a metade dele.
+--- Então o autor é o próprio Campo de Provas, e não o aluno. O `Telemetry.
+--- resolve` trata autor que não é `Player` como não-humano (`is_bot = true`,
+--- ator `bot:tutorial`): o evento SAI e aparece na coluna `all`, e a coorte
+--- `human_only` — que é onde a V3 é respondida — nunca o conta.
+--- Uma string e não um Instance de propósito: é estável, não segura referência
+--- de nada e não pode ser confundida com um jogador em lugar nenhum do funil.
+local TERRAIN_AUTHOR = "tutorial"
+
 local function fireCombo(s: Session)
 	local combo = comboOf(s)
 	s.fireAt = 0
@@ -689,8 +704,8 @@ local function fireCombo(s: Session)
 	local cx, cy = Grid.worldToCell(s.comboPos)
 	if Grid.inBounds(cx, cy) then
 		local r = combo.radius * 0.5 / Grid.CELL_SIZE
-		Terrain.applyElement(cx, cy, elementOf(s.player), r, true)
-		Terrain.applyElement(cx, cy, s.partnerElement, r, true)
+		Terrain.applyElement(cx, cy, elementOf(s.player), r, true, TERRAIN_AUTHOR)
+		Terrain.applyElement(cx, cy, s.partnerElement, r, true, TERRAIN_AUTHOR)
 	end
 	-- 2) TELA: o mesmo pacote que o SintoniaUi já sabe desenhar
 	;(evSintonia :: RemoteEvent):FireClient(s.player, {
@@ -1222,6 +1237,54 @@ function Tutorial.selfTest(): boolean
 	assert(seen[ghost] and resume[ghost] == nil, "quem saiu por vontade própria não é perguntado nem retomado")
 	assert(not reopenable(ghost) and not offerable(ghost), "quem já passou pelo Campo de Provas não vê mais nada")
 	offered[ghost], seen[ghost], resume[ghost] = nil, nil, nil -- não deixa lixo
+
+	-- ------------------------ AUTORIA DO TERRENO DO CAMPO DE PROVAS (R13/V3)
+	-- Roda o `fireCombo` DE VERDADE com o `Terrain.applyElement` espionado
+	-- (nada é aplicado no mundo) e no centro da grade — fora dela o
+	-- `Grid.inBounds` pularia o bloco e o teste passaria por vacuidade.
+	-- Os dois remotes viram tocos porque o `ghost` não é um Player de verdade.
+	local prevSin, prevAnn = evSintonia, evAnnounce
+	local stub: any = { FireClient = function() end }
+	evSintonia, evAnnounce = stub, stub
+	local realApply = Terrain.applyElement
+	local seenApply: { { element: string, author: any } } = {}
+	;(Terrain :: any).applyElement = function(_cx: number, _cy: number, element: string, _r: number, _s: boolean, author: any)
+		table.insert(seenApply, { element = element, author = author })
+	end
+	local fakeS: any = {
+		player = ghost,
+		partnerElement = "Water" :: Elements.Id,
+		comboPos = Vector3.new(0, Grid.FLOOR_Y + 3, 0),
+		fireAt = 0,
+	}
+	local okCombo, errCombo = pcall(fireCombo, fakeS)
+	;(Terrain :: any).applyElement = realApply
+	evSintonia, evAnnounce = prevSin, prevAnn
+	assert(okCombo, "fireCombo explodiu no autoteste: " .. tostring(errCombo))
+	assert(Grid.inBounds(Grid.worldToCell(fakeS.comboPos)), "o epicentro do teste TEM de cair na grade (senão o teste é vazio)")
+	assert(#seenApply == 2, "a fusão do Campo mexe o terreno DE VERDADE com os DOIS elementos, vi " .. #seenApply)
+	-- As duas asserções abaixo estão NESTA ORDEM porque cada uma tem de conseguir
+	-- ficar vermelha SOZINHA: a de igualdade pega qualquer autor errado (inclusive
+	-- o jogador) e sombrearia a outra se viesse primeiro — teste que não fica
+	-- vermelho não é cobertura, é decoração.
+	for _, call in ipairs(seenApply) do
+		-- quem está aprendendo NÃO é o autor: seria injetar treino no numerador
+		-- da pergunta que ele não está respondendo (o raciocínio da R11.1).
+		assert(
+			call.author ~= fakeS.player,
+			"quem está sendo ENSINADO não pode ser o autor: isso injeta treino na coorte humana da V3"
+		)
+		-- CARIMBAR, não suprimir (também R11.1): sem autor o desfecho SOME e o
+		-- Diretor perde a medida de quantas pessoas praticam a fusão.
+		assert(
+			call.author == TERRAIN_AUTHOR,
+			"o Campo de Provas tem de CARIMBAR o autor do terreno (autor nil = desfecho apagado)"
+		)
+	end
+	assert(
+		seenApply[1].element == elementOf(fakeS.player) and seenApply[2].element == fakeS.partnerElement,
+		"o carimbo é a FONTE REAL: elemento do jogador e depois o do parceiro, na ordem em que caem"
+	)
 
 	-- ---------------------------------------------------- TETO ABSOLUTO (AFK)
 	-- O último passo não tem teto próprio DE PROPÓSITO (quem chegou lá decide

@@ -186,6 +186,12 @@ type Agg = {
 	--- somar os dois infla a resposta.
 	outcomeKind: { [string]: number },
 	outcomeSelf: number,
+	--- ESQUEMA DE MIRA (GDD §19.3) por disparo. Sem este recorte, um playtest com
+	--- metade dos jogadores assistidos entrega um `p50` de TTK que é a média de
+	--- DUAS populações — e a V2 ("o TTK está certo com humanos mirando?") vira
+	--- ruído com cara de número. O §19.3 promete pareamento competitivo POR
+	--- esquema; sem medir, não há como saber se ele é necessário.
+	aimByScheme: { [string]: number },
 	ttk: { number },
 	ttkSeen: number,
 	--- MODO DE ENTRADA do disparo (docs/ROBLOX.md §4: "mira e disparo em UM
@@ -221,6 +227,7 @@ local function newAgg(): Agg
 		terrainTotal = 0,
 		outcomeKind = {},
 		outcomeSelf = 0,
+		aimByScheme = {},
 		ttk = {},
 		ttkSeen = 0,
 		inputCasts = 0,
@@ -850,6 +857,16 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 				end
 			end
 		end
+		--- ESQUEMA DE MIRA — separado do `input` de propósito: são perguntas
+		--- diferentes. `input` diz COMO o dedo pediu o tiro; `aim` diz se a mira
+		--- teve AJUDA. Um jogador de PC com assistência e um de celular sem ela
+		--- existem, e misturá-los é o que apaga a V2.
+		local aim = Events.sanitizeAim(p.aim)
+		if aim then
+			for _, g in ipairs(cohorts) do
+				g.aimByScheme[aim] = (g.aimByScheme[aim] or 0) + 1
+			end
+		end
 	elseif name == N.TutorialStep then
 		--- ONBOARDING agregado (o Tutorial já emite UMA linha por passo
 		--- ALCANÇADO com `completed`): alcance = linhas do passo, abandono =
@@ -911,11 +928,19 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		--- balde PRÓPRIO: misturar denominador é como se perde a leitura de um
 		--- funil. `kill` · `crossing` · `cover_destroyed`, O(1) por evento.
 		if name == N.TerrainTacticalOutcome then
+			--- DESFECHO DE TREINO FORA DA V3 (R13). Os passos `burn`/`freeze` do
+			--- Campo de Provas são magias REAIS e chegam na coorte HUMANA: sem
+			--- este corte, o aluno queimando a árvore que MANDARAM queimar entra
+			--- no numerador de "usou o terreno de propósito", junto com quem
+			--- descobriu sozinho. Mesmo raciocínio do ping na R11.1 — e, como lá,
+			--- o evento continua contado; o que ele não faz é responder a V3.
 			local kind = if typeof(p.outcome) == "string" then p.outcome else "?"
-			for _, g in ipairs(cohorts) do
-				g.outcomeKind[kind] = (g.outcomeKind[kind] or 0) + 1
-				if p.by_self == true then
-					g.outcomeSelf += 1
+			if p.tutorial ~= true then
+				for _, g in ipairs(cohorts) do
+					g.outcomeKind[kind] = (g.outcomeKind[kind] or 0) + 1
+					if p.by_self == true then
+						g.outcomeSelf += 1
+					end
 				end
 			end
 		end
@@ -1809,7 +1834,7 @@ function Telemetry.report(): string
 	--- autor, e sem autor não há desfecho — zero ali é teto conhecido, não bug.
 	needs(
 		terrainOwned == 0 and human.terrainTotal > 0,
-		"terreno mexido sem AUTOR identificavel (Sintonia/Bots/Tutorial nao passam autor em `applyElement`): sem autor nao existe desfecho tatico, e a V3 fica so' com area queimada"
+		"terreno mexido sem AUTOR identificavel: os BOTS nao passam autor em `applyElement` (omissao deliberada — desfecho de piloto automatico nao responde a V3), e o muro de Terra nao tem dono. Sintonia e Tutorial passam desde a R13"
 	)
 	needs((all.events[N.Discovery] or 0) == 0, "`discovery` (Grimorio) nao chegou — sem ele a V3 perde ate a proxy")
 	if missing == 0 then
@@ -2053,6 +2078,23 @@ function Telemetry.selfTest()
 	assert(human.outcomeSelf == 1, "quem se queimou sozinho tem de sair separado — arma de dois gumes nao e' jogada bem sucedida")
 	assert(human.terrainTotal >= 4, "o desfecho tambem conta como interacao de terreno (o mundo foi mexido)")
 
+	-- 4b-ter) DESFECHO DE TREINO FORA DA V3 (R13). O Campo de Provas manda o
+	-- aluno queimar e congelar, e essas sao magias REAIS: chegam na coorte
+	-- humana como qualquer outra. Contar isso e' medir a obediencia ao tutorial
+	-- e chamar de "o jogador descobriu que o terreno vira jogada".
+	local killBefore = human.outcomeKind.kill or 0
+	fake(N.TerrainTacticalOutcome, false, "Fire", { outcome = "kill", tutorial = true })
+	assert(
+		(human.outcomeKind.kill or 0) == killBefore,
+		"desfecho feito DENTRO do tutorial entrou na V3 — vira medida de obediencia, nao de descoberta"
+	)
+	assert(
+		(human.events[N.TerrainTacticalOutcome] or 0) > 0,
+		"o desfecho de treino tem de continuar contado como EVENTO (so' nao responde a V3)"
+	)
+	fake(N.TerrainTacticalOutcome, false, "Fire", { outcome = "kill" })
+	assert((human.outcomeKind.kill or 0) == killBefore + 1, "desfecho NORMAL parou de contar — a V3 morreu junto")
+
 	-- 4c-bis) PING DE TREINO FORA DO FUNIL (R11). O Campo de Provas dispara o
 	-- ping REAL — é o que torna o passo honesto —, e antes da R11 TODO jogador
 	-- era empurrado para lá: cada sessão injetava treino no numerador da única
@@ -2143,6 +2185,25 @@ function Telemetry.selfTest()
 	stampDevice("u_t", "high", false) -- mesmo jogador, agora sem toque
 	fake(N.SpellCast, false, "Fire", { input = "key" })
 	assert(human.inputCasts == 3 and human.inputTouchByKind.key == nil, "teclado nao entra no recorte de TOQUE")
+
+	-- 8-bis) ESQUEMA DE MIRA (R13). O GDD 19.3 promete DOIS esquemas (Simples
+	-- assistido x Avancado manual) com pareamento competitivo POR esquema — e o
+	-- servidor NUNCA soube qual estava valendo, porque a assistencia e' aplicada
+	-- no CLIENTE antes do envio. Num playtest com metade assistida, o p50 de TTK
+	-- humano e' a media de duas populacoes, e a V2 sai sem sentido.
+	-- Separado do `input` de proposito: `input` diz COMO o dedo pediu o tiro,
+	-- `aim` diz se a mira teve AJUDA. Sao perguntas diferentes.
+	fake(N.SpellCast, false, "Fire", { aim = "assist" })
+	fake(N.SpellCast, false, "Fire", { aim = "manual" })
+	fake(N.SpellCast, false, "Fire", { aim = "aimbot" }) -- inventado pelo cliente
+	assert(
+		human.aimByScheme.assist == 1 and human.aimByScheme.manual == 1,
+		"cada esquema de mira no seu balde: sem isso a V2 mede duas populacoes somadas"
+	)
+	assert(
+		human.aimByScheme.aimbot == nil,
+		"esquema inventado por cliente hostil NAO pode criar coluna no relatorio do Diretor"
+	)
 
 	-- 8b) DANO POR AUTOR — a moeda do gatilho pos-playtest n.1
 	local dmgBefore = human.dmgByActor.u_t or 0

@@ -65,6 +65,19 @@ local PT: { [string]: string } = {
 	["tutorial.offer.no"] = "JOGAR AGORA",
 	--- fica no HUD depois da recusa: recusar não pode ser porta de mão única
 	["tutorial.reopen"] = "TREINAR",
+
+	-- ------------------------------------------------- CONTROLES DE TOQUE
+	--- Estavam escritos direto no `ControlsTouch.luau` desde antes da R13 —
+	--- únicos textos de UI fora do `Strings` no projeto inteiro, e ninguém tinha
+	--- notado porque a auditoria de i18n olhava as telas, não os botões.
+	--- ABREVIADOS de propósito: cabem num alvo de 48dp sem encolher a fonte, que
+	--- é o que a régua de toque do GDD §19.3 exige.
+	["controls.basic"] = "ATQ",
+	["controls.tactic"] = "TÁT",
+	["controls.dodge"] = "ESQ",
+	["controls.jump"] = "PULAR",
+	["controls.sprint"] = "CORRER",
+	["controls.crouch"] = "AGACHAR",
 	--- explica o CORTE: a prova começou por cima do treino. Sem esta frase o
 	--- jogador só via o anúncio genérico de início e não entendia que o treino
 	--- não foi perdido — ele retoma de onde parou no lobby seguinte.
@@ -245,6 +258,13 @@ local EN: { [string]: string } = {
 	["tutorial.offer.yes"] = "PRACTICE",
 	["tutorial.offer.no"] = "PLAY NOW",
 	["tutorial.reopen"] = "PRACTICE",
+
+	["controls.basic"] = "ATK",
+	["controls.tactic"] = "TAC",
+	["controls.dodge"] = "DASH",
+	["controls.jump"] = "JUMP",
+	["controls.sprint"] = "SPRINT",
+	["controls.crouch"] = "CROUCH",
 	["tutorial.cut"] = "The trial began — your practice continues later.",
 	["tutorial.switch"] = "Switch to %s",
 	["tutorial.lead"] = "LEAD THE TARGET",

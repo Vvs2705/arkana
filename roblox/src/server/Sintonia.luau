@@ -557,11 +557,36 @@ local function fireChannel(ch: Channel)
 	local recipe = EFFECTS[combo.key]
 
 	-- 1) MUNDO — todo combo interage com o terreno (GDD §9)
+	--- AUTORIA DA FUSÃO (R13, pergunta V3). A fusão é o pilar do jogo e as
+	--- receitas que mexem no terreno são justamente as jogadas mais
+	--- espetaculares que a V3 deveria capturar — sem autor, o `applyElement`
+	--- não abre `Cast` e nada disso vira desfecho tático.
+	--- QUEM É O AUTOR: `ch.a`, o que conjurou PRIMEIRO. Três razões, nesta
+	--- ordem:
+	---   · é o MESMO sujeito de `sintonia_channel_start` e `sintonia_fired` —
+	---     dar autor diferente ao terreno faria um único ato aparecer sob dois
+	---     donos em eventos que se juntam pelo ator;
+	---   · UM autor por fusão é o que segura a razão de funil abaixo de 100%:
+	---     `crossingAt`/`openedCoverAt` consomem o disparo UMA vez, e creditar
+	---     os dois dobraria o desfecho do mesmo ato;
+	---   · o pacto de ping é OPCIONAL (a maioria das fusões é coincidência de
+	---     tiro), então "o proponente" não existe em todo canal — autor que só
+	---     às vezes existe é pior que autor sempre igual.
+	--- SEM FILTRO DE `Player`: `ch.a` pode ser o parceiro BOT (uid negativo), e
+	--- é o Telemetry que separa humano de bot pelo `is_bot`. Filtrar aqui
+	--- quebraria o débito 2 e ainda esconderia a metade que o `all` mede.
+	--- NÃO INFLA A V4: o índice de dominância se alimenta de `damage` e
+	--- `spell_cast`, e nenhum dos dois muda com esta linha — o dano da fusão
+	--- continua carimbado `"Combo"` (R8) e o dano de terreno continua com
+	--- `fromPlayer = nil`. A autoria vive só no evento de DESFECHO.
+	--- O elemento carimbado é o da RECEITA (a fonte real do que caiu no mundo),
+	--- nunca o que o autor tem na mão agora — o viés que quase custou um nerf
+	--- errado na R8.
 	local cx, cy = Grid.worldToCell(ch.pos)
 	if recipe and terrain and Grid.inBounds(cx, cy) then
 		local radiusCells = combo.radius * (recipe.scale or 1) / Grid.CELL_SIZE
 		for _, element in ipairs(recipe.apply) do
-			terrain.applyElement(cx, cy, element, radiusCells, recipe.strong == true)
+			terrain.applyElement(cx, cy, element, radiusCells, recipe.strong == true, ch.a)
 		end
 	end
 
@@ -1058,7 +1083,8 @@ end
 --   require(game.ServerScriptService.Server.Sintonia).selfTest()
 -- Cobre o que não dá para ver a olho: a matriz completa, a regra de "mesmo
 -- elemento não funde", a de "inimigo não funde", a geometria da janela, a
--- conta do dano e a FUSÃO COM PARCEIRO BOT (débito 2).
+-- conta do dano, a FUSÃO COM PARCEIRO BOT (débito 2) e a AUTORIA que a fusão
+-- entrega ao terreno (R13 — sem ela o pilar do jogo some da pergunta V3).
 -- ⚠ RODE NO LOBBY: o item 3.1 monta e limpa o Teams DE VERDADE — no meio de uma
 -- partida isto apagaria os duos e desligaria a Sintonia até a próxima.
 -- ============================================================================
@@ -1227,6 +1253,54 @@ function Sintonia.selfTest()
 	Teams.clear()
 	rigA:Destroy()
 	rigB:Destroy()
+
+	-- 3.5) AUTORIA DA FUSÃO NO TERRENO (R13 — pergunta V3). Roda o `fireChannel`
+	--      DE VERDADE com o terreno ESPIONADO (nada é aplicado no mundo) e no
+	--      epicentro do mapa: fora da grade o `Grid.inBounds` faria o bloco
+	--      inteiro ser pulado e o teste passaria por vacuidade.
+	--      Combo escolhido: Cristais Carregados — é o único que aplica DOIS
+	--      elementos SEM empurrão (com `push` a fusão de teste sacudiria quem
+	--      estivesse perto da origem).
+	local seenApply: { { element: string, author: any } } = {}
+	local prevTerrain, prevCombat = terrain, combat
+	terrain = {
+		applyElement = function(_cx: number, _cy: number, element: string, _r: number, _s: boolean, author: any)
+			table.insert(seenApply, { element = element, author = author })
+		end,
+	}
+	combat = nil -- a fusão de teste não machuca, não atordoa e não drena ninguém
+	local spyA, spyB = Instance.new("Humanoid"), Instance.new("Humanoid")
+	local fakeCh: any = {
+		a = spyA,
+		b = spyB,
+		elA = "Earth" :: Elements.Id,
+		elB = "Lightning" :: Elements.Id,
+		combo = Elements.getCombo("Earth", "Lightning"),
+		pos = Vector3.new(0, COMBO_Y, 0),
+		fireAt = 0,
+	}
+	local okFire, errFire = pcall(fireChannel, fakeCh)
+	terrain, combat = prevTerrain, prevCombat
+	assert(okFire, "fireChannel explodiu no autoteste: " .. tostring(errFire))
+	assert(Grid.inBounds(Grid.worldToCell(fakeCh.pos)), "o epicentro do teste TEM de cair na grade (senão o teste é vazio)")
+	assert(#seenApply == 2, "Cristais Carregados aplica DOIS elementos no terreno, vi " .. #seenApply)
+	--- UMA asserção só, de propósito: um `author ~= spyB` em seguida NUNCA
+	--- conseguiria ficar vermelho (a igualdade abaixo já pega qualquer autor
+	--- errado, spyB inclusive) — seria cobertura de mentira.
+	for _, call in ipairs(seenApply) do
+		assert(
+			call.author == spyA,
+			"a fusão tem de chegar ao terreno com UM autor, o que conjurou primeiro (nil = sem `Cast`, e o pilar do jogo some da V3; "
+				.. "o outro = desfecho dobrado para o mesmo ato). elemento: "
+				.. call.element
+		)
+	end
+	assert(
+		seenApply[1].element == "Earth" and seenApply[2].element == "Lightning",
+		"o carimbo é a FONTE REAL (o elemento da receita, na ordem), nunca o que o autor tem na mão"
+	)
+	spyA:Destroy()
+	spyB:Destroy()
 
 	-- 4) "mais forte que a soma das partes" (GDD §9)
 	local a, b = Balance.elements.Fire.basic.dmg, Balance.elements.Lightning.basic.dmg

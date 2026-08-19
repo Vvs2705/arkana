@@ -2,7 +2,7 @@
 -- ============================================================================
 -- ARKANA — CENÁRIOS DE ROBUSTEZ (raia A: Engenheiro de QA)
 -- Roda junto com o portão padrão (`roblox/tools/run.sh`) e também sozinho
--- (`roblox/tools/run.sh scenarios`) quando se quer só estes seis.
+-- (`roblox/tools/run.sh scenarios`) quando se quer só estes sete.
 --
 -- POR QUE ESTE ARQUIVO EXISTE: a fase R8 achou e corrigiu seis travamentos de
 -- robustez lendo código e simulando à mão. Correção sem teste é correção com
@@ -18,10 +18,15 @@
 --   S4  servidor esvaziou: a partida acaba, ninguém nasce plateia de bots
 --   S5  existe TETO DE TEMPO e ele acompanha a variante de ritmo
 --   S6  `forceStart` de `Ended` não deixa estado vazar entre partidas
+--   S7  MARATONA: seis provas encadeadas com gente entrando e saindo, e o que
+--       cresce medido por CONTAGEM (o S6 vê a virada entre duas partidas; o S7
+--       vê o servidor de alpha, que roda por horas)
 --
 -- Cada cenário monta um SERVIDOR NOVO (harness próprio, seed própria) — mesmo
 -- truque do sweep.luau. Um cenário não pode herdar mundo do outro: é
--- exatamente esse tipo de herança que o S6 existe para proibir.
+-- exatamente esse tipo de herança que o S6 existe para proibir. O S7 é a
+-- exceção deliberada: ele é UM servidor só, de propósito, porque a pergunta
+-- dele é justamente o que sobra de uma prova para a seguinte.
 -- ============================================================================
 
 local SOURCES = ...
@@ -494,6 +499,303 @@ local function s6()
 	return "escudo volta ao nível 1 · cooldown da Sintonia zerado na porta que pula o lobby"
 end
 
+-- ============================================================ S7 — MARATONA
+--- O RISCO QUE NENHUM DOS SEIS ACIMA MEDE. S1–S6 olham UMA partida (o S6, a
+--- virada entre duas). Um alpha não é uma partida: é um servidor público
+--- rodando por HORAS, com dezenas de pessoas entrando e saindo. As tabelas
+--- deste projeto são indexadas por jogador e por partida, e estado que
+--- atravessa partida já vazou TRÊS vezes aqui — as três achadas POR ACASO.
+--- Vazamento assim não dá erro: dá servidor que fica lento aos 40 min e cai no
+--- meio do playtest, com o Diretor sem entender por quê.
+---
+--- SEIS provas encadeadas, com gente entrando e saindo ENTRE elas e NO MEIO
+--- delas, pelas DUAS portas de partida nova: o ciclo normal
+--- (`Ended → Lobby → startMatch`) e o `forceStart` direto de `Ended`, que pula
+--- o `toLobby` — foi por essa porta que dois dos três vazamentos voltaram.
+---
+--- TRÊS PERGUNTAS, e as três são CONTAGEM, não estimativa de memória:
+---   1. saiu do servidor, sumiu da tabela — provado DUAS vezes: no quadro exato
+---      da saída (a entrada dele existia e some) e como rede permanente
+---      (tabela por jogador nunca tem mais entradas do que gente conectada);
+---   2. nada por partida cresce — o anel de altares é o que o Balance pede, as
+---      peças do mundo batem uma a uma com as tabelas (tabela limpa com peça
+---      órfã é o mesmo vazamento com outra cara) e o Workspace INTEIRO do
+---      sexto lobby tem o mesmo tamanho do primeiro;
+---   3. a sexta prova começa, anda e termina sozinha como a primeira — uma
+---      largada e um fim contados por prova, e `H.errors` vazio no fim de tudo.
+---
+--- O QUE ESTA MEDIÇÃO NÃO ENXERGA — dito na cara, senão o cenário vira
+--- decoração:
+---   · TABELAS DE CHAVE FRACA (`lastHit` e `deathWired` no Match, `teamOf` no
+---     Teams, `statuses`/`extraTargets` no Combat). O harness guarda TODA
+---     Instance que já criou em `H.parts`/`H.humanoids`, então nada nelas é
+---     coletado aqui — contá-las seria medir o coletor, não o código. É por
+---     isso que ficam fora do `Match.stateCounts` também.
+---   · MEMÓRIA DE VERDADE. Nada aqui pesa bytes: chave que some pode ter
+---     deixado a tabela com a capacidade inteira alocada, e ninguém aqui vê.
+---   · O QUE ESTE SERVIDOR NÃO CARREGA. O `boot` sobe Terrain/Combat/Sintonia/
+---     Match/Tutorial/Bots; `Telemetry.emit` é substituído por um contador e
+---     `Grimoire`/`Prefs` nem entram. Estado que cresça LÁ (as tabelas por
+---     `subjectKey` do Telemetry, por exemplo) passa por baixo do S7 inteiro.
+---   · CONEXÕES. `Connect` sem `Disconnect` é vazamento clássico e não tem
+---     contador nenhum neste harness.
+local function s7()
+	local c = boot("s7", { seed = 424242 })
+	--- NÚCLEO que nunca sai. Sem humano dentro o `mustEndNow` encerra por
+	--- servidor vazio — e a maratona estaria medindo o S4 de novo, não o que
+	--- cresce. Toda prova aqui acaba porque ACABOU, nunca porque esvaziou.
+	c.addPlayer("Fixo1", 5701)
+	c.addPlayer("Fixo2", 5702)
+	c.step(0.1, 5)
+
+	local nextId = 5710
+	local function join(): any
+		nextId += 1
+		return c.addPlayer("Passante" .. nextId, nextId)
+	end
+	local function stateNow(): string
+		local p = c.H.lastFire.MatchState
+		return (p and p.state) or "?"
+	end
+
+	local Z = c.Balance.match.zone
+	local schedule = Z.phases * (Z.holdTime + Z.shrinkTime)
+	--- lido do Balance, não cravado: o anel de altares é dado, e o teste não
+	--- pode ficar vermelho porque alguém rebalanceou o ritual.
+	local ALTARS = ((c.Balance.match :: any).revive or {}).altars or 4
+
+	--- AS DUAS RÉGUAS, lidas no mesmo instante:
+	--- (1) `Match.stateCounts()` — contagem de CHAVES das tabelas do módulo;
+	--- (2) varredura do Workspace pelas peças que a partida cria (altar, farol,
+	---     essência, cilindro da zona). Só a segunda vê peça órfã de tabela já
+	---     limpa; só a primeira vê chave órfã de peça já destruída.
+	local PARTS = {
+		CirculoDeInvocacao = "altarParts",
+		FarolDoAltar = "altarParts",
+		EssenciaArcana = "essenciaParts",
+		ArcaneZone = "zonaParts",
+	}
+	local function census(): any
+		local m = c.Match.stateCounts()
+		m.altarParts, m.essenciaParts, m.zonaParts = 0, 0, 0
+		for _, inst in ipairs(c.H.Workspace:GetChildren()) do
+			local key = PARTS[inst.Name]
+			if key then
+				m[key] += 1
+			end
+		end
+		m.bots = #c.Bots.list()
+		m.online = #c.H.Players:GetPlayers()
+		--- E O MUNDO INTEIRO, sem lista de nomes: é a rede que pega o que a
+		--- varredura por nome não previu — corpo de quem saiu, modelo de bot,
+		--- projétil, efeito de terreno. Foi ela que achou o defeito de fidelidade
+		--- do harness (um Model por jogador que passava, acumulando no Workspace).
+		m.mundo = #c.H.Workspace:GetChildren()
+		return m
+	end
+
+	--- Invariantes que valem em QUALQUER instante do ciclo — é o que separa
+	--- "rodei seis provas e nada explodiu" de medição.
+	local function check(where: string)
+		local m = census()
+		for _, key in ipairs({ "eliminated", "stats", "spirits" }) do
+			assert(
+				m[key] <= m.online,
+				string.format(
+					"%s: `%s` tem %d entradas para %d jogadores conectados — sobrou estado por jogador de quem JÁ SAIU do servidor",
+					where, key, m[key], m.online
+				)
+			)
+		end
+		--- POR PARTIDA NÃO CRESCE: o anel de altares é do tamanho que o Balance
+		--- pede, na primeira prova e na sexta. A identidade com as peças do
+		--- mundo sozinha NÃO pega isto — quando a prova nova empilha altares em
+		--- cima da anterior, tabela e mundo crescem JUNTOS e continuam batendo.
+		assert(
+			m.altars <= ALTARS,
+			string.format(
+				"%s: %d altares para os %d que o Balance pede — a prova nova empilhou o anel em cima do da anterior",
+				where, m.altars, ALTARS
+			)
+		)
+		assert(
+			m.altarParts == m.altars * 2,
+			string.format(
+				"%s: %d peças de altar no mundo para %d esperadas — altar órfão no Workspace a cada prova",
+				where, m.altarParts, m.altars * 2
+			)
+		)
+		assert(
+			m.essenciaParts == m.spirits,
+			string.format(
+				"%s: %d essências no mundo para %d espíritos na tabela — essência órfã sobrevive ao espírito",
+				where, m.essenciaParts, m.spirits
+			)
+		)
+		assert(
+			m.zonaParts <= 1,
+			string.format("%s: %d cilindros de zona no mundo — a prova nova não reaproveitou o da anterior", where, m.zonaParts)
+		)
+		return m
+	end
+
+	local MATCHES = 6
+	local firstLobby, lastLobby, firstEnd, lastEnd = nil, nil, 0, 0
+
+	for m = 1, MATCHES do
+		--- provas 1 e 6 rodam INTEIRAS, até resolver por dupla: é o par que
+		--- responde "a enésima prova ainda é a primeira?". As do meio são
+		--- cortadas — elas estão aqui pelo VAI-E-VEM e pelas duas portas, não
+		--- pela duração.
+		local full = m == 1 or m == MATCHES
+		local a, b = join(), join()
+		c.step(0.1, 5)
+		assert(c.Match.forceStart(4), string.format("prova %d: o servidor não começa mais (`forceStart` recusado)", m))
+
+		--- anda até `secs`, mas para assim que a prova acaba (o que vem depois
+		--- do fim é o ciclo, não a prova).
+		local function play(secs: number)
+			c.until_(0.1, secs, function()
+				return not c.Match.isPlaying()
+			end)
+		end
+		play(10)
+
+		--- TRÊS SAÍDAS, UMA POR TABELA. Cada uma é medida com o MESMO padrão:
+		--- prova-se que a entrada EXISTE (senão o teste de limpeza passa por
+		--- vacuidade — foi assim que quatro testes desta série passaram), sai o
+		--- jogador, e o censo é lido no MESMO quadro. Sem quadro no meio não há
+		--- outra coisa que possa ter mexido na contagem: a diferença é dele.
+		local function leaves(who: any, key: string, label: string)
+			local before = c.Match.stateCounts()[key]
+			c.removePlayer(who)
+			local after = c.Match.stateCounts()[key]
+			assert(
+				after == before - 1,
+				string.format(
+					"prova %d: %s saiu do servidor e `%s` foi de %d para %d — a entrada dele ficou na tabela (num alpha de horas, isso é uma por jogador que passa)",
+					m, label, key, before, after
+				)
+			)
+		end
+
+		-- (1) `stats` — `a` deixa RASTRO batendo em inimigo. Ele só sai lá na
+		-- tela de fim: a entrada tem de atravessar a prova inteira e sumir na
+		-- saída, não antes.
+		local bot = c.Bots.list()[1]
+		assert(bot and bot.humanoid.Health > 0, string.format("prova %d: pré-condição — existe bot vivo para o passante bater", m))
+		c.Combat.applyDamage(bot.humanoid, 20, a, false)
+		assert(
+			c.Match.stateCounts().stats > 0,
+			string.format("prova %d: pré-condição — bater em inimigo cria a entrada em `stats`", m)
+		)
+
+		-- (2) `spirits` — `b` CAI (essência de verdade no chão) e SÓ ENTÃO dá
+		-- alt-F4. O caso mais comum do alpha: quem morre cedo fecha o jogo.
+		local humB = b.Character and b.Character:FindFirstChildOfClass("Humanoid")
+		assert(humB, string.format("prova %d: pré-condição — o passante tem corpo", m))
+		humB.Health = 0
+		c.step(0.1, 3)
+		assert(
+			c.Match.stateCounts().spirits > 0,
+			string.format("prova %d: pré-condição — quem cai cedo vira espírito com essência no chão", m)
+		)
+		leaves(b, "spirits", "o espírito")
+		c.step(0.1, 3)
+
+		-- (3) `eliminated` — alguém ENTRA no meio da prova (nasce "late", fora da
+		-- contagem) e desiste ainda eliminado, sem nunca ter jogado.
+		play(5)
+		local late = join()
+		c.step(0.1, 5)
+		assert(
+			c.Match.stateCounts().eliminated > 0,
+			string.format("prova %d: pré-condição — quem entra no meio da prova nasce fora da contagem", m)
+		)
+		play(5)
+		leaves(late, "eliminated", "o atrasado")
+		check(string.format("prova %d em andamento", m))
+
+		if full then
+			--- SOZINHA, sem `forceEnd`. Teto DERIVADO do cronograma (mesmo truque
+			--- do S3): fica acima do teto duro do Match, então "não terminou aqui"
+			--- só pode querer dizer que nem a rede de segurança funciona mais.
+			--- Se a prova acabou por resolução ou pelo teto é do S5; aqui a
+			--- pergunta é se a enésima ainda TERMINA como a primeira.
+			local endedAt = c.until_(0.1, schedule * 1.5, function()
+				return not c.Match.isPlaying()
+			end)
+			assert(endedAt ~= nil, string.format("prova %d não terminou sozinha em %s", m, fmt(schedule * 1.5)))
+			if m == 1 then
+				firstEnd = endedAt
+			else
+				lastEnd = endedAt
+			end
+		elseif c.Match.isPlaying() then
+			assert(c.Match.forceEnd(), string.format("prova %d: a prova em andamento não encerra", m))
+		end
+		--- UMA largada e UM fim por prova, sempre — nem evento a menos (a
+		--- enésima parou de acontecer) nem a mais (a máquina de estados começou
+		--- a disparar duas vezes). Vale para as seis, cortadas ou não.
+		assert(
+			c.events.match_start == m and c.events.match_end == m,
+			string.format(
+				"prova %d: %s largadas e %s fins contados — a máquina de estados deixou de dar uma volta por prova",
+				m, tostring(c.events.match_start), tostring(c.events.match_end)
+			)
+		)
+
+		-- SAI ENTRE PROVAS (na tela de fim), com o rastro em `stats` a tiracolo:
+		-- a outra metade do vai-e-vem, e a que o `toLobby` não veria.
+		leaves(a, "stats", "quem bateu em alguém")
+		c.step(0.1, 5)
+		check(string.format("prova %d na tela de fim", m))
+
+		--- A PORTA QUE PULA O LOBBY: as provas PARES recomeçam direto de
+		--- `Ended` — a volta do laço chama `forceStart` sem passar pelo
+		--- `toLobby`, que é onde mora metade da limpeza.
+		if m % 2 == 1 or m == MATCHES then
+			local back = c.until_(0.1, 25, function()
+				return stateNow() == "Lobby"
+			end)
+			assert(back ~= nil, string.format("prova %d: a tela de fim não devolveu o lobby em 25 s", m))
+			c.step(0.1, 10) -- os `LoadCharacter` do `toLobby` drenam aqui
+			local lob = check(string.format("lobby depois da prova %d", m))
+			--- NO LOBBY tudo que é POR PARTIDA está zerado — é o teste mais duro
+			--- que existe para "não cresce": não "cresceu pouco", é zero.
+			for _, key in ipairs({ "eliminated", "spirits", "altars", "bots", "altarParts", "essenciaParts", "zonaParts" }) do
+				assert(
+					lob[key] == 0,
+					string.format("lobby depois da prova %d: `%s` ficou em %d — estado da prova anterior sobreviveu ao lobby", m, key, lob[key])
+				)
+			end
+			firstLobby = firstLobby or lob
+			lastLobby = lob
+		end
+	end
+
+	--- O ENÉSIMO LOBBY É O PRIMEIRO? Comparação chave a chave. `online` fica de
+	--- fora: quantos jogadores estão no servidor é o ROTEIRO do cenário, não o
+	--- que cresce sozinho.
+	for key, was in pairs(firstLobby) do
+		if key ~= "online" then
+			assert(
+				lastLobby[key] == was,
+				string.format(
+					"o lobby da prova %d não é o lobby da prova 1: `%s` era %d e virou %d — estrutura por partida CRESCENDO",
+					MATCHES, key, was, lastLobby[key]
+				)
+			)
+		end
+	end
+	assert(#c.H.errors == 0, string.format("%d erro(s) acumulados nas %d provas: %s", #c.H.errors, MATCHES, tostring(c.H.errors[1] and c.H.errors[1].err)))
+
+	return string.format(
+		"%d provas encadeadas · prova 1 terminou sozinha em %s, prova %d em %s · lobby da %da idêntico ao da 1a",
+		MATCHES, fmt(firstEnd), MATCHES, fmt(lastEnd), MATCHES
+	)
+end
+
 -- ================================================================== runner
 local SCENARIOS = {
 	{ "S1 tutorial opcional nao trava o lobby", s1 },
@@ -502,6 +804,7 @@ local SCENARIOS = {
 	{ "S4 servidor vazio encerra", s4 },
 	{ "S5 teto de tempo derivado", s5 },
 	{ "S6 forceStart não vaza estado", s6 },
+	{ "S7 maratona não vaza estado", s7 },
 }
 
 --- `record(nome, ok, detalhe)` — o mesmo formato do run.luau, para os cenários

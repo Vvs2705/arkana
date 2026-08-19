@@ -2,6 +2,117 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.7.0 — 2026-08-19 — R13: as cinco decisões, e a ponte deixando de ser teórica
+
+O Diretor delegou as decisões travadas à equipe (*"você toma a decisão mais viável e
+segue"*) e fixou o rumo: **Roblox no centro, e o que funciona vai sendo registrado para
+atravessar ao Android**. As cinco foram tomadas e coladas no `docs/GDD.md`.
+
+### As cinco decisões
+
+1. **As duas réguas de TTK sempre estiveram certas — medem alvos diferentes.** A
+   varredura passou a medir contra os dois e mostrou: **5/5 dentro nas DUAS leituras**
+   (Fogo 1,88 s contra vida base, 2,95 s contra vida + escudo nv1). O escudo soma 50
+   sobre 100 de vida: +50% de alvo, 1,5× mais tempo com a mesma arma. O defeito era o
+   relatório comparar a faixa do GDD com o número do escudo. **Nenhum número de
+   `Balance` mudou** — e a hipótese que a equipe tinha registrado (de que a faixa
+   antiga fora calibrada antes do escudo existir) estava **errada**.
+2. **Gesto único promovido ao §19.3** — e, junto, o que o Diretor apontou: **teclado e
+   mouse são um esquema DIFERENTE, não uma adaptação do de toque**. *"O que se
+   compartilha é a REGRA do jogo — dano, mana, cooldown, alcance —, nunca o gesto."*
+3. **A frente Android começa pelo Degrau 3 (mini-BR top-down)**, não pelo first-person:
+   a escada da §8 vale, e o first-person continua sendo o destino, não o próximo passo.
+4. **Antecipação registrada em duas velocidades**: o que não depende de V1–V5 anda; o
+   design de combate espera o playtest.
+5. **Público-alvo 10+**, com o registro explícito de que o questionário IARC é
+   respondido pelo Diretor e a classificação é atribuída pelos órgãos.
+
+### `docs/PONTE.md` — a auditoria que dá sentido ao "salvar o que funciona"
+
+40 achados nas duas direções (21 que o Roblox faz e o GDD não descreve; 19 que o GDD
+descreve e o Roblox não faz), cada um classificado como **PROVADO · PLAUSÍVEL · NÃO
+VALIDADO**.
+
+**O formato do resultado é a conclusão:** dos 10 PROVADOS, **nenhum é um número de
+jogo**. São regras de sistema, arquitetura, medição e acessibilidade. Todo número de
+combate, de Sintonia e de ritmo caiu em PLAUSÍVEL ou NÃO VALIDADO — porque **o jogo
+nunca foi tocado por terceiros**. As regras atravessam agora; os números esperam a
+sessão.
+
+Também mapeou **9 decisões silenciosas** (o GDD manda uma coisa, o projeto fez outra,
+ninguém registrou), e separou as **15 armadilhas que valem para qualquer engine** das
+**8 que morrem no Roblox** — com o critério escrito: se a frase sobrevive trocando
+"Humanoid" por "personagem", atravessa.
+
+### O servidor nunca soube qual esquema de mira o jogador usa
+
+Achado da auditoria, verificado e corrigido. O §19.3 promete dois esquemas (Simples
+assistido × Avançado manual) **com pareamento competitivo por esquema**. No Roblox os
+dois existem — `aimAssist = true`, sem tela para trocar — e a assistência é aplicada
+**100% no cliente antes do envio**: o servidor recebe a direção já corrigida.
+
+Num playtest com metade dos jogadores assistidos, o `p50` de TTK humano é a média de
+duas populações e a pergunta **V2** sai sem sentido. O disparo passou a carimbar `aim`
+("assist"/"manual") no `spell_cast` que já existia — mesma solução do `input`, sem
+remote novo, telemetria pura (a assistência já aconteceu antes do envio, então mentir
+não concede nada).
+
+### A V3 parou de ter buraco de autoria
+
+A Sintonia passa autor no terreno: a fusão é o pilar do jogo, e toda mudança de mapa
+que ela causava era invisível para a V3. O autor é **quem conjurou primeiro** — o
+mesmo sujeito dos eventos `channel_start`/`fired`, para um único ato não aparecer sob
+dois donos, e **um autor por fusão** é o que segura a razão do funil abaixo de 100%.
+
+**Os Bots ficaram de fora de propósito**, e virou decisão registrada em vez de
+esquecimento: a V3 pergunta se *gente* transforma o mapa em jogada, e a FSM do bot só
+conhece terreno para fugir do fogo.
+
+E o **tutorial parou de contaminar**: os passos de queimar e congelar são magias reais
+e chegavam à coorte humana: o aluno queimando a árvore que *mandaram* queimar entrava
+no numerador de "usou o terreno de propósito", junto com quem descobriu sozinho. Isso
+media obediência e chamava de descoberta. Agora sai carimbado e o coletor exclui da V3
+— mesmo raciocínio da R11.1 com o ping, e pela mesma razão: **carimbar, não suprimir**.
+
+### PC × celular: três defeitos que a separação expôs
+
+- **Herança cruzada na detecção de aparelho** — havia **três critérios diferentes**
+  para "é celular?". Notebook com tela sensível casava com dois e recebia o esquema de
+  celular por cima do mouse. Agora é uma regra só, e o campo `touch` do relatório passou
+  a significar *"jogou no esquema de toque"* em vez de *"tem digitalizador"*.
+- **Clique de interface virava conjuração** — o disparo básico do PC era lido por
+  sondagem todo frame, fora da porta que filtra clique consumido por UI: clicar em
+  Grimório ou Opções soltava magia junto.
+- **O cancelar era invisível no polegar** — a lógica existia, mas o anel do botão só
+  dizia "tem dedo em cima". Uma conta só decide agora as duas coisas.
+
+Um defeito real foi **deixado em paz com argumento**: `pcAimDirection` mistura duas APIs
+com convenções diferentes de inset de GUI (viés de ~36 px). Não foi tocado porque o
+Diretor disse que a mira está ajustada — e se foi ajustada no olho, foi ajustada **com**
+esse viés. Registrado como candidato, só com número de playtest na mão.
+
+### S7 — a maratona, e o harness que mentia
+
+Todos os cenários mediam **uma** partida. O S7 encadeia **6 provas** com gente entrando
+e saindo pelas duas portas de partida nova, e mede por **contagem de chaves**, nunca por
+memória. Nenhum vazamento no `Match` — mas o cenário achou algo pior:
+
+**O harness nunca desparentava o Player que saía.** `player.Parent` é o teste de "ainda
+conectado" usado em quatro ramos do `Match` — e **nenhum deles jamais rodou num teste**,
+sendo o caminho que um alpha percorre o dia inteiro. E o corpo nunca era destruído: 3
+Models órfãos por prova (43 em 14 provas) continuavam aparecendo em consultas espaciais.
+
+Custo: portão de 3,05 s → 4,08 s (+34%), justificado no relatório — e uma otimização
+que economizava 100 ms foi **revertida** por não valer 20 linhas de harness.
+
+### Higiene
+Os seis rótulos dos botões de toque (`ATQ`, `TÁT`, `ESQ`, `PULAR`, `CORRER`, `AGACHAR`)
+eram os **únicos textos de UI fora do `Strings`** no projeto — a auditoria de i18n
+olhava as telas, não os botões. Migrados, PT e EN.
+
+Gates: 40 arquivos Luau sem erro · `rojo build` limpo (935 KB) · harness **49/49** ·
+`npm run typecheck` limpo. **Nenhum número de `Balance` tocado.**
+
 ## v0.6.0 — 2026-08-19 — R12: as frentes que faltavam do roadmap
 
 Quatro frentes avançadas em paralelo, na ordem escrita em `docs/ANDROID.md` §5. As
