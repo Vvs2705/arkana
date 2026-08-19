@@ -40,6 +40,13 @@ Net.Names = {
 	--- fluxo do onboarding (Campo de Provas de 3 min): { step: string } C→S para
 	--- registrar progresso/abandono por passo, e S→C para conduzir o roteiro.
 	Tutorial = "Tutorial",
+	--- PREFERÊNCIAS que atravessam o rejoin. C→S: { prefs: { [string]: any } }
+	--- (o jogador mudou algo) · S→C: { prefs } no login. O servidor é quem
+	--- persiste — o cliente não tem DataStore. Nada aqui decide jogo: são
+	--- opções de conforto, então o pior que um cliente hostil faz é estragar as
+	--- PRÓPRIAS opções. Mesmo assim o servidor valida chave e tipo contra a
+	--- lista conhecida: chave livre vinda do cliente vira armazenamento grátis.
+	Settings = "Settings",
 	ProposeSintonia = "ProposeSintonia", -- { pos: Vector3 } (Ping de Sintonia, GDD §18.7)
 	AcceptSintonia = "AcceptSintonia", -- { fromUserId: number }
 

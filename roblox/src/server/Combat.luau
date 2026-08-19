@@ -696,7 +696,14 @@ end
 
 --- Intenção validada pelo Main: conjurar básico (M1) ou tático (M2).
 --- Aqui a intenção é tratada como HOSTIL: vivo? cadência? mana? Só então age.
-function Combat.handleCast(player: Player, kind: string, dir: Vector3)
+--- `input` (R10) é TELEMETRIA e nada mais: "drag" (o gesto único do
+--- docs/ROBLOX.md §4), "tap" (toque curto) ou "key" (teclado/mouse). Vem
+--- sanitizado do `Main.server` por `Events.sanitizeInput` e não entra em
+--- NENHUMA decisão de jogo — se um dia entrar, virou vetor de trapaça, porque
+--- é a única coisa neste arquivo que o cliente declara sobre si mesmo. Existe
+--- porque o requisito de celular (mira e disparo em UM gesto) reprovou no teste
+--- do APK 2D e até aqui não havia como medir se a correção pegou.
+function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: string?)
 	local st = states[player]
 	if not st or cannotAct[player] or not isAlive(st) or not st.root or not st.root.Parent then
 		return -- eliminado não conjura (nem do poleiro de espectador)
@@ -723,6 +730,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 			kind = "basic",
 			pos = (st.root :: BasePart).Position,
 			mana_left = st.mana,
+			input = input,
 		})
 	elseif kind == "tactic" then
 		-- GDD §4 regra 2: TÁTICA usa COOLDOWN, nunca mana
@@ -740,6 +748,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3)
 			kind = "tactic",
 			pos = (st.root :: BasePart).Position,
 			cooldown = cd,
+			input = input,
 		})
 	end
 	sendStats(st)

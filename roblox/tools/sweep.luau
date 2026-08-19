@@ -440,8 +440,15 @@ end
 -- ------------------------------------------------------------ TTK "de tabela"
 --- Duelo parelho TEORICO, direto do Balance: espelho 1v1, todo tiro de basico
 --- acerta, sem esquiva, sem tatica, sem viagem de projetil. E' o LIMITE INFERIOR
---- do TTK real — serve de regua fixa contra o alvo (p50 2,75-3,5s), imune ao
---- ruido do piloto. EHP = hp + escudo nivel 1.
+--- do TTK real, imune ao ruido do piloto. EHP = hp + escudo nivel 1.
+---
+--- DUAS REGUAS, E ELAS DISCORDAM (achado da R10). Este arquivo media so' contra
+--- 2,75-3,5s ("alvo da auditoria") e vinha concluindo "5/5 DENTRO do alvo" desde
+--- a R7 — mas `docs/GDD.md:168`, que e' a FONTE DA VERDADE do projeto, define
+--- "TTK alvo: ~1,5-2,5s em duelo parelho", e contra essa nenhum dos cinco esta'
+--- dentro. Qual vale e' decisao do DIRETOR; o relatorio nao escolhe por ele, e
+--- passou a mostrar as DUAS com a origem no nome. Numero que finge conclusao
+--- destroi a confianca em todos os outros do relatorio.
 local function mirrorTtk(Balance, el)
 	local spec = Balance.elements[el].basic
 	local ehp = Balance.player.hp + Balance.shield.caps[1]
@@ -644,7 +651,9 @@ w("partidas ......... %d rodadas · %d terminaram · %d falharam no boot", #reco
 
 w("")
 w("-- V2: TTK (1o dano sofrido -> queda) --------------------------------")
-w("   alvo da auditoria: p50 entre 2,75s e 3,5s em duelo parelho")
+w("   DUAS REGUAS (elas discordam — a escolha e' do Diretor, R10):")
+w("     GDD linha 168 (design, FONTE DA VERDADE) ... 1,50s a 2,50s")
+w("     auditoria externa (recomendacao) ........... 2,75s a 3,50s")
 w("   human_only    %4d amostras   p10 %6.2fs   p50 %6.2fs   p90 %6.2fs", #ttkH, percentile(ttkH, 0.1), percentile(ttkH, 0.5), percentile(ttkH, 0.9))
 w("   all_entities  %4d amostras   p10 %6.2fs   p50 %6.2fs   p90 %6.2fs", #ttkA, percentile(ttkA, 0.1), percentile(ttkA, 0.5), percentile(ttkA, 0.9))
 w("   (amostras vem de partidas com bots — incluem fogo cruzado e zona;")
@@ -653,11 +662,18 @@ w("   TTK TEORICO de duelo espelho (Balance puro: so' basico, tudo acerta,")
 w("   sem esquiva/tatica/viagem — limite INFERIOR do real; EHP=%d):", Balance.player.hp + Balance.shield.caps[1])
 for _, el in ipairs({ "Fire", "Water", "Earth", "Wind", "Lightning" }) do
 	local t = mirrorTtk(Balance, el)
-	local flag = if t >= 2.75 and t <= 3.5
-		then "DENTRO do alvo"
-		elseif t < 2.75 then "ABAIXO do alvo (mata rapido demais)"
-		else "acima do alvo (esperado p/ limite inferior)"
-	w("     %-10s %6.2fs   %s", el, t, flag)
+	local function verdict(lo, hi)
+		return if t >= lo and t <= hi then "DENTRO" elseif t < lo then "ABAIXO" else "ACIMA"
+	end
+	local gdd, audit = verdict(1.5, 2.5), verdict(2.75, 3.5)
+	w(
+		"     %-10s %6.2fs   GDD: %-6s   auditoria: %-6s%s",
+		el,
+		t,
+		gdd,
+		audit,
+		if gdd ~= audit then "   << as reguas DISCORDAM" else ""
+	)
 end
 
 local ELS = { "Fire", "Water", "Earth", "Wind", "Lightning" }

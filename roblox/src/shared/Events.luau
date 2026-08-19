@@ -22,8 +22,18 @@ Events.Name = {
 	-- partida
 	MatchStart = "match_start",
 	MatchEnd = "match_end",
-	SessionEnd = "session_end",
 	TutorialStep = "tutorial_step",
+
+	--- SESSÃO — o par que responde a pergunta V5 ("o combate é gostoso o
+	--- bastante para o jogador VOLTAR?", docs/ROBLOX.md §1). Era a única das
+	--- cinco perguntas sem uma linha de instrumentação: `SessionEnd` estava
+	--- declarado neste schema desde a R5 e NUNCA foi emitido.
+	--- Ninguém mede "volta amanhã" numa sessão — mede-se o que o alpha ENTREGA:
+	--- quanto tempo ficou, quantas provas jogou, e EM QUE PONTO desistiu. Um
+	--- jogador que sai no lobby, um que sai no meio da primeira prova e um que
+	--- fica para a terceira são três respostas diferentes para a mesma pergunta.
+	SessionStart = "session_start",
+	SessionEnd = "session_end",
 
 	-- combate
 	SpellCast = "spell_cast",
@@ -75,6 +85,23 @@ Events.CONTEXT_FIELDS = {
 	"alive_count",
 	"zone_phase",
 }
+
+--- MODO DE ENTRADA do disparo — a régua do requisito de celular (docs/ROBLOX.md
+--- §4: "mira e disparo em UM gesto", que reprovou no teste do APK 2D). Viaja
+--- como campo do `spell_cast` já existente, e não como remote novo: é PURA
+--- telemetria, mentir aqui não dá vantagem nenhuma, e um remote a mais é
+--- superfície de ataque a mais num lugar público.
+---   drag = arrastou do botão e soltou (o gesto único)
+---   tap  = toque curto (disparo rápido na direção da câmera)
+---   key  = teclado/mouse (PC)
+Events.INPUT_KINDS = { drag = true, tap = true, key = true }
+
+--- Só o que está na lista entra no dado. Entrada desconhecida vira `nil` (e não
+--- "unknown"): categoria inventada por cliente hostil não pode criar coluna no
+--- relatório do Diretor.
+function Events.sanitizeInput(raw: any): string?
+	return if typeof(raw) == "string" and Events.INPUT_KINDS[raw] then raw else nil
+end
 
 --- Granularidade do bucket de posição: telemetria não precisa de coordenada
 --- exata, precisa de "onde no mapa" — e agregar reduz volume e ruído.

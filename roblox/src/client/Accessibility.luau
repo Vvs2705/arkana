@@ -28,9 +28,18 @@
 --   · HÁPTICO/VIBRAÇÃO fica com o menu nativo do Roblox — não há toggle aqui de
 --     propósito (recriar daria dois lugares para a mesma escolha).
 --
--- PERSISTÊNCIA: atributos no LocalPlayer. Sobrevive a respawn e a partida
--- inteira, é 100% cliente e não custa remote. NÃO sobrevive a rejoin — isso
--- exige DataStore, que é do servidor (outra raia). Ver RELATÓRIO/gancho.
+-- PERSISTÊNCIA EM DOIS ANDARES:
+--   · SESSÃO — atributos no LocalPlayer. Sobrevive a respawn, é 100% cliente e
+--     não custa remote.
+--   · REJOIN — `Net.Names.Settings`. Toda escolha do jogador sobe para o
+--     `server/Prefs.luau`, que guarda no DataStore e devolve no login. Quem
+--     baixou o volume ou ligou o alto contraste não leva o susto de novo (R10).
+--     O que chega do servidor popula ESTA loja (`A11y.load`), antes de o jogador
+--     abrir a tela — não existe segunda loja para sincronizar.
+--   · O que ele NUNCA tocou não sobe. Os padrões de tremor/flash/contraste
+--     nascem dos sinais nativos (ReducedMotion, PreferredTransparency): salvar o
+--     valor DERIVADO congelaria a escolha de acessibilidade que o jogador fizer
+--     no Roblox depois.
 -- ============================================================================
 
 local GuiService = game:GetService("GuiService")
@@ -125,6 +134,13 @@ local ATTR = "Arkana_"
 local prefs: { [string]: any } = {}
 local loaded = false
 local listeners: { (string) -> () } = {}
+--- chaves que o JOGADOR mexeu nesta sessão. Duas funções: (1) só elas sobem para
+--- o servidor — o resto continua obedecendo à plataforma; (2) a resposta atrasada
+--- do DataStore não desfaz o que ele acabou de escolher.
+local touched: { [string]: boolean } = {}
+--- true enquanto aplicamos o que VEIO do servidor: sem isto, cada preferência
+--- carregada no login voltaria pelo remote como se fosse escolha nova.
+local applying = false
 
 local function ensureLoaded()
 	if loaded then
@@ -311,6 +327,68 @@ local function applyVolume()
 	end
 end
 
+-- ------------------------------------------------------------------ rejoin
+--- Mesmo require preguiçoso e protegido do `audio()`: sem o `Net` as opções
+--- valem por sessão (o comportamento de antes) e ninguém fica sem jogar.
+local netMod: any = nil
+local settingsRemote: RemoteEvent? = nil
+
+local function remote(): RemoteEvent?
+	if settingsRemote then
+		return settingsRemote
+	end
+	if netMod == nil then
+		local ok, m = pcall(function()
+			return require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Net")) :: any
+		end)
+		netMod = (ok and m) or false
+	end
+	if not netMod then
+		return nil
+	end
+	--- ATENÇÃO: `Net.event` no cliente espera o remote existir (WaitForChild).
+	--- Quem chama isto está sempre dentro de uma thread própria — ver `init`.
+	local ok, ev = pcall(netMod.event, netMod.Names.Settings)
+	settingsRemote = (ok and ev) or nil
+	return settingsRemote
+end
+
+--- C→S: uma preferência mudou. Uma mensagenzinha por chip clicado; o servidor
+--- NÃO escreve no DataStore por mensagem (ele acumula e grava na saída).
+local sentCount = 0 -- só para o autoteste: "isto realmente subiu?"
+local listening = false
+
+--- S→C: o que o servidor tinha salvo no login. Função nomeada (e idempotente)
+--- porque o autoteste liga a fiação e dispara o remote — fio que ninguém testa é
+--- fio que só aparece quebrado no playtest.
+local function listenServer()
+	if listening then
+		return
+	end
+	local ev = remote()
+	if not ev then
+		return
+	end
+	listening = true
+	ev.OnClientEvent:Connect(function(payload: any)
+		if typeof(payload) == "table" then
+			A11y.load((payload :: any).prefs)
+		end
+	end)
+end
+
+local function sendPref(key: string, value: any)
+	sentCount += 1
+	task.spawn(function()
+		local ev = remote()
+		if ev then
+			pcall(function()
+				ev:FireServer({ prefs = { [key] = value } })
+			end)
+		end
+	end)
+end
+
 -- ------------------------------------------------------------------ legendas
 --- FAIXA DE LEGENDAS: um lugar só, sempre o mesmo, para os cues críticos —
 --- "SINTONIA CANALIZANDO", "FORA DA ZONA". Quem joga sem som (ou no ônibus, que
@@ -478,6 +556,10 @@ function A11y.set(key: string, value: any)
 	if p then
 		p:SetAttribute(ATTR .. key, value)
 	end
+	if not applying then
+		touched[key] = true
+		sendPref(key, value) -- atravessa o rejoin (server/Prefs.luau)
+	end
 	applyAll()
 	if not prefs.captions then
 		capLeft = 0
@@ -503,6 +585,24 @@ function A11y.onChange(fn: (string) -> ())
 	table.insert(listeners, fn)
 end
 
+--- S→C: o que estava salvo do rejoin passado entra AQUI, na mesma loja, pela
+--- mesma porta (`A11y.set` valida chave e tipo dos dois lados). Não volta pelo
+--- remote e não pisa no que o jogador já mexeu nesta sessão — a resposta do
+--- DataStore pode chegar depois de ele abrir a tela.
+function A11y.load(incoming: any)
+	ensureLoaded()
+	if typeof(incoming) ~= "table" then
+		return
+	end
+	applying = true
+	for key, value in pairs(incoming :: { [string]: any }) do
+		if not touched[key] then
+			A11y.set(key, value)
+		end
+	end
+	applying = false
+end
+
 -- ------------------------------------------------------------------ API
 function A11y.init(_player: Player?)
 	ensureLoaded()
@@ -518,6 +618,11 @@ function A11y.init(_player: Player?)
 		end)
 	end
 	Lighting.ChildAdded:Connect(applyBlurTo)
+
+	--- Thread PRÓPRIA: `Net.event` no cliente espera o remote replicar
+	--- (WaitForChild). O `Main.client` chama os `init` em sequência — ceder aqui
+	--- seguraria o HUD inteiro por uma opção de conforto.
+	task.spawn(listenServer)
 end
 
 function A11y.update(dt: number)
@@ -602,7 +707,48 @@ function A11y.selfTest()
 	A11y.set("volMaster", wasVol)
 	A11y.set("captions", wasCap)
 
-	print("[Accessibility] autoteste OK — espelho canhoto/destro · volume (loja única, mudo↔legendas)")
+	-- -------------------------------------------------------------- rejoin
+	-- O que o servidor devolve no login entra na MESMA loja, pela mesma porta.
+	local wasBlur, wasSize = A11y.get("blur"), A11y.get("uiSize")
+	local wasTouched = touched.blur
+	touched.blur = nil
+
+	-- 1) o que veio do servidor popula ESTA loja, e pela mesma porta validada
+	A11y.load({ blur = false, hackKey = 1, uiSize = "grande" })
+	assert(A11y.get("blur") == false, "o que veio do servidor não populou a loja")
+	assert(A11y.get("hackKey") == nil, "chave desconhecida do servidor entrou na loja do cliente")
+	assert(A11y.get("uiSize") == wasSize, "tipo errado vindo do servidor sobrescreveu a preferência")
+
+	-- 2) …e NÃO volta pelo remote (eco = uma escrita de DataStore por login)
+	local sent = sentCount
+	touched.blur = nil
+	A11y.load({ blur = true })
+	assert(sentCount == sent, "o que veio do servidor voltou pelo remote (eco)")
+
+	-- 3) a escolha do JOGADOR sobe
+	A11y.set("blur", false)
+	assert(sentCount > sent, "a escolha do jogador não subiu para o servidor — nada atravessa o rejoin")
+
+	-- 4) o jogador mexeu ANTES de a resposta do DataStore chegar: ele vence
+	A11y.load({ blur = true })
+	assert(A11y.get("blur") == false, "a resposta atrasada do servidor desfez a escolha da sessão")
+
+	-- 5) O FIO: o remote S→C está mesmo ligado na loja. Só dá para disparar um
+	--    sinal à mão no runner headless; no Studio um RBXScriptSignal não tem
+	--    `Fire` e este trecho fica de fora (o resto do teste continua valendo).
+	listenServer()
+	local ev = settingsRemote
+	local fire = if ev then (ev.OnClientEvent :: any).Fire else nil
+	if fire then
+		touched.blur = nil
+		fire(ev.OnClientEvent, { prefs = { blur = true } })
+		assert(A11y.get("blur") == true, "o remote S→C não está ligado na loja: nada atravessa o rejoin")
+	end
+
+	A11y.set("blur", wasBlur)
+	touched.blur = wasTouched
+
+	print("[Accessibility] autoteste OK — espelho canhoto/destro · volume (loja única, mudo↔legendas) · rejoin")
 	return true
 end
 

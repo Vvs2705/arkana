@@ -15,6 +15,9 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Balance = require(Shared:WaitForChild("Balance"))
+--- schema de telemetria: só para SANEAR o modo de entrada do disparo (drag/tap/
+--- key). Nada aqui decide jogo — ver o handler de CastSpell.
+local Events = require(Shared:WaitForChild("Events"))
 
 local ServerModules = ServerScriptService:WaitForChild("Server")
 local Arena = require(ServerModules:WaitForChild("Arena"))
@@ -71,10 +74,30 @@ if Grimoire and Grimoire.init then
 	pcall(Grimoire.init, Terrain, Combat)
 end
 
+-- PREFERÊNCIAS que atravessam o rejoin (R10). Opcional e protegido como o
+-- Grimório: sem ele o jogador entra com os padrões e joga — que é exatamente o
+-- comportamento de antes desta fase. `Prefs.init` se auto-fia (PlayerAdded,
+-- PlayerRemoving, BindToClose e quem já estava dentro), e as funções de ciclo de
+-- vida são idempotentes: fiar aqui não faz carregar nem salvar duas vezes.
+-- Nada aqui decide jogo — são opções de conforto do próprio jogador.
+local okPrefs, Prefs = pcall(require, ServerModules:WaitForChild("Prefs") :: ModuleScript)
+if not okPrefs then
+	warn("[ARKANA] preferências não persistem nesta sessão: " .. tostring(Prefs))
+	Prefs = nil
+end
+if Prefs and Prefs.init then
+	pcall(Prefs.init)
+end
+
 -- Telemetria por último: observa todos os outros, não é observada por ninguém.
 -- Protegida por pcall — se o coletor quebrar, a partida continua de pé.
 local okTelemetry, Telemetry = pcall(require, ServerModules:WaitForChild("Telemetry") :: ModuleScript)
-if okTelemetry and Telemetry and Telemetry.init then
+if not okTelemetry then
+	--- normaliza para nil (o pcall devolve a MENSAGEM de erro no lugar do
+	--- módulo): quem consultar `Telemetry` embaixo pergunta uma coisa só.
+	Telemetry = nil
+end
+if Telemetry and Telemetry.init then
 	pcall(Telemetry.init, Terrain, Combat, Match)
 else
 	warn("[ARKANA] telemetria indisponível — o jogo segue, os dados não")
@@ -94,7 +117,46 @@ Net.event(Net.Names.CastSpell).OnServerEvent:Connect(function(player, payload)
 	if not dir then
 		return
 	end
-	Combat.handleCast(player, kind, dir)
+	--- MODO DE ENTRADA (drag/tap/key) — a régua do requisito de celular
+	--- (docs/ROBLOX.md §4: "mira e disparo em UM gesto"). Viaja de carona neste
+	--- payload em vez de num remote novo: é telemetria PURA (mentir não dá
+	--- vantagem) e um remote a mais seria superfície de ataque a mais.
+	--- Categoria fora de Events.INPUT_KINDS vira nil — nunca "unknown", nunca
+	--- coluna inventada por cliente hostil no relatório do Diretor.
+	--- NÃO ENTRA EM DECISÃO NENHUMA: o Combat recebe como 4º argumento e o
+	--- ignora até publicar a assinatura nova (ver relatório da raia B/R10).
+	local input = Events.sanitizeInput((payload :: any).input)
+	Combat.handleCast(player, kind, dir, input)
+end)
+
+--- RELATO DO APARELHO (Net.Names.DeviceInfo). O cliente MANDA isto desde a R5
+--- (client/Device.luau) — o que nunca existiu foi este ouvinte, então o dado
+--- chegava e era jogado fora, e `device_tier` saía "unknown" em TODO evento.
+--- Sem ele não dá para saber quantos do playtest estavam num telefone, que é
+--- exatamente o que o gate de celular precisa medir.
+--- É telemetria pura: nada de jogo depende disto (docs/ROBLOX.md §3).
+--- Payload HOSTIL até validar: `tier` só pode ser uma das três classes e
+--- `touch` tem de ser booleano. A raia A valida de novo lá dentro — validar
+--- dos dois lados é barato e este handler não pode confiar no que chega.
+local deviceReported: { [Player]: boolean } = {}
+Net.event(Net.Names.DeviceInfo).OnServerEvent:Connect(function(player, payload)
+	if typeof(payload) ~= "table" or deviceReported[player] then
+		return -- o contrato é UMA vez por sessão; repetição é ruído ou flood
+	end
+	local p = payload :: any
+	if p.tier ~= "low" and p.tier ~= "mid" and p.tier ~= "high" then
+		return
+	end
+	if typeof(p.touch) ~= "boolean" then
+		return
+	end
+	deviceReported[player] = true
+	--- TELEMETRIA NÃO DERRUBA O JOGO: o módulo pode ter faltado no boot e a API
+	--- pode ainda não estar publicada. Nos dois casos o relato se perde e a
+	--- partida continua idêntica.
+	if Telemetry and Telemetry.setDevice then
+		pcall(Telemetry.setDevice, player, p.tier, p.touch)
+	end
 end)
 
 Net.event(Net.Names.SwitchElement).OnServerEvent:Connect(function(player, payload)
@@ -167,7 +229,21 @@ local function onCharacter(player: Player, character: Model)
 	end
 end
 
+--- SESSÃO (R10) — o par que responde a pergunta V5 ("o combate segura o jogador
+--- até a próxima prova?"). É o ÚNICO recorte de telemetria que atravessa
+--- partida: `matchStart`/`matchEnd` zeram os agregados da prova, e a sessão
+--- precisa sobreviver a isso — quem jogou três provas é a resposta.
+--- POR QUE AQUI e não dentro do Telemetry: o coletor OBSERVA, não se inscreve em
+--- ciclo de vida de jogador — é o Main que fia todo mundo. Protegido por pcall
+--- pela regra de sempre: telemetria não decide jogo e não pode derrubar o boot.
+local function noteSession(player: Player, event: string)
+	if Telemetry and Telemetry.emit then
+		pcall(Telemetry.emit, event, player)
+	end
+end
+
 local function onPlayer(player: Player)
+	noteSession(player, Events.Name.SessionStart)
 	Combat.onPlayerAdded(player)
 	if Grimoire and Grimoire.onPlayerAdded then
 		pcall(Grimoire.onPlayerAdded, player)
@@ -186,6 +262,12 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	--- ANTES de qualquer desmontagem: o `session_end` é enriquecido com o
+	--- contexto de quem ainda ESTÁ na partida (fase da zona, vivos). Emitido
+	--- depois de o Match soltar o jogador, "onde ele desistiu" — o número mais
+	--- acionável da V5 — sairia vazio justamente na hora que interessa.
+	noteSession(player, Events.Name.SessionEnd)
+	deviceReported[player] = nil -- senão a tabela segura Player de quem já saiu
 	Combat.onPlayerRemoving(player)
 	Sintonia.onPlayerRemoving(player)
 	if Tutorial and Tutorial.onPlayerRemoving then

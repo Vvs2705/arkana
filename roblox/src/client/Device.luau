@@ -78,7 +78,6 @@ function Device.update(dt: number)
 	if acc < SAMPLE then
 		return
 	end
-	sent = true
 
 	local render = frames / acc
 	--- `GetRealPhysicsFPS` é o relógio de física (teto 60). Um aparelho que já
@@ -94,10 +93,23 @@ function Device.update(dt: number)
 	local viewportY = if cam then cam.ViewportSize.Y else 640
 
 	-- contrato de Net.Names.DeviceInfo: exatamente { tier, touch }
-	Net.event(Net.Names.DeviceInfo):FireServer({
-		tier = Device.tier(fps, touch, viewportY),
-		touch = touch,
-	})
+	--- ENVIO PROTEGIDO: no boot, a pasta `Remotes` pode ainda não ter replicado
+	--- e `Net.event` estoura (espera com tempo limite e devolve nil). Sem o
+	--- pcall o erro subia até o laço do Main.client, que TIRA O MÓDULO DE CENA
+	--- ao primeiro erro — e o relato do aparelho sumia calado, para sempre.
+	--- `sent` só trava quando o envio ACONTECEU; se falhou, a janela é
+	--- reamostrada e a próxima tenta de novo. Não é reenvio periódico: é a MESMA
+	--- remessa, e depois que ela passa nunca mais sai nada daqui.
+	local ok = pcall(function()
+		Net.event(Net.Names.DeviceInfo):FireServer({
+			tier = Device.tier(fps, touch, viewportY),
+			touch = touch,
+		})
+	end)
+	sent = ok
+	if not ok then
+		acc, frames = 0, 0
+	end
 end
 
 -- ============================================================================
@@ -112,7 +124,49 @@ function Device.selfTest()
 	assert(Device.tier(60, false, 1080) == "high", "desktop folgado tem de ser high")
 	assert(Device.tier(60, false, 600) == "mid", "tela pequena sem toque não é high")
 	assert(Device.tier(48, false, 1080) == "mid", "fps intermediário é mid")
-	print("[Device] autoteste OK — classificação de aparelho")
+
+	-- ------------------------------------------------- o relato SAI do cliente
+	--- Metade do contrato mora aqui: o cliente TEM de emitir, UMA vez, com a
+	--- forma exata { tier, touch }. Se este pedaço calar, `device_tier` volta a
+	--- sair "unknown" no servidor e ninguém percebe até o dashboard ficar vazio.
+	local got: any, hits = nil, 0
+	local conn = Net.event(Net.Names.DeviceInfo).OnServerEvent:Connect(function(_player, payload)
+		got, hits = payload, hits + 1
+	end)
+	--- alimenta a janela inteira (aquecimento + amostra) no ritmo pedido
+	local function feed(fps: number)
+		local dt = 1 / fps
+		for _ = 1, math.ceil((WARMUP + SAMPLE) * fps) + 2 do
+			Device.update(dt)
+		end
+	end
+
+	--- 1) remote ainda não replicado: NÃO pode estourar o frame do cliente
+	Device.init()
+	local realEvent = Net.event
+	Net.event = function()
+		error("Remotes ainda não replicou")
+	end
+	local survived = pcall(feed, 60)
+	Net.event = realEvent
+	assert(survived, "envio tem de sobreviver ao remote ausente")
+	assert(hits == 0, "nada pode ter saído enquanto o remote faltava")
+
+	--- 2) remote de volta: o relato que falhou ainda sai (não foi dado como
+	--- enviado enquanto não saiu)
+	feed(60)
+	assert(hits == 1, "o cliente TEM de reportar o aparelho quando o remote existe")
+	assert(typeof(got) == "table", "payload de DeviceInfo tem de ser tabela")
+	assert(got.tier == "low" or got.tier == "mid" or got.tier == "high", "tier fora do contrato: " .. tostring(got.tier))
+	assert(typeof(got.touch) == "boolean", "touch tem de ser booleano")
+
+	--- 3) e é UMA vez por sessão — não vira torneira de rede
+	feed(60)
+	assert(hits == 1, "o contrato é UMA vez por sessão; virou reenvio")
+
+	conn:Disconnect()
+	Device.init() -- não deixa a sessão de teste marcada como já reportada
+	print("[Device] autoteste OK — classificação e relato do aparelho")
 	return true
 end
 

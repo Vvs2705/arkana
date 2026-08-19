@@ -15,6 +15,10 @@
 --   P.duo(3)         -- idem, mas com exatamente 3 bots (teste sozinho precisa
 --                       de pelo menos 1 — com 0 bots e 1 humano a partida acaba
 --                       na hora, porque só há um vivo).
+--   P.stop()         -- ENCERRA a partida em andamento: fecha a janela da
+--                       telemetria (o relatório sai sozinho) e cai na tela de
+--                       fim, como uma vitória. É o que permite repetir uma
+--                       condição sem reiniciar o Studio.
 --   P.report()       -- imprime o relatório da telemetria AGORA (pode chamar no
 --                       meio da partida; a coleta continua).
 --   P.variant()      -- mostra qual coorte de Sintonia está ativa (A ou B).
@@ -24,13 +28,14 @@
 --   P.reset()        -- DESCARTA o que foi coletado, abre janela nova e devolve
 --                       os valores de Balance.match que o `duo()` mexeu.
 --
--- POR QUE `duo()` MEXE EM BALANCE E NÃO CHAMA O MATCH: o Match não expõe
--- `startMatch` (é local) nem `forceEnd`. O caminho honesto sem editar arquivo de
--- outra raia é mexer nos MESMOS dados que o Match lê a cada passo do lobby.
--- ponytail: TETO CONHECIDO — isto é um empurrão no lobby, não um controle de
--- partida: não dá para ENCERRAR uma partida em andamento por aqui. O upgrade é
--- o Match expor `Match.forceStart()` / `Match.forceEnd()`; aí estas funções
--- viram uma linha cada.
+-- HISTÓRICO (R10): este cabeçalho dizia que o Match não expunha `forceStart` /
+-- `forceEnd` e que por isso `duo()` precisava EMPURRAR o lobby mexendo em
+-- `Balance.match`. A R8 criou as duas funções e anotou no Match que "era a
+-- pendência declarada no cabeçalho do Playtest" — mas ninguém voltou aqui. O
+-- resultado é que a ferramenta do Diretor passou duas fases mentindo que não
+-- dava para encerrar uma partida, e mexendo em números de balanceamento para
+-- fazer o que o Match já fazia direito. Agora são uma linha cada, como previsto,
+-- e `Balance` não é mais tocado por este módulo.
 --
 -- NOTA DE HONESTIDADE (A/B da Sintonia): `Balance.sintonia` é RESOLVIDA no
 -- require, a partir de `Balance.experiment.sintoniaVariant`, e a tabela de
@@ -53,26 +58,30 @@ local Balance = require(Shared:WaitForChild("Balance"))
 
 local Playtest = {}
 
---- valores originais do lobby, fotografados no require: `reset()` devolve.
-local ORIGINAL = {
-	lobbyWait = Balance.match.lobbyWait,
-	minPlayersToStart = Balance.match.minPlayersToStart,
-	fillWithBots = Balance.match.fillWithBots,
-	maxPlayers = Balance.match.maxPlayers,
-}
-
-local function telemetry(): any
-	local mod = script.Parent and script.Parent:FindFirstChild("Telemetry")
+local function sibling(name: string): any
+	local mod = script.Parent and script.Parent:FindFirstChild(name)
 	local ok, m = pcall(function()
 		return require(mod :: ModuleScript)
 	end)
 	return if ok then m else nil
 end
 
---- Começa a partida no próximo passo do Match, sem esperar os 25 s de lobby.
+local function telemetry(): any
+	return sibling("Telemetry")
+end
+
+local function match(): any
+	return sibling("Match")
+end
+
+--- Começa a partida AGORA, sem esperar os 25 s de lobby.
 --- `bots` = quantos bots entram (0 = só humanos, que é o teste de duplas).
 function Playtest.duo(bots: number?): boolean
-	local M = Balance.match
+	local M = match()
+	if not M or not M.forceStart then
+		warn("[Playtest] Match indisponível — este módulo só existe com o servidor de pé")
+		return false
+	end
 	local botCount = math.max(0, math.floor(tonumber(bots) or 0))
 	local humans = #Players:GetPlayers()
 	if humans == 0 then
@@ -82,25 +91,39 @@ function Playtest.duo(bots: number?): boolean
 	if humans + botCount < 2 then
 		warn("[Playtest] partida de 1 acaba sozinha: chame P.duo(1) ou entre com um segundo jogador")
 	end
-
-	M.lobbyWait = 0
-	-- PISCADA: por um passo o Match precisa achar que a partida NÃO pode
-	-- começar. É o único ramo em que ele reatribui `lobbyLeft = M.lobbyWait` —
-	-- ou seja, o único jeito de zerar uma contagem regressiva já em curso.
-	M.minPlayersToStart = math.huge
-	M.fillWithBots = false
-	RunService.Heartbeat:Wait()
-
-	M.minPlayersToStart = 1
-	M.fillWithBots = botCount > 0
-	M.maxPlayers = humans + botCount
-	RunService.Heartbeat:Wait()
-
+	if not M.forceStart(botCount) then
+		-- a única recusa possível: já existe partida rodando. Dizer QUAL é o
+		-- caminho vale mais do que um `false` mudo na Command Bar.
+		warn("[Playtest] já há uma partida em andamento — chame P.stop() antes de começar outra")
+		return false
+	end
 	-- NÃO abrimos a janela de telemetria aqui: o próprio Match chama
-	-- `Telemetry.matchStart(matchId)` dentro do `startMatch` que acabou de rodar
-	-- neste mesmo Heartbeat. Chamar de novo zeraria a coleta que acabou de abrir
-	-- (e trocaria o id da partida por um apelido).
-	print(string.format("[Playtest] partida forçada — %d humano(s) + %d bot(s), variante Sintonia %s", humans, botCount, tostring(Balance.experiment.sintoniaVariant)))
+	-- `Telemetry.matchStart(matchId)` dentro do `startMatch`. Chamar de novo
+	-- zeraria a coleta que acabou de abrir (e trocaria o id por um apelido).
+	print(
+		string.format(
+			"[Playtest] partida forçada — %d humano(s) + %d bot(s), variante Sintonia %s",
+			humans,
+			botCount,
+			tostring(Balance.experiment.sintoniaVariant)
+		)
+	)
+	return true
+end
+
+--- Encerra a partida em andamento. O relatório da telemetria sai sozinho no
+--- `matchEnd` — é o momento em que o Diretor lê.
+function Playtest.stop(): boolean
+	local M = match()
+	if not M or not M.forceEnd then
+		warn("[Playtest] Match indisponível")
+		return false
+	end
+	if not M.forceEnd() then
+		warn("[Playtest] não há partida em andamento para encerrar")
+		return false
+	end
+	print("[Playtest] partida encerrada — o relatório saiu acima (matchEnd)")
 	return true
 end
 
@@ -150,15 +173,13 @@ end
 
 --- Descarta a coleta, abre janela nova e devolve o lobby ao que era.
 function Playtest.reset(): boolean
-	Balance.match.lobbyWait = ORIGINAL.lobbyWait
-	Balance.match.minPlayersToStart = ORIGINAL.minPlayersToStart
-	Balance.match.fillWithBots = ORIGINAL.fillWithBots
-	Balance.match.maxPlayers = ORIGINAL.maxPlayers
+	-- nada de Balance para devolver: desde a R10 o `duo()` chama
+	-- `Match.forceStart` e este módulo não escreve mais em balanceamento.
 	local tel = telemetry()
 	if tel and tel.matchStart then
 		pcall(tel.matchStart, "reset")
 	end
-	print("[Playtest] lobby restaurado e telemetria zerada (o que foi coletado FOI DESCARTADO)")
+	print("[Playtest] telemetria zerada (o que foi coletado FOI DESCARTADO)")
 	return true
 end
 

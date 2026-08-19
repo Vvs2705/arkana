@@ -2,6 +2,70 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.4.0-roblox — 2026-08-18 — R10: a medição que faltava para o playtest valer
+
+O produto existe para responder **cinco perguntas** (`docs/ROBLOX.md` §1). Esta fase
+foi auditar se ele consegue — e a resposta era não.
+
+**A V5 ("o combate segura o jogador até a próxima prova?") não tinha uma linha de
+instrumentação**, e `Events.Name.SessionEnd` estava declarado no schema desde a R5
+**sem nunca ter sido emitido**. Agora há sessão que ATRAVESSA partidas (o único
+recorte que `matchStart`/`matchEnd` não zeram): quanto tempo ficou, quantas provas
+jogou, e **em que ponto desistiu** — lobby, onboarding, meio da prova ou depois
+dela. São quatro consertos diferentes, e por isso não viram um número só.
+
+**`device_tier` saía "unknown" por um bug, não por falta de feature.** A pendência
+dizia "falta o cliente reportar plataforma"; o cliente reporta desde sempre
+(`Device.luau` dispara `Net.Names.DeviceInfo`) e **nunca existiu handler no
+servidor**. O dado era enviado e jogado fora — por duas fases, com o diagnóstico
+errado registrado. Fiado, e o portão agora dispara o remote de verdade e reprova se
+a ponta a ponta abrir.
+
+**O disparo passou a carimbar o gesto** (`drag` / `tap` / `key`) — a régua do
+requisito de celular do §4, que reprovou no teste do APK 2D e até aqui não tinha
+como ser medido. Viaja como campo do `spell_cast` que já existia: é telemetria
+pura, e um remote a mais seria superfície de ataque a mais num lugar público.
+
+**O relatório passou a responder as cinco perguntas por nome**, com o número e a
+decisão que ele muda. Amostra pequena sai como `n=4, NÃO CONCLUI` em vez de
+percentil de anedota.
+
+### A régua do TTK estava contraditória — e o relatório afirmava sucesso contra a mais frouxa
+`docs/GDD.md:168`, fonte da verdade, define **TTK ~1,5–2,5s**. A varredura media
+contra **2,75–3,5s** ("alvo da auditoria") e vinha concluindo **"5/5 DENTRO do
+alvo" desde a R7** — contra a régua do GDD, nenhum dos cinco está dentro. As duas
+réguas são legítimas e ninguém as reconciliou. **Qual vale é decisão do Diretor**:
+os relatórios passaram a mostrar as duas, com a origem no nome, e a avisar quando
+discordam. Nenhum número de `Balance` foi tocado.
+
+### Também nesta fase
+- **Preferências atravessam o rejoin** (`server/Prefs.luau`): as 11 opções de
+  conforto morriam na saída — quem baixava o volume levava o susto de novo a cada
+  entrada. O servidor guarda só o TIPO de cada chave, nunca o valor: os padrões
+  continuam num lugar só e não há dois números para divergir. Zero escritas durante
+  a partida (uma por sessão, na saída, mais `BindToClose`).
+- **`Playtest.luau` parou de mentir**: o cabeçalho dizia que não dava para encerrar
+  partida em curso e o módulo empurrava o lobby escrevendo em `Balance.match`.
+  `Match.forceStart/forceEnd` existem desde a R8 — agora `P.duo()` chama o Match, há
+  **`P.stop()`**, e a ferramenta do Diretor não escreve mais em balanceamento.
+- **Protocolo do playtest alfa** (`docs/ROBLOX.md` §11): arranjo, duração, o que o
+  Diretor NÃO pode dizer (a V1 é "a dupla aperta COMBO sem você mandar"), como o
+  relatório chega num lugar publicado, limiar de "bom" por pergunta e as
+  contradições encontradas entre documento e código.
+- **`Discovery` era coletado e nunca impresso** — a melhor proxy de "descobriu a
+  química sozinho" (V3) estava invisível. E a distribuição de dano por jogador
+  humano entrou no relatório: sem ela o gatilho pós-playtest do escudo era
+  inacionável justamente quando houvesse dado humano.
+
+### Continua aberto, declarado no próprio relatório
+`Events.Name.TerrainTacticalOutcome` está no schema e é consumido, mas **ninguém o
+emite** — a V3 fica sem métrica de DESFECHO e sobra a descoberta do Grimório como
+proxy honesta. E o funil da V1 é contaminado pelo tutorial, que usa o ping de
+verdade: a mitigação é ter todo mundo dentro antes da largada.
+
+Gates: 40 arquivos Luau sem erro · `rojo build` limpo (822 KB) · harness **46/46**.
+**Nenhum número de `Balance` foi tocado.**
+
 ## v0.3.0-roblox — 2026-08-18 — R9: robustez com teste, anti-griefing e a tela do estranho
 
 Fase de **preparo para o alpha público**. Nada de feature nova: o alvo foi o que

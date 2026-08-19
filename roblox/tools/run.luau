@@ -147,7 +147,26 @@ serverEvent(Net.Names.CastSpell):Connect(function(player, payload)
 	if not dir then
 		return
 	end
-	Combat.handleCast(player, kind, dir)
+	--- `input` (R10) espelha o Main: modo de entrada do disparo, PURA telemetria
+	--- (drag = o gesto único do §4 · tap · key). Sanitizado aqui também porque
+	--- este espelho é o que o portão executa — validação que só existe no
+	--- arquivo que o teste NÃO roda é validação que ninguém verifica.
+	Combat.handleCast(player, kind, dir, boot.Events.sanitizeInput(payload.input))
+end)
+--- Espelha o handler que a R10 criou no Main. O cliente reporta o aparelho
+--- desde a R5 e NINGUÉM escutava — `device_tier` saía "unknown" em todo evento.
+--- Sem este espelho o portão jamais exercitaria o caminho de volta.
+serverEvent(Net.Names.DeviceInfo):Connect(function(player, payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	local tier = payload.tier
+	if tier ~= "low" and tier ~= "mid" and tier ~= "high" then
+		return
+	end
+	if boot.Telemetry and boot.Telemetry.setDevice then
+		pcall(boot.Telemetry.setDevice, player, tier, payload.touch == true)
+	end
 end)
 serverEvent(Net.Names.SwitchElement):Connect(function(player, payload)
 	if typeof(payload) == "table" then
@@ -170,6 +189,13 @@ end)
 
 --- Mesma fiação por jogador do Main.server.luau (o Match/Combat dependem dela).
 local function wirePlayer(player)
+	--- SESSÃO (R10): mesma ordem do Main — `session_start` ANTES da fiação, e o
+	--- `session_end` sai na saída do jogador. É o único recorte que atravessa
+	--- partida (é a pergunta V5), então tem de estar no portão: instrumentação
+	--- sem emissor é exatamente o defeito que esta fase encontrou.
+	if boot.Telemetry and boot.Telemetry.emit then
+		pcall(boot.Telemetry.emit, boot.Events.Name.SessionStart, player)
+	end
 	Combat.onPlayerAdded(player)
 	player.CharacterAdded:Connect(function(char)
 		local humanoid = char:WaitForChild("Humanoid")
@@ -192,6 +218,41 @@ local okPlayers, errPlayers = xpcall(function()
 	end
 end, trace)
 record("partida", "2 jogadores entram", okPlayers, if okPlayers then nil else errPlayers)
+
+--- O CAMINHO QUE A R10 DESCOBRIU QUEBRADO. O cliente reporta o aparelho em
+--- `Net.Names.DeviceInfo` desde a R5 e NINGUEM escutava: `device_tier` saia
+--- "unknown" em todo evento, e a pendencia foi registrada por duas fases como
+--- "falta o cliente reportar" — diagnostico errado, o receptor e' que nao
+--- existia. Disparar o remote de verdade (com o Player certo, como o cliente
+--- faz) e' o unico jeito de o portao provar que a ponta a ponta fecha: handler
+--- espelhado + `Telemetry.setDevice` + contexto LENDO o carimbo. Sem isto o
+--- espelho acima seria mais um teste decorativo.
+local okDevice, devErr = xpcall(function()
+	for i, p in ipairs(players) do
+		serverEvent(boot.Net.Names.DeviceInfo):Fire(p, {
+			tier = if i == 1 then "mid" else "high",
+			touch = i == 1, -- um celular e um PC: o recorte de TOQUE precisa dos dois
+		})
+	end
+	--- e um disparo carimbado com o gesto unico (§4), pelo remote real: prova que
+	--- `input` sobrevive a sanitizacao do handler ate o evento `spell_cast`.
+	serverEvent(boot.Net.Names.CastSpell):Fire(players[1], {
+		kind = "basic",
+		dir = H.Vector3.new(1, 0, 0),
+		input = "drag",
+	})
+	local text = boot.Telemetry.report()
+	assert(
+		not string.find(text, "ninguem chamou `Telemetry.setDevice`", 1, true),
+		"o relato de aparelho nao chegou: `device_tier` continua 'unknown' (era o bug da R5 a R9)"
+	)
+	--- NAO basta o bloco existir: ele tem de CONTAR. Um assert que so' procura o
+	--- cabecalho passa com o agregador quebrado — foi assim que dois testes
+	--- decorativos escaparam nesta mesma fase.
+	local touchCasts = tonumber(string.match(text, "em aparelho de TOQUE %.*%s*(%d+) disparos")) or 0
+	assert(touchCasts > 0, "o `input` nao chegou ao `spell_cast`: recorte de TOQUE ficou em 0 disparos")
+end, trace)
+record("partida", "aparelho relatado + gesto carimbado", okDevice, if okDevice then nil else devErr)
 
 local okStart, startedOrErr = xpcall(function()
 	return Match.forceStart(8)

@@ -42,6 +42,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Balance = require(Shared:WaitForChild("Balance"))
 local Elements = require(Shared:WaitForChild("Elements"))
 local Net = require(Shared:WaitForChild("Net"))
+--- schema de telemetria: a lista fechada de modos de entrada (drag/tap/key).
+--- O autoteste confere os rótulos daqui contra ele — rótulo que o servidor
+--- descarta é rótulo que vira buraco calado no relatório.
+local Events = require(Shared:WaitForChild("Events"))
 local ControlsTouch = require(script.Parent:WaitForChild("ControlsTouch"))
 
 local Controls = {}
@@ -192,7 +196,9 @@ end
 
 -- ------------------------------------------------------------------ intenção
 
-local function doCast(kind: string, dir: Vector3)
+--- `input` é TELEMETRIA (Events.INPUT_KINDS): conta o que a pessoa FEZ para
+--- disparar. Não muda nada do tiro — o servidor ignora para efeito de jogo.
+local function doCast(kind: string, dir: Vector3, input: string)
 	local from = rootPosition()
 	if not from or not remCast then
 		return
@@ -200,7 +206,7 @@ local function doCast(kind: string, dir: Vector3)
 	if kind == "tactic" and not ready("tactic") then
 		return
 	end
-	(remCast :: RemoteEvent):FireServer({ kind = kind, dir = assisted(from, dir) })
+	(remCast :: RemoteEvent):FireServer({ kind = kind, dir = assisted(from, dir), input = input })
 	if kind == "tactic" then
 		startCooldown("tactic", (Balance.elements :: any)[element].tactic.cooldown)
 	else
@@ -302,6 +308,21 @@ local function updateDrag(g: Gesture, input: InputObject)
 	g.dir = if g.dragPx >= Balance.controls.aimDeadzonePx then screenToWorld(delta) else nil
 end
 
+--- MODO DE ENTRADA do disparo, decidido no GESTO e não no aparelho: telefone
+--- com teclado bluetooth existe, e o dado tem de dizer o que a pessoa FEZ.
+--- O InputObject vem do botão que iniciou o gesto (ControlsTouch entrega o
+--- objeto cru), então a origem é o próprio dispositivo do toque:
+---   dedo + arrastou = drag (o gesto único do docs/ROBLOX.md §4)
+---   dedo + toque curto = tap (tiro rápido na direção da câmera)
+---   mouse/teclado = key — inclusive clicando no botão de tela num PC com
+---   touchscreen: quem clicou não fez o gesto de celular.
+function Controls.inputKind(input: any, dragged: boolean): string
+	if input and input.UserInputType == Enum.UserInputType.Touch then
+		return if dragged then "drag" else "tap"
+	end
+	return "key"
+end
+
 local function release(g: Gesture)
 	if touchUi then
 		(touchUi :: TouchHandle).setPressed(g.kind, false)
@@ -315,7 +336,8 @@ local function release(g: Gesture)
 		-- mais útil do que a direção da câmera
 		doDodge(dir)
 	else
-		doCast(g.kind, dir or facing()) -- toque curto: tiro rápido, direção da câmera
+		-- toque curto: tiro rápido, direção da câmera
+		doCast(g.kind, dir or facing(), Controls.inputKind(g.input, dir ~= nil))
 	end
 end
 
@@ -471,7 +493,7 @@ local function bindKeyboard()
 		if input.UserInputType == Enum.UserInputType.MouseButton2 then
 			local from = rootPosition()
 			if from then
-				doCast("tactic", pcAimDirection(from))
+				doCast("tactic", pcAimDirection(from), "key") -- M2 é PC, sempre
 			end
 		end
 	end)
@@ -595,7 +617,7 @@ function Controls.update(_dt: number)
 		and not UserInputService:GetFocusedTextBox()
 	then
 		if os.clock() - lastBasic >= (Balance.elements :: any)[element].basic.fireRate then
-			doCast("basic", pcAimDirection(from))
+			doCast("basic", pcAimDirection(from), "key") -- M1 segurado: PC
 		end
 	end
 
@@ -630,6 +652,33 @@ end
 --- Esquema de mira (GDD §19.3): true = Simples (assistido) · false = Avançado.
 function Controls.setAimAssist(on: boolean)
 	aimAssist = on
+end
+
+-- ============================================================================
+-- AUTOTESTE — cole no Command Bar do Studio (cliente):
+--   require(game.Players.LocalPlayer.PlayerScripts.Client.Controls).selfTest()
+-- Cobre o CARIMBO DO MODO DE ENTRADA. Não cobre a máquina do gesto (que precisa
+-- de dedo de verdade) — cobre a classificação, que é o que vira número.
+-- ============================================================================
+function Controls.selfTest()
+	local finger = { UserInputType = Enum.UserInputType.Touch }
+	local mouse = { UserInputType = Enum.UserInputType.MouseButton1 }
+
+	assert(Controls.inputKind(finger, true) == "drag", "dedo que arrastou é o gesto único: drag")
+	assert(Controls.inputKind(finger, false) == "tap", "dedo em toque curto é tap")
+	assert(Controls.inputKind(mouse, true) == "key", "clique de mouse no botão de tela é PC: key")
+	assert(Controls.inputKind(mouse, false) == "key", "clique de mouse é PC mesmo sem arrasto")
+	assert(Controls.inputKind(nil, false) == "key", "sem InputObject, o caminho é o do PC")
+
+	--- O rótulo tem de SOBREVIVER ao servidor: `Events.sanitizeInput` derruba o
+	--- que não está na lista, e rótulo derrubado vira buraco calado no relatório.
+	for _, case in ipairs({ { finger, true }, { finger, false }, { mouse, true } }) do
+		local kind = Controls.inputKind(case[1], case[2] :: any)
+		assert(Events.sanitizeInput(kind) == kind, "rótulo fora de Events.INPUT_KINDS: " .. kind)
+	end
+
+	print("[Controls] autoteste OK — modo de entrada (drag/tap/key)")
+	return true
 end
 
 return Controls
