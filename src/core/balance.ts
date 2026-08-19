@@ -142,8 +142,22 @@ export const BAL = {
      * num telefone a 375 CSS e ~28dp num monitor 2560 -- o mesmo gesto pedia
      * esforcos completamente diferentes conforme o aparelho. Convertido em
      * `TouchControls` por `dpToPx`, a mesma funcao do piso de 48dp.
-     * CALIBRACAO: e' `feel`, entao o numero certo sai do playtest em aparelho.
+     *
+     * No gesto único (R15, GDD 19.3) o MESMO número é três coisas: onde o
+     * arrasto a partir do botão vira mira, o raio de "voltar ao centro" que
+     * cancela o disparo, e o que separa toque curto de arrasto. O Roblox usa
+     * 14 na escala de lá — calibração de lá, não referência.
+     * CALIBRACAO: knob de playtest em aparelho, SEMPRE junto com tapMaxMs
+     * (tocam a mesma sensação — medir separado dá leitura falsa, R14).
      */
     aimDeadzoneDp: 14,
+    /**
+     * Gesto único: soltar o botão até aqui (ms) sem arrastar = disparo rápido
+     * na última mira; segurar além disso sem arrastar = soltar CANCELA (o X
+     * no botão avisa). Roblox usa 0,18s — mas o WebView Android soma latência
+     * de toque, então o 2D começa mais folgado. KNOB DE PLAYTEST (par do
+     * aimDeadzoneDp).
+     */
+    tapMaxMs: 220,
   },
 } as const;

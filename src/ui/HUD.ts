@@ -19,6 +19,18 @@ import { t } from '../core/strings';
 const W = GAME_WIDTH;
 const H = GAME_HEIGHT;
 
+/**
+ * Margens seguras p/ celular (R15 — defeito do Diretor: HUD embaixo da barra
+ * de status). SAFE_TOP: a barra de status do Android tem 24dp; no pior caso
+ * comum (tela de 360dp de altura em landscape) isso vira 24 × 720/360 = 48px
+ * do canvas — o painel vital fica abaixo disso, então mesmo que a barra
+ * apareça (transiente, via swipe) o valor de vida continua legível.
+ * SAFE_EDGE: folga p/ cantos arredondados do display no que fica colado na
+ * borda (minimapa).
+ */
+const SAFE_TOP = 48;
+const SAFE_EDGE = 24;
+
 const L = {
   // painel inferior esquerdo (vida/escudo/mana)
   blX: 16, blY: H - 140, blW: 320, blH: 106,
@@ -39,7 +51,7 @@ const L = {
   dodgeX: W - 114, dodgeY: H - 124, dodgeR: 13,
 
   // minimapa (topo direito)
-  mapX: W - 166, mapY: 16, mapSize: 150,
+  mapX: W - 150 - SAFE_EDGE, mapY: SAFE_EDGE, mapSize: 150,
   /** amostra o terreno a cada 2 células → 30×30 amostras de 5px */
   mapStep: 2, mapCellPx: 5,
   mapRedrawMs: 500,
@@ -90,7 +102,7 @@ export class HUD {
    */
   private readonly touchMode = touchControlsEnabled();
   /** deslocamento vertical do painel esquerdo no modo toque */
-  private readonly blDy = this.touchMode ? -(L.blY - 34) : 0;
+  private readonly blDy = this.touchMode ? -(L.blY - SAFE_TOP) : 0;
 
   // barras (redesenhadas por frame num único Graphics)
   private barsG!: Phaser.GameObjects.Graphics;

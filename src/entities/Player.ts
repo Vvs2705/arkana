@@ -185,11 +185,17 @@ export class Player {
     // mana regenera devagar (GDD regra global 2)
     this.mana = Math.min(BAL.player.manaMax, this.mana + BAL.player.manaRegen * dt);
 
-    // ataques (botões seguráveis) — com toque ativo, o mouse é ignorado
-    // (tocar o joystick também é um pointer down e dispararia magias)
+    // ataques — com toque ativo, o mouse é ignorado (tocar o joystick também
+    // é um pointer down e dispararia magias). Dois caminhos, um só chega a
+    // sinalizar por vez (a TouchControls decide pelo Settings): clássico =
+    // segurar (attackHeld/tacticHeld); gesto único = soltar dispara UMA vez
+    // (consumeAttack/consumeTactic). Mana/cadência/cooldown seguem em tryBasic/
+    // tryTactic — o gesto não ganha regra própria.
     if (touch) {
       if (touch.attackHeld) this.tryBasic();
+      if (touch.consumeAttack()) this.tryBasic();
       if (touch.tacticHeld) this.tryTactic();
+      if (touch.consumeTactic()) this.tryTactic();
       if (touch.consumeDodge()) this.tryDodge();
     } else {
       if (p.leftButtonDown()) this.tryBasic();

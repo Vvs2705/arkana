@@ -14,6 +14,15 @@ export type KeyAction =
 export interface TouchSettings {
   /** 'auto' liga quando o dispositivo tem toque; 'on' força (teste no desktop) */
   mode: 'auto' | 'on' | 'off';
+  /**
+   * Gesto de disparo (R15 — GDD 19.3, pedido do Diretor 19/08):
+   * 'unified' = arrastar a partir do botão mira e soltar dispara (padrão);
+   * 'legacy'  = o esquema antigo de dois gestos (arrasto de mira na zona
+   * livre + segurar o botão = fogo contínuo).
+   * Campo NOVO: saves antigos ganham 'unified' pelo deepMerge do load SEM
+   * perder o `scheme` salvo — o esquema antigo continua a um toque no menu.
+   */
+  gesture: 'unified' | 'legacy';
   /** Simples = mira assistida (cone) · Avançado = mira 100% manual */
   scheme: 'simple' | 'advanced';
   /** multiplicador de escala dos controles (TOUCH.scaleMin..scaleMax) */
@@ -84,6 +93,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
     },
     touch: {
       mode: 'auto',
+      gesture: 'unified',
       scheme: 'simple',
       scale: 1.0,
       layout: defaultTouchLayout(),

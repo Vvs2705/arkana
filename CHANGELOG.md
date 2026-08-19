@@ -2,6 +2,55 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.9.0 — 2026-08-19 — R15: o pedido do primeiro playtest em aparelho
+
+**O Diretor instalou o APK e jogou** — primeiro teste em aparelho real desde a
+reprovação de 17/08. O veredito dele: magias OK (números de dano visíveis),
+movimentação "polida", e **o seletor de magia funcionando** — que era exatamente o
+defeito reprovado em 17/08; o conserto da R12 está confirmado em aparelho, por ele.
+Dois pedidos saíram do teste, e esta fase os entrega.
+
+### O botão de disparo virou a mira (pedido textual do Diretor)
+
+> *"o botão de disparo tem dupla funcionalidade: movimenta a direção da magia e
+> aciona o disparo"* — é o gesto único do GDD §19.3, implementado no 2D.
+
+Dedo desce no botão → arrastar mira como joystick (o cajado do mago acompanha o
+dedo) → **soltar dispara**. Toque curto = tiro rápido na última direção. **Voltar ao
+centro cancela**, e o cancelar é estado de primeira classe: anel branco = soltar
+dispara; **X vermelho** = soltar cancela (cor + FORMA, GDD §10). Tática segue o mesmo
+padrão; esquiva fica toque simples (a direção dela já vem do movimento, e é botão de
+pânico — arrasto só atrasaria a reação).
+
+**Medido no jogo rodando:** 8 arrastos em 8 direções = 8 projéteis com erro angular
+máximo de **0,41°**; cancelamento = **0 projéteis**; re-armar depois de cancelar
+dispara exato. Provado por defeito reintroduzido (a guarda do cancelamento ficou
+vermelha sozinha).
+
+O esquema clássico **não morreu**: vive atrás de `gesture: 'legacy'` no menu, e saves
+antigos migram sem perder o esquema de assistência. Knobs de playtest declarados:
+`tapMaxMs: 220` (mais folgado que o 0,18s do Roblox — WebView soma latência) e
+`aimDeadzoneDp: 14`, calibráveis **sempre juntos**.
+
+### A barra de status por cima da vida — e por que o documento mentia
+
+`docs/BUILD_ANDROID.md` dizia "tela cheia" porque o tema tinha `windowFullscreen=true`
+— **flag legada que o Android ignora a partir do targetSdk 35** (o projeto usa 36).
+O app já foi tela cheia; uma atualização de targetSdk o quebrou em silêncio, e a
+barra de status passou a cobrir o HUD.
+
+Conserto sem plugin novo: imersivo canônico na `MainActivity` (reaplicado ao voltar
+de outro app; swipe da borda mostra a barra translúcida por ~3s sem empurrar o
+layout), `windowLayoutInDisplayCutoutMode=shortEdges` (o recorte de câmera cai na
+faixa preta do letterbox, nunca sobre o jogo) e **margem de área segura no HUD**
+(painel vital 34→48px do topo; minimapa com folga do canto, que o Diretor notou
+colado). Provado no APK compilado: flags no tema extraído via aapt2, código imersivo
+no dex.
+
+Gates: typecheck limpo · os dois portões do build 2D verdes · APK compilado com o
+gesto e as flags DENTRO do pacote · harness Roblox **51/51** (nada tocado lá).
+**Nenhum número de `Balance` do Roblox tocado.**
+
 ## v0.8.0 — 2026-08-19 — R14: os alvos que sumiam, e a pergunta do celular com resposta
 
 ### O 2D: girar o aparelho tornava os controles inoperantes

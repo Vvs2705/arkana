@@ -284,7 +284,23 @@ export class SettingsScene extends Phaser.Scene {
     );
     this.note(y + 19, t('settings.touch.note'));
 
-    y = 316;
+    // gesto único (R15 — GDD 19.3): padrão 'unified'; o clássico continua aqui
+    y = 314;
+    const gestures: GameSettings['controls']['touch']['gesture'][] = ['unified', 'legacy'];
+    this.rowLabel(y, t('settings.touch.gesture'), 16);
+    this.makeSelect(
+      y,
+      [t('settings.touch.gesture.unified'), t('settings.touch.gesture.legacy')],
+      gestures.indexOf(c.touch.gesture),
+      (i) => {
+        Settings.update({
+          controls: { ...Settings.get().controls, touch: { ...Settings.get().controls.touch, gesture: gestures[i] } },
+        });
+      },
+    );
+    this.note(y + 19, t('settings.touch.gesture.note'));
+
+    y = 350;
     const schemes: GameSettings['controls']['touch']['scheme'][] = ['simple', 'advanced'];
     this.rowLabel(y, t('settings.touch.scheme'), 16);
     this.makeSelect(
@@ -298,7 +314,7 @@ export class SettingsScene extends Phaser.Scene {
       },
     );
 
-    y = 352;
+    y = 384;
     this.rowLabel(y, t('settings.touch.scale'), 16);
     this.makeSlider(y, TOUCH.scaleMin, TOUCH.scaleMax, 0.05, c.touch.scale, 2, (val) => {
       Settings.update({
@@ -306,7 +322,7 @@ export class SettingsScene extends Phaser.Scene {
       });
     });
 
-    y = 388;
+    y = 416;
     const editBtn = this.keep(this.add.text(LABEL_X, y, t('settings.touch.edit'), {
       fontFamily: FONTS.ui, fontSize: '16px', color: css(COLORS.gold),
     }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }));
@@ -320,12 +336,12 @@ export class SettingsScene extends Phaser.Scene {
     this.separator(y + 20);
 
     // remapeamento em DUAS colunas (4 ações por coluna); clicar captura a tecla
-    this.keep(this.add.text(LABEL_X, 428, t('settings.keys').toUpperCase(), {
+    this.keep(this.add.text(LABEL_X, 452, t('settings.keys').toUpperCase(), {
       fontFamily: FONTS.ui, fontSize: '13px', color: css(COLORS.textDim), letterSpacing: 3,
     }).setOrigin(0, 0.5));
     KEY_ACTIONS.forEach((action, i) => {
       const col = Math.floor(i / 4);
-      const rowY = 456 + (i % 4) * 34;
+      const rowY = 478 + (i % 4) * 30;
       const labelX = col === 0 ? LABEL_X : P_CX + 16;
       const boxCx = col === 0 ? P_CX - 140 : CTRL_R - 75;
       this.makeKeyRow(rowY, action, labelX, boxCx);
