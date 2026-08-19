@@ -2,6 +2,123 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.8.0 — 2026-08-19 — R14: os alvos que sumiam, e a pergunta do celular com resposta
+
+### O 2D: girar o aparelho tornava os controles inoperantes
+
+Medido com 15 toques sintéticos passando pelo hit-test do próprio Phaser:
+
+| | acertos | menor alvo |
+|---|---|---|
+| tela original | 15/15 | 48,0dp |
+| **depois de girar para 375 CSS** | **0/15** | **14,1dp** |
+| depois do conserto, em 5 resoluções | **15/15 em todas** | 48,0dp |
+
+**Zero de quinze**, sem sinal visível nenhum. Nada em `src/**` reagia a
+`Phaser.Scale.Events.RESIZE` — `minHitRadius()` era calculado uma vez no `build()`.
+A autoridade virou `TouchControls.refresh()`, método único e idempotente, com três
+gatilhos chamando o **mesmo** código.
+
+**Armadilha que teria feito o conserto falhar em silêncio:** chamar `setInteractive()`
+de novo **não troca a área** de um objeto que já tem input — o Phaser reaproveita o
+`InteractiveObject`. O recálculo seria ignorado calado.
+
+**E um defeito grave fora da lista:** `CombatVfx.destroy()` estourava no encerramento
+da cena (a câmera principal já não existe no SHUTDOWN). Consequência: **toda saída de
+partida** abortava a limpeza no meio, e TouchControls, HUD, pool, bots, terreno e
+player **nunca eram destruídos**.
+
+Também fechados: mudança de controle na pausa não pegava (a Arena nunca é recriada), e
+o destravamento de áudio era de **tiro único** — se o primeiro gesto falhasse, a
+partida inteira saía muda.
+
+### Os controles de toque eram a única tela sem acessibilidade
+
+**As quatro opções de tamanho de UI davam o mesmo alvo de dedo.** Quem precisa de alvo
+grande é exatamente quem foi mexer na opção, e não recebia nada. Agora uiSize 1,3 com
+o texto ampliado do Roblox dá **83px** contra os 49px de antes.
+
+A rota óbvia (`A11y.attach`) estava errada nos **dois** eixos: o `repaint` escreveria em
+`UIStroke.Transparency`, que é onde essa tela guarda **estado** (anel armado, elemento
+ativo) — em alto contraste todos acenderiam juntos; e o `attach` estampa um `UIScale`
+por filho, que cresce sem mexer na posição, jogando os botões uns por cima dos outros.
+
+De brinde: o nome do elemento no carrossel era **português cravado no código**.
+
+### A pergunta do celular ganhou resposta
+
+O relatório dizia *quanto* do toque usava o gesto — não se ele **funciona**. Agora:
+
+```
+gestos ARMADOS no toque ........ 41 (drag 6 + tap 1 + CANCELADOS 34)
+   CANCELADOS: 83% dos gestos armados foram ABORTADOS
+-- O GESTO UNICO RESOLVEU O CELULAR? (acerto por modo de entrada) ----
+   drag (o gesto unico)     11 acertos /   20 disparos  55%
+   key  (PC: a REGUA)       12 acertos /   20 disparos  60%
+   RESPOSTA: SIM — o arrasto empata com o PC (-5 pp)
+```
+
+Três coisas que essa resposta exigiu:
+
+1. **O `input` deixou de morrer no `spell_cast`** e passou a viajar no projétil até o
+   `spell_hit`. `drag%` alto diz que usam o gesto, não que ele acerta.
+2. **O PC entrou como grupo de controle.** Sem régua, "tão bom quanto" não tem contra o
+   quê. `n` é a **menor** das duas pernas, nunca a soma.
+3. **O CANCELAR virou dado.** Gesto armado e abortado não emitia nada: quem desiste
+   cinco vezes por abate era idêntico a quem nunca hesita.
+
+**Por que o cancelamento é um contador e não um 4º rótulo de `INPUT_KINDS`:** rótulo
+pega carona no disparo, e cancelamento **não tem disparo** — precisaria de um
+`spell_cast` falso, que entraria em `castsByElement`, o **denominador da dominância
+elemental**. Medir o cancelamento assim **quebraria a V4**.
+
+Quando o campo não chega, o relatório diz **`CEGO`**, nunca `0%`.
+
+### A maratona passou a ver os módulos que faltavam
+
+O S7 não carregava `Telemetry`, `Grimoire` e `Prefs` — justamente os de mais tabelas
+por jogador. O **S8** os sobe atrás de um booleano (`boot(tag, { full = true })`), e não
+num boot paralelo: *um boot copiado começa igual e diverge em silêncio, e no dia em que
+alguém consertar um e esquecer o outro, S1–S6 medem um servidor que não existe.*
+Provado com `diff` vazio contra as ferramentas anteriores.
+
+Resultado com 12 passantes distintos: **nenhum vazamento**. A única tabela que cresce
+(`sessHumans`) é o denominador que impede o acumulado de fingir conclusão.
+
+Dois métodos que valem além deste caso:
+- **A declaração virou asserção viva.** "Não dá para medir chave fraca porque o harness
+  fixa toda Instance" era um comentário; agora é um teste que fica **vermelho** se o
+  harness parar de fixar — obrigando a reler a declaração em vez de deixar um cenário
+  medindo o coletor de lixo em silêncio.
+- **Conexões se medem por DELTA**, não em absoluto: o número absoluto precisa de um
+  contrato que ninguém tem; o delta não — doze pessoas entrando e saindo têm de deixar
+  a conta como acharam. Medido: 9 conexões, constante.
+
+### As decisões silenciosas foram reconciliadas no GDD
+
+A auditoria da R13 achou nove casos em que o documento manda uma coisa e o código faz
+outra. Como o GDD é a **única ponte** para o Android, quem implementar lá lê o
+documento. Cinco foram corrigidas, incluindo as três de gravidade alta:
+
+- **§14 ainda descrevia o modelo de fogo medido e REPROVADO** ("chance por tick": 30%
+  por vizinho × 16 tiques = 99,67% acumulado, acendendo 380 de 380 células em 100% das
+  rodadas). Quem implementasse o §14 no Android hoje **reimplementaria a carbonização**.
+- **O anti-farm do §5, como escrito, deixava o exploit aberto** — o recorte era "aliados
+  *sendo revividos*"; medido, uma dupla subia os dois escudos ao nível 4 atirando um no
+  outro num canto.
+- **A Runa de Eco não existe**; o solo é resolvido pareando com bot. Junto foi o aviso
+  operacional: **número ímpar de humanos entrega o último a um bot, e essa dupla não
+  responde V1**.
+
+### `aimDeadzonePx` variava 7× conforme a tela
+Estava em px de canvas: ~4dp de arrasto num telefone, ~28dp num monitor. Virou dp, pela
+mesma função do piso de 48dp, com a regra escrita: *número que o **dedo** sente vive em
+dp; número que o **mundo** sente vive em unidade de mundo.*
+
+Gates: 40 arquivos Luau sem erro · `rojo build` limpo (980 KB) · harness **51/51** ·
+`typecheck` limpo · dois portões no build do 2D (toque e offline). **Nenhum número de
+`Balance` do Roblox tocado.**
+
 ## v0.7.0 — 2026-08-19 — R13: as cinco decisões, e a ponte deixando de ser teórica
 
 O Diretor delegou as decisões travadas à equipe (*"você toma a decisão mais viável e

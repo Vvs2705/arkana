@@ -23,13 +23,34 @@
 -- As formas vêm de Elements.shape e são desenhadas só com Frames (zero asset,
 -- zero Toolbox): Wedge→losango · Ball→círculo · Block→quadrado · Ring→anel
 -- vazado · Bolt→ziguezague. Legíveis em preto e branco.
+--
+-- PREFERÊNCIAS DE CONFORTO (R14): esta tela lê a loja do `Accessibility` DIRETO
+-- — nada de `A11y.attach`. Duas razões, as duas duras:
+--   · CONTRASTE. O `repaint` do attach força TODO `UIStroke.Transparency` a 0.
+--     Aqui o stroke não é enfeite, é ESTADO: anel armado do gesto, elemento
+--     ativo, correr/agachar ligados. Attachar acenderia os cinco anéis de uma
+--     vez e o polegar perderia qual botão está armado. Então o contraste entra
+--     pela porta oposta: cada canal de estado tem o PAR aceso/apagado, e o alto
+--     contraste AFASTA os dois valores — nunca junta.
+--   · LAYOUT. O attach estampa um `UIScale` por filho, e `UIScale` cresce o
+--     objeto sem mexer na `Position` dele. Estes botões são posicionados em px
+--     absolutos derivados de `dpScale`, então cresceriam por cima uns dos
+--     outros e sairiam do arco do polegar. Aqui a escala entra na MESMA conta
+--     que já posiciona tudo.
+-- E o multiplicador só CRESCE: os 48dp do GDD §19.3 nasceram de reprovação em
+-- aparelho real. Quem escolhe UI menor encolhe painel — nunca o que o dedo tem
+-- de acertar.
 -- ============================================================================
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Strings = require(Shared:WaitForChild("Strings"))
 local Elements = require(Shared:WaitForChild("Elements"))
+--- LOJA ÚNICA de preferência. Lida direto; ver o cabeçalho para o porquê de
+--- esta tela não passar pelo `A11y.attach`.
+local A11y = require(script.Parent:WaitForChild("Accessibility"))
 
 --- GDD §10
 local GOLD = Color3.fromHex("#F0C75E")
@@ -59,6 +80,39 @@ local SLOT_W, SLOT_H, SLOT_PAD = 58, 64, 8
 local ROW_RIGHT, ROW_BOTTOM = 20, 252
 local ICON_IDLE, ICON_ACTIVE = 32, 42
 
+--- TODO alvo de dedo desta tela, em dp. É desta lista que o autoteste tira o
+--- piso do GDD §19.3 — botão novo entra AQUI ou o teste não o enxerga.
+local TARGETS = { BASIC.size, TACTIC.size, DODGE.size, JUMP.size, SPRINT.size, CROUCH.size, SLOT_W, SLOT_H }
+local SMALLEST_DP = math.min(table.unpack(TARGETS))
+
+--- PARES [normal, ALTO CONTRASTE] dos canais que carregam ESTADO. O alto
+--- contraste deixa o fundo mais opaco (legível contra a arena atrás) e AUMENTA
+--- a distância entre aceso e apagado. Nunca a diminui: juntar os dois é
+--- exatamente o que o `repaint` do `A11y.attach` faria aqui.
+local ACT_BG = { 0.12, 0 } --- fundo do botão de ação (constante: não é estado)
+local RING_OFF = { 0.7, 0.9 } --- anel PARADO; armado é sempre RING_ON
+local RING_ON = 0
+local SLOT_BG_ON = { 0.1, 0 }
+local SLOT_BG_OFF = { 0.45, 0.25 }
+
+--- 1 = normal · 2 = ALTO CONTRASTE. `pcall` porque a loja é de outra tela e um
+--- knob de conforto não pode derrubar os controles do jogo.
+local function hc(): number
+	local ok, on = pcall(A11y.highContrast)
+	return if ok and on == true then 2 else 1
+end
+
+--- Multiplicador de acessibilidade do alvo de dedo. SÓ CRESCE (ver cabeçalho).
+--- Separada de `a11yScale` para o autoteste provar o piso sem mexer na loja.
+local function growOnly(v: any): number
+	return math.max(1, tonumber(v) or 1)
+end
+
+local function a11yScale(): number
+	local ok, v = pcall(A11y.uiScale)
+	return growOnly(if ok then v else 1)
+end
+
 export type Handle = {
 	gui: ScreenGui,
 	setElement: (string) -> (),
@@ -74,8 +128,10 @@ local Touch = {}
 --- 1 dp → px. O Roblox não expõe DPI; a referência prática é a altura da
 --- viewport (640 px ≈ celular pequeno em paisagem). CALIBRAÇÃO: se os botões
 --- saírem grandes/pequenos demais no aparelho do Diretor, é este número.
-local function dpScale(camera: Camera): number
-	return math.clamp(camera.ViewportSize.Y / 640, 0.85, 2.0)
+--- Recebe a ALTURA da viewport (e não a Camera) para o autoteste poder provar
+--- o piso de 48dp sem forjar uma câmera.
+local function dpScale(viewportY: number): number
+	return math.clamp(viewportY / 640, 0.85, 2.0)
 end
 
 --- Preenchimento vertical sem clipping (respeita o canto arredondado):
@@ -154,7 +210,7 @@ function Touch.build(
 	onSimple: (string) -> ()
 ): Handle
 	local camera = workspace.CurrentCamera
-	local scale = dpScale(camera)
+	local scale = dpScale(camera.ViewportSize.Y) * a11yScale()
 	--- cada widget registra como se redimensiona (rotação de tela / resize)
 	local sized: { (number) -> () } = {}
 
@@ -167,8 +223,19 @@ function Touch.build(
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	-- --------------------------------------------------------- botões de ação
-	type Action =
-		{ btn: TextButton, grad: UIGradient, stroke: UIStroke, glyph: string, color: Color3, dim: Color3, frac: number }
+	type Action = {
+		btn: TextButton,
+		grad: UIGradient,
+		stroke: UIStroke,
+		glyph: string,
+		color: Color3,
+		dim: Color3,
+		frac: number,
+		--- anel ACESO? (armado pelo gesto, ou correr/agachar ligado). Guardado
+		--- porque o alto contraste REPINTA o anel e precisa saber o estado — ler
+		--- a transparência de volta seria adivinhar.
+		lit: boolean,
+	}
 	local actions: { [string]: Action } = {}
 
 	local function actionButton(kind: string, glyph: string, spec: Spec, color: Color3, simple: boolean?)
@@ -176,7 +243,7 @@ function Touch.build(
 		btn.Name = kind
 		btn.AnchorPoint = Vector2.new(0.5, 0.5)
 		btn.BackgroundColor3 = INK -- o UIGradient é quem colore (fill de cooldown)
-		btn.BackgroundTransparency = 0.12
+		btn.BackgroundTransparency = ACT_BG[hc()]
 		btn.AutoButtonColor = false
 		btn.Text = glyph
 		btn.TextColor3 = NIGHT
@@ -193,7 +260,7 @@ function Touch.build(
 
 		local stroke = Instance.new("UIStroke")
 		stroke.Color = GOLD
-		stroke.Transparency = 0.7
+		stroke.Transparency = RING_OFF[hc()]
 		stroke.Parent = btn
 
 		table.insert(sized, function(s)
@@ -222,8 +289,16 @@ function Touch.build(
 		end)
 
 		local dim = color:Lerp(NIGHT, 0.72)
-		actions[kind] =
-			{ btn = btn, grad = grad, stroke = stroke, glyph = glyph, color = color, dim = dim, frac = 0 }
+		actions[kind] = {
+			btn = btn,
+			grad = grad,
+			stroke = stroke,
+			glyph = glyph,
+			color = color,
+			dim = dim,
+			frac = 0,
+			lit = false,
+		}
 		setFill(grad, 0, color, dim)
 	end
 
@@ -267,7 +342,7 @@ function Touch.build(
 		btn.Name = id
 		btn.LayoutOrder = i
 		btn.BackgroundColor3 = NIGHT
-		btn.BackgroundTransparency = 0.45
+		btn.BackgroundTransparency = SLOT_BG_OFF[hc()]
 		btn.AutoButtonColor = false
 		btn.Text = ""
 		btn.Parent = row
@@ -295,7 +370,10 @@ function Touch.build(
 		name.AnchorPoint = Vector2.new(0.5, 1)
 		name.Position = UDim2.new(0.5, 0, 1, 0)
 		name.Size = UDim2.new(1, 0, 0.24, 0)
-		name.Text = element.pt -- cor + forma + PALAVRA: três canais, não um
+		-- cor + forma + PALAVRA: três canais, não um. A palavra sai do idioma
+		-- ATIVO (mesmo critério de MatchUi/TutorialUi): o rótulo que o dedo lê
+		-- não pode ficar em português numa sessão em inglês.
+		name.Text = if Strings.getLang() == "pt" then element.pt else element.en
 		name.TextColor3 = INK
 		name.TextScaled = true
 		name.Font = Enum.Font.GothamBold
@@ -333,7 +411,10 @@ function Touch.build(
 	end
 
 	local function applyScale()
-		scale = dpScale(camera)
+		--- a preferência de tamanho de UI entra na MESMA conta que posiciona os
+		--- botões — por isso ela cresce o alvo de dedo em vez de só inchar o
+		--- desenho por cima do vizinho (ver cabeçalho).
+		scale = dpScale(camera.ViewportSize.Y) * a11yScale()
 		for _, fn in ipairs(sized) do
 			fn(scale)
 		end
@@ -346,10 +427,11 @@ function Touch.build(
 		end
 		activeId = id
 		local element = Elements.ById[id :: any]
+		local c = hc()
 		for slotId, slot in pairs(slots) do
 			local on = slotId == id
-			slot.stroke.Transparency = if on then 0 else 1
-			slot.btn.BackgroundTransparency = if on then 0.1 else 0.45
+			slot.stroke.Transparency = if on then RING_ON else 1
+			slot.btn.BackgroundTransparency = if on then SLOT_BG_ON[c] else SLOT_BG_OFF[c]
 		end
 		sizeIcons()
 		-- o botão de ataque assume a cor do elemento: o dedo vê o que vai sair.
@@ -363,6 +445,12 @@ function Touch.build(
 		recolor(actions.tactic, element.glow)
 	end
 
+	--- O ÚNICO lugar que escreve o anel. Aceso é sempre opaco; apagado sai do par
+	--- de contraste. Estado primeiro, contraste depois — nunca o contrário.
+	local function paintStroke(a: Action)
+		a.stroke.Transparency = if a.lit then RING_ON else RING_OFF[hc()]
+	end
+
 	--- correr/agachar ficam ACESOS enquanto valem: apagado = desligado, sem
 	--- depender de cor nenhuma (o mesmo critério de acessibilidade do GDD §10).
 	local function setToggle(kind: string, on: boolean)
@@ -372,7 +460,8 @@ function Touch.build(
 		end
 		a.frac = if on then 0 else 1
 		setFill(a.grad, a.frac, a.color, a.dim)
-		a.stroke.Transparency = if on then 0 else 0.7
+		a.lit = on
+		paintStroke(a)
 	end
 
 	--- ANEL ARMADO: aceso = soltar o dedo AGORA dispara · apagado = soltar não
@@ -392,7 +481,8 @@ function Touch.build(
 			return
 		end
 		pressed[kind] = on
-		a.stroke.Transparency = if on then 0 else 0.7
+		a.lit = on
+		paintStroke(a)
 	end
 
 	local function setCooldown(kind: string, remaining: number, total: number)
@@ -406,11 +496,30 @@ function Touch.build(
 		a.btn.Text = if remaining > 0.05 then string.format("%.1f", remaining) else a.glyph
 	end
 
-	applyScale()
-	setElement(activeId)
+	--- A ÚNICA porta da acessibilidade nesta tela: redimensiona o alvo de dedo e
+	--- reescolhe o par aceso/apagado de cada canal, SEM tocar em qual botão está
+	--- aceso. É o que o `A11y.attach` não sabe fazer (ver cabeçalho).
+	local function applyA11y()
+		applyScale()
+		local c = hc()
+		for _, a in pairs(actions) do
+			a.btn.BackgroundTransparency = ACT_BG[c]
+			paintStroke(a)
+		end
+		setElement(activeId) -- borda e fundo dos slots saem daqui
+	end
+
+	applyA11y()
 	setToggle("sprint", false)
 	setToggle("crouch", false)
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(applyScale)
+	--- `pcall` no registro (a loja é de outra tela) e filtro por chave: mexer no
+	--- volume não precisa remontar botão nenhum.
+	pcall(A11y.onChange, function(key: string)
+		if key == "uiSize" or key == "contrast" then
+			applyA11y()
+		end
+	end)
 
 	return {
 		gui = gui,
@@ -419,6 +528,97 @@ function Touch.build(
 		setCooldown = setCooldown,
 		setToggle = setToggle,
 	}
+end
+
+-- ============================================================================
+-- AUTOTESTE — cole no Command Bar do Studio (cliente):
+--   require(game.Players.LocalPlayer.PlayerScripts.Client.ControlsTouch).selfTest()
+-- Cobre as três coisas desta tela que quebram CALADAS: o alvo de dedo abaixo do
+-- piso do GDD §19.3, a preferência de tamanho que não chega no botão (era o
+-- defeito da R13: quem aumentou a UI não ganhava dedo maior) e o alto contraste
+-- apagando o ESTADO em vez de realçá-lo.
+-- ============================================================================
+function Touch.selfTest()
+	-- ------------------------------------------------------ 1) piso de 48dp
+	-- Pior caso REAL: viewport minúscula (dpScale trava em 0.85) com a MENOR
+	-- escolha do menu (uiSize 0.9).
+	assert(dpScale(1) == 0.85 and dpScale(999999) == 2, "as travas de dpScale mudaram")
+	assert(growOnly(0.9) == 1, "UI menor encolheu o alvo de dedo — 48dp é piso, não meta")
+	assert(growOnly(1.3) == 1.3, "quem aumentou a UI não ganhou alvo maior")
+	assert(SMALLEST_DP * dpScale(1) * growOnly(0.9) >= 48, "menor alvo de dedo abaixo dos 48dp do GDD §19.3")
+
+	local player = Players.LocalPlayer
+	if not player then
+		print("[ControlsTouch] autoteste PARCIAL — sem LocalPlayer: só as contas puras")
+		return true
+	end
+	local noop = function() end
+	local h = Touch.build(player, noop, noop, noop)
+	local row = h.gui:FindFirstChild("Elementos")
+	local idle = row and row:FindFirstChild(Elements.Order[1])
+	local live = row and row:FindFirstChild(Elements.Order[2])
+	assert(idle and live, "carrossel de elementos sumiu")
+
+	local wasSize, wasContrast = A11y.get("uiSize"), A11y.get("contrast")
+
+	-- --------------------------------------------------------- 2) a FIAÇÃO
+	-- A conta certa com o fio solto é exatamente o que estava em produção: o
+	-- alvo tem de mudar na TELA MONTADA quando o menu muda.
+	A11y.set("uiSize", 0.9)
+	local small = idle.Size.X.Offset
+	A11y.set("uiSize", 1.3)
+	local big = idle.Size.X.Offset
+	assert(big > small, "aumentar a UI não aumentou o alvo de dedo: a tela de toque ignora o menu")
+	assert(small >= 48, "a menor escolha do menu furou os 48dp nesta viewport")
+
+	-- ------------------------------- 3) contraste NÃO pode apagar o estado
+	-- Este é o assert que reprova quem "resolver" a acessibilidade daqui com
+	-- `A11y.attach(gui)`: o `repaint` dele força todo UIStroke a 0 e acende os
+	-- cinco anéis (e os dois comandos) de uma vez.
+	h.setElement(Elements.Order[2])
+	h.setPressed("basic", true)
+	h.setPressed("tactic", false)
+	local armed = (h.gui:FindFirstChild("basic") :: any):FindFirstChildOfClass("UIStroke")
+	local parado = (h.gui:FindFirstChild("tactic") :: any):FindFirstChildOfClass("UIStroke")
+	for _, on in ipairs({ false, true }) do
+		A11y.set("contrast", on)
+		local tag = if on then " [alto contraste]" else ""
+		assert(
+			(live :: any):FindFirstChildOfClass("UIStroke").Transparency
+				< (idle :: any):FindFirstChildOfClass("UIStroke").Transparency,
+			"elemento ativo e inativo com a MESMA borda" .. tag
+		)
+		assert(
+			(live :: any).BackgroundTransparency < (idle :: any).BackgroundTransparency,
+			"elemento ativo e inativo com o MESMO fundo" .. tag
+		)
+		assert(armed.Transparency < parado.Transparency, "anel ARMADO e anel parado iguais" .. tag)
+	end
+
+	-- A ROTA ERRADA, conferida DEPOIS de a preferência ter mexido de verdade —
+	-- é aí que `A11y.attach` deixa rastro: um `UIScale` chamado "A11yScale" em
+	-- cada filho da ScreenGui (cresce o botão sem mexer na Position em px: ele
+	-- sai do arco do polegar) e os atributos `A11yBg`/`A11yStroke` que o
+	-- `repaint` grava ao tomar conta dos canais de ESTADO. Conferir antes do
+	-- primeiro `A11y.set` daria verde por vacuidade.
+	for _, child in ipairs(h.gui:GetChildren()) do
+		assert(
+			not child:FindFirstChild("A11yScale"),
+			"alguém chamou A11y.attach nesta tela: o UIScale desalinha o botão da posição em px"
+		)
+	end
+	for _, d in ipairs(h.gui:GetDescendants()) do
+		assert(
+			d:GetAttribute("A11yStroke") == nil and d:GetAttribute("A11yBg") == nil,
+			"o repaint do A11y passou por aqui: ele é dono do UIStroke, e aqui UIStroke é ESTADO"
+		)
+	end
+
+	A11y.set("uiSize", wasSize)
+	A11y.set("contrast", wasContrast)
+	h.gui:Destroy()
+	print("[ControlsTouch] autoteste OK — 48dp com folga · o menu chega no alvo de dedo · contraste não apaga o estado")
+	return true
 end
 
 return Touch

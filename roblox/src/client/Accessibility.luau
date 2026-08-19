@@ -544,6 +544,23 @@ local function applyAll()
 	applyVolume()
 end
 
+local function notify(key: string)
+	for _, fn in ipairs(listeners) do
+		task.spawn(fn, key)
+	end
+end
+
+--- SINAL NATIVO → `onChange`. O tamanho de texto preferido do Roblox MULTIPLICA
+--- `uiScale` e o jogador pode mexer nele no MEIO da partida, sem passar por
+--- `set`. Quem escala painel por `attach` nem percebe (o `applyAll` acima já
+--- restampa o `UIScale`), mas quem dimensiona ALVO DE DEDO por conta própria —
+--- os controles de toque, que não podem usar `attach` — só descobre pelo aviso.
+--- Sem esta linha o botão fica com o tamanho velho até o próximo giro de tela.
+local function nativeChanged()
+	applyAll()
+	notify("uiSize")
+end
+
 function A11y.set(key: string, value: any)
 	ensureLoaded()
 	if DEFAULTS[key] == nil or typeof(value) ~= typeof(DEFAULTS[key]) then
@@ -573,9 +590,7 @@ function A11y.set(key: string, value: any)
 			capBox.Visible = false
 		end
 	end
-	for _, fn in ipairs(listeners) do
-		task.spawn(fn, key)
-	end
+	notify(key)
 	-- MUDO NÃO PODE CUSTAR INFORMAÇÃO (GDD §10): "SINTONIA CANALIZANDO" e "FORA
 	-- DA ZONA" existem no som E na faixa de legendas. Quem zera o volume ganha a
 	-- faixa ligada na hora — LIGAR, não travar: desligar depois continua sendo
@@ -616,7 +631,7 @@ function A11y.init(_player: Player?)
 	-- o usuário pode mexer no menu do Roblox NO MEIO da partida: seguir o sinal
 	-- nativo é mais barato (e mais correto) que ler a propriedade por frame
 	pcall(function()
-		GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(applyAll)
+		GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(nativeChanged)
 	end)
 	if UGS then
 		pcall(function()
@@ -754,7 +769,19 @@ function A11y.selfTest()
 	A11y.set("blur", wasBlur)
 	touched.blur = wasTouched
 
-	print("[Accessibility] autoteste OK — espelho canhoto/destro · volume (loja única, mudo↔legendas) · rejoin")
+	-- ------------------------------------------------- sinal nativo → onChange
+	-- O menu do ROBLOX (tamanho de texto preferido) muda a conta de `uiScale`
+	-- sem passar por `set`. Quem dimensiona alvo de dedo por conta própria (a
+	-- tela de toque, que não pode usar `attach`) só sabe pelo aviso; sem ele o
+	-- botão fica pequeno até o próximo giro de tela.
+	local heard: string? = nil
+	A11y.onChange(function(key: string)
+		heard = key
+	end)
+	nativeChanged()
+	assert(heard == "uiSize", "tamanho de texto nativo mudou e ninguém foi avisado")
+
+	print("[Accessibility] autoteste OK — espelho canhoto/destro · volume (loja única, mudo↔legendas) · rejoin · sinal nativo avisa")
 	return true
 end
 

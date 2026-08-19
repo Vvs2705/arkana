@@ -88,10 +88,18 @@ class AudioManager {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     this.applyVolumes();
     Settings.onChange(() => this.applyVolumes());
-    // navegadores exigem gesto do usuário p/ liberar áudio
-    const resume = () => { this.ctx?.resume(); };
-    window.addEventListener('pointerdown', resume, { once: true });
-    window.addEventListener('keydown', resume, { once: true });
+    // Navegadores exigem gesto do usuário p/ liberar o áudio — e o resume()
+    // pode não completar (política do navegador, WebView entregando o contexto
+    // 'interrupted', app voltando do segundo plano no Android). SEM `once`:
+    // com uma única tentativa, uma falha no primeiro toque deixava a partida
+    // inteira muda, sem sinal nenhum. Cada gesto é uma nova tentativa e o custo
+    // é ler ctx.state — que também recupera o áudio suspenso no meio da sessão.
+    const unlock = (): void => {
+      if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => undefined);
+    };
+    for (const ev of ['pointerdown', 'keydown', 'touchend'] as const) {
+      window.addEventListener(ev, unlock);
+    }
   }
 
   applyVolumes(): void {

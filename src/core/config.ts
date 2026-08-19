@@ -166,6 +166,37 @@ export const TOUCH = {
   },
 } as const;
 
+/**
+ * Raio mínimo, em px do canvas 1280×720, equivalente a TOUCH.minDp na tela real.
+ *
+ * `dispW` é a largura CSS do canvas (Phaser: `scale.displaySize.width`) e MUDA
+ * durante a sessão — rotação, tela dividida, WebView reajustando depois do
+ * load. Por isso a conversão é uma função pura de `dispW`, e não uma constante
+ * calculada uma vez: a TouchControls a chama a cada RESIZE, e o portão do build
+ * (vite.config.ts) confere o piso de 48dp com ESTA função, não com uma cópia.
+ */
+export function minHitRadiusPx(dispW: number): number {
+  return dpToPx(TOUCH.minDp, dispW) / 2;
+}
+
+/**
+ * Converte dp da tela real para px do canvas 1280x720.
+ *
+ * Existe porque `minHitRadiusPx` nao era o unico numero de DEDO medido em px de
+ * canvas: a deadzone de mira tambem era, e variava **7x** conforme a tela (~4dp
+ * de arrasto num telefone a 375 CSS, ~28dp num monitor 2560). E' a mesma classe
+ * de defeito que ja' mordeu duas vezes neste projeto -- o piso de 48dp virando
+ * raio errado por tela, e o alvo de toque parando de valer depois de um giro.
+ *
+ * REGRA: numero que o DEDO sente vive em dp e passa por aqui. Numero que o
+ * MUNDO sente (alcance de magia, raio de explosao) vive em unidade de mundo e
+ * nao encosta nesta funcao.
+ */
+export function dpToPx(dp: number, dispW: number): number {
+  const w = dispW > 0 ? dispW : GAME_WIDTH;
+  return dp * (GAME_WIDTH / w);
+}
+
 /** cópia mutável das posições padrão (p/ DEFAULT_SETTINGS e "Restaurar padrão") */
 export function defaultTouchLayout(): Record<TouchControlId, { x: number; y: number }> {
   return structuredClone(TOUCH.defaults) as unknown as Record<TouchControlId, { x: number; y: number }>;

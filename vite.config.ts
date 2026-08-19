@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { GAME_WIDTH, TOUCH, minHitRadiusPx } from './src/core/config';
 
 /** fontes que TÊM de estar dentro do dist (empacotadas de public/fonts) */
 const FONT_FILES = [
@@ -51,9 +52,56 @@ function offlineFontsGate(): Plugin {
   };
 }
 
+/**
+ * Portão do alvo de toque (GDD §19.3, 48dp).
+ *
+ * Dois defeitos já chegaram ao aparelho do Diretor por este caminho e nenhum
+ * dos dois aparece no desktop: (R12) o piso de 48dp virava 48px de canvas fixos
+ * — metade do alvo num telefone; (R14) a conversão dp→px era calculada UMA vez
+ * no build da cena, então girar o aparelho ou entrar em tela dividida deixava
+ * todos os alvos errados no meio da partida. Sem framework de teste no 2D, o
+ * build é onde a regressão pode ser barrada.
+ *
+ * 1. Roda a função REAL do jogo (a mesma que a TouchControls chama) em várias
+ *    larguras de tela e exige que o alvo continue medindo TOUCH.minDp na tela.
+ *    Quebra se alguém voltar a fixar o raio em px de canvas.
+ * 2. Confere que a TouchControls reassina o RESIZE (e desassina) — sem isso a
+ *    conversão certa é calculada uma vez e congela.
+ */
+function touchTargetGate(): Plugin {
+  return {
+    name: 'arkana-touch-target-gate',
+    apply: 'build',
+    buildStart() {
+      // larguras CSS de canvas: telefone estreito → retrato → paisagem → 2K
+      for (const dispW of [320, 360, 375, 412, 640, 720, 1080, 1280, 1920, 2560]) {
+        const dp = minHitRadiusPx(dispW) * 2 * (dispW / GAME_WIDTH);
+        if (Math.abs(dp - TOUCH.minDp) > 0.01) {
+          throw new Error(
+            `[toque] alvo mínimo = ${dp.toFixed(1)}dp numa tela de ${dispW}px CSS ` +
+            `(GDD §19.3 exige ${TOUCH.minDp}dp) — a conversão dp→px parou de acompanhar a tela.`,
+          );
+        }
+      }
+
+      const src = readFileSync(join('src', 'ui', 'TouchControls.ts'), 'utf8');
+      for (const hook of ['scale.on(Phaser.Scale.Events.RESIZE', 'scale.off(Phaser.Scale.Events.RESIZE']) {
+        if (!src.includes(hook)) {
+          throw new Error(
+            `[toque] TouchControls.ts não tem "${hook}" — a tela muda durante a sessão ` +
+            '(rotação, tela dividida, WebView) e os alvos ficariam no tamanho do primeiro frame.',
+          );
+        }
+      }
+
+      console.log(`[toque] ok — piso de ${TOUCH.minDp}dp em 10 larguras de tela, RESIZE assinado`);
+    },
+  };
+}
+
 export default defineConfig({
   base: './',
-  plugins: [offlineFontsGate()],
+  plugins: [offlineFontsGate(), touchTargetGate()],
   server: { port: 5173, host: '127.0.0.1' },
   build: { target: 'es2020', chunkSizeWarningLimit: 1600 },
 });

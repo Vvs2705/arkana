@@ -119,6 +119,30 @@ function Events.sanitizeAim(raw: any): string?
 	return if typeof(raw) == "string" and Events.AIM_SCHEMES[raw] then raw else nil
 end
 
+--- GESTOS CANCELADOS desde o disparo anterior. Quem arma a mira, volta ao
+--- centro e desiste não emite NADA hoje: quem aborta cinco vezes por abate fica
+--- idêntico a quem nunca hesita, e o `drag%` sai lindo enquanto a pessoa sofre.
+---
+--- POR QUE UM CONTADOR E NÃO UM 4º RÓTULO em `INPUT_KINDS`: rótulo pega carona
+--- no disparo, e cancelamento **não tem disparo**. Para virar rótulo precisaria
+--- de um `spell_cast` falso — que entraria em `castsByElement`, o DENOMINADOR da
+--- dominância elemental. Medir o cancelamento assim quebraria a pergunta V4.
+Events.ABORT_CAP = 32
+
+--- Irmã de `sanitizeInput`/`sanitizeAim`, mas para campo NUMÉRICO — e é
+--- justamente por não ter lista fechada que ele precisa de MAIS cuidado, não
+--- menos. `nil`, texto, NaN, infinito, negativo e zero viram `nil`; acima do teto
+--- volta o teto. Clampar só faz a razão CAIR, nunca estourar os 100%.
+--- NaN merece nota: ele falha TODA comparação, então `n < 0` não o pega — a
+--- guarda é `n == n`. Este projeto já teve jogador imortal por causa disso.
+function Events.sanitizeAborted(raw: any): number?
+	local n = tonumber(raw)
+	if n == nil or n ~= n or n == math.huge or n < 1 then
+		return nil
+	end
+	return math.min(math.floor(n), Events.ABORT_CAP)
+end
+
 --- Só o que está na lista entra no dado. Entrada desconhecida vira `nil` (e não
 --- "unknown"): categoria inventada por cliente hostil não pode criar coluna no
 --- relatório do Diretor.

@@ -11,6 +11,10 @@
 --     rápido na direção da câmera;
 --   · arrastar e voltar para dentro da deadzone = CANCELA (nada é enviado).
 -- Dois gestos separados (mirar, depois atirar) foi REPROVADO — não repetir.
+-- O CANCELAR É MEDIDO (R14): "nada é enviado" era verdade até no dado, e por
+-- isso quem armava e desistia cinco vezes por abate saía idêntico a quem nunca
+-- hesita. O contador `pendingAborts` pega carona no próximo disparo — ver o
+-- bloco `gesto CANCELADO` abaixo.
 --
 -- REQUISITO Nº 2: troca de elemento responde ao toque — ver ControlsTouch.
 --
@@ -229,7 +233,16 @@ local function doCast(kind: string, dir: Vector3, input: string)
 	--- humanos mirando?") sai sem sentido. Telemetria pura, como o `input`:
 	--- mentir aqui não dá vantagem nenhuma, porque a assistência já aconteceu.
 	local aim = if aimAssist then "assist" else "manual"
-	;(remCast :: RemoteEvent):FireServer({ kind = kind, dir = assisted(from, dir), input = input, aim = aim })
+	--- `aborted` = gestos armados e abortados DESDE O DISPARO ANTERIOR. Sai só
+	--- aqui, depois das portas de cadência acima: se saísse antes, um disparo
+	--- recusado zeraria a conta e os cancelamentos sumiriam sem nunca chegar.
+	;(remCast :: RemoteEvent):FireServer({
+		kind = kind,
+		dir = assisted(from, dir),
+		input = input,
+		aim = aim,
+		aborted = Controls.takeAborts(),
+	})
 	if kind == "tactic" then
 		startCooldown("tactic", (Balance.elements :: any)[element].tactic.cooldown)
 	else
@@ -365,6 +378,55 @@ function Controls.inputKind(input: any, dragged: boolean): string
 	return "key"
 end
 
+-- ------------------------------------------------------- gesto CANCELADO
+--- O BURACO QUE O `drag%` NÃO VIA (R14). Cancelar é metade do gesto único: o
+--- dedo arrasta, a pessoa se arrepende, volta ao centro e solta — e NADA é
+--- enviado. Sem contar isso, quem arma e aborta cinco vezes por abate fica
+--- IDÊNTICO no dado a quem nunca hesita, e o relatório mostra um `drag%` lindo
+--- enquanto a pessoa sofre. Foi exatamente esse tipo de silêncio que fez o
+--- requisito de celular reprovar num aparelho real sem aparecer em número.
+---
+--- COMO VIAJA: contador que pega CARONA no próximo disparo (`aborted` no
+--- payload de CastSpell), e não rótulo novo em `Events.INPUT_KINDS` — rótulo
+--- viaja NO disparo, e cancelamento não tem disparo. Nem remote novo: é
+--- telemetria pura, e um remote a mais é superfície de ataque a mais.
+--- CUSTO CONHECIDO: cancelamentos depois do ÚLTIMO disparo da sessão nunca são
+--- relatados, e quem só arma e nunca dispara não aparece. É perda de CAUDA,
+--- declarada — o conserto seria um flush no `session_end`, que hoje o cliente
+--- não envia.
+local pendingAborts = 0
+
+--- ESTE gesto solto conta como cancelamento? Pura, porque é a linha que define
+--- a POPULAÇÃO do número — e população torta é como razão de funil passa de
+--- 100%. O denominador do relatório é `drag + tap`, que só existe para DEDO em
+--- BOTÃO DE MAGIA; então o numerador tem de recusar exatamente o mesmo:
+---   · disparou  → não é cancelamento, é disparo;
+---   · esquiva   → o requisito §4 é "mira e disparo", e esquiva não produz
+---                 `spell_cast` nenhum: contá-la deixaria o numerador maior que
+---                 o denominador;
+---   · mouse/PC  → `inputKind` já responde "key", e o PC não faz este gesto.
+function Controls.isAbortedCast(kind: string, input: any, willFire: boolean): boolean
+	return not willFire and kind ~= "dodge" and Controls.inputKind(input, false) ~= "key"
+end
+
+--- Registra, se for o caso. Sem retorno de propósito: a única prova que vale é
+--- o que `takeAborts` devolve — um booleano de cortesia aqui daria ao autoteste
+--- uma asserção que passa sozinha enquanto o contador não anda.
+function Controls.noteAbort(kind: string, input: any, willFire: boolean)
+	if Controls.isAbortedCast(kind, input, willFire) then
+		pendingAborts += 1
+	end
+end
+
+--- Lê E ZERA. O disparo carrega "quantos desde o disparo anterior": se não
+--- zerasse, o mesmo cancelamento seria contado em todos os tiros seguintes e a
+--- razão passaria de 100% — o defeito que este projeto já pagou uma vez.
+function Controls.takeAborts(): number
+	local n = pendingAborts
+	pendingAborts = 0
+	return n
+end
+
 --- SAÍDA ÚNICA do gesto: tira do rastreio E apaga o anel. Eram dois caminhos
 --- (o InputEnded normal e a varredura de toque cancelado pelo sistema) e só um
 --- apagava o anel — app em segundo plano no meio do arrasto deixava o botão
@@ -380,7 +442,11 @@ local function release(g: Gesture)
 	local held = os.clock() - g.startedAt
 	endGesture(g)
 	local dir = g.dir
-	if not Controls.willFire(dir, held) then
+	local fire = Controls.willFire(dir, held)
+	--- ÚNICO ponto onde o cancelamento existe no código — o `return` abaixo é,
+	--- literalmente, o evento que nunca foi emitido (ver `noteAbort`).
+	Controls.noteAbort(g.kind, g.input, fire)
+	if not fire then
 		return -- segurou e voltou ao centro: CANCELA
 	end
 	if g.kind == "dodge" then
@@ -793,6 +859,34 @@ function Controls.selfTest()
 	assert(not Controls.willFire(nil, tap * 2), "voltou ao centro e segurou: CANCELA, nada é enviado")
 	assert(not Controls.willFire(nil, tap), "no limiar exato o tiro rápido já expirou")
 
+	-- ------------------------------ CANCELAR VIRA NÚMERO (R14, requisito §4)
+	--- Antes desta raia o `return` do `release` era o fim da linha: o gesto
+	--- abortado não emitia NADA, então quem hesita e quem não hesita saíam
+	--- idênticos no relatório. Aqui se prova as duas metades que o número exige:
+	--- a POPULAÇÃO (quem entra na conta) e o DRENO (cada cancelamento é contado
+	--- uma vez só). Errar a primeira faz a razão passar de 100%; errar a segunda
+	--- faz o mesmo cancelamento reaparecer em todo disparo seguinte.
+	Controls.takeAborts() -- parte do zero, sem depender de quem rodou antes
+	assert(Controls.isAbortedCast("basic", finger, false), "dedo que armou e voltou ao centro É um cancelamento")
+	assert(not Controls.isAbortedCast("basic", finger, true), "gesto que DISPARA não é cancelamento")
+	--- a esquiva é o caso que quebraria a razão: ela cancela pelo mesmo caminho,
+	--- mas NUNCA produz `spell_cast` — contá-la poria no numerador um gesto que
+	--- não existe no denominador, e a conta passaria de 100%.
+	assert(not Controls.isAbortedCast("dodge", finger, false), "esquiva cancelada não entra: ela não tem disparo no denominador")
+	--- e o PC também não: `drag`/`tap` só existem para dedo, então cancelamento
+	--- de mouse entraria num numerador cujo denominador o exclui.
+	assert(not Controls.isAbortedCast("basic", mouse, false), "cancelamento de mouse não entra no recorte de TOQUE")
+
+	--- e o CONTADOR tem de obedecer à regra acima, não só concordar com ela: os
+	--- cinco casos entram juntos e só os dois legítimos podem sair do outro lado.
+	Controls.noteAbort("basic", finger, false) -- conta
+	Controls.noteAbort("tactic", finger, false) -- conta
+	Controls.noteAbort("basic", finger, true) -- disparou
+	Controls.noteAbort("dodge", finger, false) -- esquiva
+	Controls.noteAbort("basic", mouse, false) -- PC
+	assert(Controls.takeAborts() == 2, "o disparo leva SÓ os cancelamentos de dedo em botão de magia")
+	assert(Controls.takeAborts() == 0, "DRENO: cancelamento contado duas vezes faz a razão passar de 100%")
+
 	-- ------------------------------------------- PC: o cursor no plano do chão
 	--- A mira do PC é CONTÍNUA e sai do cursor. Aqui só se verifica o caso
 	--- degenerado — cursor em cima do próprio personagem —, que caía na
@@ -822,7 +916,7 @@ function Controls.selfTest()
 	assert(Controls.armPcFire(false, false) == false, "soltar desarma")
 	assert(Controls.armPcFire(false, true) == false, "soltar em cima da UI também desarma")
 
-	print("[Controls] autoteste OK — entrada (drag/tap/key) · cancelar do gesto · mira do cursor · clique de UI")
+	print("[Controls] autoteste OK — entrada (drag/tap/key) · cancelar do gesto (e a CONTAGEM dele) · mira do cursor · clique de UI")
 	return true
 end
 

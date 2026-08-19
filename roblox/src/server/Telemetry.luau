@@ -115,6 +115,21 @@ local TUTORIAL_CAP = 16
 --- observação a mais move a porcentagem em mais de 10 pontos — isso não é
 --- conclusão, é ruído. "n=3, não conclui" vale mais que um número que finge.
 local MIN_SAMPLE = 10
+--- TETO do contador de gestos CANCELADOS que vem no `spell_cast`. É o único
+--- campo NUMÉRICO que o cliente declara sobre si mesmo, e número não tem lista
+--- fechada como `INPUT_KINDS` tem: sem teto, um cliente hostil manda
+--- `aborted = 1e9` numa partida e a linha "cancelados" vira 100% para sempre —
+--- mentir não daria vantagem NO JOGO, mas destruiria o relatório do Diretor,
+--- que é o que esta raia existe para proteger. 32 hesitações entre dois tiros
+--- já é patológico; clampar só faz a razão cair, nunca subir dos 100%.
+local ABORT_CAP = 32
+--- ordem FIXA dos modos de entrada no relatório (`pairs` embaralha e o Diretor
+--- compara linhas entre provas). O autoteste confere contra `Events.INPUT_KINDS`
+--- para que um modo novo do coordenador não fique fora da tabela em silêncio.
+local INPUT_ORDER = { "drag", "tap", "key" }
+--- FOLGA da comparação com o PC, em pontos percentuais. "Tão bom quanto" não é
+--- "idêntico": 2 pp de diferença é ruído de amostra, não regressão de controle.
+local PARITY_PP = 5
 
 -- --- PERSISTÊNCIA DO RELATÓRIO ---------------------------------------------
 --- POR QUE ISTO EXISTE: num servidor público as provas se ENCADEIAM. O
@@ -201,6 +216,27 @@ type Agg = {
 	--- teclado a pergunta não existe — por isso o recorte é por aparelho.
 	inputCasts: number,
 	inputTouchByKind: { [string]: number },
+	--- DESFECHO POR MODO DE ENTRADA (R14). O recorte acima diz QUANTO do toque
+	--- usou o gesto único; não diz se o gesto FUNCIONA. "Resolveu o celular" é o
+	--- tiro de arrasto ACERTAR como o do PC — e para isso o `input` precisou
+	--- deixar de morrer no `spell_cast` e chegar ao `spell_hit` (raia B/R14).
+	--- Estes dois NÃO são filtrados por aparelho, ao contrário de
+	--- `inputTouchByKind`: `key` entra de propósito, porque o PC é o GRUPO DE
+	--- CONTROLE. Sem ele, "tão bom quanto o PC" não tem contra o que ser medido.
+	--- RAZÃO DE FUNIL SEGURA POR CONSTRUÇÃO: o projétil é removido no primeiro
+	--- acerto (`Combat.step`), então acerto <= disparo para o mesmo rótulo. Se
+	--- algum dia passar, as PENDÊNCIAS denunciam em vez de imprimir 130%.
+	castsByInput: { [string]: number },
+	hitsByInput: { [string]: number },
+	--- GESTOS ARMADOS E ABORTADOS (R14) — o buraco mais grave do requisito §4.
+	--- Arrastar do botão e voltar ao centro CANCELA no cliente e não emite nada:
+	--- quem arma e desiste cinco vezes por abate ficava idêntico a quem nunca
+	--- hesita. Chega como CONTADOR de carona no `spell_cast` (`aborted`).
+	--- POPULAÇÃO IDÊNTICA à de `inputTouchByKind` (dedo, botão de magia,
+	--- aparelho de toque): é o que garante que `abortados / (drag+tap+abortados)`
+	--- não passe de 100%. Se este contador aceitasse gesto de PC ou de esquiva,
+	--- o numerador teria gente que o denominador não tem.
+	abortedGestures: number,
 }
 
 local function newAgg(): Agg
@@ -232,6 +268,9 @@ local function newAgg(): Agg
 		ttkSeen = 0,
 		inputCasts = 0,
 		inputTouchByKind = {},
+		castsByInput = {},
+		hitsByInput = {},
+		abortedGestures = 0,
 	}
 end
 
@@ -272,6 +311,13 @@ local teams: any = nil
 local bots: any = nil
 --- algum jogador chegou carimbado com plataforma? (checklist de pendencias)
 local sawDeviceTier = false
+--- o campo `aborted` já CHEGOU alguma vez (mesmo valendo zero)? Sem esta
+--- distinção, "0% dos gestos foram cancelados" e "ninguém instrumentou o
+--- cancelamento" saem iguais no relatório — e o segundo, impresso como o
+--- primeiro, é exatamente o número que não se sustenta. Mesmo papel do
+--- `sawDeviceTier`: é FIAÇÃO, não agregado de partida, então `matchStart` não
+--- zera (ver o cabeçalho).
+local sawAborted = false
 
 -- ------------------------------------------------- APARELHO (por jogador)
 --- Aparelhos CONHECIDOS. Cliente hostil não cria coluna nova no relatório do
@@ -847,13 +893,44 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		--- inteiro — a régua diz "0 disparos instrumentados" em vez de inventar
 		--- um número. O que a lista de `Events.INPUT_KINDS` não conhece é
 		--- descartado (`sanitizeInput` devolve nil), nunca vira balde novo.
+		local onTouch = deviceTouch[ctx.user_id_hash] == true
 		local kind = Events.sanitizeInput(p.input)
 		if kind then
-			local onTouch = deviceTouch[ctx.user_id_hash] == true
 			for _, g in ipairs(cohorts) do
 				g.inputCasts += 1
+				--- DENOMINADOR DO DESFECHO (R14) — sem filtro de aparelho de
+				--- propósito: `key` é o GRUPO DE CONTROLE do requisito §4, e sem
+				--- ele "o arrasto acerta como o PC" não tem contra o que medir.
+				g.castsByInput[kind] = (g.castsByInput[kind] or 0) + 1
 				if onTouch then
 					g.inputTouchByKind[kind] = (g.inputTouchByKind[kind] or 0) + 1
+				end
+			end
+		end
+		--- GESTOS CANCELADOS desde o disparo anterior (R14). Fora do `if kind`
+		--- de propósito: o cancelamento é um fato do gesto, não do rótulo do
+		--- disparo que o trouxe de carona — se o `input` faltar, os
+		--- cancelamentos ainda contam.
+		--- ÚNICO CAMPO NUMÉRICO QUE O CLIENTE DECLARA: entra clampado. `nil`,
+		--- texto, NaN, infinito e negativo viram 0; acima de `ABORT_CAP` vira o
+		--- teto. Nada disto decide jogo — decide só se o relatório mente.
+		if p.aborted ~= nil then
+			sawAborted = true
+			local raw = tonumber(p.aborted) or 0
+			--- ÚNICA AUTORIDADE sobre o valor — de propósito. Uma segunda guarda
+			--- (`if ab > 0`) lá embaixo pareceria defesa e seria SOMBRA: ela
+			--- engoliria em silêncio um `ab` negativo que escapasse daqui, e o
+			--- autoteste desta linha nunca conseguiria ficar vermelho sozinho.
+			--- `raw > 0` faz três trabalhos: barra negativo (que SUBTRAIRIA do
+			--- contador), barra zero, e barra NaN — com NaN toda comparação é
+			--- falsa, então ele cai fora aqui. Texto e `nil` já viraram 0 acima.
+			local ab = if raw > 0 then math.min(math.floor(raw), ABORT_CAP) else 0
+			--- MESMA PORTA de `inputTouchByKind`: sem o carimbo de aparelho o
+			--- denominador (drag+tap) fica vazio, e numerador sem denominador é
+			--- como uma razão de funil vira 100% do nada.
+			if onTouch then
+				for _, g in ipairs(cohorts) do
+					g.abortedGestures += ab
 				end
 			end
 		end
@@ -865,6 +942,17 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		if aim then
 			for _, g in ipairs(cohorts) do
 				g.aimByScheme[aim] = (g.aimByScheme[aim] or 0) + 1
+			end
+		end
+	elseif name == N.SpellHit then
+		--- ACERTO POR MODO DE ENTRADA (R14) — a outra metade do funil do §4.
+		--- O `input` vem do PROJÉTIL (Combat.impact), nunca do gesto atual de
+		--- quem atirou: é a mesma regra que faz o evento carimbar a FONTE REAL,
+		--- a lição que quase custou um nerf errado na R8.
+		local kind = Events.sanitizeInput(p.input)
+		if kind then
+			for _, g in ipairs(cohorts) do
+				g.hitsByInput[kind] = (g.hitsByInput[kind] or 0) + 1
 			end
 		end
 	elseif name == N.TutorialStep then
@@ -1672,6 +1760,78 @@ function Telemetry.report(): string
 	table.insert(out, "   (aparelho vem de Telemetry.setDevice; sem carimbo, o disparo conta na")
 	table.insert(out, "    linha de cobertura e fica FORA do recorte de toque — nunca chutado)")
 
+	-- ------------------------------------------------ CANCELAR (o silencio)
+	--- O bloco acima diz QUANTO do toque usou o gesto. Nao diz se o gesto
+	--- FUNCIONA — e a metade que mais faltava era o CANCELAR, invisivel POR
+	--- CONSTRUCAO: arrastar e voltar ao centro nao envia pacote nenhum, entao
+	--- quem arma e aborta cinco vezes por abate saia IDENTICO a quem nunca
+	--- hesita, com um `drag%` lindo enquanto a pessoa sofria.
+	--- POPULACAO: os tres baldes sao o mesmo gesto (dedo, botao de magia,
+	--- aparelho de toque) em seus tres desfechos possiveis — disparou arrastando,
+	--- disparou tocando, ou abortou. Por serem uma PARTICAO, a razao nao passa
+	--- de 100% por construcao, nao por conferencia.
+	local armed = drag + tap + human.abortedGestures
+	table.insert(out, string.format("gestos ARMADOS no toque ........ %d (drag %d + tap %d + CANCELADOS %d)", armed, drag, tap, human.abortedGestures))
+	if not sawAborted then
+		--- "0% cancelados" e "ninguem instrumentou o cancelamento" NAO PODEM sair
+		--- iguais: o segundo impresso como o primeiro e' o numero que nao se
+		--- sustenta, e um numero desses derruba a confianca em todos os outros.
+		table.insert(out, "   CANCELADOS: o campo `aborted` NUNCA CHEGOU. Isto nao e' 0%, e' CEGO.")
+	else
+		table.insert(out, "   CANCELADOS: " .. verdict(armed, string.format("%s dos gestos armados foram ABORTADOS", pct(human.abortedGestures, armed))))
+		table.insert(out, "   (alto = a mao esta sendo punida entre armar e soltar. Conserto e' de")
+		table.insert(out, "    CONTROLE — mas o numero que CALIBRA `aimDeadzonePx`/`tapMaxDuration`")
+		table.insert(out, "    (quantos px alem da deadzone, quanto tempo segurou) ainda nao existe.)")
+	end
+	table.insert(out, "   (`key` e esquiva ficam fora do numerador E do denominador: e' o que")
+	table.insert(out, "    impede cancelados/armados de passar de 100%)")
+
+	-- ------------------------- DESFECHO: o gesto ACERTA como o do PC? (V2/§4)
+	--- `drag%` alto diz que USAM o gesto, nao que ele ACERTA. "Resolveu o
+	--- celular" so tem uma leitura honesta: o tiro de arrasto acerta como o do
+	--- PC. Por isso o `key` — excluido do recorte de toque acima de proposito —
+	--- entra AQUI como GRUPO DE CONTROLE. La a pergunta e' de PREFERENCIA de
+	--- gesto; aqui e' de DESEMPENHO, e sem regua nao existe "tao bom quanto".
+	--- UMA conta so' para os DOIS lugares que fazem esta pergunta (a prova, aqui,
+	--- e o acumulado do servidor, la embaixo). Duplicar a formula seria garantir
+	--- que um dos dois numeros envelheceria — e dois numeros diferentes para a
+	--- mesma pergunta no mesmo relatorio e' pior que nao ter nenhum.
+	--- A AMOSTRA QUE VALE E' A MENOR DAS DUAS PERNAS: 200 arrastos contra 2
+	--- tiros de PC nao e' comparacao, e' anedota com casa decimal.
+	local function gestureAnswer(g: Agg): string
+		local dc, kc = g.castsByInput.drag or 0, g.castsByInput.key or 0
+		local n = math.min(dc, kc)
+		if dc == 0 or kc == 0 then
+			return verdict(n, "-") -- sem uma das pernas nao existe comparacao
+		end
+		local d = (g.hitsByInput.drag or 0) / dc * 100
+		local k = (g.hitsByInput.key or 0) / kc * 100
+		local gap = d - k
+		local parecer = if gap >= -PARITY_PP then "SIM — o arrasto empata com o PC" else "NAO — o arrasto acerta MENOS que o PC"
+		return verdict(n, string.format("%s (arrasto %.0f%% x PC %.0f%%, %+.0f pp)", parecer, d, k, gap))
+	end
+	table.insert(out, "-- O GESTO UNICO RESOLVEU O CELULAR? (acerto por modo de entrada) ----")
+	--- razao segura por CONSTRUCAO: o projetil e' removido no primeiro acerto
+	--- (Combat.step), entao acerto <= disparo para o mesmo rotulo. Se um emissor
+	--- novo furar isso, as PENDENCIAS denunciam em vez de imprimir 130%.
+	local funnelBroken = false
+	for _, k in ipairs(INPUT_ORDER) do
+		local h, c = human.hitsByInput[k] or 0, human.castsByInput[k] or 0
+		if h > c then
+			funnelBroken = true
+		end
+		--- rotulo em ASCII puro: `%-22s` conta BYTES, e um travessao UTF-8
+		--- desalinharia so' esta coluna (o Diretor le isto num F9 monoespacado).
+		local label = if k == "drag" then "drag (o gesto unico)" elseif k == "tap" then "tap  (toque rapido)" else "key  (PC: a REGUA)"
+		table.insert(out, string.format("   %-22s %4d acertos / %4d disparos  %s", label, h, c, verdict(c, pct(h, c))))
+	end
+	local nCompare = math.min(human.castsByInput.drag or 0, human.castsByInput.key or 0)
+	table.insert(out, "   RESPOSTA: " .. gestureAnswer(human))
+	table.insert(out, string.format("   (n = a MENOR das duas pernas (%d), nunca a soma. Folga de %d pp:", nCompare, PARITY_PP))
+	table.insert(out, "    `tao bom quanto` nao e' `identico`, e 2 pp e' ruido de amostra.)")
+	table.insert(out, "   (so human_only: taxa de acerto de bot e' a mira do piloto automatico,")
+	table.insert(out, "    e misturar isso na regua do PC responde outra pergunta.)")
+
 	-- -------------------------------------------------------------- terreno
 	table.insert(out, "-- TERRENO (pergunta V3: o mapa vira carvao?) ------------------------")
 	countRow(out, "interacoes de terreno", function(g)
@@ -1779,6 +1939,19 @@ function Telemetry.report(): string
 	table.insert(out, "V1 " .. verdict(sOpp, string.format("%s das oportunidades viraram fusao (n=%d engajamentos)", pct(sessHuman.oppFused, sOpp), sOpp)))
 	table.insert(out, "V2 " .. verdict(sessHuman.ttkSeen, string.format("TTK p50 %s   p10 %s   (n=%d quedas)", secs(percentile(ss, 0.50)), secs(percentile(ss, 0.10)), sessHuman.ttkSeen)))
 	table.insert(out, "V4 " .. verdict(sCasts, string.format("pior indice: %s %.2fx (regua <=1.25x, n=%d conjuracoes)", sWorstEl, sWorstIdx, sCasts)))
+	--- REQUISITO 4 (celular) TAMBEM MORA AQUI, e por um motivo pratico: uma prova
+	--- de alpha nao junta 10 disparos de arrasto E 10 de PC do mesmo servidor. A
+	--- pergunta que reprovou no aparelho real e' justamente uma das que so'
+	--- concluem somando provas — igual a V1, V2 e V4.
+	local sArmed = (sessHuman.inputTouchByKind.drag or 0) + (sessHuman.inputTouchByKind.tap or 0) + sessHuman.abortedGestures
+	table.insert(out, "R4 gesto unico: " .. gestureAnswer(sessHuman))
+	table.insert(
+		out,
+		"R4 cancelados: "
+			.. (if not sawAborted
+				then "campo `aborted` NUNCA CHEGOU (CEGO, nao 0%)"
+				else verdict(sArmed, string.format("%s dos %d gestos armados abortados", pct(sessHuman.abortedGestures, sArmed), sArmed)))
+	)
 	table.insert(out, "   V3 e V5 ficam FORA desta soma DE PROPOSITO: a cobertura queimada e' da")
 	table.insert(out, "   PROVA (mapa novo em cada uma) e o bloco de SESSAO acima ja atravessa")
 	table.insert(out, "   provas por construcao — somar de novo contaria a mesma sessao duas vezes.")
@@ -1827,6 +2000,34 @@ function Telemetry.report(): string
 	needs(not sawDeviceTier, "ninguem chamou `Telemetry.setDevice`: o cliente reporta em Net.Names.DeviceInfo, falta o handler do servidor repassar — `device_tier` sai 'unknown'")
 	needs(sessOpened == 0, "`session_start`/`session_end` nao chegaram — a pergunta V5 fica SEM instrumentacao viva (fiar em Players.PlayerAdded/PlayerRemoving)")
 	needs(all.inputCasts == 0 and castsA > 0, "`input` nao vem no `spell_cast` — a regua do gesto unico (requisito 4) fica sem amostra")
+	--- FIACAO, nao amostra: `sawAborted` sobe assim que o campo CHEGA, mesmo
+	--- valendo zero. Sem esta separacao a pendencia sumiria numa partida em que
+	--- ninguem cancelou e voltaria na seguinte — ruido em vez de checklist.
+	needs(
+		not sawAborted and castsA > 0,
+		"`aborted` nao vem no `spell_cast`: gesto ARMADO E ABORTADO nao emite nada, entao quem hesita fica identico a quem nao hesita. O cliente ja envia (Controls.takeAborts) e o Combat ja aceita (6o argumento de handleCast) — falta o handler de Net.Names.CastSpell repassar, com `Events.sanitizeAborted` (ver relatorio da raia B/R14)"
+	)
+	needs(
+		(all.castsByInput.key or 0) == 0 and (all.castsByInput.drag or 0) > 0,
+		"nenhum disparo de PC (`key`) na amostra: sem o GRUPO DE CONTROLE, `o arrasto acerta tao bem quanto o PC` nao tem contra o que ser medido"
+	)
+	needs(
+		(all.castsByInput.drag or 0) > 0 and (all.hitsByInput.drag or 0) == 0 and (all.events[N.SpellHit] or 0) > 0,
+		"houve acerto e houve disparo de arrasto, mas nenhum acerto CARIMBADO com `drag`: o `input` esta se perdendo entre o disparo e o impacto (Combat.spawnProjectile / Combat.impact)"
+	)
+	needs(
+		funnelBroken,
+		"`spell_hit` chegou com modo de entrada que NENHUM `spell_cast` reportou: a taxa de acerto por entrada passou de 100% e NAO SE SUSTENTA — ignore a linha RESPOSTA ate isto sumir"
+	)
+	--- BURACO DECLARADO (item 4 da lista da raia de controles, R13): a
+	--- DISTRIBUICAO do gesto — quantos px alem da deadzone de 14 as pessoas
+	--- arrastam e quanto tempo seguram. E' o que separa "tap% alto e' preferencia"
+	--- de "`aimDeadzonePx`/`tapMaxDuration` estao mal calibrados". Nao foi feito
+	--- nesta raia de proposito: exigiria dois campos NUMEROS por disparo e um
+	--- reservatorio de percentil para cada um, e o mesmo handler que ainda nao
+	--- repassa `aborted` teria de repassar os dois. Numero pela metade aqui
+	--- valeria menos que o buraco escrito.
+	needs(true, "DISTRIBUICAO do gesto (px alem da deadzone, tempo segurando) nao e' medida: `tap%` alto continua sem dizer se e' PREFERENCIA ou se `aimDeadzonePx`/`tapMaxDuration` estao mal calibrados")
 	needs(#tutorialOrder == 0, "`tutorial_step` nao chegou — abandono do onboarding fica fora do quadro da V5")
 	--- NÃO acusa mais falta de emissor (ele existe desde a R12). Acusa o que
 	--- REALMENTE impede a leitura: terreno mexido por quem o servidor não
@@ -2205,6 +2406,151 @@ function Telemetry.selfTest()
 		"esquema inventado por cliente hostil NAO pode criar coluna no relatorio do Diretor"
 	)
 
+	-- 8-ter) CANCELAR + DESFECHO POR MODO DE ENTRADA (R14, requisito 4).
+	-- O bloco 8 responde "quanto do toque usou o gesto". Isso NAO diz se o gesto
+	-- FUNCIONA, e deixa de fora o silencio mais grave: gesto armado e ABORTADO
+	-- nao emite nada, entao quem hesita cinco vezes por abate sai identico a quem
+	-- nunca hesita. Aqui se prova as duas metades que faltavam.
+	local saveSawAb = sawAborted
+	sawAborted = false
+	--- contagem EXATA de ocorrencias: asserir "achou no texto" ja passou por
+	--- vacuidade nesta serie de fases porque o trecho aparecia DUAS vezes no
+	--- relatorio (uma no bloco, outra na pendencia). Contar fecha essa porta.
+	local function countIn(hay: string, needle: string): number
+		local n, at = 0, 1
+		while true do
+			local i = string.find(hay, needle, at, true)
+			if not i then
+				return n
+			end
+			n += 1
+			at = i + 1
+		end
+	end
+
+	--- (a) a tabela do relatorio nao pode ficar para tras de `INPUT_KINDS`: modo
+	--- novo criado pelo coordenador sem entrar aqui sumiria do relatorio CALADO.
+	for k in pairs(Events.INPUT_KINDS) do
+		assert(table.find(INPUT_ORDER, k) ~= nil, "modo de entrada `" .. k .. "` fora de INPUT_ORDER: sumiria do relatorio calado")
+	end
+
+	--- (b) o DENOMINADOR do desfecho NAO filtra aparelho — ao contrario do
+	--- recorte de toque do bloco 8, onde `key` fica de fora de proposito. Aqui
+	--- `key` e' o GRUPO DE CONTROLE: sem ele "tao bom quanto o PC" nao tem regua.
+	assert(human.castsByInput.key == 1, "disparo de PC tem de entrar no denominador do desfecho: e' a REGUA")
+	assert(human.castsByInput.drag == 1 and human.castsByInput.tap == 1, "disparo de toque tem de entrar no denominador do desfecho")
+	assert(human.castsByInput.swipe == nil, "modo inventado pelo cliente nao cria coluna no desfecho")
+
+	--- (c) o ACERTO carimbado: enquanto o `input` morria no `spell_cast`, "o
+	--- gesto ACERTA?" nao tinha como ser respondido.
+	fake(N.SpellHit, false, "Fire", { input = "drag" })
+	fake(N.SpellHit, false, "Fire", { input = "key" })
+	fake(N.SpellHit, false, "Fire", { input = "swipe" })
+	fake(N.SpellHit, false, "Fire", {})
+	assert(human.hitsByInput.drag == 1 and human.hitsByInput.key == 1, "o acerto tem de cair no balde do modo de entrada que o disparou")
+	assert(human.hitsByInput.swipe == nil, "modo inventado no acerto nao vira balde novo")
+	assert((human.events[N.SpellHit] or 0) == 4, "acerto SEM carimbo continua contando como acerto")
+
+	--- (d) CEGO nao e' 0%. Antes de o campo chegar, o relatorio tem de dizer que
+	--- nao enxerga: imprimir "0% cancelados" seria o numero que nao se sustenta,
+	--- e um numero desses derruba a confianca em todos os outros.
+	--- DOIS lugares perguntam isto (a prova e o acumulado do servidor) e os DOIS
+	--- tem de declarar cegueira. Asserir so' "aparece no texto" ja passou por
+	--- vacuidade nesta serie justamente porque o trecho saia duas vezes: aqui
+	--- cada linha e' contada pelo seu proprio prefixo.
+	local blind = Telemetry.report()
+	assert(countIn(blind, "CANCELADOS: o campo `aborted` NUNCA CHEGOU") == 1, "sem o campo, o bloco da PROVA tem de declarar CEGO, uma vez so")
+	assert(countIn(blind, "R4 cancelados: campo `aborted` NUNCA CHEGOU") == 1, "sem o campo, o ACUMULADO tem de declarar CEGO, uma vez so")
+	assert(countIn(blind, "foram ABORTADOS") == 0, "sem o campo, a razao de cancelamento nao pode ser impressa")
+
+	--- (e) HOSTIL: `aborted` e' o unico campo NUMERICO que o cliente declara
+	--- sobre si mesmo, e numero nao tem lista fechada como `INPUT_KINDS` tem.
+	stampDevice("u_t", "mid", true) -- volta a ser aparelho de toque
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = 2 })
+	assert(sawAborted, "campo que CHEGOU tem de baixar a pendencia de fiacao")
+	assert(human.abortedGestures == 2, "cancelamento honesto tem de somar")
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = 1e9 })
+	assert(human.abortedGestures == 2 + ABORT_CAP, "contador absurdo tem de ser CLAMPADO no teto, nunca aceito")
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = -50 })
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = 0 / 0 })
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = "muitos" })
+	assert(human.abortedGestures == 2 + ABORT_CAP, "negativo, NaN e texto tem de virar ZERO — nunca subtrair nem escapar do teto")
+
+	--- (f) E' ESTA a prova de que a razao nao passa de 100%: numerador e
+	--- denominador atravessam a MESMA porta de aparelho. Sem carimbo de toque,
+	--- drag/tap ficam fora do recorte — o cancelamento tem de ficar tambem,
+	--- senao o numerador teria gesto que o denominador nao tem.
+	local abBefore = human.abortedGestures
+	stampDevice("u_t", "high", false)
+	fake(N.SpellCast, false, "Fire", { input = "drag", aborted = 5 })
+	assert(human.abortedGestures == abBefore, "cancelamento sem carimbo de aparelho entraria num numerador sem denominador")
+
+	--- (g) com o campo chegando, o relatorio troca a declaracao de cegueira pela
+	--- razao — e nenhuma das duas pode sair em duplicata.
+	local seen = Telemetry.report()
+	assert(countIn(seen, "NUNCA CHEGOU") == 0, "com o campo chegando, NENHUM dos dois blocos pode continuar declarando CEGO")
+	assert(countIn(seen, "foram ABORTADOS") == 1, "com o campo chegando, a razao de cancelamento da PROVA tem de sair — uma vez so")
+	assert(countIn(seen, "R4 cancelados: 83% dos 41 gestos armados abortados") == 1, "o ACUMULADO do servidor tem de trazer a mesma razao (e' onde a amostra aparece)")
+
+	--- (h) A MENOR DAS DUAS PERNAS. Com 13 tiros de PC contra 7 de arrasto,
+	--- somar (20) ou pegar o maior (13) faria o quadro CONCLUIR sobre 7 arrastos.
+	--- Comparar 200 arrastos com 2 tiros de PC nao e' comparacao, e' anedota.
+	for _ = 1, 12 do
+		fake(N.SpellCast, false, "Fire", { input = "key" })
+	end
+	assert(human.castsByInput.key == 13 and human.castsByInput.drag == 7, "pre-condicao: pernas de 13 (PC) x 7 (arrasto)")
+	local legs = Telemetry.report()
+	assert(countIn(legs, "RESPOSTA: n=7, NAO CONCLUI") == 1, "a amostra da comparacao e' a MENOR das duas pernas, nunca a soma nem a maior")
+
+	--- (i) A RESPOSTA COM AMOSTRA. Ate aqui so se provou o "NAO CONCLUI"; a
+	--- frase que o Diretor vai ler de verdade e' esta, e ela depende da FOLGA
+	--- (`PARITY_PP`) — "tao bom quanto" nao e' "identico". Duas pernas de 20:
+	--- arrasto 2/20 = 10%, PC 12/20 = 60%.
+	for _ = 1, 13 do
+		fake(N.SpellCast, false, "Fire", { input = "drag" })
+	end
+	for _ = 1, 7 do
+		fake(N.SpellCast, false, "Fire", { input = "key" })
+	end
+	fake(N.SpellHit, false, "Fire", { input = "drag" })
+	for _ = 1, 11 do
+		fake(N.SpellHit, false, "Fire", { input = "key" })
+	end
+	assert(human.castsByInput.drag == 20 and human.castsByInput.key == 20, "pre-condicao: duas pernas de 20")
+	assert(human.hitsByInput.drag == 2 and human.hitsByInput.key == 12, "pre-condicao: arrasto 10% x PC 60%")
+	assert(
+		countIn(Telemetry.report(), "RESPOSTA: NAO — o arrasto acerta MENOS que o PC (arrasto 10% x PC 60%, -50 pp)") == 1,
+		"com amostra nas duas pernas, o requisito 4 tem de sair RESPONDIDO e com os dois lados a vista"
+	)
+	--- e a FOLGA valendo: 55% contra 60% e' a diferenca de 5 pp que tem de contar
+	--- como empate. LIMITE DECLARADO DESTA LINHA: em pernas de 20, `11/20*100 -
+	--- 12/20*100` nao da exatamente -5 em ponto flutuante, entao ela NAO separa
+	--- `>=` de `>` — o que ela prova e' que a folga EXISTE (trocar `-PARITY_PP`
+	--- por `0` reprova aqui). O sinal do operador na borda exata nao e'
+	--- observavel com dado real e nao se finge que e'.
+	for _ = 1, 9 do
+		fake(N.SpellHit, false, "Fire", { input = "drag" })
+	end
+	local parity = Telemetry.report()
+	assert(
+		countIn(parity, "RESPOSTA: SIM — o arrasto empata com o PC (arrasto 55% x PC 60%, -5 pp)") == 1,
+		"na folga de 5 pp o veredito da PROVA tem de ser SIM: `tao bom quanto` nao e' `identico`"
+	)
+	--- e o ACUMULADO responde a MESMA pergunta com a MESMA conta: dois numeros
+	--- diferentes para o requisito 4 no mesmo relatorio seria pior que nenhum.
+	assert(
+		countIn(parity, "R4 gesto unico: SIM — o arrasto empata com o PC (arrasto 55% x PC 60%, -5 pp)") == 1,
+		"o ACUMULADO tem de responder o requisito 4 pela mesma conta da prova"
+	)
+
+	--- (j) RAZAO DE FUNIL QUEBRADA tem de DENUNCIAR. `tap` tem 1 disparo; dois
+	--- acertos ali significam emissor furando o par disparo/acerto, e o
+	--- relatorio nao pode responder o requisito 4 com 200%.
+	fake(N.SpellHit, false, "Fire", { input = "tap" })
+	fake(N.SpellHit, false, "Fire", { input = "tap" })
+	assert(human.hitsByInput.tap == 2 and human.castsByInput.tap == 1, "pre-condicao: 2 acertos para 1 disparo de tap")
+	assert(countIn(Telemetry.report(), "NAO SE SUSTENTA") == 1, "acerto sem disparo correspondente tem de virar PENDENCIA denunciada, nao 200% impresso")
+
 	-- 8b) DANO POR AUTOR — a moeda do gatilho pos-playtest n.1
 	local dmgBefore = human.dmgByActor.u_t or 0
 	fake(N.Damage, false, "Fire", { amount = 40, target = "vitima" })
@@ -2418,6 +2764,7 @@ function Telemetry.selfTest()
 		deviceTouch[k] = v
 	end
 	sawDeviceTier = saveSaw
+	sawAborted = saveSawAb
 
 	-- 10) O RELATORIO SOBREVIVE? — o problema que a R12 veio resolver. Num
 	--     servidor publico as provas se encadeiam e o relatorio impresso rola
@@ -2492,7 +2839,7 @@ function Telemetry.selfTest()
 	for k, v in pairs(saveOpp) do
 		oppOpen[k] = v
 	end
-	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao, funil <=100%, separacao human/bot, acumulado de sessao e gravacao do relatorio")
+	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao, funil <=100%, separacao human/bot, gesto cancelado x acerto por modo de entrada, acumulado de sessao e gravacao do relatorio")
 	return true
 end
 

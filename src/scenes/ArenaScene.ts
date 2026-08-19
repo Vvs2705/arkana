@@ -69,6 +69,8 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
   private bots: Bot[] = [];
   private pool!: ProjectilePool;
   private hud!: HUD;
+  /** modo de toque com que o HUD atual foi construído (ele muda de layout) */
+  private hudTouchMode = false;
   /** PRISMA-1: módulos de apresentação, na ordem de init/update */
   private fx: RenderModule[] = [];
 
@@ -125,15 +127,11 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
 
     // HUD por último: lê getPlayerStats/getEntities já populados
     this.hud = new HUD(this);
+    this.hudTouchMode = touchControlsEnabled();
 
     // camada de toque (Auto detecta o hardware; "Ligado" testa no desktop).
     // Desligado = nenhum overlay, nenhum listener — desktop 100% intacto.
-    if (touchControlsEnabled()) {
-      this.touch = new TouchControls(this, this, {
-        onPause: () => this.onEsc(),
-        onElement: (el) => this.player.setElement(el),
-      });
-    }
+    this.syncTouchLayer();
 
     // PRISMA-1: módulos de apresentação (4 raias de render — só visual).
     // Ordem: pele do terreno → luz → personagens → vfx.
@@ -219,7 +217,40 @@ export class ArenaScene extends Phaser.Scene implements ArenaApi {
   /** ao acordar da pausa, re-zera estados de input pendurados */
   private onResume(): void {
     this.player.clearInputState();
+    this.syncTouchLayer(); // Configurações podem ter mudado no meio da partida
     this.touch?.clearState(); // pointerups perdidos durante a pausa
+  }
+
+  /**
+   * Pausa → Configurações → voltar NÃO recria a Arena (PauseScene faz
+   * scene.start(SETTINGS) e o retorno é scene.resume(ARENA)). Este é o único
+   * ponto em que a Arena volta a rodar, então é aqui que a camada de toque se
+   * acerta com o que o jogador mudou: escala, posição dos botões, esquema de
+   * mira — e ligar/desligar o toque, que também vira o layout do HUD.
+   */
+  private syncTouchLayer(): void {
+    const want = touchControlsEnabled();
+
+    // o HUD decide o layout pelo modo de toque (o carrossel substitui os ícones
+    // de elemento, o painel de vida sobe): trocar o modo exige refazê-lo.
+    // Antes da camada de toque — mesma profundidade, quem nasce depois fica por cima.
+    if (this.hudTouchMode !== want) {
+      this.hud.destroy();
+      this.hud = new HUD(this);
+      this.hudTouchMode = want;
+    }
+
+    if (want === (this.touch !== undefined)) {
+      this.touch?.refresh();
+    } else if (want) {
+      this.touch = new TouchControls(this, this, {
+        onPause: () => this.onEsc(),
+        onElement: (el) => this.player.setElement(el),
+      });
+    } else {
+      this.touch?.destroy();
+      this.touch = undefined;
+    }
   }
 
   private onPlayerDied(): void {

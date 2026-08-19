@@ -151,7 +151,18 @@ serverEvent(Net.Names.CastSpell):Connect(function(player, payload)
 	--- (drag = o gesto único do §4 · tap · key). Sanitizado aqui também porque
 	--- este espelho é o que o portão executa — validação que só existe no
 	--- arquivo que o teste NÃO roda é validação que ninguém verifica.
-	Combat.handleCast(player, kind, dir, boot.Events.sanitizeInput(payload.input))
+	--- espelha o handler do Main INTEIRO: `input` (modo do gesto), `aim` (esquema
+	--- assistido x manual) e `aborted` (gestos cancelados desde o disparo
+	--- anterior). Validação que só existe no arquivo que o teste NÃO roda é
+	--- validação que ninguém verifica.
+	Combat.handleCast(
+		player,
+		kind,
+		dir,
+		boot.Events.sanitizeInput(payload.input),
+		boot.Events.sanitizeAim(payload.aim),
+		boot.Events.sanitizeAborted(payload.aborted)
+	)
 end)
 --- Espelha o handler que a R10 criou no Main. O cliente reporta o aparelho
 --- desde a R5 e NINGUÉM escutava — `device_tier` saía "unknown" em todo evento.
@@ -240,6 +251,8 @@ local okDevice, devErr = xpcall(function()
 		kind = "basic",
 		dir = H.Vector3.new(1, 0, 0),
 		input = "drag",
+		aim = "assist",
+		aborted = 2, -- armou e desistiu duas vezes antes deste disparo
 	})
 	local text = boot.Telemetry.report()
 	assert(
@@ -251,6 +264,21 @@ local okDevice, devErr = xpcall(function()
 	--- decorativos escaparam nesta mesma fase.
 	local touchCasts = tonumber(string.match(text, "em aparelho de TOQUE %.*%s*(%d+) disparos")) or 0
 	assert(touchCasts > 0, "o `input` nao chegou ao `spell_cast`: recorte de TOQUE ficou em 0 disparos")
+	--- os TRES campos do disparo atravessam o mesmo handler; provar so' um deixa
+	--- os outros dois livres para quebrar em silencio. "CEGO" no relatorio e' a
+	--- resposta honesta quando o campo nao chega -- e e' exatamente por isso que
+	--- o portao tem de provar que, quando ele CHEGA, aparece.
+	--- NAO basta o texto "NUNCA CHEGOU" sumir: `sawAborted` e' flag de MODULO e o
+	--- autoteste da FASE 2 ja' a liga, entao um assert naquele texto passa mesmo
+	--- com o handler desligado -- foi exatamente o que aconteceu na primeira
+	--- versao desta linha. O que prova a fiacao e' o CONTADOR trazer o numero que
+	--- a sonda enviou. (Nao adianta disparar de novo para ver subir: o segundo
+	--- basico cai no cooldown do proprio Combat e nem chega a emitir evento.)
+	local canceled = tonumber(string.match(text, "CANCELADOS (%d+)%)")) or -1
+	assert(
+		canceled == 2,
+		string.format("o `aborted` nao atravessou o handler ate' o contador: esperava 2, veio %d", canceled)
+	)
 end, trace)
 record("partida", "aparelho relatado + gesto carimbado", okDevice, if okDevice then nil else devErr)
 
@@ -585,11 +613,13 @@ end
 --- (harness próprio, seed própria — mesmo truque do sweep) — mais o S7, a
 --- MARATONA da R13, que é UM servidor só de propósito: seis provas encadeadas
 --- com gente entrando e saindo, medindo o que cresce de uma prova para a
---- seguinte. Rodam no caminho PADRÃO de propósito: correção sem teste tem prazo
---- de validade, e teste que só roda quando alguém lembra não é portão.
---- `run.sh scenarios` roda só estes.
+--- seguinte; e o S8 da R14, que sobe os TRÊS módulos que o S7 não carrega
+--- (`Telemetry` de verdade, `Grimoire`, `Prefs`) e mede a tabela por jogador
+--- deles com doze pessoas entrando e saindo. Rodam no caminho PADRÃO de
+--- propósito: correção sem teste tem prazo de validade, e teste que só roda
+--- quando alguém lembra não é portão. `run.sh scenarios` roda só estes.
 print("")
-print("== FASE 4 — CENÁRIOS DE ROBUSTEZ (S1–S7, um servidor novo por cenário) ==")
+print("== FASE 4 — CENÁRIOS DE ROBUSTEZ (S1–S8, um servidor novo por cenário) ==")
 do
 	local ok, scenarios = xpcall(function()
 		return assert(loadstring(SOURCES["tools/scenarios.luau"], "@roblox/tools/scenarios.luau"))(SOURCES)

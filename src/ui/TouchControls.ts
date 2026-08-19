@@ -9,6 +9,12 @@
 // Layout/escala persistidos em Settings.controls.touch; o modo edição
 // (api === null) torna os controles arrastáveis e salva as posições.
 //
+// TODA geometria dependente de tela ou de Settings vive em refresh() — e SÓ
+// ali. É a autoridade única: o build chama, o RESIZE do Phaser chama (rotação,
+// tela dividida, WebView reajustando depois do load) e a Arena chama ao voltar
+// da pausa. Espalhar esse recálculo por vários pontos é como o defeito de 48dp
+// volta.
+//
 // A camada NÃO duplica lógica de gameplay: o Player consome getMove()/
 // getAimAngle()/attackHeld/tacticHeld/consumeDodge() pelo mesmo caminho de
 // input do teclado/mouse.
@@ -17,7 +23,7 @@ import Phaser from 'phaser';
 import { Element, ELEMENTS, type ArenaApi, type EntityRef } from '../core/types';
 import {
   GAME_WIDTH, GAME_HEIGHT, TOUCH, TEX, ICON_TEX, ELEMENT_COLORS, COLORS,
-  DEPTH, type TouchControlId,
+  DEPTH, minHitRadiusPx, dpToPx, type TouchControlId,
 } from '../core/config';
 import { BAL } from '../core/balance';
 import { Settings } from '../core/settings';
@@ -79,9 +85,15 @@ export class TouchControls {
     this.opts = opts;
 
     this.build();
+    this.refresh(); // posição, tamanho e área de toque — antes dos handlers
     if (this.edit) this.enableEditing();
     else this.enableGameplay();
+    // a tela pode mudar DURANTE a partida; sem isto a conversão dp→px
+    // congela no tamanho do primeiro frame (defeito R14)
+    this.scene.scale.on(Phaser.Scale.Events.RESIZE, this.onResize);
   }
+
+  private readonly onResize = (): void => { this.refresh(); };
 
   // ------------------------------------------------------------- geometria
   private get userScale(): number {
@@ -89,10 +101,20 @@ export class TouchControls {
     return Phaser.Math.Clamp(s, TOUCH.scaleMin, TOUCH.scaleMax);
   }
 
-  /** raio mínimo em px do canvas equivalente a 48dp na tela do jogador */
+  /** raio mínimo em px do canvas equivalente a 48dp na tela do jogador AGORA */
   private minHitRadius(): number {
-    const dispW = this.scene.scale.displaySize.width || GAME_WIDTH;
-    return (TOUCH.minDp * (GAME_WIDTH / dispW)) / 2;
+    return minHitRadiusPx(this.scene.scale.displaySize.width);
+  }
+
+  /**
+   * Deadzone de mira em px do canvas equivalente ao dp na tela do jogador AGORA.
+   * Lido a cada evento (e não cacheado) pelo mesmo motivo do raio de toque: a
+   * largura da tela MUDA durante a sessão, e um valor calculado uma vez no
+   * `build()` foi exatamente o defeito que deixava todos os alvos errados
+   * depois de um giro de aparelho.
+   */
+  private get aimDeadzonePx(): number {
+    return dpToPx(BAL.touch.aimDeadzoneDp, this.scene.scale.displaySize.width);
   }
 
   private pos(id: TouchControlId): { x: number; y: number } {
@@ -120,55 +142,60 @@ export class TouchControls {
     const sy = img.displayHeight / img.height;
     const lw = w / sx;
     const lh = h / sy;
-    img.setInteractive(
-      new Phaser.Geom.Rectangle((img.width - lw) / 2, (img.height - lh) / 2, lw, lh),
-      Phaser.Geom.Rectangle.Contains,
-    );
+    this.hitRect(img, (img.width - lw) / 2, (img.height - lh) / 2, lw, lh);
   }
 
   /** hit circle da imagem em coordenadas locais da textura (origem 0,0) */
   private hitImage(img: Phaser.GameObjects.Image, displayRadius: number): void {
     const r = Math.max(displayRadius, this.minHitRadius());
     const localR = r / (img.displayWidth / img.width);
-    img.setInteractive(
-      new Phaser.Geom.Circle(img.width / 2, img.height / 2, localR),
-      Phaser.Geom.Circle.Contains,
-    );
+    const area: unknown = img.input?.hitArea;
+    // ATENÇÃO: chamar setInteractive de novo NÃO troca a área de um objeto que
+    // já tem input — InputPlugin.setHitArea reaproveita o InteractiveObject
+    // existente (`var io = (!gameObject.input) ? Create... : gameObject.input`).
+    // O recálculo do RESIZE seria silenciosamente ignorado. Por isso a
+    // geometria é atualizada NO LUGAR.
+    if (area instanceof Phaser.Geom.Circle) area.setTo(img.width / 2, img.height / 2, localR);
+    else {
+      img.setInteractive(
+        new Phaser.Geom.Circle(img.width / 2, img.height / 2, localR),
+        Phaser.Geom.Circle.Contains,
+      );
+    }
+  }
+
+  /** idem para áreas retangulares (ícone do carrossel · caixa de arrasto) */
+  private hitRect(
+    obj: Phaser.GameObjects.Image | Phaser.GameObjects.Container,
+    x: number, y: number, w: number, h: number,
+  ): void {
+    const area: unknown = obj.input?.hitArea;
+    if (area instanceof Phaser.Geom.Rectangle) area.setTo(x, y, w, h);
+    else obj.setInteractive(new Phaser.Geom.Rectangle(x, y, w, h), Phaser.Geom.Rectangle.Contains);
   }
 
   // ----------------------------------------------------------------- build
+  /** cria os objetos; posição/tamanho/área de toque são do refresh() */
   private build(): void {
-    const s = this.userScale;
-    const sz = TOUCH.size;
     const fix = <T extends Phaser.GameObjects.Image | Phaser.GameObjects.Container | Phaser.GameObjects.Graphics>(o: T): T => {
       o.setScrollFactor(0).setDepth(TOUCH_DEPTH);
       return o;
     };
 
     // joystick
-    const sp = this.pos('stick');
-    this.stickBase = fix(this.scene.add.image(sp.x, sp.y, TEX.STICK_BASE))
-      .setDisplaySize(sz.stickBase * 2 * s, sz.stickBase * 2 * s)
-      .setAlpha(0.85);
-    this.stickThumb = fix(this.scene.add.image(sp.x, sp.y, TEX.STICK_THUMB))
-      .setDisplaySize(sz.stickThumb * 2 * s, sz.stickThumb * 2 * s)
-      .setAlpha(0.9);
+    this.stickBase = fix(this.scene.add.image(0, 0, TEX.STICK_BASE)).setAlpha(0.85);
+    this.stickThumb = fix(this.scene.add.image(0, 0, TEX.STICK_THUMB)).setAlpha(0.9);
 
     // botões de ação
-    const mk = (id: TouchControlId, tex: string, r: number): Phaser.GameObjects.Image => {
-      const p = this.pos(id);
-      return fix(this.scene.add.image(p.x, p.y, tex))
-        .setDisplaySize(r * 2 * s, r * 2 * s)
-        .setAlpha(0.92);
-    };
-    this.attackBtn = mk('attack', TEX.BTN_ATTACK, sz.attack);
-    this.tacticBtn = mk('tactic', TEX.BTN_TACTIC, sz.tactic);
-    this.dodgeBtn = mk('dodge', TEX.BTN_DODGE, sz.dodge);
+    const mk = (tex: string): Phaser.GameObjects.Image =>
+      fix(this.scene.add.image(0, 0, tex)).setAlpha(0.92);
+    this.attackBtn = mk(TEX.BTN_ATTACK);
+    this.tacticBtn = mk(TEX.BTN_TACTIC);
+    this.dodgeBtn = mk(TEX.BTN_DODGE);
 
     // carrossel dos 5 elementos (acima dos botões)
-    const cp = this.pos('carousel');
-    this.carousel = fix(this.scene.add.container(cp.x, cp.y));
-    this.carouselIcons = ELEMENTS.map((el, i) => {
+    this.carousel = fix(this.scene.add.container(0, 0));
+    this.carouselIcons = ELEMENTS.map((el) => {
       // setScrollFactor(0) no FILHO, não só no container: o Phaser DESENHA o
       // filho com o scrollFactor do pai (0 = grudado na tela), mas o hit-test
       // de input usa o scrollFactor do PRÓPRIO filho
@@ -177,56 +204,99 @@ export class TouchControls {
       // câmera — que na Arena segue o jogador — e o toque na troca de elemento
       // caía na zona livre, virando arrasto de mira. Defeito de 17/08
       // (docs/ANDROID.md, Fase 3). NÃO remover.
-      const img = this.scene.add.image((i - 2) * sz.iconGap * s, 0, ICON_TEX[el])
-        .setDisplaySize(sz.icon * s, sz.icon * s)
-        .setScrollFactor(0);
+      const img = this.scene.add.image(0, 0, ICON_TEX[el]).setScrollFactor(0);
       this.carousel.add(img);
       return img;
     });
 
     // botão de pausa (só em jogo — sem ESC no celular; posição fixa)
     if (!this.edit) {
-      this.pauseBtn = fix(this.scene.add.image(GAME_WIDTH - 200, 44, TEX.BTN_PAUSE))
-        .setDisplaySize(sz.pause * 2, sz.pause * 2)
-        .setAlpha(0.8);
+      this.pauseBtn = fix(this.scene.add.image(GAME_WIDTH - 200, 44, TEX.BTN_PAUSE)).setAlpha(0.8);
     }
 
     this.fxG = fix(this.scene.add.graphics());
   }
 
-  // -------------------------------------------------------------- gameplay
-  private enableGameplay(): void {
+  // --------------------------------------------------------------- refresh
+  /**
+   * AUTORIDADE ÚNICA da geometria: posição e tamanho (dependem de Settings) e
+   * áreas de toque (dependem do tamanho da tela AGORA). Idempotente.
+   *
+   * Três gatilhos, um só caminho:
+   *  · construção;
+   *  · Phaser.Scale.Events.RESIZE — girar o aparelho, tela dividida ou o
+   *    WebView reajustando depois do load mudam displaySize e, com ela, a
+   *    conversão dp→px de TODO alvo de toque;
+   *  · ArenaScene.onResume — Configurações abertas pela pausa não recriam a
+   *    Arena, então escala/layout novos entram por aqui.
+   */
+  refresh(): void {
+    if (this.destroyed) return;
     const s = this.userScale;
     const sz = TOUCH.size;
 
+    const place = (
+      o: Phaser.GameObjects.Image, id: TouchControlId, r: number,
+    ): void => {
+      const p = this.pos(id);
+      o.setPosition(p.x, p.y).setDisplaySize(r * 2 * s, r * 2 * s);
+    };
+    place(this.stickBase, 'stick', sz.stickBase);
+    place(this.stickThumb, 'stick', sz.stickThumb);
+    place(this.attackBtn, 'attack', sz.attack);
+    place(this.tacticBtn, 'tactic', sz.tactic);
+    place(this.dodgeBtn, 'dodge', sz.dodge);
+
+    const cp = this.pos('carousel');
+    this.carousel.setPosition(cp.x, cp.y);
+    this.carouselIcons.forEach((img, i) => {
+      img.setPosition((i - 2) * sz.iconGap * s, 0).setDisplaySize(sz.icon * s, sz.icon * s);
+    });
+    this.pauseBtn?.setDisplaySize(sz.pause * 2, sz.pause * 2);
+
+    // escalas base do feedback de pressão — depois do setDisplaySize
+    this.attackBaseScale = this.attackBtn.scaleX;
+    this.tacticBaseScale = this.tacticBtn.scaleX;
+
+    // áreas de toque: o piso de 48dp vale na tela ATUAL
+    this.hitImage(this.attackBtn, sz.attack * s);
+    this.hitImage(this.tacticBtn, sz.tactic * s);
+    this.hitImage(this.dodgeBtn, sz.dodge * s);
+    if (this.edit) {
+      this.hitImage(this.stickBase, sz.stickBase * s);
+      const cw = sz.iconGap * s * ELEMENTS.length;
+      const ch = sz.icon * s + 16;
+      this.hitRect(this.carousel, -cw / 2, -ch / 2, cw, ch);
+    } else {
+      for (const img of this.carouselIcons) this.hitCarouselIcon(img, sz.iconGap * s);
+      if (this.pauseBtn) this.hitImage(this.pauseBtn, sz.pause);
+    }
+  }
+
+  // -------------------------------------------------------------- gameplay
+  private enableGameplay(): void {
+    // só handlers: a geometria (incl. áreas de toque) é do refresh()
     // botões: pointerdown no objeto, release pelo pointerup global (o dedo
     // pode escorregar p/ fora do botão sem "prender" o disparo)
-    this.attackBaseScale = this.attackBtn.scaleX;
-    this.hitImage(this.attackBtn, sz.attack * s);
     this.attackBtn.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.attackPtr = p.id;
       this.attackBtn.setScale(this.attackBaseScale * PRESS_SCALE);
     });
 
-    this.tacticBaseScale = this.tacticBtn.scaleX;
-    this.hitImage(this.tacticBtn, sz.tactic * s);
     this.tacticBtn.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.tacticPtr = p.id;
       this.tacticBtn.setScale(this.tacticBaseScale * PRESS_SCALE);
     });
 
-    this.hitImage(this.dodgeBtn, sz.dodge * s);
     this.dodgeBtn.on('pointerdown', () => { this.dodgeQueued = true; });
 
     this.carouselIcons.forEach((img, i) => {
-      this.hitCarouselIcon(img, sz.iconGap * s);
       img.on('pointerdown', () => {
         this.opts.onElement?.(ELEMENTS[i]);
       });
     });
 
     if (this.pauseBtn) {
-      this.hitImage(this.pauseBtn, TOUCH.size.pause);
       this.pauseBtn.on('pointerdown', () => {
         Audio.playSfx('ui_click');
         this.opts.onPause?.();
@@ -259,7 +329,7 @@ export class TouchControls {
     else if (p.id === this.aimPtr) {
       const dx = p.x - this.aimStart.x;
       const dy = p.y - this.aimStart.y;
-      if (Math.hypot(dx, dy) >= BAL.touch.aimDeadzonePx) {
+      if (Math.hypot(dx, dy) >= this.aimDeadzonePx) {
         this.rawAim = Math.atan2(dy, dx);
       }
     }
@@ -405,9 +475,6 @@ export class TouchControls {
 
   // -------------------------------------------------------------- edição
   private enableEditing(): void {
-    const s = this.userScale;
-    const sz = TOUCH.size;
-
     const drag = (
       obj: Phaser.GameObjects.Image | Phaser.GameObjects.Container,
       id: TouchControlId,
@@ -439,22 +506,11 @@ export class TouchControls {
       });
     };
 
-    this.hitImage(this.stickBase, sz.stickBase * s);
+    // áreas de toque já criadas pelo refresh() — aqui só o arrasto
     drag(this.stickBase, 'stick', (x, y) => this.stickThumb.setPosition(x, y));
-
-    this.hitImage(this.attackBtn, sz.attack * s);
     drag(this.attackBtn, 'attack');
-    this.hitImage(this.tacticBtn, sz.tactic * s);
     drag(this.tacticBtn, 'tactic');
-    this.hitImage(this.dodgeBtn, sz.dodge * s);
     drag(this.dodgeBtn, 'dodge');
-
-    const cw = sz.iconGap * s * ELEMENTS.length;
-    const ch = sz.icon * s + 16;
-    this.carousel.setInteractive(
-      new Phaser.Geom.Rectangle(-cw / 2, -ch / 2, cw, ch),
-      Phaser.Geom.Rectangle.Contains,
-    );
     drag(this.carousel, 'carousel');
   }
 
@@ -462,6 +518,7 @@ export class TouchControls {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.scene.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     this.scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onDown);
     this.scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.onMove);
     this.scene.input.off(Phaser.Input.Events.POINTER_UP, this.onUp);

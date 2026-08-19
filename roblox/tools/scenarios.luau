@@ -2,7 +2,7 @@
 -- ============================================================================
 -- ARKANA — CENÁRIOS DE ROBUSTEZ (raia A: Engenheiro de QA)
 -- Roda junto com o portão padrão (`roblox/tools/run.sh`) e também sozinho
--- (`roblox/tools/run.sh scenarios`) quando se quer só estes sete.
+-- (`roblox/tools/run.sh scenarios`) quando se quer só estes oito.
 --
 -- POR QUE ESTE ARQUIVO EXISTE: a fase R8 achou e corrigiu seis travamentos de
 -- robustez lendo código e simulando à mão. Correção sem teste é correção com
@@ -21,12 +21,17 @@
 --   S7  MARATONA: seis provas encadeadas com gente entrando e saindo, e o que
 --       cresce medido por CONTAGEM (o S6 vê a virada entre duas partidas; o S7
 --       vê o servidor de alpha, que roda por horas)
+--   S8  os TRÊS módulos que o S7 não carrega — `Telemetry` de verdade,
+--       `Grimoire` e `Prefs` — com doze pessoas distintas entrando e saindo:
+--       o S7 mede o que a PROVA deixa para trás, o S8 mede o que a PESSOA
+--       deixa para trás
 --
 -- Cada cenário monta um SERVIDOR NOVO (harness próprio, seed própria) — mesmo
 -- truque do sweep.luau. Um cenário não pode herdar mundo do outro: é
--- exatamente esse tipo de herança que o S6 existe para proibir. O S7 é a
--- exceção deliberada: ele é UM servidor só, de propósito, porque a pergunta
--- dele é justamente o que sobra de uma prova para a seguinte.
+-- exatamente esse tipo de herança que o S6 existe para proibir. O S7 e o S8 são
+-- as exceções deliberadas: cada um é UM servidor só, de propósito, porque a
+-- pergunta dos dois é justamente o que sobra de uma prova (S7) ou de um
+-- jogador (S8) para o seguinte.
 -- ============================================================================
 
 local SOURCES = ...
@@ -36,6 +41,17 @@ local BASE_BALANCE = SOURCES["shared/Balance.luau"]
 --- Servidor limpo, na ordem do Main.server.luau (a mesma que o run.luau
 --- repete). `zoneVariant` troca a variante de ritmo no FONTE do Balance antes
 --- do load — nenhum arquivo de src/ é tocado, é o mesmo caminho do sweep.
+---
+--- `opts.full` (R14) sobe os TRÊS módulos que faltavam — `Telemetry` de
+--- verdade (com `init`, em vez do `emit` trocado por contador), `Grimoire` e
+--- `Prefs` — e espelha a fiação por jogador do Main para eles. É a ÚNICA
+--- diferença, e ela está toda atrás deste booleano: sem `full` cada linha
+--- abaixo executa exatamente o que executava antes desta fase, na mesma ordem,
+--- com o mesmo conjunto de módulos carregados. Foi por isso que a opção entrou
+--- AQUI em vez de virar um `boot` paralelo: S1–S6 são regressões que custaram
+--- caro e um segundo boot copiado começa igual e termina divergindo em
+--- silêncio — o dia em que alguém consertar um e esquecer o outro, o cenário
+--- de regressão passa a medir um servidor que não existe mais.
 local function boot(tag: string, opts: any?): any
 	local o = opts or {}
 	SOURCES.__seed = o.seed or 771109
@@ -71,10 +87,13 @@ local function boot(tag: string, opts: any?): any
 	local Bots = req(Server:WaitForChild("Bots"))
 
 	--- Contador de eventos pela MESMA porta que o run.luau usa (Telemetry.emit).
-	--- Sem `Telemetry.init`: aqui ninguém quer relatório, só o fato "aconteceu".
+	--- Sem `full`, NÃO há `Telemetry.init` e o original nunca roda: aqui ninguém
+	--- quer relatório, só o fato "aconteceu". Com `full` o contador DELEGA ao
+	--- coletor de verdade — é o estado interno dele que o S8 mede.
 	local events, lastPayload = {}, {}
 	local Telemetry = req(Server:WaitForChild("Telemetry"))
-	Telemetry.emit = function(name, _subject, payload)
+	local realEmit = Telemetry.emit
+	Telemetry.emit = function(name, subject, payload)
 		if type(name) == "string" then
 			events[name] = (events[name] or 0) + 1
 			--- guarda o ÚLTIMO payload: um evento que acontece não prova que ele
@@ -82,17 +101,45 @@ local function boot(tag: string, opts: any?): any
 			--- só sai mentindo). Ver o S1 e a exclusão do treino no funil da V1.
 			lastPayload[name] = payload
 		end
+		if o.full then
+			return realEmit(name, subject, payload)
+		end
+		return nil
+	end
+
+	--- OS TRÊS QUE FALTAVAM. Ordem do Main.server.luau: `Grimoire.init` depois
+	--- do `Telemetry.init`, porque ele ENVOLVE `Telemetry.emit` para observar
+	--- `sintonia_fired`/`match_end` — envolvendo o contador acima, que por sua
+	--- vez chama o original. `Prefs.init` se fia sozinho em
+	--- Players.PlayerAdded/PlayerRemoving, que é o que `H.addPlayer`/
+	--- `H.removePlayer` disparam.
+	local Grimoire, Prefs, Events = nil, nil, nil
+	if o.full then
+		Events = req(Shared:WaitForChild("Events"))
+		Telemetry.init(Terrain, Combat, Match)
+		Grimoire = req(Server:WaitForChild("Grimoire"))
+		Grimoire.init(Terrain, Combat)
+		Prefs = req(Server:WaitForChild("Prefs"))
+		Prefs.init()
 	end
 
 	local ctx: any = { H = H, Net = Net, Balance = Balance, Terrain = Terrain, Combat = Combat }
 	ctx.Sintonia, ctx.Match, ctx.Bots, ctx.Tutorial = Sintonia, Match, Bots, Tutorial
 	ctx.events, ctx.players, ctx.simulated = events, {}, 0
 	ctx.lastPayload = lastPayload
+	ctx.Telemetry, ctx.Grimoire, ctx.Prefs = Telemetry, Grimoire, Prefs
 
 	--- Mesma fiação por jogador do Main.server.luau (sem a parte de cliente).
 	function ctx.addPlayer(name: string, userId: number)
 		local p = H.addPlayer(name, userId)
+		if o.full then
+			--- ANTES da fiação, como no Main: é o `session_start` da pergunta V5.
+			Telemetry.emit(Events.Name.SessionStart, p)
+		end
 		Combat.onPlayerAdded(p)
+		if o.full then
+			Grimoire.onPlayerAdded(p)
+		end
 		p.CharacterAdded:Connect(function(char)
 			local hum = char:WaitForChild("Humanoid")
 			hum.WalkSpeed = Balance.player.speed
@@ -107,10 +154,19 @@ local function boot(tag: string, opts: any?): any
 
 	--- Saída pela porta do Main (`Players.PlayerRemoving`), na mesma ordem.
 	function ctx.removePlayer(p)
-		H.removePlayer(p)
+		if o.full then
+			--- PRIMEIRA coisa, como no Main: o `session_end` é enriquecido com o
+			--- contexto de quem ainda ESTÁ na partida. Emitido depois da
+			--- desmontagem, "onde ele desistiu" sairia vazio.
+			Telemetry.emit(Events.Name.SessionEnd, p)
+		end
+		H.removePlayer(p) -- dispara PlayerRemoving: é aqui que o `Prefs` limpa
 		Combat.onPlayerRemoving(p)
 		Sintonia.onPlayerRemoving(p)
 		pcall(Tutorial.onPlayerRemoving, p)
+		if o.full then
+			Grimoire.onPlayerRemoving(p)
+		end
 		Match.onPlayerRemoving(p)
 	end
 
@@ -125,6 +181,9 @@ local function boot(tag: string, opts: any?): any
 			Sintonia.step(dt)
 			Match.step(dt)
 			Tutorial.step(dt)
+			if o.full then
+				Grimoire.step(dt)
+			end
 			ctx.simulated += dt
 			if hook then
 				hook(i)
@@ -531,14 +590,24 @@ end
 ---     Instance que já criou em `H.parts`/`H.humanoids`, então nada nelas é
 ---     coletado aqui — contá-las seria medir o coletor, não o código. É por
 ---     isso que ficam fora do `Match.stateCounts` também.
+---     R14: continua sem medição, mas deixou de ser só uma frase — o bloco
+---     `TETO DO HARNESS` do S8 PROVA que a Instance fica fixada, e fica
+---     vermelho no dia em que isso mudar. Enquanto ficar verde, contar chave
+---     fraca aqui dá um número errado PARA CIMA, sempre.
 ---   · MEMÓRIA DE VERDADE. Nada aqui pesa bytes: chave que some pode ter
 ---     deixado a tabela com a capacidade inteira alocada, e ninguém aqui vê.
 ---   · O QUE ESTE SERVIDOR NÃO CARREGA. O `boot` sobe Terrain/Combat/Sintonia/
 ---     Match/Tutorial/Bots; `Telemetry.emit` é substituído por um contador e
 ---     `Grimoire`/`Prefs` nem entram. Estado que cresça LÁ (as tabelas por
 ---     `subjectKey` do Telemetry, por exemplo) passa por baixo do S7 inteiro.
----   · CONEXÕES. `Connect` sem `Disconnect` é vazamento clássico e não tem
+---     R14: FECHADO pelo S8, que sobe os três com `boot(..., { full = true })`.
+---     O S7 continua rodando sem eles de propósito — ele é a regressão de
+---     partida, e trocar o servidor dele seria trocar o que ele mede.
+---   · CONEXÕES. `Connect` sem `Disconnect` é vazamento clássico e não tinha
 ---     contador nenhum neste harness.
+---     R14: existe `H.aliveConnections` e o S8 o usa em DELTA sobre os sinais
+---     longevos. O que continua não existindo é o contrato "quantas conexões
+---     são normais" — por isso NÃO há número absoluto em lugar nenhum.
 local function s7()
 	local c = boot("s7", { seed = 424242 })
 	--- NÚCLEO que nunca sai. Sem humano dentro o `mustEndNow` encerra por
@@ -796,6 +865,253 @@ local function s7()
 	)
 end
 
+-- ==================================================== S8 — OS TRÊS QUE FALTAVAM
+--- O QUE A MARATONA NÃO ENXERGAVA. O S7 é UM servidor de seis provas, mas um
+--- servidor que NÃO carrega três módulos: o `Telemetry` entra com o `emit`
+--- trocado por um contador (o original nunca roda), e `Grimoire` e `Prefs` nem
+--- são requeridos. São justamente os três com MAIS tabela por jogador — então
+--- estado que crescesse lá passava por baixo da maratona inteira.
+---
+--- Este cenário sobe os três (`boot(..., { full = true })`) e faz a única coisa
+--- que um alpha de horas faz e uma prova não: DOZE pessoas distintas entram e
+--- saem, metade no meio da prova e metade na tela de fim. Ele NÃO repete o que
+--- o S7 já cobre (altares, espíritos, peças do mundo, a máquina de estados) —
+--- três provas curtas bastam para o vai-e-vem, e a prova longa é do S7.
+---
+--- TRÊS RÉGUAS, todas por CONTAGEM e todas por PORTA PÚBLICA — nenhum arquivo
+--- de src/ é tocado, nem para ler estado privado:
+---   1. `Telemetry` — a linha "sessoes ... em curso" do `report()` É a contagem
+---      de chaves de `sessions`, e `sessions` tem o MESMO ciclo de vida de
+---      `deviceTier` e `deviceTouch` (as três nascem no `session_start` e o
+---      `closeSession` mata as três juntas). Uma leitura cobre as três tabelas.
+---   2. `Prefs` — `Prefs.get(p)` é `nil` para quem o servidor não conhece.
+---      Cobrado para CADA um dos que já saíram, não só para o último.
+---   3. `Grimoire` — não expõe leitor de tabela, mas expõe a porta C→S "me
+---      manda meu grimório", e ela só responde enquanto `tracks[p]` existir. O
+---      remote é o detector, e é o mesmo caminho que o cliente usa.
+--- Mais o CONTADOR DE CONEXÕES (`H.aliveConnections`), em DELTA: ver o bloco
+--- onde ele é montado.
+---
+--- O QUE ESTE CENÁRIO CONTINUA SEM ENXERGAR:
+---   · `sessHumans` (o denominador "humanos distintos" do relatório) CRESCE por
+---     jogador distinto, de propósito — é o que impede o acumulado de servidor
+---     de fingir conclusão. Aqui ele é medido e LIMITADO por cima, não zerado.
+---   · TABELAS DE CHAVE FRACA — ver o bloco `TETO DO HARNESS` logo abaixo, que
+---     PROVA por que elas não são mensuráveis aqui em vez de só afirmar.
+---   · MEMÓRIA DE VERDADE (bytes). Como no S7: aqui se conta chave.
+local function s8()
+	local c = boot("s8", { seed = 606061, full = true })
+
+	--- ------------------------------------------------------- TETO DO HARNESS
+	--- Por que `lastHit`/`deathWired` (Match), `teamOf` (Teams) e
+	--- `statuses`/`extraTargets` (Combat) NÃO são medíveis aqui: são tabelas de
+	--- chave fraca, e este harness guarda TODA Instance que já criou em
+	--- `H.parts`/`H.humanoids`. Contar chaves nelas mediria o coletor de lixo,
+	--- não o código — e daria SEMPRE o número errado, para cima.
+	---
+	--- Isto era uma frase no cabeçalho do S7. Frase apodrece; esta é a mesma
+	--- afirmação como ASSERÇÃO VIVA — se um dia o harness parar de fixar
+	--- Instance, este teste fica vermelho e obriga a reler a declaração em vez
+	--- de deixar um cenário decorativo medindo o coletor em silêncio.
+	do
+		local weak = setmetatable({}, { __mode = "k" })
+		local ghost = c.H.Instance.new("Humanoid")
+		weak[ghost] = true
+		ghost:Destroy()
+		ghost = nil
+		collectgarbage("collect")
+		local left = 0
+		for _ in pairs(weak) do
+			left += 1
+		end
+		assert(
+			left == 1,
+			"o harness PAROU de fixar Instance: contagem de tabela de chave fraca virou medição possível — releia esta declaração e a do S7 antes de confiar em qualquer número novo"
+		)
+	end
+
+	--- NÚCLEO que nunca sai (mesma razão do S7): sem humano dentro o
+	--- `mustEndNow` encerra por servidor vazio e a medição vira o S4.
+	c.addPlayer("Fixo1", 5801)
+	c.addPlayer("Fixo2", 5802)
+	c.step(0.1, 5)
+
+	local GRIM = c.Grimoire.REMOTE
+	local grimGate = c.Net.event(GRIM).OnServerEvent
+	--- "me manda meu grimório" — a única intenção que o cliente pode mandar. O
+	--- servidor só responde se `tracks[p]` existir, então resposta para quem já
+	--- saiu É a entrada órfã.
+	local function grimoireAnswers(p: any): boolean
+		local before = c.H.fireCount[GRIM] or 0
+		grimGate:Fire(p)
+		return (c.H.fireCount[GRIM] or 0) > before
+	end
+
+	--- (sessões em curso, humanos distintos) — as duas do relatório. Se as
+	--- linhas mudarem de forma isto fica VERMELHO, não passa calado: medição que
+	--- deixa de achar o que media não pode virar "zero".
+	local function sessionCounts(): (number, number)
+		local text = c.Telemetry.report()
+		local open = tonumber(string.match(text, "encerradas%s*%+%s*(%d+) em curso"))
+		local humans = tonumber(string.match(text, "(%d+) humano%(s%) distinto%(s%)"))
+		assert(open and humans, "as linhas de SESSAO sumiram do relatório — a porta de medição do S8 mudou de forma")
+		return open, humans
+	end
+
+	--- CONEXÕES (item 3 da R14), em DELTA e só sobre sinais LONGEVOS: o
+	--- Heartbeat do loop mestre, as duas portas de entrada/saída de jogador e o
+	--- `OnServerEvent` de cada remote. Sinal que morre junto com o jogador
+	--- (`player.CharacterAdded`) fica de fora de propósito — ali `Connect` sem
+	--- `Disconnect` é o padrão certo do engine.
+	--- POR QUE DELTA: ninguém neste projeto tem o contrato "quantas conexões são
+	--- normais", e inventar um número absoluto seria cravar o estado de hoje
+	--- como regra. O delta não precisa desse contrato: doze pessoas entrando e
+	--- saindo têm de deixar a conta EXATAMENTE como acharam.
+	local WATCHED: { any } = {
+		c.H.RunService.Heartbeat,
+		c.H.Players.PlayerAdded,
+		c.H.Players.PlayerRemoving,
+		grimGate,
+	}
+	for _, name in pairs(c.Net.Names) do
+		table.insert(WATCHED, c.Net.event(name).OnServerEvent)
+	end
+	local function liveConns(): number
+		local n = 0
+		for _, sig in ipairs(WATCHED) do
+			n += c.H.aliveConnections(sig)
+		end
+		return n
+	end
+
+	-- ------------------------------------------------------- PRÉ-CONDIÇÕES
+	--- Sem estas quatro, TODA a medição abaixo passa por vacuidade: "ninguém
+	--- sobrou na tabela" é trivialmente verdade quando ninguém entrou nela.
+	local open0 = sessionCounts()
+	assert(open0 == 2, string.format("pré-condição: os dois fixos abriram sessão na telemetria (li %d em curso)", open0))
+	assert(grimoireAnswers(c.players[1]), "pré-condição: o grimório de quem ESTÁ conectado responde ao pedido C→S")
+	assert(c.Prefs.get(c.players[1]) ~= nil, "pré-condição: quem ESTÁ conectado tem espaço de preferências")
+	local conn0 = liveConns()
+	assert(conn0 > 0, "pré-condição: existe conexão viva para contar (senão o delta é vácuo)")
+
+	local gone: { any } = {}
+	local nextId, joined = 5810, 0
+	local function join(): any
+		nextId += 1
+		joined += 1
+		return c.addPlayer("Passante" .. nextId, nextId)
+	end
+	local function leave(p: any)
+		c.removePlayer(p)
+		table.insert(gone, p)
+	end
+	local function stateNow(): string
+		local p = c.H.lastFire.MatchState
+		return (p and p.state) or "?"
+	end
+
+	--- A REDE PERMANENTE: nenhum dos que JÁ SAÍRAM pode ter sobrado em nenhuma
+	--- das três tabelas — e a conta é sobre TODOS eles, não sobre o último. É a
+	--- diferença entre "a saída limpa" e "o servidor de horas limpa".
+	local function check(where: string): (number, number)
+		local open, humans = sessionCounts()
+		local online = #c.H.Players:GetPlayers()
+		assert(
+			open <= online,
+			string.format(
+				"%s: %d sessões ABERTAS na telemetria para %d jogadores conectados — `sessions` (e com ela `deviceTier`/`deviceTouch`) guarda quem já saiu",
+				where, open, online
+			)
+		)
+		local prefsLeft, grimLeft = 0, 0
+		for _, p in ipairs(gone) do
+			if c.Prefs.get(p) ~= nil then
+				prefsLeft += 1
+			end
+			if grimoireAnswers(p) then
+				grimLeft += 1
+			end
+		end
+		assert(
+			prefsLeft == 0,
+			string.format("%s: %d de %d que já saíram ainda têm espaço em `Prefs.slots` — um por jogador que passa pelo servidor", where, prefsLeft, #gone)
+		)
+		assert(
+			grimLeft == 0,
+			string.format("%s: %d de %d que já saíram ainda têm grimório no servidor — `Grimoire.tracks` segura o Player de quem fechou o jogo", where, grimLeft, #gone)
+		)
+		local now = liveConns()
+		assert(
+			now == conn0,
+			string.format("%s: %d conexões vivas nos sinais longevos contra %d do começo — `Connect` por jogador sem `Disconnect`", where, now, conn0)
+		)
+		return open, humans
+	end
+
+	local CYCLES = 3
+	local humansEnd = 0
+	for m = 1, CYCLES do
+		local a, b, cc, d = join(), join(), join(), join()
+		c.step(0.1, 5)
+		assert(c.Match.forceStart(4), string.format("ciclo %d: o servidor não começa mais (`forceStart` recusado)", m))
+		c.step(0.1, 60)
+
+		--- RASTRO DE VERDADE. Sem produzir evento o passante nem entra no
+		--- denominador de "humanos distintos" — e a linha que mede o crescimento
+		--- por jogador distinto sairia vazia sem ninguém notar.
+		local bot = c.Bots.list()[1]
+		assert(bot and bot.humanoid.Health > 0, string.format("ciclo %d: pré-condição — existe bot vivo para os passantes baterem", m))
+		for _, p in ipairs({ a, b, cc, d }) do
+			c.Combat.applyDamage(bot.humanoid, 5, p, false)
+			bot.humanoid.Health = bot.humanoid.MaxHealth
+		end
+
+		-- METADE sai NO MEIO da prova (o alt-F4 de quem morreu cedo)
+		leave(a)
+		leave(b)
+		c.step(0.1, 10)
+		check(string.format("ciclo %d no meio da prova", m))
+
+		if c.Match.isPlaying() then
+			assert(c.Match.forceEnd(), string.format("ciclo %d: a prova em andamento não encerra", m))
+		end
+		c.step(0.1, 10)
+		-- e a outra metade na TELA DE FIM (a saída que o `toLobby` não vê)
+		leave(cc)
+		leave(d)
+		check(string.format("ciclo %d na tela de fim", m))
+
+		local back = c.until_(0.1, 25, function()
+			return stateNow() == "Lobby"
+		end)
+		assert(back ~= nil, string.format("ciclo %d: a tela de fim não devolveu o lobby em 25 s", m))
+		c.step(0.1, 10)
+		local _, humans = check(string.format("lobby depois do ciclo %d", m))
+		humansEnd = humans
+	end
+
+	--- NO FIM DE TUDO, com os 12 passantes fora: as sessões em curso são
+	--- EXATAMENTE os dois fixos. Não "poucas" — dois.
+	local openEnd = sessionCounts()
+	assert(
+		openEnd == 2,
+		string.format("depois de %d passantes: %d sessões abertas para os 2 fixos que sobraram — o alpha de horas acumula uma por pessoa", joined, openEnd)
+	)
+	--- E o que CRESCE de propósito continua limitado por cima: um humano
+	--- distinto é uma entrada, nunca mais que isso.
+	assert(humansEnd > 0, "pré-condição: os passantes produziram evento (senão a linha de humanos distintos é vácuo)")
+	assert(
+		humansEnd <= 2 + joined,
+		string.format("humanos distintos = %d para %d pessoas que passaram pelo servidor — a tabela do denominador conta gente que não existe", humansEnd, 2 + joined)
+	)
+	assert(#c.H.errors == 0, string.format("%d erro(s) acumulados: %s", #c.H.errors, tostring(c.H.errors[1] and c.H.errors[1].err)))
+
+	return string.format(
+		"%d passantes em %d provas · sessões abertas voltam a %d · Prefs/Grimório zerados para os %d que saíram · conexões vivas %d, sem delta · humanos distintos %d (cresce por gente, de propósito)",
+		joined, CYCLES, openEnd, #gone, conn0, humansEnd
+	)
+end
+
 -- ================================================================== runner
 local SCENARIOS = {
 	{ "S1 tutorial opcional nao trava o lobby", s1 },
@@ -805,6 +1121,7 @@ local SCENARIOS = {
 	{ "S5 teto de tempo derivado", s5 },
 	{ "S6 forceStart não vaza estado", s6 },
 	{ "S7 maratona não vaza estado", s7 },
+	{ "S8 Telemetry/Grimoire/Prefs", s8 },
 }
 
 --- `record(nome, ok, detalhe)` — o mesmo formato do run.luau, para os cenários

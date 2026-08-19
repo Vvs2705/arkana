@@ -4,7 +4,7 @@
 #
 #   ./roblox/tools/run.sh              # boot + todos os selfTest + partida
 #   ./roblox/tools/run.sh 900          # partida com teto de 900s simulados
-#   ./roblox/tools/run.sh scenarios    # SO os cenarios de robustez S1-S6
+#   ./roblox/tools/run.sh scenarios    # SO os cenarios de robustez S1-S8
 #                                      # (eles JA entram na contagem do modo
 #                                      # padrao acima; este modo e' so o atalho
 #                                      # de quem esta mexendo neles)
@@ -84,9 +84,9 @@ if S.__mode == "sweep" then
 	assert(loadstring(S["tools/sweep.luau"], "@roblox/tools/sweep.luau"))(S)
 elseif S.__mode == "scenarios" then
 	-- atalho de quem esta mexendo nos cenarios; o PORTAO continua sendo o modo
-	-- padrao (sem argumento), que roda estes mesmos seis no fim da FASE 3.
+	-- padrao (sem argumento), que roda estes mesmos oito no fim da FASE 3.
 	local run = assert(loadstring(S["tools/scenarios.luau"], "@roblox/tools/scenarios.luau"))(S)
-	print("== CENARIOS DE ROBUSTEZ (S1-S6) ==")
+	print("== CENARIOS DE ROBUSTEZ (S1-S8) ==")
 	local n = 0
 	local failed = run(function(name, ok, detail)
 		n += 1

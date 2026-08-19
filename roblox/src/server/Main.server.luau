@@ -116,7 +116,19 @@ Net.event(Net.Names.CastSpell).OnServerEvent:Connect(function(player, payload)
 	--- NÃO ENTRA EM DECISÃO NENHUMA: o Combat recebe como 4º argumento e o
 	--- ignora até publicar a assinatura nova (ver relatório da raia B/R10).
 	local input = Events.sanitizeInput((payload :: any).input)
-	Combat.handleCast(player, kind, dir, input, Events.sanitizeAim((payload :: any).aim))
+	--- `aborted` fecha a régua do gesto único: sem ele o relatório sabe QUANTOS
+	--- usaram o arrasto e não sabe quantos DESISTIRAM no meio. Sanitizado aqui e
+	--- clampado de novo no coletor de propósito — mesma decisão que o projeto já
+	--- tomou com `device_tier`: validar dos dois lados é barato, e este handler
+	--- não pode confiar no que chega.
+	Combat.handleCast(
+		player,
+		kind,
+		dir,
+		input,
+		Events.sanitizeAim((payload :: any).aim),
+		Events.sanitizeAborted((payload :: any).aborted)
+	)
 end)
 
 --- RELATO DO APARELHO (Net.Names.DeviceInfo). O cliente MANDA isto desde a R5

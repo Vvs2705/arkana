@@ -175,7 +175,7 @@ Formato: **Passiva / Tática / Suprema** + ⚖️ limitadores (o "preço" de cad
   número do escudo — de onde saíam "5/5 no alvo" e "0/5 no alvo" para o mesmo jogo.
   Medido: os 5 elementos estão DENTRO das duas leituras. Nenhum número de `Balance`
   foi alterado.)*
-- Dano em escudos de aliados sendo revividos **não** conta para evolução (anti-farm).
+- Dano em **QUALQUER** aliado nunca conta para evolução (anti-farm). *(Revisto em 19/08: o recorte original — "aliados sendo revividos" — deixava o exploit aberto. Medido: uma dupla subia os dois escudos ao nível 4 atirando um no outro num canto. **Regra geral:** todo sistema que recompensa "dano causado" precisa excluir dano em aliado, ou vira farm sem risco.)*
 - Nível 4 adiciona um perk pequeno (ex.: recarga tática 20% mais rápida) — como o Red Evo.
 
 ## 6. Lobby e apresentação dos personagens
@@ -271,10 +271,12 @@ Dois magos do squad conjuram no mesmo alvo/área dentro de uma janela de 1,5s �
 | Vento + Raio | **Nuvem Tempestuosa** | nuvem que persegue o alvo marcado por 6s |
 
 **Limitadores (para não quebrar o jogo):**
-- Consome a magia dos DOIS conjuradores + cooldown compartilhado longo (os dois ficam "secos" depois — combo errado = squad vulnerável)
+- Consome a magia dos DOIS conjuradores + cooldown compartilhado longo (os dois ficam "secos" depois — combo errado = squad vulnerável).
+  **O custo é cobrado no INÍCIO da canalização, e a INTERRUPÇÃO devolve o cooldown a quem continua VIVO** (revisto em 19/08): a canalização só é cancelável morrendo ou saindo, então, sem a devolução, bastava o parceiro morrer de propósito para tirar 24 s do pilar do jogo do outro — e o alpha pareia DESCONHECIDOS. O limitador anti-spam continua inteiro porque mora no combo que **dispara**, que segue cobrando os dois.
 - Canalização visível/sonora de ~1s antes da fusão (dá para interromper os conjuradores)
 - Interação com o mapa: todo combo tem counter elemental (Torrencial apaga Magma, etc.)
-- Jogador solo/random: item raro **Runa de Eco** permite auto-combinar 1x por partida (acessibilidade sem tirar o valor do jogo em dupla)
+- Jogador solo/random: **pareado com um parceiro BOT**, que entra na canalização real da Sintonia como um humano entraria (revisto em 19/08 — substitui a **Runa de Eco**, que nunca foi implementada). Razão: o bot exercita o pilar do jogo de verdade, enquanto um item de auto-combinação daria o resultado sem a coordenação, que é justamente o que a pergunta V1 mede.
+  ⚠️ **Consequência operacional para playtest:** número ÍMPAR de humanos entrega o último a um bot, e **essa dupla não responde V1** (`docs/ROBLOX.md` §11).
 
 **Por que é o pilar:** é o motivo mecânico para jogar em squad (não só "somar dano"), gera os clipes virais ("olha o combo que a gente fez"), cria teto de habilidade competitivo (times treinam rotações de combo) e é estruturalmente impossível no Apex — identidade que nenhum processo alcança e nenhum concorrente copia rápido.
 
@@ -354,13 +356,31 @@ O mapa é dividido numa grade de células, cada uma com **material** (grama, gra
 
 | Ação | Resultado | Contra-jogada |
 |---|---|---|
-| Fogo em árvore/grama | incendeia; **propaga** para células vizinhas (chance por tick); após ~8s vira carvão — a cobertura DESAPARECE | Água/Torrencial apaga; Vento espalha (arma de dois gumes) |
+| Fogo em árvore/grama | incendeia; **propaga** para células vizinhas por **ORÇAMENTO DE COMBUSTÍVEL** (uma rolagem por aresta, nunca chance por tique — ver nota abaixo); após ~8s vira carvão — a cobertura DESAPARECE | Água/Torrencial apaga; Vento espalha (arma de dois gumes) |
 | Fogo em grama alta | queima e **revela** quem estava escondido | — |
 | Água em lago | **congela a superfície** por ~10s: vira ponte/rota nova | Fogo derrete; quem estiver em cima cai |
 | Raio em água/lago | **eletrocuta** todos em contato com a água | sair da água; Terra isola |
 | Terra em qualquer chão | ergue **muro de pedra** (cobertura destrutível, ~200hp) | qualquer dano destrói; Raio racha mais rápido |
 | Água + chão de terra | **lamaçal**: lentidão severa na área | Fogo seca; Vento não afeta |
 | Vento em fogo/névoa/gás | **espalha ou dissipa** (decisão tática) | — |
+
+> **NOTA DE MEDIÇÃO (19/08) — por que ORÇAMENTO e não chance por tique.** O modelo
+> original ("chance por tick") foi implementado e **medido**: 30% por vizinho × 16
+> tiques = **99,67% acumulado**, e o incêndio acendia **380 de 380 células em 100% das
+> rodadas**. O mapa inteiro virava carvão toda partida e o terreno deixava de ser
+> escolha. O modelo atual faz **uma rolagem por aresta** e gasta um **orçamento de
+> combustível** (`fuelBudget`), que o Vento também paga: mede **~44 células**.
+> **Para regular o tamanho do incêndio, mexa no ORÇAMENTO — nunca na chance.**
+> Previsível é aprendível, e o jogador planeja a jogada. Quem implementar esta seção
+> em outra engine e voltar à chance por tique reimplementa a carbonização.
+>
+> **NOTA DE DESIGN (19/08) — fogo amigo é ASSIMÉTRICO.** A magia **mirada** não atinge
+> o parceiro; o **terreno atinge todos** (a arma de dois gumes desta seção continua
+> valendo integralmente). Razão: o produto pareia **desconhecidos** em dupla, e com
+> fogo amigo direto ligado um estranho arruína a sessão do outro — a pergunta V1 ("a
+> Sintonia é divertida entre dois jogadores?") ficaria ilegível por comportamento, não
+> por design. A contrapartida é que a dupla ainda pode se queimar pelo mapa, que é
+> onde a lição de §14 deve doer.
 
 **Por que isso importa:** junto com a Sintonia, o terreno reativo é a segunda invenção que o Apex não tem. O mapa deixa de ser cenário e vira **recurso** — queimar a floresta do inimigo é uma jogada, congelar o lago é uma rotação. Em 2D top-down com tilemap, isso é tecnicamente simples de prototipar (trocar estado da célula + sprite + timer). É o melhor custo-benefício de inovação do projeto inteiro.
 
@@ -518,7 +538,8 @@ No carregamento, uma carta de presságio anuncia a condição arcana da partida:
 Cada elemento tem um "stem" musical (camada instrumental). Durante a luta, a música mistura os stems dos elementos em uso: luta de Fogo×Raio soa diferente de Água×Vento. Toda luta tem trilha única — assinatura sensorial do jogo, e cada clipe compartilhado carrega um som que nenhum outro jogo tem. Tecnicamente: áudio em camadas sincronizadas, viável até em Phaser.
 
 ### 18.6 Espírito Errante (pós-morte) + Selo do Campeão
-- **Espírito Errante:** ao morrer em squad, vira um espírito por 60s: não ataca, mas pode dar UM "arrepio" (revela 1 inimigo por 2s para os aliados). O morto continua participando — retenção mobile — com counterplay (o inimigo sente o arrepio).
+- **Espírito Errante:** ao morrer em squad, vira um espírito: não ataca, mas pode dar UM "arrepio" (revela 1 inimigo por 2s para os aliados). O morto continua participando — retenção mobile — com counterplay (o inimigo sente o arrepio).
+  **Sem prazo em segundos** (revisto em 19/08): o espírito dura até ser resgatado, até a dupla gastar sua única volta, ou até a zona entrar na fase final. Relógio de 60 s transformava a morte em espera; consumo + fase transforma em **disputa por altar**, que é o que a feature existe para criar.
 - **Selo do Campeão:** o vencedor carimba o Selo de Arkana no ponto final do mapa e o jogo gera automaticamente um card compartilhável (elementos usados, combos, dano) — o loop viral de fim de partida embutido no produto.
 
 ### 18.7 Ping de Sintonia

@@ -180,7 +180,12 @@ export class CombatVfx implements RenderModule {
     this.trauma = 0;
     this.kickX = 0;
     this.kickY = 0;
-    this.scene.cameras.main.setFollowOffset(0, 0);
+    // `?.` obrigatório: o CameraManager assina o SHUTDOWN no start da cena,
+    // antes do create() da Arena, então quando este destroy roda o main já é
+    // undefined. Sem isto o onShutdown estourava no MEIO — e tudo que vem
+    // depois (TouchControls, HUD, pool, terreno) ficava sem destruir, incluindo
+    // o listener global de RESIZE. Acontecia em toda saída de partida.
+    this.scene.cameras.main?.setFollowOffset(0, 0);
   }
 
   // ================================================================== ponte

@@ -437,6 +437,32 @@ function SIG.Fire(self, ...)
 	end
 end
 
+--- Handlers VIVOS de um sinal (`Disconnect` só marca `alive = false`; nada é
+--- removido de `_fns`, senão `Fire` andando sobre a lista perderia o passo).
+---
+--- POR QUE EXISTE (R14, item 3): `Connect` sem `Disconnect` é vazamento
+--- clássico de Roblox e este harness não tinha contador nenhum. O que ele NÃO
+--- resolve é o contrato "quantas conexões são normais" — esse número ninguém
+--- tem. Por isso o uso correto daqui é DELTA, nunca absoluto: conte os
+--- handlers vivos de um sinal LONGEVO (Heartbeat, Players.PlayerAdded/
+--- Removing, `OnServerEvent` de remote) antes e depois de gente entrar e sair,
+--- e cobre igualdade. Sinal que MORRE com o jogador (`player.CharacterAdded`)
+--- fica de fora de propósito: ali o `Connect` sem `Disconnect` é o padrão
+--- correto do engine, e contá-lo acusaria vazamento onde não há.
+function H.aliveConnections(signal: any): number
+	local fns = signal and rawget(signal, "_fns")
+	if type(fns) ~= "table" then
+		return 0
+	end
+	local n = 0
+	for _, c in ipairs(fns) do
+		if c.alive then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- ------------------------------------------------------------------ Instance
 local CLASS_PARENT = {
 	Part = "FormFactorPart",

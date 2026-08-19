@@ -154,6 +154,13 @@ type Projectile = {
 	radius: number,
 	terrainRadius: number,
 	traveled: number,
+	--- MODO DE ENTRADA do disparo que criou ESTE projétil (telemetria pura, ver
+	--- `handleCast`). Viaja no projétil e não é lido do autor na hora do
+	--- impacto: é a MESMA regra do `element` — o evento carimba a FONTE REAL, e
+	--- não o estado atual de quem atirou. Quem troca de gesto (ou de elemento)
+	--- enquanto o tiro voa não pode reescrever o desfecho do tiro anterior; foi
+	--- esse viés que quase custou um nerf errado na R8.
+	input: string?,
 }
 
 local Combat = {}
@@ -714,7 +721,9 @@ function Combat.handleStance(player: Player, payload: any)
 end
 
 -- ------------------------------------------------------------------ conjuração
-local function spawnProjectile(st: State, strong: boolean, dir: Vector3)
+--- `input` é só carimbo de telemetria carregado até o impacto (ver o tipo
+--- `Projectile`): nada da física, do dano ou do alcance olha para ele.
+local function spawnProjectile(st: State, strong: boolean, dir: Vector3, input: string?)
 	local spec = if strong then Balance.elements[st.element].tactic else Balance.elements[st.element].basic
 	local root = st.root :: BasePart
 	local origin = root.Position + dir * MUZZLE
@@ -732,6 +741,7 @@ local function spawnProjectile(st: State, strong: boolean, dir: Vector3)
 		radius = spec.radius,
 		terrainRadius = spec.terrainRadius,
 		traveled = 0,
+		input = input,
 	})
 
 	evSpawned:FireAllClients({
@@ -757,7 +767,19 @@ end
 --- `input`: a assistência já foi aplicada no cliente antes do envio, então
 --- declarar qual esquema estava valendo não concede nada. Sem ele, a V2 do
 --- playtest mede duas populações misturadas.
-function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: string?, aim: string?)
+--- `aborted` (R14) é o CONTADOR de gestos armados e cancelados desde o disparo
+--- anterior — o buraco mais grave do requisito §4. Arrastar do botão e voltar ao
+--- centro CANCELA no cliente e não gera pacote nenhum: quem arma e desiste cinco
+--- vezes por abate ficava idêntico a quem nunca hesita, e o `drag%` saía lindo
+--- enquanto a pessoa sofria. Pega carona NESTE payload em vez de virar rótulo
+--- novo em `Events.INPUT_KINDS` (rótulo viaja no disparo, e cancelamento não tem
+--- disparo — inventar um `spell_cast` falso inflaria `castsByElement`, que é o
+--- denominador da dominância da V4) e em vez de remote novo (superfície de
+--- ataque a mais num lugar público, por telemetria pura).
+--- TELEMETRIA COMO OS OUTROS DOIS: não entra em decisão nenhuma aqui, e quem
+--- clampa o número contra cliente hostil é o coletor (Telemetry.ABORT_CAP) —
+--- este arquivo só o repassa.
+function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: string?, aim: string?, aborted: number?)
 	local st = states[player]
 	if not st or cannotAct[player] or not isAlive(st) or not st.root or not st.root.Parent then
 		return -- eliminado não conjura (nem do poleiro de espectador)
@@ -778,7 +800,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 		end
 		st.mana -= spec.manaCost
 		st.nextBasic = now + spec.fireRate
-		spawnProjectile(st, false, dir)
+		spawnProjectile(st, false, dir, input)
 		emit(Events.Name.SpellCast, player, {
 			element = st.element,
 			kind = "basic",
@@ -786,6 +808,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 			mana_left = st.mana,
 			input = input,
 			aim = aim,
+			aborted = aborted,
 		})
 	elseif kind == "tactic" then
 		-- GDD §4 regra 2: TÁTICA usa COOLDOWN, nunca mana
@@ -797,7 +820,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 			cd *= Balance.shield.lv4TacticCooldownMult -- perk do nível 4 (GDD §5)
 		end
 		st.nextTactic = now + cd
-		spawnProjectile(st, true, dir)
+		spawnProjectile(st, true, dir, input)
 		emit(Events.Name.TacticCast, player, {
 			element = st.element,
 			kind = "tactic",
@@ -805,6 +828,7 @@ function Combat.handleCast(player: Player, kind: string, dir: Vector3, input: st
 			cooldown = cd,
 			input = input,
 			aim = aim,
+			aborted = aborted,
 		})
 	end
 	sendStats(st)
@@ -1076,12 +1100,18 @@ local function impact(p: Projectile, hitHumanoid: Humanoid?)
 		Combat.applyDamage(hitHumanoid, p.dmg, p.owner, p.strong, nil, p.element)
 		-- ACERTO ≠ dano aplicado (i-frames podem ter comido tudo): é o par
 		-- SpellCast/SpellHit que dá a taxa de acerto por elemento.
+		--- `input` FECHA O FUNIL do requisito §4 (R14). Até aqui o modo de
+		--- entrada morria no `spell_cast`: dava para dizer QUANTO do toque usou o
+		--- gesto único, nunca se o gesto ACERTA. "Resolveu o celular" é o tiro de
+		--- arrasto acertar como o do PC — e essa conta precisa dos dois lados.
+		--- Vem do PROJÉTIL, nunca do autor no instante do impacto (lição da R8).
 		emit(Events.Name.SpellHit, p.owner or hitHumanoid, {
 			element = p.element,
 			strong = p.strong,
 			target = hitHumanoid,
 			pos = p.pos,
 			traveled = p.traveled,
+			input = p.input,
 		})
 	end
 
@@ -1554,10 +1584,19 @@ function Combat.selfTest()
 	-- e que o sujeito é o AUTOR da mudança, nunca quem passou por ela.
 	local savedTerrain, savedTel = terrain, telemetry
 	local outcomes: { any } = {}
+	--- o mesmo dublê serve o teste do MODO DE ENTRADA (item 6, lá embaixo):
+	--- `spell_hit` é o único lugar onde dá para provar que o carimbo do disparo
+	--- sobreviveu ao voo do projétil.
+	local hits: { any } = {}
+	local casts: { any } = {}
 	telemetry = {
 		emit = function(evName: string, subject: any, payload: any)
 			if evName == Events.Name.TerrainTacticalOutcome then
 				table.insert(outcomes, { subject = subject, p = payload })
+			elseif evName == Events.Name.SpellHit then
+				table.insert(hits, { subject = subject, p = payload })
+			elseif evName == Events.Name.SpellCast then
+				table.insert(casts, { subject = subject, p = payload })
 			end
 		end,
 	}
@@ -1683,6 +1722,52 @@ function Combat.selfTest()
 		--- autor e mandaria o elemento do fogo para a dominância sem
 		--- `spell_cast` no denominador.
 		assert(states[QUEIMOU] == nil, "o autor do terreno não pode ter virado combatente por causa de telemetria")
+
+		-- 6) MODO DE ENTRADA CHEGA AO ACERTO (R14, requisito §4). Até aqui o
+		-- `input` morria no `spell_cast`: dava para dizer QUANTO do toque usou o
+		-- gesto único, nunca se o gesto ACERTA. Sem este par (disparo × acerto
+		-- pelo MESMO rótulo) não existe "o tiro de arrasto acerta como o do PC",
+		-- que é a frase que o requisito de celular precisa provar.
+		hazardFake = 0 -- o perigo letal do caso 5 ainda estava ligado
+		pHum.Health = 100
+		local st = states[piloto]
+		st.nextBasic, st.mana = 0, Balance.player.manaMax
+		local castsBefore, hitsBefore = #casts, #hits
+		Combat.handleCast(piloto, "basic", Vector3.new(0, 0, -1), "drag", "manual", 3)
+		assert(#casts == castsBefore + 1, "PRÉ-CONDIÇÃO VAZIA: o disparo não chegou a emitir `spell_cast`")
+		assert(casts[#casts].p.input == "drag", "o `spell_cast` perdeu o modo de entrada")
+		--- CANCELAMENTOS ficam no `spell_cast` de carona (raia B/R14): um gesto
+		--- abortado não tem disparo próprio, então ou pega carona ou some.
+		assert(casts[#casts].p.aborted == 3, "o contador de gestos CANCELADOS não chegou ao evento")
+		local shot = projectiles[#projectiles]
+		assert(shot.input == "drag", "o projétil tem de carregar o modo de entrada que o criou")
+
+		--- A ARMADILHA DA R8, agora sobre o `input`: entre o disparo e o impacto
+		--- a pessoa dispara DE OUTRO JEITO. Se o acerto ler o estado ATUAL do
+		--- autor em vez do carimbo do projétil, o desfecho do arrasto é creditado
+		--- ao toque rápido e a comparação com o PC inverte de lado.
+		st.nextBasic, st.mana = 0, Balance.player.manaMax
+		Combat.handleCast(piloto, "basic", Vector3.new(0, 0, -1), "tap", "manual")
+		local alvo = Instance.new("Humanoid")
+		impact(shot, alvo)
+		assert(#hits == hitsBefore + 1, "PRÉ-CONDIÇÃO VAZIA: o impacto não emitiu `spell_hit`")
+		assert(
+			hits[#hits].p.input == "drag",
+			"o `spell_hit` carimbou o gesto ATUAL do autor e não o do projétil: é o viés da R8 de volta"
+		)
+		assert(hits[#hits].subject == piloto, "o acerto é de QUEM ATIROU — trocar o sujeito troca a coorte")
+		alvo:Destroy()
+
+		--- disparo sem carimbo continua disparo: o acerto sai com `input = nil` e
+		--- some do recorte, nunca vira balde "unknown" nem herda o rótulo alheio.
+		st.nextBasic, st.mana = 0, Balance.player.manaMax
+		Combat.handleCast(piloto, "basic", Vector3.new(0, 0, -1))
+		local mudo = projectiles[#projectiles]
+		assert(mudo.input == nil, "disparo sem carimbo não pode herdar o modo de entrada do anterior")
+		local alvo2 = Instance.new("Humanoid")
+		impact(mudo, alvo2)
+		assert(hits[#hits].p.input == nil, "acerto de disparo sem carimbo não pode inventar modo de entrada")
+		alvo2:Destroy()
 	end)
 
 	terrain = savedTerrain

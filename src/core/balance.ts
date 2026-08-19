@@ -136,6 +136,14 @@ export const BAL = {
     },
     /** zona morta do joystick e do arrasto de mira (fração do raio / px) */
     stickDeadzone: 0.15,
-    aimDeadzonePx: 14,
+    /**
+     * Arrasto minimo para a mira sair do lugar, em **dp da tela real** (nao em
+     * px de canvas). Era `aimDeadzonePx: 14` em px de canvas e variava 7x: ~4dp
+     * num telefone a 375 CSS e ~28dp num monitor 2560 -- o mesmo gesto pedia
+     * esforcos completamente diferentes conforme o aparelho. Convertido em
+     * `TouchControls` por `dpToPx`, a mesma funcao do piso de 48dp.
+     * CALIBRACAO: e' `feel`, entao o numero certo sai do playtest em aparelho.
+     */
+    aimDeadzoneDp: 14,
   },
 } as const;
