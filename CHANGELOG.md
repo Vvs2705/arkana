@@ -2,6 +2,116 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.6.0 — 2026-08-19 — R12: as frentes que faltavam do roadmap
+
+Quatro frentes avançadas em paralelo, na ordem escrita em `docs/ANDROID.md` §5. As
+Fases 1, 4, 7 e 8 são atos do Diretor (aparelho físico, conta de loja, testadores
+externos, decisão de produto) e não têm como ser avançadas pela equipe.
+
+### Android — Fase 2 fechada: "Parece o Arkana"
+
+Ícone e splash eram **os padrões do Capacitor** (símbolo azul sobre branco). Agora o
+**Selo de Arkana** em VectorDrawable: adaptativo (API 26+), camada `<monochrome>`
+para o tema do Android 13+, e fallback próprio para 24–25. **Zero binário novo** no
+repositório — e −180 KB de PNG do template removidos.
+
+A forma não foi inventada: veio de `src/core/textures.ts` (`uiSeal`) e
+`roblox/src/client/Hud.luau` (`buildSeal`). Onde as duas divergem, ficou o **losango**
+do Roblox em vez do círculo do 2D — o losango é o que carrega a FORMA que o GDD §10
+exige junto da cor, para daltônico.
+
+**Prova, não intenção:** o APK foi extraído e não contém **nenhum PNG** de ícone ou
+splash; `colorPrimary` saiu de `#3F51B5` (lib do Capacitor) para `#0B1026`. Foi
+preciso apagar os `mipmap-*dpi/*.png` porque qualificador de densidade venceria o
+sem-qualificador em 24–25 e o ícone do Capacitor continuaria aparecendo — exatamente
+a falha calada que o portão procura.
+
+### 2D — offline de verdade, e o defeito de toque de 17/08 tinha causa-raiz
+
+**Fontes empacotadas** (4 `.woff2`, ~69 KB, subconjunto `latin`, licenças OFL junto).
+Era a **única chamada de rede do protótipo inteiro** — sem ela, a ficha de Segurança
+de Dados da Play declara "nenhuma coleta", e o jogo abre em modo avião com a
+tipografia certa (GDD §19.6 quer o Modo Treino Offline como produto). Um portão no
+`vite.config.ts` quebra o `npm run build` se alguém reintroduzir CDN de fonte —
+testado que falha de verdade.
+
+Achado que teria matado o critério: **o canvas do Phaser nunca dispara o download de
+um `@font-face`** (não há texto no DOM que peça a fonte, e cada `Text` é rasterizado
+uma vez). O jogo abriria com a fonte local instalada e o título em fonte de sistema.
+Resolvido com `document.fonts.load()` no boot, com `.catch()` — falha de fonte nunca
+impede o jogo de abrir.
+
+**A troca de elemento que não respondia ao toque: dois defeitos, e o segundo explica
+por que só o aparelho do Diretor via.**
+
+1. `setScrollFactor(0)` era aplicado ao *container*, nunca aos ícones. O Phaser
+   restaura o `scrollFactor` do filho depois de desenhar, mas o **hit-test usa o do
+   próprio filho** — a área de toque ficava deslocada pelo scroll da câmera, que na
+   Arena **segue o jogador**. O toque caía na zona de mira.
+2. O piso de 48dp brigava com o espaçamento de 54px: em tela de 640px o raio de toque
+   vira 48px e **três quartos da superfície do próprio ícone** entregavam o toque ao
+   vizinho. Em desktop o raio é 24px e nada acontece — por isso era invisível fora do
+   celular.
+
+Verificado no pior caso (pane de 306px): 15 toques sintéticos, 15 acertos. Com o
+código anterior, os mesmos 15 devolviam o vizinho.
+
+**O gesto único NÃO foi implementado**, de propósito: o GDD §19.3 ainda especifica
+dois gestos e o §9 trava que o GDD é a única ponte. Sem meio-termo, sem flag.
+
+### V3 finalmente tem métrica de desfecho
+
+`terrain_tactical_outcome` estava no schema desde a R5, era consumido pelo coletor e
+**ninguém o emitia**. O relatório sabia dizer que *o mapa queimou* e não que *alguém
+queimou de propósito e ganhou algo*.
+
+Três desfechos, cada um com o que o servidor sabe que o PROVA: **abate** (vida ≤0 no
+tique de perigo, na célula cujo estado tem autor), **travessia** (jogador de pé em
+água `Frozen` — líquida barra o andar, logo aquela posição não existia) e **cobertura
+destruída** (projétil atravessou célula de árvore cuja copa o fogo derrubou — a prova
+não é "queimou", é ter passado tiro por onde ela barrava).
+
+**`fuga` não é emitida**: exigiria contrafactual (saber que o alvo *ia* morrer e que o
+terreno foi *a causa* de não ter morrido). Número bonito e inauditável.
+
+Anti-inflação: ponte de gelo de 6 células = **1** travessia; queimada que derrubou 20
+árvores = **1** cobertura. A razão não tem como passar de 100%. E o dano de terreno
+**continua com `fromPlayer = nil`** — creditar o autor ali seria telemetria decidindo
+jogo (evoluiria o escudo dele com dano de ambiente e jogaria o elemento na dominância
+sem `spell_cast` no denominador).
+
+Relatório: o desfecho passou a ser quebrado por tipo (**abates · travessias ·
+coberturas**) e a separar quem se queimou sozinho — arma de dois gumes é evidência do
+GDD §14, não jogada bem-sucedida. E a pendência parou de mentir: acusava "ninguém
+emite", quando agora zero é **resposta legítima** ("ninguém usou o terreno de
+propósito"); ela passou a acusar o que de fato impede a leitura — terreno mexido por
+Sintonia/Bots/Tutorial, que não passam autor.
+
+### O relatório do playtest parou de evaporar
+
+`matchEnd` imprimia e `matchStart` zerava: num servidor público há ~35 s entre uma
+prova e a próxima, e relatório não copiado nessa janela sumia. Agora há **acumulado
+da sessão de servidor** (várias provas somadas, com o TAMANHO DA AMOSTRA declarado
+antes de qualquer número) e **persistência em DataStore** dos 5 relatórios mais
+recentes, de todos os servidores, recuperáveis com **uma linha colável** que o próprio
+relatório imprime.
+
+Guarda o TEXTO e não os números: quem agrega máquina a máquina já tem
+`Telemetry.snapshot()`; o que se perdia era a leitura do Diretor. `UpdateAsync` e não
+`SetAsync` — dois servidores fechando juntos apagariam o relatório um do outro. E
+quando nada foi gravado o relatório **grita** `!! NADA GRAVADO AINDA`, porque no
+Studio o DataStore só existe com "Enable Studio Access to API Services" ligado.
+
+### `docs/DECISOES_PENDENTES.md` (novo)
+
+As cinco decisões que só o Diretor pode tomar viraram cinco linhas para preencher —
+duas já com **o texto pronto para colar no GDD**. A equipe não edita o GDD: ele é a
+fonte da verdade e emendá-lo é ato dele (§19.5).
+
+Gates: 40 arquivos Luau sem erro · `rojo build` limpo (905 KB) · harness **48/48** ·
+`npm run typecheck` limpo · APK debug recompilado e verificado (o conserto do
+carrossel e as fontes estão DENTRO do pacote). **Nenhum número de `Balance` tocado.**
+
 ## v0.5.0-roblox — 2026-08-19 — R11: tela mais limpa, tutorial opcional e o Android de volta
 
 Três ordens do Diretor, e a frente mobile retomada.

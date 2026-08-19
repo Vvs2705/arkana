@@ -38,6 +38,12 @@
 --
 -- FRONTEIRA DE RESPONSABILIDADE: o Terrain NUNCA aplica dano. Ele publica o
 -- perigo em `hazardAt` e o Combat (raia B) decide quem toma quanto.
+--
+-- AUTORIA (R12, pergunta V3): a mesma fronteira vale para o DESFECHO. Este
+-- módulo guarda QUEM fez cada mudança de mundo (`Cast`) e publica isso em
+-- `hazardAt` / `crossingAt` / `openedCoverAt`; quem sabe que alguém MORREU ou
+-- que um tiro PASSOU é o Combat, e é ele quem emite `terrain_tactical_outcome`.
+-- Nenhuma linha de dano mudou de lado para a autoria existir.
 -- ============================================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -111,6 +117,28 @@ local active: { [number]: boolean } = {}
 --- por cima de Burned e, ao expirarem, a árvore não pode "ressuscitar".
 local burnedOut: { [number]: boolean } = {}
 
+--- AUTORIA DA MUDANÇA DE TERRENO (R12 — pergunta V3). Uma MAGIA que mexe no
+--- mundo vira um `Cast`, e TODAS as células que ela mudou compartilham a MESMA
+--- tabela. Duas consequências que não são detalhe de implementação:
+---   · consumir `used` UMA vez consome o disparo inteiro — uma ponte de gelo de
+---     6 células rende UMA travessia, não seis. É o que impede a razão
+---     "disparos que viraram jogada / disparos" de passar de 100%, e razão
+---     acima de 100% destrói a confiança em todo o resto do relatório.
+---   · não existe registro de casts: quando a última célula sai do estado,
+---     ninguém mais aponta para a tabela e o coletor de lixo a leva. Não há
+---     tabela crescendo por partida para alguém esquecer de limpar.
+--- `element` é o elemento REAL do disparo (o argumento que chegou em
+--- `applyElement`) e nunca o elemento que o autor tem na mão AGORA: foi
+--- carimbar o elemento atual que quase custou um nerf errado na R8.
+type Cast = { by: any, element: string, used: boolean }
+--- célula → disparo que escreveu o estado ATUAL dela (nil = ninguém reivindica)
+local castOf: { [number]: Cast } = {}
+--- célula de ÁRVORE cuja copa o fogo derrubou → o disparo que a derrubou. Vive
+--- FORA de `castOf` porque `Burned` é permanente e a autoria tem de sobreviver
+--- ao fim do incêndio. Teto: uma entrada por árvore do mapa (~307), zerada no
+--- `build` (a porta da partida nova) e no `clearFires` (a porta do autoteste).
+local burnedBy: { [number]: Cast } = {}
+
 --- INCÊNDIO = uma frente com orçamento próprio (ver "MODELO DE FOGO" no topo).
 --- `seeds` são as células acesas pelo impacto da magia; `spread` as que a frente
 --- conquistou (as únicas que cobram do `budget`); `alive` é quantas ainda
@@ -123,6 +151,12 @@ type Fire = {
 	alive: number,
 	cx: number,
 	cy: number,
+	--- QUEM acendeu esta frente. Mora no incêndio, e não na célula, porque a
+	--- chama que a frente CONQUISTA é do mesmo disparo que a começou.
+	--- ponytail: TETO CONHECIDO — quem sopra Vento numa fogueira alheia
+	--- AMPLIFICA sem aparecer. Se o playtest mostrar isso virando jogada, o
+	--- upgrade é o Vento abrir um cast próprio para o que ELE acendeu.
+	cast: Cast?,
 }
 local fires: { [number]: Fire } = {}
 --- célula acesa → id do incêndio que a acendeu (só enquanto ela queima)
@@ -380,11 +414,16 @@ end
 
 --- Escreve o estado, agenda a expiração e sincroniza o visual. `duration <= 0`
 --- significa estado permanente (Burned) ou volta ao Normal.
-local function setState(idx: number, state: Grid.State, duration: number)
+--- `by` é o DISPARO que escreveu este estado (R12). Quem não passa autor APAGA
+--- a autoria da célula, que é o certo: voltar ao Normal não tem dono. Como todo
+--- caminho passa por aqui, é este ponto único que garante que autoria nenhuma
+--- sobrevive a uma mudança de estado.
+local function setState(idx: number, state: Grid.State, duration: number, by: Cast?)
 	local cell = cells[idx]
 	if cell.state == "Burning" and state ~= "Burning" then
 		leaveFire(idx)
 	end
+	castOf[idx] = by
 	cell.state = state
 	if duration > 0 then
 		cell.stateUntil = os.clock() + duration
@@ -416,9 +455,10 @@ local function isFlammable(idx: number): boolean
 end
 
 --- Abre um incêndio: uma ignição = uma magia de Fogo = um orçamento.
-local function newFire(cx: number, cy: number): Fire
+local function newFire(cx: number, cy: number, cast: Cast?): Fire
 	nextFireId += 1
-	local fire: Fire = { id = nextFireId, budget = T.fuelBudget, seeds = 0, spread = 0, alive = 0, cx = cx, cy = cy }
+	local fire: Fire =
+		{ id = nextFireId, budget = T.fuelBudget, seeds = 0, spread = 0, alive = 0, cx = cx, cy = cy, cast = cast }
 	fires[nextFireId] = fire
 	return fire
 end
@@ -442,7 +482,7 @@ local function ignite(idx: number, fire: Fire, charge: boolean): boolean
 	fireOf[idx] = fire.id
 	fire.alive += 1
 	pendingSpread[idx] = true -- fará a sua ÚNICA rolagem por aresta no próximo tick
-	setState(idx, "Burning", T.burnDuration)
+	setState(idx, "Burning", T.burnDuration, fire.cast)
 	return true
 end
 
@@ -701,6 +741,10 @@ function Terrain.build(layout: { { Grid.Material } })
 	fires = {}
 	fireOf = {}
 	pendingSpread = {}
+	--- AUTORIA NÃO ATRAVESSA PARTIDA (estado assim já vazou 3x neste projeto):
+	--- esta é a porta da partida nova; a outra é o `clearFires` do autoteste.
+	castOf = {}
+	burnedBy = {}
 	acc = 0
 
 	table.clear(markAt)
@@ -817,27 +861,87 @@ function Terrain.speedMultAt(pos: Vector3): number
 	return 1
 end
 
---- DPS do perigo no ponto e seu tipo, ou (0, nil). O Terrain NUNCA aplica dano:
---- quem lê isto e decide quem morre é o Combat (raia B).
-function Terrain.hazardAt(pos: Vector3): (number, string?)
+--- DPS do perigo no ponto, seu tipo e a AUTORIA do disparo que o criou (autor
+--- + elemento REAL), ou (0, nil, nil, nil). O Terrain continua NUNCA aplicando
+--- dano — quem lê isto e decide quem morre é o Combat (raia B). A autoria sai
+--- por aqui exatamente para o ABATE POR TERRENO poder ter dono sem que este
+--- módulo encoste na vida de ninguém.
+--- Devolver mais valores é ADITIVO: quem só queria o DPS (`Bots`, o `hazardDps`
+--- do Combat) continua lendo o primeiro e ignorando o resto.
+function Terrain.hazardAt(pos: Vector3): (number, string?, any, string?)
 	local cell = Terrain.getCell(Grid.worldToCell(pos))
 	if not cell then
-		return 0, nil
+		return 0, nil, nil, nil
 	end
+	local cast = castOf[idxOf(cell.cx, cell.cy)]
+	local by = if cast then cast.by else nil
+	local el = if cast then cast.element else nil
 	if cell.state == "Burning" then
 		-- o dano sobe de burnDmgMin a burnDmgMax conforme a célula queima
 		local remaining = math.max(0, cell.stateUntil - os.clock())
 		local f = math.clamp(1 - remaining / T.burnDuration, 0, 1)
-		return T.burnDmgMin + (T.burnDmgMax - T.burnDmgMin) * f, "Burning"
+		return T.burnDmgMin + (T.burnDmgMax - T.burnDmgMin) * f, "Burning", by, el
 	elseif cell.state == "Electrified" then
-		return T.electrifyDps, "Electrified"
+		return T.electrifyDps, "Electrified", by, el
 	end
-	return 0, nil
+	return 0, nil, nil, nil
+end
+
+-- ------------------------------------------------- DESFECHOS TÁTICOS (V3)
+--- As duas consultas abaixo existem para a pergunta V3 sair do olho do
+--- observador. `terrain_state_change` diz que o MUNDO mudou (e chega com sujeito
+--- nulo, porque é o mundo que muda); ele nunca disse que ALGUÉM mudou o mundo de
+--- propósito e ganhou alguma coisa com isso.
+--- As duas CONSOMEM o disparo: devolvem o autor uma única vez e nada depois,
+--- para a contagem ser de JOGADAS e não de passos nem de tiros.
+
+--- TRAVESSIA CRIADA. `pos` está sobre água que alguém congelou? Água líquida
+--- barra o andar (`isBlocking`); congelada, não. Estar de pé nesta célula é
+--- ocupar uma posição que NÃO EXISTIA antes do disparo — é isso que o servidor
+--- sabe provar, e é só isso que vira evento. A ponte inteira e todo mundo que
+--- passar por ela rendem UM desfecho.
+function Terrain.crossingAt(pos: Vector3): (any, string?)
+	local cx, cy = Grid.worldToCell(pos)
+	if not Grid.inBounds(cx, cy) then
+		return nil, nil
+	end
+	local i = idxOf(cx, cy)
+	local cell = cells[i]
+	if not cell or cell.material ~= "Water" or cell.state ~= "Frozen" then
+		return nil, nil
+	end
+	local cast = castOf[i]
+	if not cast or cast.used or cast.by == nil then
+		return nil, nil
+	end
+	cast.used = true
+	return cast.by, cast.element
+end
+
+--- COBERTURA DESTRUÍDA. A célula é uma árvore cuja copa o fogo derrubou, e quem
+--- chama é o Combat com um projétil ATRAVESSANDO-a. A prova não é "a árvore
+--- queimou" (isso já é `terrain_state_change`): é ter passado TIRO por onde a
+--- árvore barrava. Uma queimada que derrubou N árvores rende UM desfecho, pelo
+--- mesmo motivo do `crossingAt`.
+--- MURO DE TERRA FICA DE FORA: derrubar muro também é cobertura destruída, mas
+--- `damageWall` não sabe QUEM atirou (o Combat chama sem autor) e o muro ainda
+--- expira sozinho — não daria para separar "derrubei" de "acabou o tempo".
+--- Desfecho que não dá para auditar é pior que desfecho nenhum.
+function Terrain.openedCoverAt(cx: number, cy: number): (any, string?)
+	if not Grid.inBounds(cx, cy) then
+		return nil, nil
+	end
+	local cast = burnedBy[idxOf(cx, cy)]
+	if not cast or cast.used or cast.by == nil then
+		return nil, nil
+	end
+	cast.used = true
+	return cast.by, cast.element
 end
 
 -- -------------------------------------------------------------- reações (§14)
 --- FOGO: acende cobertura, derrete o gelo e seca a lama.
-local function applyFire(cx: number, cy: number, r: number)
+local function applyFire(cx: number, cy: number, r: number, cast: Cast?)
 	-- o incêndio só nasce se houver o que queimar: sem isto, cada bola de fogo
 	-- em campo aberto abriria uma frente vazia e uma linha de telemetria falsa
 	local fire: Fire? = nil
@@ -845,7 +949,7 @@ local function applyFire(cx: number, cy: number, r: number)
 		if cell.state == "Frozen" or cell.state == "Mud" then
 			setState(i, restState(i), 0) -- fogo derrete o gelo e seca a lama
 		elseif isFlammable(i) then
-			local f = fire or newFire(cx, cy)
+			local f = fire or newFire(cx, cy, cast)
 			fire = f
 			ignite(i, f, false) -- semente: o raio da magia não cobra combustível
 		end
@@ -853,12 +957,12 @@ local function applyFire(cx: number, cy: number, r: number)
 end
 
 --- ÁGUA: apaga o fogo, congela o lago (vira ponte) e faz lamaçal em terra/carvão.
-local function applyWater(cx: number, cy: number, r: number)
+local function applyWater(cx: number, cy: number, r: number, cast: Cast?)
 	forDisc(cx, cy, r, function(i, cell)
 		if cell.state == "Burning" then
 			setState(i, restState(i), 0) -- material preservado: apagar não carboniza
 		elseif cell.material == "Water" and (cell.state == "Normal" or cell.state == "Electrified") then
-			setState(i, "Frozen", T.freezeDuration) -- congelar também corta a condução
+			setState(i, "Frozen", T.freezeDuration, cast) -- congelar também corta a condução
 		-- `Silt` (lodo da baixada) entra JUNTO com `Dirt`: é o mesmo chão de
 		-- terra com outra cor, e a baixada é justamente onde "Água + terra =
 		-- lamaçal" (§14) é a jogada da casa. Deixá-lo de fora apagaria a
@@ -983,7 +1087,7 @@ end
 
 --- RAIO — condução (GDD §14): eletriza TODA a água conectada por flood fill.
 --- Gelo e rocha isolam naturalmente (o fill só atravessa água líquida).
-local function applyLightning(cx: number, cy: number, r: number)
+local function applyLightning(cx: number, cy: number, r: number, cast: Cast?)
 	local function isLiquid(cell: Grid.Cell): boolean
 		return cell.material == "Water" and cell.state ~= "Frozen"
 	end
@@ -1010,7 +1114,7 @@ local function applyLightning(cx: number, cy: number, r: number)
 	while head <= #queue and head <= ELECTRIFY_FLOOD_LIMIT do
 		local i = queue[head]
 		head += 1
-		setState(i, "Electrified", T.electrifyDuration) -- refresca se já estava
+		setState(i, "Electrified", T.electrifyDuration, cast) -- refresca se já estava
 		forNeighbors(i, function(nIdx)
 			if not seen[nIdx] and isLiquid(cells[nIdx]) then
 				seen[nIdx] = true
@@ -1022,17 +1126,31 @@ end
 
 --- ENTRADA DA QUÍMICA: uma magia do elemento `element` atinge a área.
 --- `strong` = magia tática (efeitos maiores: muro de pedra em área).
-function Terrain.applyElement(cx: number, cy: number, element: string, radiusCells: number, strong: boolean)
+--- `author` (R12) é OPCIONAL de propósito: quem não passa autor muda o mundo
+--- exatamente como antes, só não gera desfecho tático. Foi assim que a autoria
+--- entrou sem tocar na chamada de Bots, Sintonia e Tutorial.
+function Terrain.applyElement(
+	cx: number,
+	cy: number,
+	element: string,
+	radiusCells: number,
+	strong: boolean,
+	author: any?
+)
+	--- sem a quem atribuir, nenhuma tabela é criada — e a maioria dos impactos
+	--- do jogo é de bot, que não responde a pergunta V3.
+	local cast: Cast? = if author ~= nil then { by = author, element = element, used = false } else nil
 	if element == "Fire" then
-		applyFire(cx, cy, radiusCells)
+		applyFire(cx, cy, radiusCells, cast)
 	elseif element == "Water" then
-		applyWater(cx, cy, radiusCells)
+		applyWater(cx, cy, radiusCells, cast)
 	elseif element == "Earth" then
+		--- muro de Terra não recebe autoria: ver `Terrain.openedCoverAt`.
 		applyEarth(cx, cy, radiusCells, strong)
 	elseif element == "Wind" then
 		applyWind(cx, cy, radiusCells)
 	elseif element == "Lightning" then
-		applyLightning(cx, cy, radiusCells)
+		applyLightning(cx, cy, radiusCells, cast)
 	end
 end
 
@@ -1082,6 +1200,15 @@ local function simTick()
 			if now >= cell.stateUntil then
 				-- carvão PERMANENTE: a cobertura sumiu e o mapa mudou de verdade
 				burnedOut[i] = true
+				--- COBERTURA DESTRUÍDA (V3): só ÁRVORE conta. Grama alta também
+				--- queima (Grid.FLAMMABLE.TallGrass) e também esconde — mas ela
+				--- NUNCA barrou tiro (`blocksProjectile` só olha árvore, rocha e
+				--- muro), então contá-la aqui inventaria linha de tiro que a
+				--- chama não abriu. Guardado ANTES do `setState`, que é quem
+				--- apaga a autoria da célula.
+				if cell.material == "Tree" then
+					burnedBy[i] = castOf[i]
+				end
 				setState(i, "Burned", 0)
 			end
 		elseif cell.stateUntil > 0 and now >= cell.stateUntil then
@@ -1170,6 +1297,7 @@ local function clearFires()
 	fires = {}
 	fireOf = {}
 	pendingSpread = {}
+	burnedBy = {} -- a autoria da cobertura vai junto (ver `Terrain.build`)
 	for i = 1, CELL_COUNT do
 		local st = cells[i].state
 		if st == "Burning" or st == "Burned" then
@@ -1366,6 +1494,164 @@ function Terrain.selfTest()
 	applyWater(cells[silt].cx, cells[silt].cy, 0)
 	assert(cells[silt].state == "Mud", "Água no lodo parou de fazer lamaçal (§14) — a cor nova levou a regra junto")
 	setState(silt, restState(silt), 0) -- o autoteste não entrega a arena molhada
+
+	-- ------------------------ AUTORIA DO TERRENO / DESFECHOS TÁTICOS (V3, R12)
+	-- `terrain_tactical_outcome` está no schema desde a R5 e NINGUÉM o emitia:
+	-- dava para dizer que o mapa queimou, nunca que ALGUÉM queimou de propósito
+	-- e ganhou alguma coisa com isso. O que se prova AQUI é a metade que mora
+	-- neste módulo — a AUTORIA e a DEDUPLICAÇÃO. Quem emite é o Combat, porque o
+	-- desfecho depende de vida e de projétil, e este módulo não aplica dano.
+	-- Todo `PRÉ-CONDIÇÃO VAZIA` abaixo existe porque nesta mesma fase um teste
+	-- passou verde sem nunca alcançar a condição que dizia cobrir.
+	local AUTOR = ({} :: any)
+	local OUTRO = ({} :: any)
+
+	-- 1) TRAVESSIA CRIADA — congelar água é abrir uma posição que não existia.
+	local w1 = 0
+	for i = 1, CELL_COUNT do
+		local c = cells[i]
+		if c.material == "Water" and c.state == "Normal" then
+			local n = 0
+			forNeighbors(i, function(nIdx)
+				if cells[nIdx].material == "Water" then
+					n += 1
+				end
+			end)
+			if n >= 2 then
+				w1 = i
+				break
+			end
+		end
+	end
+	assert(w1 > 0, "PRÉ-CONDIÇÃO VAZIA: sem miolo de lago a metade `congelar` da V3 não teria o que testar")
+	local wc = cells[w1]
+	assert(Terrain.isBlocking(wc.cx, wc.cy), "pré-condição: água líquida barra o andar")
+	applyWater(wc.cx, wc.cy, 1, { by = AUTOR, element = "Water", used = false })
+	assert(wc.state == "Frozen", "pré-condição: a água tinha de congelar")
+	assert(not Terrain.isBlocking(wc.cx, wc.cy), "gelo é ponte: tem de dar para andar em cima")
+	local xby, xel = Terrain.crossingAt(Grid.cellToWorld(wc.cx, wc.cy))
+	assert(xby == AUTOR, "TRAVESSIA: quem pisa no gelo tem de creditar QUEM congelou")
+	assert(xel == "Water", "o elemento do desfecho é o do DISPARO (lição da R8), veio " .. tostring(xel))
+	assert(
+		(Terrain.crossingAt(Grid.cellToWorld(wc.cx, wc.cy))) == nil,
+		"o segundo passo no MESMO gelo não é uma segunda travessia"
+	)
+	local w2 = 0
+	for i = 1, CELL_COUNT do
+		if i ~= w1 and cells[i].material == "Water" and cells[i].state == "Frozen" then
+			w2 = i
+			break
+		end
+	end
+	assert(w2 > 0, "PRÉ-CONDIÇÃO VAZIA: o disco congelou uma célula só — o anti-inflação não mediria nada")
+	assert(
+		(Terrain.crossingAt(Grid.cellToWorld(cells[w2].cx, cells[w2].cy))) == nil,
+		"uma ponte de N células não pode render N travessias (razão de funil acima de 100%)"
+	)
+	for i = 1, CELL_COUNT do
+		local sNow = cells[i].state
+		if sNow == "Frozen" or sNow == "Mud" then
+			setState(i, restState(i), 0) -- o autoteste não entrega a arena congelada
+		end
+	end
+
+	-- 2) ABATE — o perigo tem de saber quem o acendeu, inclusive na chama que a
+	-- FRENTE conquistou (que é a maior parte de qualquer incêndio de verdade).
+	applyFire(fx0, fy0, radius, { by = AUTOR, element = "Fire", used = false })
+	local seedSet: { [number]: boolean } = {}
+	local seed0 = 0
+	for i = 1, CELL_COUNT do
+		if cells[i].state == "Burning" then
+			seedSet[i] = true
+			if seed0 == 0 then
+				seed0 = i
+			end
+		end
+	end
+	assert(seed0 > 0, "PRÉ-CONDIÇÃO VAZIA: a ignição de teste não acendeu nada")
+	local hDps, hKind, hBy, hEl = Terrain.hazardAt(Grid.cellToWorld(cells[seed0].cx, cells[seed0].cy))
+	assert(hDps > 0 and hKind == "Burning", "pré-condição: célula acesa publica perigo")
+	assert(hBy == AUTOR, "ABATE: o perigo do fogo tem de carregar QUEM acendeu")
+	assert(hEl == "Fire", "o elemento do perigo é o do DISPARO, não o que o autor tem na mão agora")
+
+	for _ = 1, 8 do
+		simTick()
+	end
+	local grown = 0
+	for i = 1, CELL_COUNT do
+		if cells[i].state == "Burning" and not seedSet[i] then
+			grown = i
+			break
+		end
+	end
+	assert(grown > 0, "PRÉ-CONDIÇÃO VAZIA: a frente não avançou — o autor na propagação não mediria nada")
+	local _, _, gBy = Terrain.hazardAt(Grid.cellToWorld(cells[grown].cx, cells[grown].cy))
+	assert(gBy == AUTOR, "a chama que a FRENTE conquistou continua sendo de quem acendeu")
+
+	-- 3) COBERTURA DESTRUÍDA — força o fim da queima (o relógio não anda aqui).
+	local tree = 0
+	for i = 1, CELL_COUNT do
+		if cells[i].state == "Burning" then
+			cells[i].stateUntil = 0
+			if tree == 0 and cells[i].material == "Tree" then
+				tree = i
+			end
+		end
+	end
+	assert(tree > 0, "PRÉ-CONDIÇÃO VAZIA: o incêndio de teste não pegou nenhuma árvore")
+	simTick() -- tudo que estava aceso vira carvão
+	assert(burnedOut[tree] and cells[tree].state == "Burned", "pré-condição: a árvore tinha de virar carvão")
+	assert(
+		not Terrain.blocksProjectile(cells[tree].cx, cells[tree].cy),
+		"pré-condição: árvore queimada deixa de barrar tiro (é design, GDD §14)"
+	)
+	local oBy, oEl = Terrain.openedCoverAt(cells[tree].cx, cells[tree].cy)
+	assert(oBy == AUTOR, "COBERTURA DESTRUÍDA: a linha de tiro aberta tem de ter dono")
+	assert(oEl == "Fire", "o elemento da cobertura destruída é o do DISPARO, veio " .. tostring(oEl))
+	assert(
+		(Terrain.openedCoverAt(cells[tree].cx, cells[tree].cy)) == nil,
+		"a mesma árvore não pode render dois desfechos"
+	)
+	local more = 0
+	for i = 1, CELL_COUNT do
+		if burnedOut[i] and (Terrain.openedCoverAt(cells[i].cx, cells[i].cy)) ~= nil then
+			more += 1
+		end
+	end
+	assert(more == 0, "uma queimada que derrubou N árvores não pode render N desfechos (inflaria a V3)")
+
+	-- 4) GRAMA ALTA QUEIMADA NÃO É COBERTURA DESTRUÍDA: ela esconde, mas nunca
+	-- barrou tiro. Sem este filtro a V3 contaria linha de tiro que o fogo não
+	-- abriu — e ela queima de verdade (Grid.FLAMMABLE.TallGrass = true).
+	local grass = 0
+	for i = 1, CELL_COUNT do
+		local c = cells[i]
+		if c.material == "TallGrass" and c.state == "Normal" and not burnedOut[i] then
+			grass = i
+			break
+		end
+	end
+	assert(grass > 0, "PRÉ-CONDIÇÃO VAZIA: sem grama alta intacta o filtro de cobertura não seria exercido")
+	local gFire = newFire(cells[grass].cx, cells[grass].cy, { by = OUTRO, element = "Fire", used = false })
+	assert(ignite(grass, gFire, false), "pré-condição: grama alta tem de acender")
+	cells[grass].stateUntil = 0
+	simTick()
+	assert(burnedOut[grass], "pré-condição: a grama tinha de virar carvão")
+	assert(
+		(Terrain.openedCoverAt(cells[grass].cx, cells[grass].cy)) == nil,
+		"grama alta queimada NUNCA barrou tiro: não pode contar como cobertura destruída"
+	)
+
+	-- 5) A AUTORIA NÃO ATRAVESSA A PORTA (estado assim já vazou 3x no projeto).
+	clearFires()
+	assert(next(burnedBy) == nil, "autoria da cobertura tem de morrer na limpeza")
+	local orphan = 0
+	for i = 1, CELL_COUNT do
+		if castOf[i] ~= nil then
+			orphan += 1
+		end
+	end
+	assert(orphan == 0, "nenhuma célula pode sair do autoteste com autoria pendurada: " .. orphan)
 
 	local parts = if folder then #folder:GetDescendants() else 0
 	assert(parts <= 4000, "orçamento de parts do GDD §19.2 estourado: " .. parts)

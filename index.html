@@ -4,10 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Arkana — Magos Battle Royale (v0.1)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
+    /* ------------------------------------------------------------------
+       Tipografia EMPACOTADA (public/fonts) — nenhuma chamada de rede.
+       Regra: o protótipo não faz UMA requisição externa sequer, o que
+       mantém a resposta "nenhuma coleta" na ficha de Segurança de Dados
+       e faz o jogo abrir idêntico em modo avião (GDD §19.6).
+       Subconjunto "latin" (U+0000-00FF + pontuação geral) — cobre todo o
+       pt-BR do jogo. Licenças: public/fonts/OFL.txt (SIL OFL 1.1).
+       Cinzel e Inter são variáveis: um arquivo serve todos os pesos.
+       ------------------------------------------------------------------ */
+    @font-face {
+      font-family: 'Cinzel'; font-style: normal; font-weight: 500; font-display: block;
+      src: url(./fonts/cinzel-latin.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Cinzel'; font-style: normal; font-weight: 700; font-display: block;
+      src: url(./fonts/cinzel-latin.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Chakra Petch'; font-style: normal; font-weight: 400; font-display: block;
+      src: url(./fonts/chakra-petch-400-latin.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Chakra Petch'; font-style: normal; font-weight: 700; font-display: block;
+      src: url(./fonts/chakra-petch-700-latin.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: block;
+      src: url(./fonts/inter-latin.woff2) format('woff2');
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 100%; height: 100%; background: #05070f; overflow: hidden;

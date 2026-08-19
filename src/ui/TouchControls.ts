@@ -100,6 +100,32 @@ export class TouchControls {
     return layout[id] ?? TOUCH.defaults[id];
   }
 
+  /**
+   * Hit area do ícone do carrossel: RETÂNGULO, não círculo.
+   * O piso de 48dp (minHitRadius) fica MAIOR que o espaçamento entre os ícones
+   * no telefone. Com círculos, o toque cai dentro de dois ícones ao mesmo tempo
+   * e o `topOnly` do Phaser entrega o de índice MAIOR — o jogador toca Fogo e
+   * recebe Água. Medido: tela de 640px css ⇒ raio de 48px de canvas contra 54px
+   * de espaçamento, ou seja, tudo além de 6px do centro (o ícone visível tem 22px
+   * de raio) já pertencia ao vizinho. No desktop o raio cai para 24px e o defeito
+   * some — por isso só apareceu no aparelho real (17/08, docs/ANDROID.md).
+   * Solução: 48dp na vertical, onde há espaço livre, e largura limitada ao
+   * espaçamento, para nenhum ícone roubar o toque do vizinho.
+   */
+  private hitCarouselIcon(img: Phaser.GameObjects.Image, gapPx: number): void {
+    const min = this.minHitRadius() * 2;
+    const w = Math.min(Math.max(img.displayWidth, min), gapPx);
+    const h = Math.max(img.displayHeight, min);
+    const sx = img.displayWidth / img.width;
+    const sy = img.displayHeight / img.height;
+    const lw = w / sx;
+    const lh = h / sy;
+    img.setInteractive(
+      new Phaser.Geom.Rectangle((img.width - lw) / 2, (img.height - lh) / 2, lw, lh),
+      Phaser.Geom.Rectangle.Contains,
+    );
+  }
+
   /** hit circle da imagem em coordenadas locais da textura (origem 0,0) */
   private hitImage(img: Phaser.GameObjects.Image, displayRadius: number): void {
     const r = Math.max(displayRadius, this.minHitRadius());
@@ -143,8 +169,17 @@ export class TouchControls {
     const cp = this.pos('carousel');
     this.carousel = fix(this.scene.add.container(cp.x, cp.y));
     this.carouselIcons = ELEMENTS.map((el, i) => {
+      // setScrollFactor(0) no FILHO, não só no container: o Phaser DESENHA o
+      // filho com o scrollFactor do pai (0 = grudado na tela), mas o hit-test
+      // de input usa o scrollFactor do PRÓPRIO filho
+      // (InputManager.hitTest: `px = worldX + csx * gameObject.scrollFactorX - csx`).
+      // Com o padrão 1, a área de toque do ícone ficava deslocada pelo scroll da
+      // câmera — que na Arena segue o jogador — e o toque na troca de elemento
+      // caía na zona livre, virando arrasto de mira. Defeito de 17/08
+      // (docs/ANDROID.md, Fase 3). NÃO remover.
       const img = this.scene.add.image((i - 2) * sz.iconGap * s, 0, ICON_TEX[el])
-        .setDisplaySize(sz.icon * s, sz.icon * s);
+        .setDisplaySize(sz.icon * s, sz.icon * s)
+        .setScrollFactor(0);
       this.carousel.add(img);
       return img;
     });
@@ -184,7 +219,7 @@ export class TouchControls {
     this.dodgeBtn.on('pointerdown', () => { this.dodgeQueued = true; });
 
     this.carouselIcons.forEach((img, i) => {
-      this.hitImage(img, (sz.icon / 2) * s);
+      this.hitCarouselIcon(img, sz.iconGap * s);
       img.on('pointerdown', () => {
         this.opts.onElement?.(ELEMENTS[i]);
       });

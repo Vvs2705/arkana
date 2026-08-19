@@ -230,6 +230,26 @@ local function emit(name: string, subject: any, payload: any?)
 	end
 end
 
+--- DESFECHO TÁTICO DE TERRENO (R12 — pergunta V3 de docs/ROBLOX.md §1).
+--- `terrain_state_change` chega ao coletor com sujeito NULO, porque quem muda é
+--- o mundo: com ele dá para dizer que o mapa QUEIMOU, nunca que alguém queimou
+--- DE PROPÓSITO e ganhou alguma coisa com isso. Aqui o sujeito é o AUTOR do
+--- disparo que mexeu no terreno, e o desfecho só sai quando a consequência é
+--- VERIFICÁVEL (ver os três pontos de chamada em `Combat.step`).
+--- `element` é o elemento do DISPARO que mudou o terreno — a raia A guarda os
+--- dois juntos. Carimbar o elemento que o autor tem na mão AGORA é o erro que
+--- quase custou um nerf errado na R8 (1,34x medido contra 1,64x real).
+--- O payload NUNCA leva `cells`: no coletor esse campo é o tamanho de uma
+--- FRENTE DE INCÊNDIO, e um desfecho tático não é uma frente.
+local function emitTerrainOutcome(outcome: string, by: any, element: string?, extra: { [string]: any })
+	if by == nil then
+		return -- sem autor não há jogada: o `terrain_state_change` já conta o mundo
+	end
+	extra.outcome = outcome
+	extra.element = element
+	emit(Events.Name.TerrainTacticalOutcome, by, extra)
+end
+
 -- ------------------------------------------------------- trava de ELIMINADO
 --- P0 da auditoria externa: eliminado continuava conjurando do poleiro de
 --- espectador (Match.perch), sujando TTK, funil de Sintonia e dano por
@@ -447,19 +467,22 @@ end
 -- -------------------------------------------------------------------- terreno
 --- Perigos do terreno: o Terrain NUNCA aplica dano sozinho — quem aplica é o
 --- Combat. A raia A expõe `hazardAt`; enquanto não expõe, isto devolve 0.
-local function hazardDps(pos: Vector3): number
+--- Desde a R12 ele devolve também QUEM criou o perigo e com QUE elemento: é o
+--- que torna o abate por terreno atribuível SEM que a raia A encoste em vida de
+--- ninguém. Autor e elemento são só telemetria — não entram no cálculo de dano.
+local function hazardDps(pos: Vector3): (number, any, string?)
 	local fn = terrain and terrain.hazardAt
 	if not fn then
-		return 0
+		return 0, nil, nil
 	end
-	local hz = fn(pos)
+	local hz, _kind, by, element = fn(pos)
 	if typeof(hz) == "number" then
-		return hz
+		return hz, by, element
 	end
 	if typeof(hz) == "table" then
-		return tonumber((hz :: any).dps) or 0
+		return tonumber((hz :: any).dps) or 0, by, element
 	end
-	return 0
+	return 0, nil, nil
 end
 
 --- Bloqueio de PROJÉTIL (≠ bloqueio de MOVIMENTO). O projétil voa na altura do
@@ -1031,8 +1054,11 @@ local function impact(p: Projectile, hitHumanoid: Humanoid?)
 
 	local cx, cy = Grid.worldToCell(p.pos)
 	if Grid.inBounds(cx, cy) then
-		-- reação elemental do terreno no ponto de impacto (GDD §14)
-		terrain.applyElement(cx, cy, p.element, p.terrainRadius, p.strong)
+		-- reação elemental do terreno no ponto de impacto (GDD §14). O 6º
+		-- argumento (R12) é o AUTOR: é ele que faz a mudança de mundo deixar de
+		-- ser anônima e a pergunta V3 sair do olho do observador. Quem não passa
+		-- autor (Bots, Sintonia, Tutorial) muda o terreno exatamente como antes.
+		terrain.applyElement(cx, cy, p.element, p.terrainRadius, p.strong, p.owner)
 		if not hitHumanoid and blocksProjectile(cx, cy, p.pos.Y) then
 			-- bateu em muro/árvore/rocha: descasca a célula (GDD §14)
 			terrain.damageWall(cx, cy, Balance.terrain.projectileCellDmg)
@@ -1155,9 +1181,45 @@ function Combat.step(dt: number)
 		st.hazardAcc += dt
 		while st.hazardAcc >= HAZARD_TICK do
 			st.hazardAcc -= HAZARD_TICK
-			local dps = hazardDps(root.Position)
+
+			--- DESFECHO TÁTICO — TRAVESSIA CRIADA (V3): está de pé sobre água que
+			--- alguém CONGELOU. Água líquida barra o andar; congelada, não — logo
+			--- esta posição não existia antes do disparo, e é isso que o servidor
+			--- sabe provar. A raia A entrega uma vez por congelamento (a ponte
+			--- inteira e todo mundo que passar por ela rendem UM desfecho), então
+			--- a razão "congelamentos que viraram rota / congelamentos" nunca
+			--- passa de 100%. Roda no tique de terreno (4 Hz) e não por frame:
+			--- é a mesma cadência que já lê a posição para o perigo.
+			if terrain.crossingAt then
+				local crossBy, crossEl = terrain.crossingAt(root.Position)
+				if crossBy then
+					emitTerrainOutcome("crossing", crossBy, crossEl, {
+						used_by = st.player,
+						pos = root.Position,
+						by_self = crossBy == st.player,
+					})
+				end
+			end
+
+			local dps, hazardBy, hazardEl = hazardDps(root.Position)
 			if dps > 0 then
 				Combat.applyDamage(hum, dps * HAZARD_TICK, nil)
+				--- DESFECHO TÁTICO — ABATE (V3). O dano continua indo SEM autor
+				--- de propósito: creditar `fromPlayer` aqui evoluiria o Escudo e
+				--- o crédito de abate do Match com dano de ambiente (mudança de
+				--- JOGO por causa de telemetria) e jogaria o elemento do perigo
+				--- na dominância sem `spell_cast` no denominador — a razão
+				--- passaria de 100% e derrubaria a confiança no resto do
+				--- relatório. Quem carrega a autoria é o desfecho, e ele só sai
+				--- quando o alvo REALMENTE caiu neste tique: perigo que só
+				--- machuca não é jogada, é paisagem cobrando pedágio.
+				if hum.Health <= 0 then
+					emitTerrainOutcome("kill", hazardBy, hazardEl, {
+						victim = hum,
+						pos = root.Position,
+						by_self = hazardBy == st.player,
+					})
+				end
 			end
 			if hum.Health <= 0 then
 				st.hazardAcc = 0
@@ -1191,6 +1253,22 @@ function Combat.step(dt: number)
 				impact(p, nil)
 				done = true
 				break
+			end
+
+			--- DESFECHO TÁTICO — COBERTURA DESTRUÍDA (V3): o tiro passou por uma
+			--- célula onde uma ÁRVORE barrava até alguém queimá-la. A prova não é
+			--- "a árvore queimou" (isso já é `terrain_state_change`): é ter
+			--- passado tiro por ali. A raia A entrega isto UMA vez por queimada,
+			--- então uma frente que derrubou 20 árvores rende 1 desfecho e não 20.
+			if terrain.openedCoverAt then
+				local openedBy, openedEl = terrain.openedCoverAt(cx, cy)
+				if openedBy then
+					emitTerrainOutcome("cover_destroyed", openedBy, openedEl, {
+						used_by = p.owner,
+						pos = p.pos,
+						by_self = openedBy == p.owner,
+					})
+				end
 			end
 
 			-- 2) personagens (o dono nunca se acerta)
@@ -1431,6 +1509,154 @@ function Combat.selfTest()
 	Teams.clear()
 	Combat.onPlayerRemoving(mage)
 	dummyBody:Destroy()
+
+	-- ------------------------ DESFECHO TÁTICO DE TERRENO (V3, R12) ----------
+	-- `terrain_tactical_outcome` está no schema desde a R5 e ninguém o emitia:
+	-- o relatório dizia que o mapa QUEIMOU e não que alguém queimou de propósito
+	-- e ganhou algo com isso. A metade que mora aqui é a DECISÃO (o alvo caiu? o
+	-- tiro passou? o pé pisou?) — a AUTORIA e a deduplicação são do Terrain e
+	-- estão provadas no autoteste dele.
+	-- O mundo é trocado por um DUBLÊ: o que se prova não é a química do terreno
+	-- (isso é raia A), é que o Combat só emite quando a consequência aconteceu
+	-- e que o sujeito é o AUTOR da mudança, nunca quem passou por ela.
+	local savedTerrain, savedTel = terrain, telemetry
+	local outcomes: { any } = {}
+	telemetry = {
+		emit = function(evName: string, subject: any, payload: any)
+			if evName == Events.Name.TerrainTacticalOutcome then
+				table.insert(outcomes, { subject = subject, p = payload })
+			end
+		end,
+	}
+	local QUEIMOU = ({} :: any) :: Player -- autor da mudança de terreno
+	local GELOU = ({} :: any) :: Player
+	local hazardBy: any = nil
+	local crossBy: any = nil
+	local coverBy: any = nil
+	local hazardFake = 0
+	local crossCalls, coverCalls = 0, 0
+	terrain = {
+		speedMultAt = function()
+			return 1
+		end,
+		blocksProjectile = function()
+			return false
+		end,
+		getCell = function()
+			return nil
+		end,
+		applyElement = function() end,
+		damageWall = function() end,
+		hazardAt = function()
+			return hazardFake, "Burning", hazardBy, "Fire"
+		end,
+		--- o dublê entrega UMA vez, como a raia A: se o Combat pedir de novo não
+		--- pode nascer um segundo desfecho do mesmo congelamento
+		crossingAt = function()
+			crossCalls += 1
+			local by = crossBy
+			crossBy = nil
+			return by, "Water"
+		end,
+		openedCoverAt = function()
+			coverCalls += 1
+			local by = coverBy
+			coverBy = nil
+			return by, "Fire"
+		end,
+	}
+
+	local piloto = ({} :: any) :: Player
+	Combat.onPlayerAdded(piloto)
+	local corpo = Instance.new("Model")
+	local pRoot = Instance.new("Part")
+	pRoot.Name = "HumanoidRootPart"
+	pRoot.Parent = corpo
+	local pHum = Instance.new("Humanoid")
+	pHum.Parent = corpo
+	Combat.onCharacterAdded(piloto, corpo, pHum)
+	states[piloto].shield = 0 -- senão o escudo come o dano do terreno e nada cai
+
+	--- o mundo falso NÃO pode sobreviver a uma reprovação: sem isto um assert
+	--- vermelho entregaria a FASE 3 inteira rodando sobre um terreno de mentira,
+	--- e a causa real ficaria enterrada em vinte falhas derivadas.
+	local ok, err = pcall(function()
+		-- 1) COBERTURA DESTRUÍDA: tiro passando por onde a árvore barrava.
+		coverBy = QUEIMOU
+		Combat.handleCast(piloto, "basic", Vector3.new(0, 0, -1))
+		Combat.step(0.05)
+		assert(coverCalls > 0, "PRÉ-CONDIÇÃO VAZIA: o projétil não chegou a consultar a cobertura aberta")
+		assert(#outcomes == 1, "COBERTURA DESTRUÍDA: passar tiro por onde a árvore barrava tem de virar UM desfecho")
+		local c = outcomes[1]
+		assert(c.subject == QUEIMOU, "o sujeito é QUEM QUEIMOU a árvore, não quem atirou")
+		assert(c.p.outcome == "cover_destroyed", "desfecho errado: " .. tostring(c.p.outcome))
+		assert(c.p.element == "Fire", "o elemento é o do DISPARO que queimou (lição da R8)")
+		assert(c.p.used_by == piloto, "quem atirou entra como `used_by`, nunca como sujeito")
+		assert(c.p.cells == nil, "`cells` no payload seria lido pelo coletor como FRENTE DE INCÊNDIO")
+
+		-- 2) TRAVESSIA CRIADA: de pé sobre o gelo de outra pessoa.
+		crossBy = GELOU
+		Combat.step(0.1)
+		Combat.step(0.1)
+		Combat.step(0.1)
+		assert(crossCalls > 0, "PRÉ-CONDIÇÃO VAZIA: o tique de terreno não consultou a travessia")
+		assert(#outcomes == 2, "TRAVESSIA: pisar no gelo de alguém tem de virar UM desfecho")
+		local x = outcomes[2]
+		assert(x.subject == GELOU, "o sujeito é QUEM CONGELOU, não quem atravessou")
+		assert(x.p.outcome == "crossing" and x.p.element == "Water", "desfecho/elemento errados na travessia")
+		assert(x.p.used_by == piloto and x.p.by_self == false, "quem atravessa entra como `used_by`")
+
+		-- 3) PERIGO QUE NÃO DERRUBA NÃO É ABATE. Sem esta guarda a V3 conta
+		-- "tomou dano de fogo" como jogada e o número vira decoração.
+		hazardBy = QUEIMOU
+		hazardFake = 4
+		pHum.Health = 100
+		local before = #outcomes
+		Combat.step(0.1)
+		Combat.step(0.1)
+		Combat.step(0.1)
+		assert(pHum.Health < 100, "PRÉ-CONDIÇÃO VAZIA: o perigo do dublê não chegou a causar dano")
+		assert(pHum.Health > 0, "pré-condição: este perigo não podia derrubar")
+		assert(#outcomes == before, "perigo que NÃO derruba não é abate")
+
+		-- 4) ABATE POR TERRENO com autor: o desfecho que a V3 não tinha. Vem
+		-- ANTES do caso sem autor de propósito: assim um sujeito trocado
+		-- reprova AQUI, com a mensagem certa, em vez de reprovar adiante.
+		hazardFake = 400
+		pHum.Health = 10
+		Combat.step(0.1)
+		Combat.step(0.1)
+		Combat.step(0.1)
+		assert(pHum.Health <= 0, "PRÉ-CONDIÇÃO VAZIA: o perigo letal não derrubou o alvo")
+		assert(#outcomes == before + 1, "ABATE: cair no perigo de terreno de alguém tem de virar desfecho")
+		local k = outcomes[#outcomes]
+		assert(k.subject == QUEIMOU, "o sujeito do abate é QUEM ACENDEU, não a vítima")
+		assert(k.p.outcome == "kill" and k.p.element == "Fire", "desfecho/elemento errados no abate")
+		assert(k.p.victim == pHum and k.p.by_self == false, "a vítima viaja no payload, não como sujeito")
+
+		-- 5) ABATE SEM AUTOR CONHECIDO NÃO EXISTE: perigo aceso por bot, pela
+		-- Sintonia ou pelo Campo de Provas chega sem dono, e desfecho sem dono
+		-- não é auditável.
+		hazardBy = nil
+		pHum.Health = 10
+		Combat.step(0.1)
+		Combat.step(0.1)
+		Combat.step(0.1)
+		assert(pHum.Health <= 0, "PRÉ-CONDIÇÃO VAZIA: o perigo sem autor não derrubou o alvo")
+		assert(#outcomes == before + 1, "perigo SEM autor não pode inventar desfecho tático")
+
+		--- O DANO CONTINUA SEM AUTOR (e isto é a metade que impede telemetria de
+		--- decidir jogo): creditar `fromPlayer` no perigo evoluiria o Escudo do
+		--- autor e mandaria o elemento do fogo para a dominância sem
+		--- `spell_cast` no denominador.
+		assert(states[QUEIMOU] == nil, "o autor do terreno não pode ter virado combatente por causa de telemetria")
+	end)
+
+	terrain = savedTerrain
+	telemetry = savedTel
+	Combat.onPlayerRemoving(piloto)
+	corpo:Destroy()
+	assert(ok, err)
 
 	print("[Combat] autoteste OK")
 	return true

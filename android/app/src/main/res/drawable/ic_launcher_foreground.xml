@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SELO DE ARKANA (GDD §10) — camada da frente do ícone adaptativo, e também o
+  logo da splash.
+
+  A forma NÃO foi inventada: é a mesma que o jogo já desenha em dois lugares.
+    · src/core/textures.ts, uiSeal()  — anel + pentágono + pentagrama interno
+      sutil + 5 gemas nas pontas, primeira ponta apontando para cima.
+    · roblox/src/client/Hud.luau, buildSeal() + SEAL_GEMS — as gemas são
+      LOSANGOS (quadrado girado 45°), de propósito: cor + FORMA, a régra de
+      daltonismo do GDD §10. Circulozinho colorido só teria a cor.
+  Onde as duas divergem, vale a forma do Roblox (losango) sobre a do 2D
+  (círculo), porque é a que carrega a forma.
+
+  Geometria: centro (54,54), pentágono de circunraio 29, primeira ponta em -90°
+  e as demais de 72 em 72; anel em 26.8 (o 48/52 do original — o anel passa por
+  DENTRO das pontas); losangos de meia-diagonal 4.0. Extremo = 29+4 = 33, que é
+  exatamente o raio da zona segura de 66dp do ícone adaptativo. Nada escapa da
+  máscara, em nenhum formato de launcher.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- anel -->
+    <path
+        android:pathData="M27.2,54 a26.8,26.8 0 1,0 53.6,0 a26.8,26.8 0 1,0 -53.6,0"
+        android:strokeColor="@color/arkana_gold"
+        android:strokeWidth="1.7"
+        android:strokeAlpha="0.9" />
+
+    <!-- pentagrama interno (sutil, como no original: alpha 0.35) -->
+    <path
+        android:pathData="M54,25 L71.046,77.462 L26.419,45.038 L81.581,45.038 L36.954,77.462 Z"
+        android:strokeColor="@color/arkana_gold"
+        android:strokeWidth="0.8"
+        android:strokeAlpha="0.35" />
+
+    <!-- pentágono -->
+    <path
+        android:pathData="M54,25 L81.581,45.038 L71.046,77.462 L36.954,77.462 L26.419,45.038 Z"
+        android:strokeColor="@color/arkana_gold"
+        android:strokeWidth="1.7"
+        android:strokeAlpha="0.9" />
+
+    <!-- gemas: Fogo (topo), Água, Terra, Vento, Raio — sentido horário -->
+    <path
+        android:pathData="M54,21 L58,25 L54,29 L50,25 Z"
+        android:fillColor="@color/arkana_fire" />
+    <path
+        android:pathData="M81.581,41.038 L85.581,45.038 L81.581,49.038 L77.581,45.038 Z"
+        android:fillColor="@color/arkana_water" />
+    <path
+        android:pathData="M71.046,73.462 L75.046,77.462 L71.046,81.462 L67.046,77.462 Z"
+        android:fillColor="@color/arkana_earth" />
+    <path
+        android:pathData="M36.954,73.462 L40.954,77.462 L36.954,81.462 L32.954,77.462 Z"
+        android:fillColor="@color/arkana_wind" />
+    <path
+        android:pathData="M26.419,41.038 L30.419,45.038 L26.419,49.038 L22.419,45.038 Z"
+        android:fillColor="@color/arkana_lightning" />
+</vector>

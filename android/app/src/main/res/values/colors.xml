@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paleta oficial do GDD §10. Fonte da forma e das cores: o Selo já desenhado em
+  `src/core/textures.ts` (uiSeal) e `roblox/src/client/Hud.luau` (buildSeal /
+  SEAL_GEMS). Nenhuma cor inventada aqui.
+
+  Os três `color*` do fim SOBRESCREVEM os da biblioteca do Capacitor
+  (node_modules/@capacitor/android/capacitor/src/main/res/values/colors.xml:
+  #3F51B5 / #303F9F / #FF4081 — índigo do Material). Recurso do módulo do app
+  vence recurso de biblioteca; por isso é só declarar com o mesmo nome.
+-->
+<resources>
+    <color name="arkana_night">#0B1026</color>
+    <color name="arkana_night_deep">#05070F</color>
+    <color name="arkana_gold">#F0C75E</color>
+
+    <!-- gemas do Selo, na ordem canônica dos elementos (GDD §10) -->
+    <color name="arkana_fire">#FF5A2A</color>
+    <color name="arkana_water">#2AA7FF</color>
+    <color name="arkana_earth">#A8763E</color>
+    <color name="arkana_wind">#8FE8C9</color>
+    <color name="arkana_lightning">#F5D90A</color>
+
+    <color name="colorPrimary">#0B1026</color>
+    <color name="colorPrimaryDark">#05070F</color>
+    <color name="colorAccent">#F0C75E</color>
+</resources>

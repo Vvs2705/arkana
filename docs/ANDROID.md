@@ -335,13 +335,13 @@ não é capaz de provar (tipicamente, coisa que vive fora dele).
 
 | Item | Status | Evidência |
 |---|---|---|
-| Ícone do app | **falta** | `mipmap-*/ic_launcher.png` é o **logo padrão do Capacitor** (símbolo azul sobre branco) — conferido visualmente. Nada do Selo de Arkana (GDD §10) |
+| Ícone do app | **EXISTE** (R12) | Selo de Arkana em VectorDrawable: adaptativo (26+) + fallback próprio (24–25). Os 15 PNG do Capacitor foram **apagados** — verificado dentro do APK: zero PNG de ícone/splash |
 | Fundo do ícone adaptativo | **falta** | `values/ic_launcher_background.xml` = `#FFFFFF`, não a paleta do GDD §10 |
-| Ícone monocromático (tema do Android 13+) | **falta** | `mipmap-anydpi-v26/ic_launcher.xml` não tem `<monochrome>` |
-| Splash | **falta** | todos os `drawable*/splash.png` são o splash padrão do Capacitor (mesmo símbolo azul, centrado em branco) |
+| Ícone monocromático (tema do Android 13+) | **EXISTE** (R12) | camada `<monochrome>` no adaptativo. É a camada que ninguém lembra de testar — vale conferir no aparelho |
+| Splash | **EXISTE** (R12) | azul-noite `#0B1026` + Selo, em `drawable/splash.xml`; `values-v31` cobre a splash do sistema em Android 12+, senão sairia um flash claro em todo aparelho moderno |
 | Cores do tema nativo | **falta** | `styles.xml` referencia `@color/colorPrimary`, que vem da **biblioteca do Capacitor** (`#3F51B5`, índigo do Material), não do `#0B1026`/`#F0C75E` do GDD §10 |
 | Orientação e tela cheia | **existe** | `sensorLandscape` no manifesto; `windowFullscreen` nos temas |
-| Fontes empacotadas (offline) | **falta** | `index.html` busca `fonts.googleapis.com` em runtime; nenhum arquivo de fonte no repositório |
+| Fontes empacotadas (offline) | **EXISTE** (R12) | 4 `.woff2` (~69 KB, subconjunto `latin`) em `public/fonts/`, licenças em `OFL.txt`. Portão no `vite.config.ts` quebra o build se voltar CDN. **Achado:** o canvas do Phaser nunca dispara o download de um `@font-face` — precisou de `document.fonts.load()` no boot, senão abriria com fonte de sistema mesmo tendo a local |
 
 ### Ficha de loja e conformidade
 
@@ -404,6 +404,10 @@ conserto de gameplay.* O APK já está compilado; falta atravessar o cabo.
 - Fontes OFL empacotadas localmente, removendo a busca a `fonts.googleapis.com`.
 - **Pronto quando:** instalação limpa mostra o Selo na gaveta de aplicativos, o
   splash em azul-noite, e o jogo abre **em modo avião** com a tipografia correta.
+- ✅ **ENTREGUE na R12**, com prova: o APK foi extraído e não contém nenhum PNG de
+  ícone/splash (o padrão do Capacitor saiu do pacote, não só do código-fonte), e o
+  `dist/` não referencia CDN de fonte nenhuma. **Falta só a confirmação no aparelho
+  físico**, que é ato do Diretor — a Fase 1 e esta se conferem no mesmo gesto.
 
 ### Fase 3 — "Consertar o que o Diretor já reprovou"
 *(só se o 2D seguir como veículo — ver §1)*
@@ -417,6 +421,19 @@ conserto de gameplay.* O APK já está compilado; falta atravessar o cabo.
   mira e dispara **em um gesto**; a troca de elemento responde ao primeiro
   toque; e o Diretor joga 3 partidas sem reencontrar nenhum dos dois defeitos de
   17/08.
+- ⚠️ **METADE ENTREGUE na R12.** A troca de elemento foi consertada (o defeito era
+  REAL e falhava 100% das vezes — ver abaixo); o **gesto único continua bloqueado**
+  pelo pré-requisito acima, e a equipe recusou improvisar meio-termo.
+- **A causa-raiz da troca de elemento, para o registro** — eram DOIS defeitos, e o
+  segundo explica por que só o aparelho do Diretor via:
+  1. `setScrollFactor(0)` era aplicado ao *container*, nunca aos ícones. O Phaser
+     restaura o `scrollFactor` do filho depois de desenhar, mas o hit-test usa o do
+     próprio filho — então a área de toque ficava deslocada pelo scroll da câmera,
+     que na Arena **segue o jogador**. O toque caía na zona de mira.
+  2. O piso de 48dp brigava com o espaçamento de 54px: em tela de 640px o raio de
+     toque vira 48px e **três quartos da superfície do próprio ícone** entregavam o
+     toque ao vizinho. Em desktop (1280px) o raio é 24px e nada disso acontece —
+     por isso o defeito era invisível fora do celular.
 
 ### Fase 4 — "A conta e o relógio" 🧑
 

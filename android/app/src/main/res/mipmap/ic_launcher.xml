@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FALLBACK API 24–25 (minSdk é 24; ícone adaptativo só existe a partir do 26).
+  Aqui o launcher desenha o drawable como veio, sem máscara — então o fundo
+  azul-noite tem de vir junto. Continua sendo XML: VectorDrawable é nativo desde
+  a API 21, não precisa de PNG e não põe binário no repositório.
+
+  ponytail: reaproveita @drawable/ic_launcher_foreground em vez de duplicar a
+  geometria do Selo. O preço é o Selo ocupar ~61% do quadrado (a margem da zona
+  segura do adaptativo vem junto), um pouco mais folgado que um ícone legado
+  típico. Se algum dia isso incomodar em um aparelho 7.x de verdade, o conserto
+  é um segundo vetor com o pentágono em circunraio ~40 — não uma ferramenta de
+  imagem.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/arkana_night"/>
+            <corners android:radius="12dp"/>
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_launcher_foreground"/>
+</layer-list>

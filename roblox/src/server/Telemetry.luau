@@ -59,6 +59,23 @@
 -- COMO O DIRETOR LÊ (Command Bar do Studio, contexto SERVIDOR):
 --   require(game.ServerScriptService.Server.Telemetry).report()  -- string
 --   require(game.ServerScriptService.Server.Playtest).report()   -- imprime
+--
+-- COMO O DIRETOR LÊ NUM LUGAR PUBLICADO (onde NÃO existe Command Bar de
+-- servidor — ela só existe no Studio). O relatório era impresso e sumia: num
+-- servidor público as provas se encadeiam, e entre o fim de uma e a largada da
+-- seguinte há a tela de fim + o lobby (~35 s). Duas coisas consertam isso:
+--   1. ACUMULADO DA SESSÃO DE SERVIDOR — `matchStart` zera os agregados da
+--      PROVA, nunca os da sessão. O relatório traz um bloco com V1/V2/V4
+--      somados sobre TODAS as provas do servidor, dizendo quantas provas e
+--      quantos humanos entraram na conta;
+--   2. DATASTORE — o relatório inteiro é gravado no fim de cada prova (com
+--      freio de cota) e SEMPRE no fechamento do servidor. Depois, no Studio:
+--        local s = game:GetService("DataStoreService"):GetDataStore("ArkanaTelemetry_v1")
+--        for _, r in ipairs(s:GetAsync("playtest") or {}) do print(r.text) end
+--      (ou `Playtest.saved()` com o jogo rodando).
+-- O que NÃO cobre: servidor que morre de vez (crash) perde o que veio depois
+-- da última gravação; durante a sessão, o F9 do Diretor continua sendo a
+-- leitura ao vivo.
 -- ============================================================================
 
 local Players = game:GetService("Players")
@@ -98,6 +115,26 @@ local TUTORIAL_CAP = 16
 --- observação a mais move a porcentagem em mais de 10 pontos — isso não é
 --- conclusão, é ruído. "n=3, não conclui" vale mais que um número que finge.
 local MIN_SAMPLE = 10
+
+-- --- PERSISTÊNCIA DO RELATÓRIO ---------------------------------------------
+--- POR QUE ISTO EXISTE: num servidor público as provas se ENCADEIAM. O
+--- relatório era impresso no `matchEnd` e o `matchStart` seguinte zerava os
+--- agregados — entre um e outro há a tela de fim + o lobby (~35 s). Relatório
+--- não copiado nessa janela era relatório perdido para sempre, e o Diretor não
+--- tem Command Bar de servidor num lugar publicado (ela só existe no Studio).
+--- Mesmo padrão de `Grimoire`/`Prefs`: `pcall` em tudo (no Studio o serviço nem
+--- existe), UMA chave, e cota respeitada com freio + `BindToClose`.
+local DATA_STORE = "ArkanaTelemetry_v1"
+--- ponytail: TETO CONHECIDO — chave ÚNICA para toda a experiência. Com poucos
+--- servidores de alpha o `UpdateAsync` resolve a concorrência sozinho; se um
+--- dia houver dezenas de servidores simultâneos ela vira ponto quente e o
+--- upgrade é chave por `JobId` + um índice, não um teto maior.
+local DATA_KEY = "playtest"
+--- quantos relatórios ficam guardados (do mais novo para o mais velho)
+local KEEP_REPORTS = 5
+--- segundos mínimos entre gravações AUTOMÁTICAS. Escrita por partida num
+--- servidor cheio queima cota; o fechamento do servidor grava de qualquer jeito.
+local SAVE_INTERVAL = 120
 
 --- Traço ao vivo: imprime cada evento já enriquecido. O Diretor liga com
 --- `Playtest.trace(true)` quando quer VER a instrumentação disparando.
@@ -142,6 +179,13 @@ type Agg = {
 	acceptLatN: number,
 	terrainByActor: { [string]: number },
 	terrainTotal: number,
+	--- DESFECHO TÁTICO por TIPO (R12). "N desfechos" tem número e não tem
+	--- diagnóstico: 12 abates por fogo e 12 pontes de gelo respondem coisas
+	--- opostas sobre a V3. `outcomeSelf` separa quem se queimou sozinho — arma
+	--- de dois gumes é evidência do GDD §14, não de jogada bem-sucedida, e
+	--- somar os dois infla a resposta.
+	outcomeKind: { [string]: number },
+	outcomeSelf: number,
 	ttk: { number },
 	ttkSeen: number,
 	--- MODO DE ENTRADA do disparo (docs/ROBLOX.md §4: "mira e disparo em UM
@@ -175,6 +219,8 @@ local function newAgg(): Agg
 		acceptLatN = 0,
 		terrainByActor = {},
 		terrainTotal = 0,
+		outcomeKind = {},
+		outcomeSelf = 0,
 		ttk = {},
 		ttkSeen = 0,
 		inputCasts = 0,
@@ -184,10 +230,33 @@ end
 
 local human: Agg = newAgg()
 local all: Agg = newAgg()
---- Coortes pré-montadas: humano entra nas DUAS, bot só na total. Sem closure e
---- sem alocação por evento.
-local HUMAN_COHORTS: { Agg } = { all, human }
-local BOT_COHORTS: { Agg } = { all }
+--- ACUMULADO DA SESSÃO DE SERVIDOR — os MESMOS agregados, só que `matchStart`
+--- NÃO os zera. Uma prova de 4 pessoas não conclui nada (o próprio quadro
+--- V1..V5 imprime `n=4, NAO CONCLUI`) e num servidor público as provas se
+--- encadeiam: somar as provas DESTE servidor é o que dá amostra às perguntas
+--- V1, V2 e V4. A V5 já atravessava partidas de propósito — este bloco não
+--- mexe nela.
+--- NÃO é log cru: são os mesmos campos O(1) do `Agg`, com o mesmo reservatório
+--- de teto no TTK. Partida de 3 h e servidor de 8 h ocupam o mesmo.
+local sessHuman: Agg = newAgg()
+local sessAll: Agg = newAgg()
+--- Coortes pré-montadas: humano entra nas de PARTIDA e nas de SESSÃO, bot só
+--- nas totais. Sem closure e sem alocação por evento.
+local HUMAN_COHORTS: { Agg } = { all, human, sessAll, sessHuman }
+local BOT_COHORTS: { Agg } = { all, sessAll }
+--- provas ENCERRADAS somadas no acumulado e quanta GENTE distinta entrou nele.
+--- Número que finge conclusão destrói a confiança em todos os outros: relatório
+--- que soma provas tem de dizer QUANTAS provas e SOBRE QUANTOS humanos.
+local sessMatches = 0
+local sessHumans: { [string]: boolean } = {}
+local sessHumanN = 0
+--- estado da gravação — o relatório diz na cara se o dado foi guardado ou não.
+--- Número sem procedência é pior que número faltando; "não foi gravado"
+--- também é procedência.
+local savesOk = 0
+local savesFail = 0
+local lastSaveReason = "-"
+local lastSaveAt = -math.huge
 
 local terrain: any = nil
 local combat: any = nil
@@ -654,6 +723,15 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		g.events[name] = (g.events[name] or 0) + 1
 	end
 
+	--- QUANTA GENTE distinta entrou no acumulado da sessão de servidor. É o
+	--- denominador que impede o acumulado de virar número que finge conclusão:
+	--- "3 provas somadas" com UMA pessoa em todas continua não concluindo nada.
+	--- `world` fica fora — evento do mundo não é humano.
+	if not isBot and ctx.user_id_hash ~= "world" and not sessHumans[ctx.user_id_hash] then
+		sessHumans[ctx.user_id_hash] = true
+		sessHumanN += 1
+	end
+
 	--- SESSÃO (V5): quantas PROVAS este jogador jogou. Não existe evento de
 	--- "entrou na partida", então participação é ter PRODUZIDO evento com a
 	--- partida rodando — é o que separa quem jogou de quem ficou de plateia.
@@ -827,6 +905,19 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		for _, g in ipairs(cohorts) do
 			g.terrainTotal += 1
 			g.terrainByActor[actor] = (g.terrainByActor[actor] or 0) + 1
+		end
+		--- MUDANÇA DO MUNDO ≠ CONSEQUÊNCIA DA MUDANÇA. Os dois eventos somam em
+		--- `terrainTotal` (é "quanto o terreno foi mexido"), mas o desfecho tem
+		--- balde PRÓPRIO: misturar denominador é como se perde a leitura de um
+		--- funil. `kill` · `crossing` · `cover_destroyed`, O(1) por evento.
+		if name == N.TerrainTacticalOutcome then
+			local kind = if typeof(p.outcome) == "string" then p.outcome else "?"
+			for _, g in ipairs(cohorts) do
+				g.outcomeKind[kind] = (g.outcomeKind[kind] or 0) + 1
+				if p.by_self == true then
+					g.outcomeSelf += 1
+				end
+			end
 		end
 		--- frente de incêndio FECHADA: o Terrain reporta o tamanho dela de uma
 		--- vez. É a medida direta de carbonização (GDD §16.1 / lição do 2D).
@@ -1065,14 +1156,29 @@ function Telemetry.init(terrainModule: any, combatModule: any, matchModule: any)
 			internalFailures += 1
 		end
 	end)
+
+	--- FECHAMENTO DO SERVIDOR — a ÚLTIMA chance de o playtest virar dado. O
+	--- Roblox dá até 30 s aqui e a chamada PODE ceder, então a gravação é
+	--- SÍNCRONA: `task.spawn` no fechamento simplesmente não chega a rodar
+	--- (mesma lição do `Prefs.flushAll`). Tudo em `pcall`: servidor fechando
+	--- não pode ser atrapalhado por telemetria.
+	pcall(function()
+		game:BindToClose(function()
+			pcall(Telemetry.save, "fechamento do servidor")
+		end)
+	end)
 end
 
 --- Abre a janela de coleta (zera TUDO: partida nova, dado novo).
 function Telemetry.matchStart(id: string?)
 	human = newAgg()
 	all = newAgg()
-	HUMAN_COHORTS = { all, human }
-	BOT_COHORTS = { all }
+	--- `sessAll`/`sessHuman` são os MESMOS objetos de propósito — recriá-los aqui
+	--- mataria o acumulado da sessão de servidor em silêncio e devolveria o
+	--- Diretor ao `n=4, NAO CONCLUI` de cada prova. O que é de PARTIDA continua
+	--- morrendo aqui, como sempre.
+	HUMAN_COHORTS = { all, human, sessAll, sessHuman }
+	BOT_COHORTS = { all, sessAll }
 	table.clear(firstHitAt)
 	table.clear(eliminatedKeys)
 	table.clear(burnedCells)
@@ -1109,7 +1215,20 @@ function Telemetry.matchEnd()
 	matchEndedAt = os.clock()
 	running = false
 	ended = true
+	sessMatches += 1
 	print(Telemetry.report())
+	--- GRAVAÇÃO AUTOMÁTICA COM FREIO. Este print é a única leitura que existia,
+	--- e ele rola para fora da tela na tela de fim + lobby que vêm a seguir.
+	--- O freio existe porque uma escrita por prova num servidor cheio queima
+	--- cota de DataStore; o `BindToClose` do `init` fecha a conta no fim.
+	--- `task.spawn` porque `UpdateAsync` CEDE o thread — telemetria não segura o
+	--- fim da partida, e gravação que falha não muda nada do que o jogo faz.
+	if os.clock() - lastSaveAt >= SAVE_INTERVAL then
+		lastSaveAt = os.clock() -- marca ANTES: duas provas curtas não viram duas escritas
+		task.spawn(function()
+			pcall(Telemetry.save, "fim de prova")
+		end)
+	end
 end
 
 -- -------------------------------------------------------------- relatório
@@ -1299,13 +1418,27 @@ function Telemetry.report(): string
 	table.insert(out, "V3 queimar a floresta / congelar o lago vira JOGADA?")
 	table.insert(out, "   " .. verdict(flammableAtStart, string.format("%s da cobertura inflamavel queimou (%d de %d celulas)", pct(burnedCount, flammableAtStart), burnedCount, flammableAtStart)))
 	table.insert(out, string.format("   interacoes de terreno com AUTOR identificado: %d de %d", terrainOwned, human.terrainTotal))
+	local ok = human.outcomeKind
 	table.insert(out, string.format("   descobertas do Grimorio: %d   ·   desfechos taticos: %d", human.events[N.Discovery] or 0, human.events[N.TerrainTacticalOutcome] or 0))
+	table.insert(
+		out,
+		string.format(
+			"      abates %d · travessias %d · coberturas destruidas %d   (contra si mesmo: %d)",
+			ok.kill or 0,
+			ok.crossing or 0,
+			ok.cover_destroyed or 0,
+			human.outcomeSelf
+		)
+	)
 	table.insert(out, "   -> ~0% queimado = terreno virou cenario (custo sem retorno). ~100% =")
 	table.insert(out, "      o mapa vira carvao: cortar `fuelBudget`. AUTOR em 0 = da' para")
 	table.insert(out, "      dizer que queimou, NAO que alguem queimou de proposito.")
-	table.insert(out, "   -> `terrain_tactical_outcome` e' o desfecho VERIFICAVEL (abate, fuga,")
-	table.insert(out, "      travessia) e NINGUEM o emite ainda: enquanto isso a descoberta do")
-	table.insert(out, "      Grimorio e' a proxy honesta — ela diz que o jogador ACHOU a quimica.")
+	table.insert(out, "   -> desfecho TATICO e' a V3 respondida com consequencia, nao com area")
+	table.insert(out, "      queimada: abate pelo fogo de alguem, travessia que nao existia")
+	table.insert(out, "      (gelo), cobertura que deixou de barrar tiro. ZERO aqui com terreno")
+	table.insert(out, "      mexido NAO e' falta de instrumentacao (R12): e' 'ninguem usou o")
+	table.insert(out, "      terreno de proposito' — que e' uma resposta, e das ruins.")
+	table.insert(out, "      `fuga` nao e' medida: exigiria saber que o alvo IA morrer.")
 	table.insert(out, "V4 os 5 elementos se equilibram, ou um domina?")
 	table.insert(out, "   " .. verdict(castsHuman, string.format("pior indice: %s %.2fx (regua <=1.25x, n=%d conjuracoes)", worstEl, worstIdx, castsHuman)))
 	table.insert(out, "   -> acima da regua = nerf DO ELEMENTO. O indice ja desconta uso, entao")
@@ -1593,6 +1726,54 @@ function Telemetry.report(): string
 		table.insert(out, string.format("   %-20s alcancou %3d   largou %3d (%s)", step, t.reached, t.dropped, pct(t.dropped, t.reached)))
 	end
 
+	-- ------------------------------------------ acumulado da SESSAO DE SERVIDOR
+	--- Tudo acima é UMA prova. Num servidor público as provas se encadeiam e o
+	--- `matchStart` zera os agregados da prova — mas NÃO estes. Sem esta soma o
+	--- Diretor lê `n=4, NAO CONCLUI` em toda prova e nunca junta amostra.
+	table.insert(out, "-- ACUMULADO DA SESSAO DE SERVIDOR (varias provas somadas) -----------")
+	table.insert(out, "   Tudo acima e' UMA prova. As linhas abaixo somam TODAS as provas deste")
+	table.insert(out, "   servidor: `matchStart` zera a prova e NUNCA este bloco. E' aqui que a")
+	table.insert(out, "   amostra aparece — 4 pessoas numa prova nao concluem nada.")
+	local ss = ttkSorted(sessHuman)
+	local sOpp = sessHuman.events[N.SintoniaOpportunity] or 0
+	local sCasts = 0
+	for _, el in ipairs(ELEMENTS) do
+		sCasts += sessHuman.castsByElement[el] or 0
+	end
+	local sWorstEl, sWorstIdx = "-", 0
+	for _, el in ipairs(ELEMENTS) do
+		local v = usageIndex(sessHuman, el)
+		if v and v > sWorstIdx then
+			sWorstEl, sWorstIdx = el, v
+		end
+	end
+	table.insert(out, string.format("TAMANHO DA AMOSTRA ............. %d prova(s) encerrada(s)%s  ·  %d humano(s) distinto(s)", sessMatches, if running then "  [+1 EM ANDAMENTO]" else "", sessHumanN))
+	table.insert(out, "   (os eventos da prova em andamento JA entram nos numeros abaixo; o que")
+	table.insert(out, "    ainda nao entrou na CONTAGEM de provas e' a prova que nao terminou.")
+	table.insert(out, "    `humanos distintos` = quem PRODUZIU evento, nao quem conectou.)")
+	table.insert(out, "V1 " .. verdict(sOpp, string.format("%s das oportunidades viraram fusao (n=%d engajamentos)", pct(sessHuman.oppFused, sOpp), sOpp)))
+	table.insert(out, "V2 " .. verdict(sessHuman.ttkSeen, string.format("TTK p50 %s   p10 %s   (n=%d quedas)", secs(percentile(ss, 0.50)), secs(percentile(ss, 0.10)), sessHuman.ttkSeen)))
+	table.insert(out, "V4 " .. verdict(sCasts, string.format("pior indice: %s %.2fx (regua <=1.25x, n=%d conjuracoes)", sWorstEl, sWorstIdx, sCasts)))
+	table.insert(out, "   V3 e V5 ficam FORA desta soma DE PROPOSITO: a cobertura queimada e' da")
+	table.insert(out, "   PROVA (mapa novo em cada uma) e o bloco de SESSAO acima ja atravessa")
+	table.insert(out, "   provas por construcao — somar de novo contaria a mesma sessao duas vezes.")
+
+	-- ------------------------------------------------- o relatorio SOBREVIVE?
+	table.insert(out, string.format("guardado no DataStore .......... %d gravacao(oes) OK · %d falha(s) · ultima: %s", savesOk, savesFail, lastSaveReason))
+	if savesOk == 0 then
+		table.insert(out, "   !! NADA GRAVADO AINDA. No Studio o DataStore so existe com `Enable")
+		table.insert(out, "      Studio Access to API Services` ligado nas configuracoes do jogo;")
+		table.insert(out, "      sem ele este relatorio vale so enquanto estiver na tela.")
+	end
+	table.insert(out, "   RECUPERAR DEPOIS (barra de comandos do STUDIO, sem precisar de Play):")
+	table.insert(out, string.format('     local s = game:GetService("DataStoreService"):GetDataStore("%s")', DATA_STORE))
+	table.insert(out, string.format('     for _, r in ipairs(s:GetAsync("%s") or {}) do print(r.reason) print(r.text) end', DATA_KEY))
+	table.insert(out, string.format("   Ficam os %d relatorios mais recentes de TODOS os servidores desta", KEEP_REPORTS))
+	table.insert(out, "   experiencia, do mais novo para o mais velho. Grava no fim de cada prova")
+	table.insert(out, string.format("   (no maximo uma vez a cada %ds, para nao queimar cota) e SEMPRE no", SAVE_INTERVAL))
+	table.insert(out, "   fechamento do servidor. O que ele NAO cobre: servidor que MORRE de vez")
+	table.insert(out, "   (crash) perde o que veio depois da ultima gravacao.")
+
 	-- ----------------------------------------------------------- pendências
 	table.insert(out, "-- PENDENCIAS DE INSTRUMENTACAO (o que ainda nao da para medir) ------")
 	local missing = 0
@@ -1622,7 +1803,14 @@ function Telemetry.report(): string
 	needs(sessOpened == 0, "`session_start`/`session_end` nao chegaram — a pergunta V5 fica SEM instrumentacao viva (fiar em Players.PlayerAdded/PlayerRemoving)")
 	needs(all.inputCasts == 0 and castsA > 0, "`input` nao vem no `spell_cast` — a regua do gesto unico (requisito 4) fica sem amostra")
 	needs(#tutorialOrder == 0, "`tutorial_step` nao chegou — abandono do onboarding fica fora do quadro da V5")
-	needs((all.events[N.TerrainTacticalOutcome] or 0) == 0, "`terrain_tactical_outcome` esta no schema e e' consumido aqui, mas NINGUEM o emite (seria Terrain/Combat): a V3 fica sem metrica de DESFECHO e sobra a descoberta do Grimorio como proxy")
+	--- NÃO acusa mais falta de emissor (ele existe desde a R12). Acusa o que
+	--- REALMENTE impede a leitura: terreno mexido por quem o servidor não
+	--- consegue nomear. Sintonia, Bots e Tutorial chamam `applyElement` sem
+	--- autor, e sem autor não há desfecho — zero ali é teto conhecido, não bug.
+	needs(
+		terrainOwned == 0 and human.terrainTotal > 0,
+		"terreno mexido sem AUTOR identificavel (Sintonia/Bots/Tutorial nao passam autor em `applyElement`): sem autor nao existe desfecho tatico, e a V3 fica so' com area queimada"
+	)
 	needs((all.events[N.Discovery] or 0) == 0, "`discovery` (Grimorio) nao chegou — sem ele a V3 perde ate a proxy")
 	if missing == 0 then
 		table.insert(out, "   (nenhuma — instrumentacao completa)")
@@ -1633,6 +1821,84 @@ function Telemetry.report(): string
 	table.insert(out, line)
 	table.insert(out, "")
 	return table.concat(out, "\n")
+end
+
+-- --------------------------------------------------------- persistência
+--- DataStore SEMPRE por `pcall`: no Studio sem API Services o serviço nem
+--- existe e a falha tem de ser SILENCIOSA (mesmo padrão de `Grimoire`/`Prefs`).
+--- Sem persistência o relatório continua saindo na tela — que é exatamente o
+--- comportamento de antes desta raia. Ninguém fica sem jogar por causa disto.
+local store: any = nil
+local function ensureStore(): any
+	if store == nil then
+		local ok, s = pcall(function()
+			return game:GetService("DataStoreService"):GetDataStore(DATA_STORE)
+		end)
+		store = (ok and s) or false
+	end
+	return store
+end
+
+--- Põe o relatório novo no TOPO e corta a cauda. PURA de propósito: é o único
+--- pedaço da persistência que o runner headless consegue provar (lá não existe
+--- DataStoreService). Sem a poda o valor da chave cresceria sem fim até
+--- estourar o limite do DataStore — e aí NENHUM relatório seria gravado.
+local function pushSaved(list: any, entry: any): { any }
+	local out: { any } = if typeof(list) == "table" then list else {}
+	table.insert(out, 1, entry)
+	while #out > KEEP_REPORTS do
+		table.remove(out)
+	end
+	return out
+end
+
+--- Grava o relatório INTEIRO (texto) na lista do DataStore. Texto, e não
+--- números: quem agrega máquina a máquina já tem `Telemetry.snapshot()` — o que
+--- se perde aqui é a LEITURA do Diretor, e a leitura é o texto.
+--- `reason` sai no registro para ele saber se aquilo foi fim de prova,
+--- fechamento de servidor ou pedido manual.
+function Telemetry.save(reason: string?): boolean
+	local s = ensureStore()
+	if not s then
+		return false -- sem DataStore não é falha: é ausência de persistência
+	end
+	local entry = {
+		at = os.time(),
+		job = tostring(game.JobId),
+		reason = if typeof(reason) == "string" then reason else "manual",
+		matches = sessMatches,
+		humans = sessHumanN,
+		text = Telemetry.report(),
+	}
+	--- `UpdateAsync` e não `SetAsync`: a chave é uma só para a experiência
+	--- inteira, e dois servidores fechando juntos com `SetAsync` apagariam o
+	--- relatório um do outro.
+	local ok = pcall(function()
+		s:UpdateAsync(DATA_KEY, function(old)
+			return pushSaved(old, entry)
+		end)
+	end)
+	if ok then
+		savesOk += 1
+		lastSaveReason = entry.reason
+		lastSaveAt = os.clock()
+	else
+		savesFail += 1
+	end
+	return ok
+end
+
+--- Os relatórios guardados, do mais novo para o mais velho. Lista vazia quando
+--- não há DataStore — nunca `nil`, para quem chamar não ter de checar duas vezes.
+function Telemetry.load(): { any }
+	local s = ensureStore()
+	if not s then
+		return {}
+	end
+	local ok, v = pcall(function()
+		return s:GetAsync(DATA_KEY)
+	end)
+	return if ok and typeof(v) == "table" then v else {}
 end
 
 --- NÚMEROS CRUS da partida, para quem AGREGA várias partidas (a varredura de
@@ -1696,8 +1962,15 @@ function Telemetry.selfTest()
 	local saveMatch, saveRunning = matchId, running
 	local saveFirst, saveCount, saveHits = firstDamageAt, firstHitCount, table.clone(firstHitAt)
 	local saveOpp = table.clone(oppOpen)
+	--- o ACUMULADO DA SESSÃO DE SERVIDOR entra nas coortes do teste: é o que
+	--- permite provar, lá no bloco 9, que ele atravessa a virada de prova.
+	local saveSH, saveSA = sessHuman, sessAll
+	local saveSM, saveSHN, saveSHum = sessMatches, sessHumanN, table.clone(sessHumans)
 	human, all = newAgg(), newAgg()
-	HUMAN_COHORTS, BOT_COHORTS = { all, human }, { all }
+	sessHuman, sessAll = newAgg(), newAgg()
+	sessMatches, sessHumanN = 0, 0
+	table.clear(sessHumans)
+	HUMAN_COHORTS, BOT_COHORTS = { all, human, sessAll, sessHuman }, { all, sessAll }
 	local function fake(name: string, isBot: boolean, element: string, payload: any)
 		local ctx = { event = name, is_bot = isBot, element = element, user_id_hash = if isBot then "bot:t" else "u_t", timestamp = 100, team_id = 0, zone_phase = 1, alive_count = 2, position_bucket = "0,0" }
 		record(name, isBot, ctx, payload)
@@ -1707,6 +1980,9 @@ function Telemetry.selfTest()
 	assert(human.dmgTotal == 30, "human_only nao pode enxergar dano de bot")
 	assert(all.dmgTotal == 100, "all_entities tem de somar os dois")
 	assert(human.dmgByElement.Water == nil, "elemento de bot vazou para human_only")
+	--- o acumulado da sessao herda a MESMA regra: somar varias provas nao pode
+	--- ser a porta pela qual bot entra na coluna de gente.
+	assert(sessHuman.dmgTotal == 30 and sessAll.dmgTotal == 100, "o acumulado da sessao tem de separar bot de gente igual a prova")
 	-- dano sem autor: o elemento do CONTEXTO e' o da vitima, nao pode virar dominancia
 	fake(N.Damage, false, "Earth", { amount = 5, environmental = true })
 	assert(human.dmgByElement.Earth == nil, "dano de ambiente nao pode ser creditado a elemento")
@@ -1762,6 +2038,20 @@ function Telemetry.selfTest()
 	fake(N.SintoniaOpportunity, false, "Fire", { with_user_id = 4242 })
 	fake(N.SintoniaPing, false, "Fire", {})
 	assert(human.oppPinged == 2, "engajamento novo do mesmo par converte de novo")
+
+	-- 4b-bis) DESFECHO TATICO POR TIPO (R12, V3). "N desfechos" tem numero e nao
+	-- tem diagnostico: 12 abates pelo fogo de alguem e 12 pontes de gelo
+	-- respondem coisas OPOSTAS sobre "o terreno vira jogada". E queimar a si
+	-- mesmo e' evidencia de arma de dois gumes (GDD 14), nao de jogada bem
+	-- sucedida — somar os dois infla a V3.
+	fake(N.TerrainTacticalOutcome, false, "Fire", { outcome = "kill" })
+	fake(N.TerrainTacticalOutcome, false, "Water", { outcome = "crossing" })
+	fake(N.TerrainTacticalOutcome, false, "Fire", { outcome = "cover_destroyed" })
+	fake(N.TerrainTacticalOutcome, false, "Fire", { outcome = "kill", by_self = true })
+	assert(human.outcomeKind.kill == 2, "abate por terreno tem de cair no balde `kill`")
+	assert(human.outcomeKind.crossing == 1 and human.outcomeKind.cover_destroyed == 1, "cada desfecho no SEU balde: sem isso a V3 tem numero e nao tem diagnostico")
+	assert(human.outcomeSelf == 1, "quem se queimou sozinho tem de sair separado — arma de dois gumes nao e' jogada bem sucedida")
+	assert(human.terrainTotal >= 4, "o desfecho tambem conta como interacao de terreno (o mundo foi mexido)")
 
 	-- 4c-bis) PING DE TREINO FORA DO FUNIL (R11). O Campo de Provas dispara o
 	-- ping REAL — é o que torna o passo honesto —, e antes da R11 TODO jogador
@@ -1976,12 +2266,26 @@ function Telemetry.selfTest()
 	openSession("u_vivo", 42)
 	matchId, running = "m_selftest_2", true
 	sfake("u_vivo", N.Damage, { amount = 1, target = "x" })
+	--- ACUMULADO DA SESSÃO DE SERVIDOR — mesmo teste, outro alvo: `human` MORRE
+	--- na virada (é de prova) e `sessHuman` TEM de atravessar. É ele que dá
+	--- amostra às V1/V2/V4 num servidor onde as provas se encadeiam.
+	local dmgSessBefore, ttkSessBefore = sessHuman.dmgTotal, sessHuman.ttkSeen
+	local humansBefore = sessHumanN
+	assert(dmgSessBefore > 0 and ttkSessBefore > 0 and humansBefore > 0, "o acumulado precisa ter coletado ANTES da virada, senao o teste abaixo passa por vacuidade")
 	Telemetry.matchStart("selftest_v5")
 	assert(sessOpened == 5 and sessClosed == 4 and #sessDur == 4, "matchStart NAO pode zerar dado de SESSAO")
 	assert(sessions.u_vivo ~= nil, "matchStart NAO pode apagar a sessao de quem esta CONECTADO")
 	assert(sessions.u_vivo.startedAt == 42 and sessions.u_vivo.matches == 1, "a sessao viva atravessa a virada de partida INTEIRA (relogio e provas)")
 	assert(sessPlayed[1] == 3 and sessPlayed[2] == 1 and #tutorialOrder == 2, "funil de provas e onboarding atravessam a partida")
 	assert(human.dmgTotal == 0, "o que e' de PARTIDA continua morrendo no matchStart")
+	assert(sessHuman.dmgTotal == dmgSessBefore and sessHuman.ttkSeen == ttkSessBefore, "matchStart NAO pode zerar o ACUMULADO DA SESSAO DE SERVIDOR")
+	assert(sessHumanN == humansBefore, "o tamanho da amostra (humanos distintos) tem de atravessar a virada de prova")
+	--- ...e ele tem de CONTINUAR somando depois da virada. Recriar as coortes
+	--- sem os agregados de sessao mataria a soma em silencio: o assert acima
+	--- ainda passaria e a prova NOVA simplesmente nao entraria em conta nenhuma.
+	sfake("u_vivo", N.Damage, { amount = 7, target = "x" })
+	assert(sessHuman.dmgTotal == dmgSessBefore + 7, "depois do matchStart o evento novo tem de cair no acumulado da SESSAO")
+	assert(human.dmgTotal == 7, "...e continuar caindo na prova tambem")
 	--- estado que `matchEnd` deixa (coletor fechado): `session_end` que chega
 	--- depois ainda TEM de contar — e' o dado mais valioso da V5, e a guarda
 	--- `ended` do `emit` engoliria se a sessao passasse por la.
@@ -2054,7 +2358,69 @@ function Telemetry.selfTest()
 	end
 	sawDeviceTier = saveSaw
 
+	-- 10) O RELATORIO SOBREVIVE? — o problema que a R12 veio resolver. Num
+	--     servidor publico as provas se encadeiam e o relatorio impresso rola
+	--     para fora da tela; sem gravacao, leitura nao copiada e' leitura
+	--     perdida. Aqui se prova o caminho INTEIRO da gravacao.
+	local saveStore = store
+	local saveOkN, saveFailN, saveReason, saveAt = savesOk, savesFail, lastSaveReason, lastSaveAt
+	--- (a) SEM DataStore — Studio sem API Services e o proprio runner headless.
+	---     Tem de falhar EM SILENCIO: telemetria nunca decide jogo.
+	store = false
+	assert(Telemetry.save("teste") == false, "sem DataStore a gravacao devolve false — e NAO estoura")
+	assert(#Telemetry.load() == 0, "sem DataStore a leitura devolve lista VAZIA, nunca nil")
+
+	--- (b) COM DataStore — loja de mentira, porque o runner headless nao tem
+	---     DataStoreService. Sem isto a persistencia iria para o playtest sem
+	---     NENHUMA prova de que grava, que e' o mesmo buraco de antes com outro
+	---     nome.
+	local disk: any = nil
+	local seenKey = "-"
+	store = {
+		UpdateAsync = function(_, key: string, fn: (any) -> any)
+			seenKey = key
+			disk = fn(disk)
+			return disk
+		end,
+		GetAsync = function(_, key: string)
+			return if key == DATA_KEY then disk else nil
+		end,
+	}
+	savesOk, savesFail = 0, 0
+	assert(Telemetry.save("teste") == true, "com DataStore de pe a gravacao tem de dar certo")
+	assert(seenKey == DATA_KEY, "a gravacao tem de usar a MESMA chave que o relatorio ensina a ler")
+	assert(savesOk == 1 and savesFail == 0, "gravacao boa tem de aparecer no contador que o relatorio imprime")
+	assert(typeof(disk[1].text) == "string" and #disk[1].text > 0, "o que se guarda e' o RELATORIO inteiro, nao um resumo")
+	assert(string.find(disk[1].text, "ACUMULADO DA SESSAO DE SERVIDOR", 1, true) ~= nil, "o relatorio guardado tem de trazer o acumulado — e' a unica parte com amostra")
+	assert(string.find(disk[1].text, "TAMANHO DA AMOSTRA", 1, true) ~= nil, "somar provas sem dizer QUANTAS e sobre QUANTOS e' numero que finge conclusao")
+	assert(disk[1].reason == "teste" and typeof(disk[1].at) == "number", "o registro tem de dizer QUANDO e POR QUE foi guardado")
+	--- TETO: sem poda o valor da chave cresce ate estourar o limite do
+	--- DataStore — e ai nenhuma gravacao passa, justo no dia do playtest.
+	for i = 1, KEEP_REPORTS + 2 do
+		Telemetry.save("teste " .. i)
+	end
+	assert(#disk == KEEP_REPORTS, "a lista guardada tem TETO: sem poda o valor do DataStore cresce sem fim")
+	assert(disk[1].reason == "teste " .. (KEEP_REPORTS + 2), "o mais NOVO fica no topo: o Diretor le o primeiro da lista")
+	assert(#Telemetry.load() == KEEP_REPORTS, "a leitura devolve o que foi guardado")
+	--- gravacao que EXPLODE nao pode escapar: o `matchEnd` chama isto e a
+	--- partida seguinte comeca de qualquer jeito.
+	store = {
+		UpdateAsync = function()
+			error("DataStore fora do ar")
+		end,
+	}
+	assert(Telemetry.save("teste") == false, "DataStore que estoura tem de virar false, nao erro solto no matchEnd")
+	assert(savesFail == 1, "falha de gravacao tem de ser CONTADA — o relatorio diz se o dado foi guardado")
+	store = saveStore
+	savesOk, savesFail, lastSaveReason, lastSaveAt = saveOkN, saveFailN, saveReason, saveAt
+
 	human, all, HUMAN_COHORTS, BOT_COHORTS = saveH, saveA, saveHC, saveBC
+	sessHuman, sessAll = saveSH, saveSA
+	sessMatches, sessHumanN = saveSM, saveSHN
+	table.clear(sessHumans)
+	for k, v in pairs(saveSHum) do
+		sessHumans[k] = v
+	end
 	matchId, running = saveMatch, saveRunning
 	firstDamageAt, firstHitCount = saveFirst, saveCount
 	table.clear(firstHitAt)
@@ -2065,7 +2431,7 @@ function Telemetry.selfTest()
 	for k, v in pairs(saveOpp) do
 		oppOpen[k] = v
 	end
-	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao, funil <=100% e separacao human/bot")
+	print("[Telemetry] autoteste OK — percentis, reservatorio, knock/eliminacao, funil <=100%, separacao human/bot, acumulado de sessao e gravacao do relatorio")
 	return true
 end
 

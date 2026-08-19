@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash: azul-noite do GDD §10 com o Selo centrado. Substitui os
+  drawable*/splash.png padrão do Capacitor (símbolo azul sobre branco), que
+  foram removidos — eram 11 PNGs por densidade/orientação; isto é um XML só,
+  que serve qualquer tela sem binário no repositório.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/arkana_night"/>
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center"
+        android:width="200dp"
+        android:height="200dp" />
+</layer-list>

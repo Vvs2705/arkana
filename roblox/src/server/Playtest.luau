@@ -27,7 +27,29 @@
 --   P.trace(true)    -- imprime cada evento de telemetria conforme acontece.
 --   P.reset()        -- DESCARTA o que foi coletado, abre janela nova e devolve
 --                       os valores de Balance.match que o `duo()` mexeu.
+--   P.save()         -- GRAVA o relatório agora no DataStore. Rode UMA vez antes
+--                       do playtest: se devolver false, o relatório do dia vai
+--                       existir só na saída do servidor (é o teste de fumaça).
+--   P.saved()        -- imprime os relatórios GUARDADOS, do mais novo para o
+--                       mais velho, de qualquer servidor desta experiência.
 --
+-- COMO O DIRETOR RECUPERA O RELATÓRIO NUM LUGAR PUBLICADO (R12). Este módulo
+-- inteiro é inalcançável num servidor público: a Command Bar de servidor só
+-- existe no Studio. O que sobrevive lá é o que a telemetria GRAVA sozinha —
+-- fim de cada prova (com freio de cota) e fechamento do servidor. Passo a passo:
+--   1. no servidor publicado, F9 (Developer Console) → aba SERVER: o relatório
+--      de cada prova continua saindo ali, ao vivo, para quem é dono do lugar;
+--   2. terminado o playtest, abra o lugar no STUDIO (não precisa de Play) com
+--      `Enable Studio Access to API Services` ligado em Game Settings →
+--      Security, e cole na barra de comandos:
+--        local s = game:GetService("DataStoreService"):GetDataStore("ArkanaTelemetry_v1")
+--        for _, r in ipairs(s:GetAsync("playtest") or {}) do print(r.reason) print(r.text) end
+--      (com o jogo rodando no Studio, `P.saved()` faz o mesmo em uma linha);
+--   3. o relatório guardado traz o ACUMULADO DA SESSÃO DE SERVIDOR — V1/V2/V4
+--      somadas sobre TODAS as provas daquele servidor, com o tamanho da amostra
+--      declarado (quantas provas, quantos humanos distintos).
+--
+
 -- HISTÓRICO (R10): este cabeçalho dizia que o Match não expunha `forceStart` /
 -- `forceEnd` e que por isso `duo()` precisava EMPURRAR o lobby mexendo em
 -- `Balance.match`. A R8 criou as duas funções e anotou no Match que "era a
@@ -143,6 +165,49 @@ function Playtest.report(): boolean
 	return true
 end
 
+--- GRAVA o relatório agora. Teste de fumaça da persistência: rode uma vez antes
+--- do playtest — `false` aqui significa que, no dia, o relatório vai existir só
+--- enquanto estiver na tela.
+function Playtest.save(): boolean
+	local tel = telemetry()
+	if not tel or not tel.save then
+		warn("[Playtest] telemetria indisponível")
+		return false
+	end
+	local ok, res = pcall(tel.save, "manual")
+	if not (ok and res == true) then
+		warn("[Playtest] NAO gravou — DataStore fora do ar, ou `Enable Studio Access to API Services` desligado em Game Settings → Security")
+		return false
+	end
+	print("[Playtest] relatório gravado — recupere com P.saved()")
+	return true
+end
+
+--- Imprime os relatórios GUARDADOS, do mais novo para o mais velho. É o que
+--- sobrevive ao fim da prova E ao fim do servidor.
+function Playtest.saved(): number
+	local tel = telemetry()
+	if not tel or not tel.load then
+		warn("[Playtest] telemetria indisponível")
+		return 0
+	end
+	local ok, list = pcall(tel.load)
+	if not ok or typeof(list) ~= "table" then
+		warn("[Playtest] leitura falhou: " .. tostring(list))
+		return 0
+	end
+	local n = #(list :: any)
+	if n == 0 then
+		print("[Playtest] nada guardado ainda (sem DataStore, ou nenhuma prova terminou neste lugar)")
+		return 0
+	end
+	for i, r in ipairs(list :: any) do
+		print(string.format("=== relatorio guardado %d de %d — %s · servidor %s ===", i, n, tostring(r.reason), tostring(r.job)))
+		print(tostring(r.text))
+	end
+	return n
+end
+
 --- Coorte de Sintonia ativa. Com argumento, ensina a trocar (ver NOTA DE
 --- HONESTIDADE no cabeçalho: é edição de arquivo, não interruptor de runtime).
 function Playtest.variant(want: string?): string
@@ -179,7 +244,12 @@ function Playtest.reset(): boolean
 	if tel and tel.matchStart then
 		pcall(tel.matchStart, "reset")
 	end
-	print("[Playtest] telemetria zerada (o que foi coletado FOI DESCARTADO)")
+	--- HONESTIDADE (R12): isto zera a PROVA, não a sessão de servidor. O
+	--- acumulado (V1/V2/V4 somadas) e o bloco de sessão (V5) sobrevivem de
+	--- propósito — são o que dá amostra. Para começar do zero de verdade,
+	--- reinicie o servidor.
+	print("[Playtest] prova zerada (o que foi coletado NELA foi descartado)")
+	print("[Playtest] o ACUMULADO DA SESSAO DE SERVIDOR e o bloco de sessao continuam de pé — reinicie o servidor para zerá-los")
 	return true
 end
 
