@@ -19,6 +19,10 @@
 -- em NÚMERO e em PIPS (4 quadrados) além da cor — daltônico lê igual.
 -- ZONA DE POLEGAR: informação no ALTO da tela. A metade de baixo e a direita
 -- pertencem aos botões da raia C (ScreenGui "ArkanaControls").
+-- DENSIDADE (R11, pedido do Diretor — "informações demais"): a preferência
+-- `hudDensity` do menu de acessibilidade escolhe entre ESSENCIAL (padrão de
+-- fábrica) e COMPLETO. Ver o bloco "DENSIDADE DA TELA" abaixo: o que sai é o
+-- que já está dito em outro lugar, nunca o que decide luta.
 -- O cliente NÃO decide nada: só apresenta Net.StatsUpdate / Net.Announce.
 -- ============================================================================
 
@@ -102,6 +106,9 @@ local L = {
 	partnerRight = 12,
 	partnerW = 200,
 	partnerH = 40,
+	--- faixa do parceiro SEM o nome (modo ESSENCIAL): uma linha só, selo de
+	--- elemento + vida lado a lado. Ver `partnerNameVisible`.
+	partnerHMin = 28,
 	--- seta do parceiro: some nas bordas quando ele sai de quadro
 	arrow = 30,
 	arrowMargin = 34,
@@ -233,6 +240,49 @@ local mateAlive = false
 local paintedElement: any = nil
 local fuseReady = false
 local gemPulse = 0
+
+-- ------------------------------------------- DENSIDADE DA TELA (R11, Diretor)
+--- "informações demais na tela" — o levantamento apontou DOIS painéis
+--- permanentes cujo conteúdo já é dito em outro lugar, e os dois moram na
+--- COLUNA DA MIRA (3ª pessoa, celular):
+---   · o SELO (72×72 fixo no alto-centro, girando o tempo todo) diz duas coisas:
+---     "combo disponível AGORA" — que a pílula `ComboReady` diz com PALAVRA +
+---     losango, ou seja, no canal mais acessível dos dois — e "meu elemento",
+---     que o slot de elemento da raia C mostra permanentemente (cor + forma) e
+---     é onde o dedo já está. Zero informação perdida ao apagá-lo.
+---   · o NOME do parceiro nunca muda no meio de um tiroteio; quem é ele já vem
+---     da seta e do nametag nativo. O que muda é a VIDA dele — essa fica.
+--- O padrão de fábrica é ESSENCIAL: a queixa é de excesso, então o excesso é
+--- que vira opt-in.
+local hudFull = false
+
+--- Leitura PROTEGIDA da preferência: `hudDensity` é da raia do Accessibility e
+--- pode não existir ainda. `A11y.get` devolve nil para chave desconhecida, e
+--- qualquer erro cai no mesmo lugar — ESSENCIAL.
+local function densityFull(): boolean
+	local ok, v = pcall(A11y.get, "hudDensity")
+	return ok and v == "full"
+end
+
+--- O QUE OCUPA ESPAÇO PERMANENTE em cada modo. Puro de propósito: é o que o
+--- autoteste consegue reprovar sem montar a tela inteira.
+function Hud.densityPlan(full: boolean)
+	return {
+		--- COMPLETO devolve o Selo de Arkana; ESSENCIAL fica sem ele
+		seal = full,
+		--- sem o Selo, a pílula sobe para o lugar dele: o único aviso que resta no
+		--- alto-centro fica o mais longe possível da mira
+		pillTop = if full then L.sealTop + L.sealSize + 4 else L.sealTop,
+		--- altura da faixa do parceiro com ele VIVO (caído ela volta ao normal)
+		partnerH = if full then L.partnerH else L.partnerHMin,
+	}
+end
+
+--- Nome do parceiro na tela: em COMPLETO sempre; em ESSENCIAL só quando ele
+--- CAI — a única hora em que esse texto muda e decide o que fazer.
+local function partnerNameVisible(full: boolean, alive: boolean): boolean
+	return full or not alive
+end
 
 --- Quem é meu parceiro: o time publicado na partida e, na falta dele, o pacto
 --- de Sintonia em curso. ponytail: a segunda leitura são 2 linhas e some no dia
@@ -639,7 +689,13 @@ local function refreshGems(dt: number)
 	--- pulso em 0 as gemas do par ficam acesas e FIXAS — quem não suporta
 	--- piscada continua vendo que o combo está disponível.
 	local beat = (1 - math.cos(gemPulse * math.pi * 2)) / 2 * A11y.flash()
+	--- A PÍLULA NUNCA SAI POR DENSIDADE: ela é o canal acessível do "combo
+	--- disponível" (palavra + losango) e decide luta. Quem some no ESSENCIAL é o
+	--- Selo, que dizia o mesmo só com cor.
 	readyPill.Visible = fuseReady and A11y.readyCue()
+	if not seal.Visible then
+		return -- ESSENCIAL: sem Selo na tela não há gema para animar
+	end
 	for i, gem in ipairs(gems) do
 		local id: any = Elements.Order[i]
 		local lit = fuseReady and (id == myElement or id == mateElement)
@@ -660,6 +716,40 @@ local function edgePoint(dx: number, dy: number, halfW: number, halfH: number): 
 	local sy = if math.abs(dy) > 1e-3 then halfH / math.abs(dy) else math.huge
 	local s = math.min(sx, sy) -- a borda mais próxima é quem trava
 	return dx * s, dy * s
+end
+
+--- Geometria da faixa do parceiro: duas linhas (selo + NOME em cima, vida
+--- embaixo) ou uma só (selo + vida lado a lado). Guardado porque `updatePartner`
+--- roda a 60 Hz e reescrever geometria por quadro é desperdício puro.
+local partnerTwoRows: boolean? = nil
+
+local function applyPartnerRow(twoRows: boolean)
+	if partnerTwoRows == twoRows then
+		return
+	end
+	partnerTwoRows = twoRows
+	partnerName.Visible = twoRows
+	partnerPanel.Size = UDim2.fromOffset(L.partnerW, if twoRows then L.partnerH else L.partnerHMin)
+	local bg = partnerFill.Parent :: Frame
+	if twoRows then
+		bg.Position = UDim2.new(0, 0, 0, 22)
+		bg.Size = UDim2.new(1, 0, 0, 6)
+	else
+		--- a vida corre AO LADO do selo de elemento, no espaço que o nome deixou —
+		--- e mais grossa, porque agora é o único número da faixa
+		bg.Position = UDim2.new(0, 22, 0, 4)
+		bg.Size = UDim2.new(1, -22, 0, 10)
+	end
+end
+
+--- Aplica a preferência de densidade nos widgets já montados. Chamada no `init`
+--- e a cada mudança no menu de acessibilidade (a preferência é de outra raia:
+--- se ela nunca mexer na chave, isto roda uma vez e pronto).
+local function applyDensity()
+	local plan = Hud.densityPlan(hudFull)
+	seal.Visible = plan.seal
+	readyPill.Position = UDim2.new(0.5, 0, 0, plan.pillTop)
+	applyPartnerRow(partnerNameVisible(hudFull, mateAlive))
 end
 
 --- Presença da dupla: quem é, onde está, qual elemento, se está vivo.
@@ -695,6 +785,9 @@ local function updatePartner()
 			hpFrac = clamp01(hum.Health / math.max(hum.MaxHealth, 1))
 		end
 	end
+	--- em ESSENCIAL a faixa é de uma linha só enquanto ele está de pé, e volta a
+	--- ter o texto no instante em que ele CAI
+	applyPartnerRow(partnerNameVisible(hudFull, mateAlive))
 	partnerName.Text = if mateAlive
 		then (if mateName ~= "" then mateName else mp.DisplayName)
 		else Strings.t("hud.partner.down")
@@ -789,6 +882,17 @@ function Hud.init(player: Player)
 	hpLabel.Text = Strings.t("hud.hp")
 	manaLabel.Text = Strings.t("hud.mana")
 	refreshShieldLevel()
+
+	--- densidade: aplica agora e volta a aplicar se o jogador mexer no menu de
+	--- acessibilidade. `pcall` porque `onChange` é da raia do Accessibility.
+	hudFull = densityFull()
+	applyDensity()
+	pcall(A11y.onChange, function(key: string)
+		if key == "hudDensity" and gui then
+			hudFull = densityFull()
+			applyDensity()
+		end
+	end)
 
 	-- ------------------------------------------------ o servidor manda, o HUD mostra
 	table.insert(
@@ -920,7 +1024,9 @@ function Hud.update(dt: number)
 	)
 	manaValue.Text = string.format("%d", math.max(0, math.floor(stats.mana)))
 
-	seal.Rotation = (seal.Rotation + dt * L.sealSpinDeg) % 360
+	if seal.Visible then
+		seal.Rotation = (seal.Rotation + dt * L.sealSpinDeg) % 360
+	end
 	updatePartner()
 	refreshGems(dt)
 
@@ -959,6 +1065,7 @@ function Hud.destroy()
 	mateUserId, mateName, mateElement, paintedElement, pactUserId = nil, "", nil, nil, nil
 	mateAliveSrv, mateHp, mateHpMax = nil, nil, nil
 	mateAlive, fuseReady = false, false
+	partnerTwoRows = nil -- a próxima montagem reaplica a densidade do zero
 	localPlayer = nil
 	if gui then
 		gui:Destroy()
@@ -1025,7 +1132,41 @@ function Hud.selfTest()
 	botMate:Destroy()
 	neutral:Destroy()
 
-	print("[Hud] autoteste OK — seta do parceiro + filtro de Reveal por time")
+	-- ------------------------------------------ DENSIDADE DA TELA (R11, Diretor)
+	--- A PONTE COM O MENU: a chave `hudDensity` é da raia do Accessibility. Ler
+	--- protegido garante que a falta dela não derruba o HUD; este assert garante
+	--- a outra metade do contrato — o padrão de fábrica é ESSENCIAL, porque a
+	--- queixa do Diretor foi excesso. Se a outra raia inverter o padrão (ou trocar
+	--- o valor "full"), a tela volta cheia calada; aqui não volta.
+	assert(not densityFull(), "padrão de fábrica de `hudDensity` tem de ser ESSENCIAL")
+
+	local min, full = Hud.densityPlan(false), Hud.densityPlan(true)
+	assert(not min.seal, "ESSENCIAL tem de apagar o Selo (é o que o Diretor chamou de excesso)")
+	assert(full.seal, "COMPLETO tem de devolver o Selo — senão o modo não existe")
+	assert(min.pillTop < full.pillTop, "sem o Selo, a pílula sobe para o lugar dele (longe da mira)")
+	assert(min.partnerH < full.partnerH, "ESSENCIAL tem de encolher a faixa do parceiro")
+
+	-- o nome do parceiro é o único texto que sai — e volta no instante em que ele cai
+	assert(partnerNameVisible(true, true), "COMPLETO mostra o nome do parceiro vivo")
+	assert(not partnerNameVisible(false, true), "ESSENCIAL não gasta linha com nome que não muda")
+	assert(partnerNameVisible(false, false), "parceiro CAÍDO tem de aparecer escrito nos dois modos")
+
+	-- ZONA DE POLEGAR: a metade de baixo é dos botões (raia C) e a barra do rodapé
+	-- é das legendas. Nada que esta tela ancora no TOPO pode passar do meio.
+	-- Régua: 640 px de altura = celular pequeno em paisagem, a mesma da raia C.
+	local VIEW_H = 640
+	local bands = {
+		{ name = "Stats", top = L.panelPos.Y.Offset, h = L.panelMax.Y },
+		{ name = "Seal", top = L.sealTop, h = L.sealSize },
+		{ name = "ComboReady", top = full.pillTop, h = 20 },
+		{ name = "Partner", top = L.partnerTop, h = L.partnerH },
+		{ name = "Announce", top = L.announceTop, h = 26 },
+	}
+	for _, b in ipairs(bands) do
+		assert(b.top + b.h < VIEW_H / 2, "invadiu a metade de baixo (botões/legendas): " .. b.name)
+	end
+
+	print("[Hud] autoteste OK — seta do parceiro, Reveal por time e densidade ESSENCIAL/COMPLETO")
 	return true
 end
 

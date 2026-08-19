@@ -45,6 +45,9 @@ local L = {
 	barRight = 12,
 	barW = 190,
 	barH = 62,
+	--- barra SEM a linha da fase (modo ESSENCIAL, ver `phaseLineVisible`): sobram
+	--- os times vivos e o relógio da zona, que são as duas linhas que mudam.
+	barHMin = 50,
 	warnTop = 0.30,
 	--- pulsos por segundo do aviso de fora da zona
 	warnHz = 2.2,
@@ -121,6 +124,29 @@ local outside = false
 local pulse = 0
 local overlayShown = 0
 local wasEnded = false
+
+-- ------------------------------------------- DENSIDADE DA TELA (R11, Diretor)
+--- "FASE 2/5" é a linha mais PARADA da tela: muda umas quatro vezes numa prova
+--- inteira e nunca decide um tiroteio — quem decide é o relógio logo acima, que
+--- já diz FECHANDO/ESTÁVEL. Em ESSENCIAL ela deixa de ocupar espaço permanente
+--- e vira aviso: aparece quando o número MUDA e some sozinha. Em COMPLETO fica
+--- fixa, como sempre foi. Fora de "Playing" ela também fica: no lobby e no fim
+--- é ela que carrega o rótulo do estado, e ali não há tiroteio para atrapalhar.
+local PHASE_HOLD = 4
+local phaseLeft = 0
+local hudFull = false
+
+--- Leitura PROTEGIDA: `hudDensity` é chave da raia do Accessibility e pode não
+--- existir ainda. Chave desconhecida (ou erro) cai no padrão ESSENCIAL.
+local function densityFull(): boolean
+	local ok, v = pcall(A11y.get, "hudDensity")
+	return ok and v == "full"
+end
+
+--- Pura de propósito: é o que o autoteste consegue reprovar sem montar a tela.
+local function phaseLineVisible(full: boolean, playing: boolean, hold: number): boolean
+	return full or not playing or hold > 0
+end
 
 -- ------------------------------------------------------------------ build
 local function buildBar(root: ScreenGui)
@@ -471,6 +497,15 @@ function MatchUi.init(player: Player)
 	warnText.Text = Strings.t("match.outside")
 	warnSub.Text = Strings.t("match.outside.sub")
 
+	--- densidade: o `update` já reavalia por quadro, aqui só o valor inicial e o
+	--- gancho de mudança (`pcall` porque a chave/o gancho são de outra raia).
+	hudFull = densityFull()
+	pcall(A11y.onChange, function(key: string)
+		if key == "hudDensity" then
+			hudFull = densityFull()
+		end
+	end)
+
 	table.insert(
 		conns,
 		Net.event(Net.Names.MatchState).OnClientEvent:Connect(function(p: any)
@@ -478,7 +513,12 @@ function MatchUi.init(player: Player)
 				return
 			end
 			st.state = tostring(p.state or st.state)
+			local lastPhase = st.phase
 			st.phase = tonumber(p.phase) or st.phase
+			--- em ESSENCIAL a linha da fase só existe quando o número MUDA
+			if st.phase ~= lastPhase then
+				phaseLeft = PHASE_HOLD
+			end
 			st.phases = tonumber(p.phases) or st.phases
 			local wasShrinking = st.shrinking
 			st.shrinking = p.shrinking == true
@@ -550,6 +590,15 @@ function MatchUi.update(dt: number)
 		zoneLabel.TextColor3 = if st.shrinking then ZONE_VIOLET else TEXT
 		phaseLabel.Text = Strings.t("match.phase", st.phase, st.phases)
 	end
+
+	--- LINHA DA FASE sob demanda (ESSENCIAL): a barra encolhe quando ela não está
+	--- lá, senão sobraria um buraco de 12 px no alto à direita.
+	if phaseLeft > 0 then
+		phaseLeft -= dt
+	end
+	local showPhase = phaseLineVisible(hudFull, st.state == "Playing", phaseLeft)
+	phaseLabel.Visible = showPhase
+	bar.Size = UDim2.fromOffset(L.barW, if showPhase then L.barH else L.barHMin)
 
 	-- ----------------------------------------------- fora da zona (só aviso)
 	local wasOutside = outside
@@ -625,6 +674,44 @@ function MatchUi.destroy()
 		gui:Destroy()
 		gui = nil
 	end
+	phaseLeft = 0
+end
+
+-- ============================================================================
+-- AUTOTESTE — roda no runner headless e na Command Bar do Studio (cliente):
+--   require(game.Players.LocalPlayer.PlayerScripts.Client.MatchUi).selfTest()
+-- Cobre o que não dá para ver a olho: a regra de densidade da linha da fase e a
+-- promessa de zona de polegar (nada desta tela cai na metade de baixo, que é dos
+-- botões da raia C, nem na faixa de legendas do rodapé).
+-- ============================================================================
+function MatchUi.selfTest()
+	-- A PONTE COM O MENU: `hudDensity` é chave de outra raia. A leitura é
+	-- protegida (falta da chave não derruba a tela) e o padrão é ESSENCIAL.
+	assert(not densityFull(), "padrão de fábrica de `hudDensity` tem de ser ESSENCIAL")
+
+	-- DENSIDADE: em ESSENCIAL a fase é aviso; em COMPLETO é linha fixa.
+	assert(phaseLineVisible(true, true, 0), "COMPLETO tem de manter a linha da fase")
+	assert(not phaseLineVisible(false, true, 0), "ESSENCIAL não pode manter a fase parada na tela")
+	assert(phaseLineVisible(false, true, 0.1), "a fase tem de APARECER quando o número muda")
+	assert(phaseLineVisible(false, false, 0), "fora da partida a linha fica: é ela que diz o estado")
+	assert(PHASE_HOLD > 0, "aviso com prazo zero nunca chega a ser lido")
+	assert(L.barHMin < L.barH, "sem a linha da fase a barra tem de encolher, não deixar buraco")
+
+	-- ZONA DE POLEGAR (régua: 640 px de altura = celular pequeno em paisagem,
+	-- a mesma da raia C). Metade de baixo = botões; rodapé = legendas.
+	local VIEW_H = 640
+	local half = VIEW_H / 2
+	assert(L.barTop + L.barH < half, "MatchBar invadiu a metade de baixo")
+	--- a placa de espectador é ancorada em ESCALA (0.06) + 66 px de altura
+	assert(0.06 * VIEW_H + 66 < half, "placa de espectador invadiu a metade de baixo")
+	assert(L.warnTop * VIEW_H + 54 < half, "aviso de fora da zona invadiu a metade de baixo")
+
+	-- relógio: o texto que o jogador mais olha na prova inteira
+	assert(clock(0) == "0:00" and clock(65) == "1:05", "relógio da zona escreveu errado")
+	assert(clock(-3) == "0:00", "tempo negativo não pode virar relógio de trás para frente")
+
+	print("[MatchUi] autoteste OK — densidade da fase + zona de polegar + relógio")
+	return true
 end
 
 return MatchUi

@@ -2,6 +2,72 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v0.5.0-roblox — 2026-08-19 — R11: tela mais limpa, tutorial opcional e o Android de volta
+
+Três ordens do Diretor, e a frente mobile retomada.
+
+**"Informação demais na tela".** A raia mediu antes de cortar: **65 004 px² permanentes
+= 8,9% de um celular em paisagem** — e, pior que a área, **72 px de mobília girando na
+coluna da mira** (o Selo de Arkana, em 3ª pessoa, bem onde o jogador aponta). O Selo
+some no modo ESSENCIAL porque suas duas informações eram **100% duplicadas**: "combo
+disponível" já é dito pela pílula com **palavra + losango** (canal mais acessível que
+gema colorida) e "meu elemento" pelo slot do carrossel, permanente em cor+forma, onde o
+dedo já está. Nome do parceiro e `FASE x/y` viraram sob demanda — texto que nunca muda
+durante um tiroteio não paga o espaço que ocupa; o nome volta **no instante em que ele
+cai**, que é a única hora em que decide algo. **Permanente depois: 55 140 px², 15% menos**,
+coluna da mira zerada. Preferência `hudDensity` (ESSENCIAL padrão × COMPLETO), persistida
+e trocável ao vivo — a queixa foi de excesso, então o excesso é que virou opt-in.
+
+**"Tutorial não é obrigatório."** Ele era pior que obrigatório-com-botão-de-pular: o
+`Main` o empurrava em todo corpo novo, **e o lobby segurava por até 240 s** enquanto
+alguém treinava — quem nem escolheu o tutorial esperava por quem escolheu. Agora é
+CONVITE (`Tutorial.offer`): duas saídas do mesmo peso, a sessão só abre com aceite, e
+recusar não é porta de mão única (o botão TREINAR volta no lobby, no mesmo slot do PULAR,
+sem mobília nova). **O teto de 240 s deixou de existir** — o conserto não era mexer no
+número, era não ter espera — e um assert trava a volta dele. Quem entra no minuto 4 de
+uma prova não perde o convite: ele fica pendente e sai no lobby seguinte.
+
+**O cenário S1 trocou de pergunta, não foi apagado.** Ele cobrava que o lobby SEGURASSE
+— exatamente a regra derrubada. Mas o defeito que ele existe para pegar continua
+possível: o perigo nunca foi "a partida começa", foi a **sessão do onboarding ficar
+órfã**, com o jogador preso num Campo de Provas que o `startMatch` já desmontou. O S1
+agora cobra: ninguém entra sem aceitar · o aceite chega pelo payload REAL do cliente ·
+o lobby não espera · e quem treinava sai limpo. Provado com dois defeitos reintroduzidos.
+
+### Android — a frente mobile saiu do papel, com prova
+**O APK compila.** Debug 4,4 MB, release 3,4 MB e **AAB 3,3 MB** (o formato que a Play
+exige de app novo), build frio em 59 s, `typecheck` limpo. O `docs/BUILD_ANDROID.md`
+estava errado em cinco pontos: dizia que "falta o SDK para compilar" (compila), mandava
+instalar **JDK 17** quando o projeto **exige 21**, pedia `platforms;android-34` com
+`compileSdk` 36, e instruía a referenciar um bloco `signingConfigs` **que não existia**.
+Agora existe, lê `keystore.properties` (fora do versionamento, com `.gitignore` cobrindo
+`*.jks`/`*.keystore`/`keystore.properties`) e o release compila sem chave em vez de travar.
+
+Armadilha documentada: `bundleRelease` termina com `BUILD SUCCESSFUL` e o `.aab` sai
+**não assinado** — a Play recusa. A fiação de assinatura foi provada apontando para a
+keystore de *debug* do próprio SDK (`apksigner verify` → `Verifies`), e depois apagada.
+**Nenhuma chave existe no repositório.** `versionName` era `"1.0"` (default do Capacitor,
+anunciando protótipo como versão final) → `0.1.0`.
+
+**`docs/ANDROID.md`** (novo): qual produto vai para a loja, o que falta para publicar
+(existe/falta/não verificado) e as diretrizes que ESTE jogo precisa cumprir — ECA Digital,
+zero caixa aleatória, classificação etária.
+
+### Decisões que ficaram para o Diretor (não tomadas aqui)
+- **O gesto único não pode atravessar para o Android.** O GDD §19.3 ainda especifica
+  DOIS gestos ("mirar arrastando + botões"); o gesto único nasceu da reprovação do teste
+  de APK e vive no Roblox e no PRISMA. Pela regra travada do §9 ("nada técnico migra do
+  Roblox — o GDD é a única ponte"), ele precisa ser **promovido ao §19.3** para valer.
+- **Não está decidido qual build Android vem primeiro**: §9 aponta first-person; a escada
+  do §8 põe o mini-BR top-down (Degrau 3) antes; o PRISMA está "pendente de 1 palavra".
+- **Antecipar o Android contraria o §9**, que trava o início para depois da validação do
+  Roblox — e nenhuma das 5 perguntas foi respondida com jogador real.
+- **Público-alvo etário nunca foi declarado** em documento nenhum — sem isso não há
+  questionário IARC nem política de dados de menores.
+
+Gates: 40 arquivos Luau sem erro · `rojo build` limpo (852 KB) · harness **48/48** ·
+APK/AAB compilados e verificados. **Nenhum número de `Balance` foi tocado.**
+
 ## v0.4.0-roblox — 2026-08-18 — R10: a medição que faltava para o playtest valer
 
 O produto existe para responder **cinco perguntas** (`docs/ROBLOX.md` §1). Esta fase

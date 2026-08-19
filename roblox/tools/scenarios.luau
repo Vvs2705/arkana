@@ -147,51 +147,57 @@ local function fmt(n: number): string
 end
 
 -- ============================================================ S1 — TUTORIAL
---- O Campo de Provas é a primeira coisa que alguém de fora vê, e `startMatch`
---- reconstrói terreno e recarrega personagens. Começar a partida por cima do
---- tutorial destrói a sessão de quem está aprendendo — e era o que acontecia
---- aos 25 s. O lobby tem de SEGURAR enquanto `Tutorial.active`, e SOLTAR
---- assim que a sessão fecha (senão a cura vira a doença: servidor parado).
+--- REGRA REESCRITA NA R11 — o Diretor determinou que o tutorial é OPCIONAL.
+--- O S1 antigo cobrava o oposto: que o lobby SEGURASSE enquanto alguém treinava
+--- (a correção da R8 para "a partida começava por cima do onboarding aos 25 s").
+--- Aquela regra tornava o tutorial obrigatório PARA QUEM NEM O PEDIU: um
+--- desconhecido aprendendo segurava todo mundo por até 240 s. O conserto não foi
+--- mexer no teto — foi tirar a espera e transformar o Campo de Provas em CONVITE.
+---
+--- O cenário continua existindo porque o defeito original continua possível: o
+--- perigo nunca foi "a partida começa", foi "a sessão do onboarding fica ÓRFÃ"
+--- (`Tutorial.active` verdadeiro para sempre, que este projeto já viu). Então o
+--- S1 troca de pergunta: a partida AGORA TEM de começar, e quem estava treinando
+--- tem de sair limpo.
 local function s1()
 	local c = boot("s1")
 	local p = c.addPlayer("Novato", 5001)
-	c.step(0.1, 5) -- o corpo assenta antes de montar o Campo de Provas
-	assert(c.Tutorial.start(p), "pré-condição: o Campo de Provas monta no lobby")
-	assert(c.Tutorial.active(p), "pré-condição: a sessão do onboarding está aberta")
+	c.step(0.1, 5) -- o corpo assenta antes de qualquer convite
 
-	-- 70 s = quase TRÊS lobbies (25 s cada) com um jogador só: com bots ligados
-	-- `ready` é verdadeiro desde o primeiro quadro, então sem a guarda a partida
-	-- já teria começado por cima do tutorial.
+	-- 1) NINGUÉM É EMPURRADO. `offer` pergunta e só; sem aceite não há sessão.
+	assert(c.Tutorial.offer(p), "pré-condição: o convite sai para quem acabou de entrar")
+	assert(
+		not c.Tutorial.active(p),
+		"o Campo de Provas ABRIU SOZINHO: convite que começa sem resposta é o tutorial obrigatório de volta"
+	)
+
+	-- 2) o jogador ACEITA — pelo payload REAL do cliente, não por chamada direta:
+	-- foi um contrato de payload divergente entre estas duas pontas que uma vez
+	-- impediu QUALQUER partida de começar, em qualquer servidor.
+	c.Net.event(c.Net.Names.Tutorial).OnServerEvent:Fire(p, { step = "accept" })
+	assert(c.Tutorial.active(p), "aceitar o convite TEM de abrir a sessão (contrato C→S do TutorialUi)")
+
+	-- 3) O LOBBY NÃO ESPERA. Com bots ligados `ready` é verdadeiro desde o
+	-- primeiro quadro, então a partida tem de sair no tempo normal do lobby —
+	-- mesmo com a sessão do onboarding aberta. É o inverso exato do S1 antigo.
 	local started = c.until_(0.1, 70, function()
 		return c.Match.isPlaying()
 	end)
 	assert(
-		started == nil,
-		string.format("a partida começou em %s POR CIMA do tutorial (sessão ainda aberta)", fmt(started or 0))
+		started ~= nil,
+		"o lobby ficou preso 70 s por causa de quem estava treinando — tutorial opcional não pode parar o servidor"
 	)
-	assert(c.Tutorial.active(p), "pré-condição: a sessão continuava aberta durante a espera")
 
-	-- e o outro lado da moeda: fechada a sessão, o lobby volta a andar
-	c.Tutorial.skip(p)
-	assert(not c.Tutorial.active(p), "pré-condição: `skip` fecha a sessão")
-	local after = c.until_(0.1, 60, function()
-		return c.Match.isPlaying()
-	end)
-	assert(after ~= nil, "a sessão fechou e a partida NÃO começou em 60 s — o lobby ficou preso")
-
-	return string.format("segurou 70s com o tutorial aberto · partida saiu %s depois do skip", fmt(after))
+	-- 4) E O TREINANDO NÃO FICA ÓRFÃO. Este é o defeito que o S1 sempre existiu
+	-- para pegar: sessão aberta para sempre trava o jogador num Campo de Provas
+	-- que não existe mais (o `startMatch` reconstrói o terreno por baixo dele).
+	c.step(0.1, 20)
+	assert(
+		not c.Tutorial.active(p),
+		"a prova começou e a sessão do onboarding continuou ABERTA: o jogador ficou preso num Campo de Provas que o startMatch já desmontou"
+	)
 end
 
--- ============================================================== S2 — ARREPIO
---- O arrepio (GDD §18.6) revela UM inimigo perto da própria dupla. Sem freio, o
---- morto vira radar do mapa inteiro: pinga sem parar, de qualquer canto. Dois
---- freios têm de existir e são observáveis de fora — UMA marca por espírito, e
---- a posição pedida tem de estar ao alcance do PRÓPRIO espírito.
---- NÃO COBERTO AQUI: o terceiro freio (`TUNE.pingCooldown`, a janela mínima
---- contra pedido a 1 kHz de um canto vazio). Ele só age no caso SEM alvo, que
---- por definição não produz efeito nenhum de fora — aceito e recusado são
---- indistinguíveis pela API pública. Quem cobre é `Match.selfTest`, que afirma
---- a existência da janela. Testar isso aqui seria decoração.
 local function s2()
 	local c = boot("s2")
 	c.addPlayer("Mago1", 5101) -- o parceiro: sem dupla montada não há espírito
@@ -468,7 +474,7 @@ end
 
 -- ================================================================== runner
 local SCENARIOS = {
-	{ "S1 tutorial segura o lobby", s1 },
+	{ "S1 tutorial opcional nao trava o lobby", s1 },
 	{ "S2 arrepio tem freio", s2 },
 	{ "S3 bot preso não trava", s3 },
 	{ "S4 servidor vazio encerra", s4 },

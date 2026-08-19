@@ -51,6 +51,17 @@ local PT: { [string]: string } = {
 	["tutorial.enter"] = "ENTRAR NO ROYALE",
 	--- respeita quem já sabe jogar: sair é um toque, sem confirmação
 	["tutorial.skip"] = "PULAR",
+	--- CONVITE (R11): o Campo de Provas deixou de ser empurrado na cara de quem
+	--- entra. Duas saídas do mesmo tamanho — quem quer aprender aceita, quem quer
+	--- jogar recusa e ninguém fica esperando por ele. O texto NÃO pode sugerir
+	--- que treinar é o caminho certo: onboarding que envergonha quem pula é
+	--- onboarding obrigatório com outro nome.
+	["tutorial.offer"] = "QUER TREINAR ANTES?",
+	["tutorial.offer.sub"] = "3 minutos no Campo de Provas",
+	["tutorial.offer.yes"] = "TREINAR",
+	["tutorial.offer.no"] = "JOGAR AGORA",
+	--- fica no HUD depois da recusa: recusar não pode ser porta de mão única
+	["tutorial.reopen"] = "TREINAR",
 	--- só aparece quando o elemento na mão não resolve o passo
 	["tutorial.switch"] = "Troque para %s",
 	--- indicador de antecipação: aparece ao ERRAR, some ao acertar
@@ -146,6 +157,12 @@ local PT: { [string]: string } = {
 	["a11y.audio.master"] = "VOLUME GERAL",
 	["a11y.audio.world"] = "SONS DO JOGO",
 	["a11y.audio.mute"] = "MUDO",
+	--- DENSIDADE DE HUD (R11): o Diretor cobrou informação demais na tela. É
+	--- preferência, não decisão nossa — competitivo quer tudo, quem está
+	--- aprendendo quer o essencial.
+	["a11y.hud"] = "INFORMAÇÃO NA TELA",
+	["a11y.hud.min"] = "ESSENCIAL",
+	["a11y.hud.full"] = "COMPLETO",
 
 	-- ------------------------------------------------------------ GRIMÓRIO
 	-- (GDD §18.3) Progressão por EXPERIMENTAÇÃO, não por poder: cada página é
@@ -216,6 +233,11 @@ local EN: { [string]: string } = {
 	["tutorial.done"] = "You already know what you need.",
 	["tutorial.enter"] = "ENTER THE ROYALE",
 	["tutorial.skip"] = "SKIP",
+	["tutorial.offer"] = "WANT TO PRACTICE FIRST?",
+	["tutorial.offer.sub"] = "3 minutes in the Proving Grounds",
+	["tutorial.offer.yes"] = "PRACTICE",
+	["tutorial.offer.no"] = "PLAY NOW",
+	["tutorial.reopen"] = "PRACTICE",
 	["tutorial.switch"] = "Switch to %s",
 	["tutorial.lead"] = "LEAD THE TARGET",
 
@@ -284,6 +306,9 @@ local EN: { [string]: string } = {
 	["a11y.audio.master"] = "MASTER VOLUME",
 	["a11y.audio.world"] = "GAME SOUNDS",
 	["a11y.audio.mute"] = "MUTED",
+	["a11y.hud"] = "ON-SCREEN INFO",
+	["a11y.hud.min"] = "ESSENTIAL",
+	["a11y.hud.full"] = "FULL",
 
 	-- GRIMOIRE (GDD §18.3) — see the PT block for the writing rule.
 	["grimoire.title"] = "BOOK OF DISCOVERIES",

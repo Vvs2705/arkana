@@ -71,6 +71,7 @@ local SPEC: { [string]: string } = {
 	readyCue = "boolean",
 	volMaster = "number",
 	volWorld = "number",
+	hudDensity = "string",
 }
 
 type Slot = {
@@ -334,7 +335,7 @@ function Prefs.selfTest()
 		assert((defaults :: any)[key] ~= nil, "servidor guarda `" .. key .. "` que o cliente não conhece mais")
 		n += 1
 	end
-	assert(n == 11, "as preferências de conforto são 11; SPEC tem " .. n)
+	assert(n == 12, "as preferências de conforto são 12; SPEC tem " .. n)
 
 	-- 3) PENEIRA (regra pura). Cada linha aqui é uma porta que o cliente não abre.
 	assert(next(Prefs.sanitize(nil)) == nil, "payload que não é tabela virou preferência")
@@ -379,7 +380,7 @@ function Prefs.selfTest()
 	Prefs.flushAll() -- fechamento do servidor com gente dentro e dado sujo
 	assert(Prefs.get(probe) == nil, "flushAll não liberou os slots")
 
-	print("[Prefs] autoteste OK — 11 preferências · listas cliente↔servidor iguais · sem DataStore nada quebra")
+	print("[Prefs] autoteste OK — 12 preferências · listas cliente↔servidor iguais · sem DataStore nada quebra")
 	return true
 end
 

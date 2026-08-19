@@ -325,6 +325,13 @@ local function buildPanel(root: ScreenGui)
 		TextYAlignment = Enum.TextYAlignment.Bottom,
 	}, list))
 
+	--- DENSIDADE DE HUD (R11): a queixa do Diretor foi "informação demais". Vira
+	--- escolha do jogador e não decisão nossa — quem joga competitivo quer tudo,
+	--- quem está aprendendo quer o essencial. Mesma linha de chips das outras.
+	choiceRow(list, 10, "hudDensity", Strings.t("a11y.hud"), {
+		{ label = Strings.t("a11y.hud.min"), value = "min" },
+		{ label = Strings.t("a11y.hud.full"), value = "full" },
+	})
 	choiceRow(list, 11, "volMaster", Strings.t("a11y.audio.master"), volumeRow("volMaster"))
 	choiceRow(list, 12, "volWorld", Strings.t("a11y.audio.world"), volumeRow("volWorld"))
 end

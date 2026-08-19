@@ -35,32 +35,22 @@ Combat.init(Terrain)
 Sintonia.init(Terrain, Combat)
 Match.init(Terrain, Combat)
 
--- ONBOARDING (Campo de Provas de 3 min). Opcional e protegido: se o módulo
--- faltar, o jogador simplesmente entra direto na partida.
+-- ONBOARDING (Campo de Provas de 3 min) — OPCIONAL DE VERDADE (R11). Opcional e
+-- protegido em dois sentidos: se o módulo faltar, o jogador entra direto na
+-- partida; e mesmo com o módulo presente ninguém é EMPURRADO para dentro do
+-- Campo de Provas — o servidor faz um convite e a sessão só abre se o jogador
+-- aceitar (ver `Tutorial.offer`).
+--
+-- O REMOTE DO TUTORIAL NÃO É MAIS ROTEADO AQUI. Este handler existia em
+-- paralelo com o do próprio módulo, e foram esses DOIS contratos em desacordo
+-- (aqui `payload.skip`, no cliente `{ step = "skip" }`) que travaram o servidor
+-- inteiro em 18/08: ninguém saía do onboarding e o lobby não começava partida
+-- nenhuma. Agora o protocolo tem UM dono — `Tutorial.wire`, ao lado da tabela
+-- de intenções que o autoteste dos dois lados interroga.
 local okTutorial, Tutorial = pcall(require, ServerModules:WaitForChild("Tutorial") :: ModuleScript)
 if not okTutorial then
 	warn("[ARKANA] tutorial indisponível: " .. tostring(Tutorial))
 	Tutorial = nil
-end
-if Tutorial then
-	-- o cliente avisa quando quer PULAR — é a única intenção do tutorial, e
-	-- pular é sempre permitido (respeitar quem já sabe jogar é parte da spec)
-	-- CONTRATO DE SAÍDA DO TUTORIAL. Este handler nasceu esperando
-	-- `payload.skip`, mas o cliente manda `{ step = "skip" }` nos DOIS botões
-	-- (PULAR e ENTRAR NO ROYALE). Resultado: `Tutorial.skip` nunca era chamado,
-	-- a sessão não terminava, `Tutorial.active` ficava true para sempre e o
-	-- lobby — que eu mesmo mandei esperar o tutorial — segurava a partida.
-	-- NENHUMA PARTIDA COMEÇAVA, em nenhum servidor. Achado na revisão cruzada.
-	-- Agora aceita as duas formas; `skip` é idempotente, escuta dupla é inócua.
-	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
-		if typeof(payload) ~= "table" then
-			return
-		end
-		local p = payload :: any
-		if p.skip == true or p.step == "skip" or p.step == "enter" or p.step == "done" then
-			pcall(Tutorial.skip, player)
-		end
-	end)
 end
 
 -- GRIMÓRIO DE DESCOBERTAS (GDD §18.3) — progressão por experimentação.
@@ -220,11 +210,13 @@ local function onCharacter(player: Player, character: Model)
 	humanoid.Health = Balance.player.hp
 	avatarSetup(player, character, humanoid)
 	Combat.onCharacterAdded(player, character, humanoid)
-	-- Campo de Provas no PRIMEIRO corpo do jogador: é a primeira coisa que
-	-- alguém de fora vê. O módulo devolve false para quem já passou na sessão.
+	-- CONVITE (não início automático) no primeiro corpo do jogador. `offer` só
+	-- PERGUNTA — e pergunta UMA vez por jogador por sessão de servidor, então
+	-- este caminho, que roda em TODO corpo novo (todo respawn, toda largada de
+	-- partida, que recarrega o personagem de todo mundo), não vira spam.
 	if Tutorial then
 		task.defer(function()
-			pcall(Tutorial.start, player)
+			pcall(Tutorial.offer, player)
 		end)
 	end
 end

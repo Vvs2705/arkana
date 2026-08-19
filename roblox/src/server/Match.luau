@@ -64,11 +64,6 @@ local TUNE = {
 	zoneTransparency = 0.86,
 	--- raio (em fração do raio da zona) onde os competidores nascem
 	spawnRingFrac = 0.62,
-	--- teto de quanto tempo o lobby SEGURA a partida por causa do onboarding
-	--- (ver `Match.step`). Maior que o teto absoluto do próprio tutorial: no
-	--- caminho normal a sessão fecha sozinha e este número nunca é alcançado —
-	--- ele só existe para o caso de gente entrando sem parar.
-	tutorialHoldMax = 240,
 	--- ponytail: TETO CONHECIDO — 20 Humanoids de servidor em aparelho fraco
 	--- (GDD §19.2) nunca foi medido. O preenchimento vai até `maxPlayers` mas
 	--- para neste teto. Sobe para `M.maxPlayers - 1` quando o playtest medir.
@@ -225,8 +220,6 @@ local forcedBots: number? = nil
 
 local stateAcc = 0
 local zoneAcc = 0
---- há quanto tempo o lobby está segurando a partida por causa do onboarding
-local tutorialHold = 0
 local rng = Random.new()
 
 local evState: RemoteEvent
@@ -1512,42 +1505,6 @@ function Match.onPlayerRemoving(player: Player)
 	end
 end
 
---- Alguém está no onboarding? Require preguiçoso e protegido (padrão do
---- projeto): se o módulo faltar, a resposta é "não" e a partida segue normal.
-local tutorialMod: any = nil
-local tutorialChecked = false
-local function tutorialActive(): boolean
-	if not tutorialChecked then
-		tutorialChecked = true
-		local mod = ServerModules:FindFirstChild("Tutorial")
-		local ok, m = pcall(require, mod :: ModuleScript)
-		tutorialMod = ok and m or nil
-	end
-	if not tutorialMod or not tutorialMod.active then
-		return false
-	end
-	for _, player in ipairs(Players:GetPlayers()) do
-		local ok, yes = pcall(tutorialMod.active, player)
-		if ok and yes then
-			return true
-		end
-	end
-	return false
-end
-
---- Tira TODO MUNDO do Campo de Provas pela porta normal (o mesmo `skip` do
---- botão): a sessão fecha, os alvos e o pilar somem e a telemetria registra o
---- abandono. Só é chamado quando o lobby já esperou o teto — sem isto, o único
---- jeito de destravar um servidor segurado pelo onboarding é reiniciá-lo.
-local function tutorialSkipAll()
-	if not tutorialMod or not tutorialMod.skip then
-		return
-	end
-	for _, player in ipairs(Players:GetPlayers()) do
-		pcall(tutorialMod.skip, player)
-	end
-end
-
 --- A partida está em andamento? O Tutorial pergunta antes de montar o Campo de
 --- Provas — quem entra no meio da prova nasce eliminado e não concluiria passo
 --- nenhum. Leitura pura: ninguém muda estado por aqui.
@@ -1563,42 +1520,22 @@ function Match.step(dt: number)
 		-- com bots ligados, UM mago já forma partida (GDD §19.6: o novato joga
 		-- na hora); sem bots, respeita minPlayersToStart.
 		local ready = n >= M.minPlayersToStart or (M.fillWithBots and n >= 1)
-		-- ONBOARDING TEM PRIORIDADE (costura do coordenador, 18/08): o Campo de
-		-- Provas de 3 min é a primeira coisa que um jogador de fora vê, e
-		-- `startMatch` reconstrói o terreno e recarrega personagens — começar a
-		-- partida por cima do tutorial destruiria a sessão de quem está
-		-- aprendendo. Enquanto alguém estiver no tutorial, o lobby ESPERA.
-		--
-		-- MAS COM TETO. Duas correções aqui: (1) a espera não pode REINICIAR os
-		-- 25 s do lobby a cada quadro — era o que o `else` fazia, apagando o
-		-- `math.max(lobbyLeft, 3)` da linha anterior; (2) num playtest com gente
-		-- chegando o tempo todo, cada novo jogador abre um tutorial novo e a
-		-- espera nunca terminaria. Passado o teto, quem ainda estiver no Campo de
-		-- Provas é convidado a sair pela porta normal (`skip`, que fecha a sessão
-		-- e registra abandono na telemetria) e a partida começa.
-		local holding = ready and tutorialActive()
-		if holding then
-			tutorialHold += dt
-			if tutorialHold >= TUNE.tutorialHoldMax then
-				tutorialSkipAll() -- destrava: o lobby não espera para sempre
-				holding = false
-			else
-				-- a contagem PARA onde está, com piso de 3 s (o `else` de baixo a
-				-- reiniciava para 25 s a cada quadro, apagando esta linha)
-				lobbyLeft = math.max(math.min(lobbyLeft, M.lobbyWait), 3)
+		-- O LOBBY NÃO ESPERA MAIS PELO ONBOARDING (R11 — "tutorial não é
+		-- obrigatório precisa ser opcional"). Até aqui, um jogador no Campo de
+		-- Provas SEGURAVA a partida de todo mundo por até 240 s: quem não pediu
+		-- tutorial nenhum ficava preso no lobby por causa da escolha de um
+		-- desconhecido — ou seja, o onboarding era obrigatório para os OUTROS.
+		-- Agora o lobby só olha para quem quer jogar. Quem está treinando é
+		-- fechado pelo dono das sessões (`Tutorial.step`, que consulta
+		-- `Match.isPlaying`), guarda o passo alcançado e recebe o botão TREINAR
+		-- de volta no lobby seguinte — nenhuma partida espera por ninguém.
+		if ready then
+			lobbyLeft -= dt
+			if lobbyLeft <= 0 then
+				startMatch()
 			end
 		else
-			tutorialHold = 0
-		end
-		if not holding then
-			if ready then
-				lobbyLeft -= dt
-				if lobbyLeft <= 0 then
-					startMatch()
-				end
-			else
-				lobbyLeft = M.lobbyWait
-			end
+			lobbyLeft = M.lobbyWait
 		end
 	elseif state == "Playing" then
 		-- DUAS SAÍDAS QUE O BR NÃO RESOLVE SOZINHO (ver `mustEndNow`). Medidas no
@@ -1730,10 +1667,16 @@ function Match.selfTest()
 	assert(pickChampion({ solo }) == solo, "sobrevivente solitário continua sendo campeão")
 	assert(pickChampion({}) == nil, "sem sobrevivente não há campeão (o servidor não inventa um)")
 
-	-- TETO DA ESPERA PELO ONBOARDING: o lobby segura enquanto alguém está no
-	-- Campo de Provas, mas segurar PARA SEMPRE trava o servidor inteiro (era o
-	-- comportamento antigo — sem teto, com jogador AFK ou entrando sem parar).
-	assert(TUNE.tutorialHoldMax < math.huge, "a espera pelo tutorial precisa de teto, senão o lobby nunca começa")
+	-- O LOBBY NÃO ESPERA PELO ONBOARDING (R11). O tutorial virou OPCIONAL, e uma
+	-- espera pelo Campo de Provas de um desconhecido é o tutorial voltando a ser
+	-- obrigatório — para quem nem escolheu fazê-lo. A regra antiga tinha um teto
+	-- de 240 s; o conserto não é aumentar nem diminuir o teto, é não ter espera.
+	-- Este assert é a trava contra a volta do botão: reintroduzir o `holding`
+	-- exige o número, e o número não existe mais.
+	assert(
+		(TUNE :: any).tutorialHoldMax == nil,
+		"o lobby voltou a esperar pelo onboarding — quem não pediu tutorial não pode ser segurado por quem pediu"
+	)
 
 	-- ========================= ROBUSTEZ DE SERVIDOR PÚBLICO =========================
 	-- Os dois caminhos que deixavam a máquina de estados presa em `Playing`. Os

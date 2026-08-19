@@ -117,6 +117,12 @@ local DEFAULTS: { [string]: any } = {
 	blur = true, -- blur/DOF ligado
 	captions = true,
 	readyCue = true,
+	--- DENSIDADE DE HUD (R11) — o Diretor cobrou informação demais na tela.
+	--- "min" = só o que decide uma troca de tiros · "full" = tudo. Padrão é
+	--- MIN: a queixa foi de excesso, então o excesso é que vira opt-in.
+	--- É string e não booleano de propósito: se um dia houver um degrau do meio,
+	--- ele entra sem trocar o tipo da chave (e sem quebrar o que já foi salvo).
+	hudDensity = "min",
 	--- VOLUME (0..1) é preferência de primeira classe, na MESMA loja das outras:
 	--- mesmo atributo `Arkana_`, mesmos `listeners`, mesmo `set`. Quem TOCA é o
 	--- `Audio`; ele RECEBE daqui e não guarda cópia persistida — uma loja só.

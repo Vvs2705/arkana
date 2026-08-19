@@ -27,12 +27,28 @@
 -- Require preguiçoso e protegido (padrão do projeto): telemetria caiu, o jogo
 -- continua.
 --
+-- CONVITE, NÃO IMPOSIÇÃO (R11, pedido do Diretor: "tutorial não é obrigatório
+-- precisa ser opcional"). Ninguém mais cai dentro do Campo de Provas por ter
+-- entrado no servidor. Quem chega recebe UMA pergunta com duas saídas do mesmo
+-- peso — `tutorial.offer.yes` (TREINAR) e `tutorial.offer.no` (JOGAR AGORA) —
+-- e a sessão só abre em `Tutorial.start`, que só é chamado pela aceitação.
+-- Recusar não fecha a porta: fica o botão `tutorial.reopen` no lobby.
+--
+-- PROTOCOLO (contraparte: client/TutorialUi.luau — os DOIS lados têm autoteste;
+-- foi um contrato de payload em desacordo entre estes dois arquivos que travou
+-- o jogo inteiro em 18/08):
+--   C→S  { step = "accept" }   entrar no Campo de Provas (convite ou reopen)
+--        { step = "decline" }  jogar agora (fica com o botão no lobby)
+--        { step = "skip" }     sair (PULAR e ENTRAR NO ROYALE são o mesmo)
+--   S→C  { step = "offer" }    o convite de duas saídas
+--        { step = "reopen" }   só o botão TREINAR (quem já recusou, no lobby)
+--        { step = "end" }      tira tudo da tela
+--        { step = <passo> }    o roteiro (ver ORDER)
+--
 -- FIAÇÃO (o COORDENADOR faz nos Main):
---   Tutorial.start(player)  -- ao entrar (ignora quem já concluiu na sessão)
+--   Tutorial.offer(player)  -- ao entrar (pergunta; NÃO começa nada)
 --   Tutorial.step(dt)       -- no Heartbeat
---   Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player)
---       Tutorial.skip(player)   -- PULAR e ENTRAR NO ROYALE usam o MESMO caminho
---   end)
+-- O remote é roteado aqui dentro (`wire`), num lugar só.
 -- `skip` no último passo conta como CONCLUÍDO; em qualquer outro, como
 -- abandono voluntário. O jogador pode sair a qualquer momento — prender quem
 -- já sabe jogar é o oposto de onboarding.
@@ -153,8 +169,22 @@ type Session = {
 local Tutorial = {}
 
 local sessions: { [Player]: Session } = {}
---- quem já concluiu (ou pulou) NESTA sessão de servidor: o tutorial não repete
+--- quem já PASSOU pelo Campo de Provas nesta sessão de servidor (concluiu ou
+--- saiu por vontade própria): não recebe convite, não vê o botão, não repete
 local seen: { [Player]: boolean } = {}
+--- ANTI-SPAM DO CONVITE. `seen` só cobre quem ENTROU no Campo de Provas —
+--- quem recusou nunca abriu sessão e seria perguntado de novo a cada respawn
+--- (e `startMatch` recarrega o personagem de todo mundo, toda partida). Esta
+--- marca é a que diz "a pergunta já foi feita": nil = nunca perguntado ·
+--- "pending" = entrou no meio da prova, pergunta no lobby · "asked" = já
+--- perguntado, nunca mais.
+local offered: { [Player]: string } = {}
+--- passo em que a LARGADA interrompeu o treino. Quem foi cortado retoma daqui
+--- no lobby seguinte, em vez de recomeçar do zero (ver `closeMarks`).
+local resume: { [Player]: number } = {}
+--- último estado de partida visto pelo `step`: a varredura de tela roda na
+--- TRANSIÇÃO Lobby↔Playing, não a cada quadro
+local wasPlaying = false
 local folder: Folder? = nil
 local evTutorial: RemoteEvent? = nil
 local evSintonia: RemoteEvent? = nil
@@ -199,8 +229,40 @@ local function bin(): Folder
 	return f
 end
 
+local function sendTo(player: Player, payload: { [string]: any })
+	events():FireClient(player, payload)
+end
+
 local function send(s: Session, payload: { [string]: any })
-	events():FireClient(s.player, payload)
+	sendTo(s.player, payload)
+end
+
+-- --------------------------------------------------- quem pode ser convidado
+--- As DUAS perguntas do convite, puras (só leem as marcas). Puras de propósito:
+--- é o que o autoteste consegue interrogar sem Studio e sem jogador de verdade.
+--- `offerable` = nunca foi perguntado. `reopenable` = já foi perguntado, disse
+--- que não (ou foi cortado pela largada) e ainda não passou pelo Campo.
+local function offerable(player: Player?): boolean
+	return player ~= nil and offered[player] == nil and not seen[player] and sessions[player] == nil
+end
+
+local function reopenable(player: Player?): boolean
+	return player ~= nil and offered[player] == "asked" and not seen[player] and sessions[player] == nil
+end
+
+--- Marcas de fim de sessão. CORTADO PELA LARGADA NÃO É "JÁ TREINOU": o jogador
+--- não escolheu sair, então ele não pode perder o direito ao Campo de Provas —
+--- volta o botão no lobby seguinte e o roteiro RETOMA do passo onde parou (sem
+--- isso, num servidor com lobby de 25 s o treino recomeçaria do passo 1 para
+--- sempre e a oferta de "3 minutos" seria mentira).
+local function closeMarks(player: Player, index: number, reason: string)
+	if reason == "match" then
+		resume[player] = index
+		offered[player] = "asked" -- devolve o botão TREINAR no lobby seguinte
+	else
+		seen[player] = true
+		resume[player] = nil
+	end
 end
 
 local function rootOf(player: Player): BasePart?
@@ -556,7 +618,7 @@ local function finish(s: Session, completed: boolean, reason: string)
 	setBeacon(s, nil)
 	send(s, { step = "end" })
 	sessions[s.player] = nil
-	seen[s.player] = true
+	closeMarks(s.player, s.index, reason)
 end
 
 -- -------------------------------------------------------- passo 2: o lead
@@ -711,42 +773,31 @@ local function onCast(player: Player)
 	s.missAt = now + TUNE.missGrace
 end
 
---- O cliente pediu para SAIR do Campo de Provas? Aceita as DUAS formas em
---- circulação: a documentada no cabeçalho e roteada pelo Main (`{ skip = true }`)
---- e a que o TutorialUi realmente manda nos dois botões (`{ step = "skip" }`).
---- Payload é HOSTIL até prova em contrário — daí o teste de tipo.
-local function wantsOut(payload: any): boolean
+--- O QUE O CLIENTE QUER (C→S). Tabela única em vez de uma cadeia de `if`: é a
+--- lista fechada do que o servidor aceita, e é ela que o autoteste interroga
+--- dos dois lados (o `TutorialUi.selfTest` afirma os MESMOS literais).
+--- "enter"/"done" e `skip = true` são as formas antigas que o Main roteava —
+--- ficam valendo porque cliente velho continua no ar durante um deploy.
+--- NOTE que "offer"/"reopen" (S→C) NÃO estão aqui: um cliente que devolvesse o
+--- próprio convite não pode abrir sessão nenhuma.
+local INTENT: { [string]: string } = {
+	accept = "in",
+	decline = "no",
+	skip = "out",
+	enter = "out",
+	done = "out",
+}
+
+--- Payload é HOSTIL até prova em contrário — daí os testes de tipo.
+local function intentOf(payload: any): string?
 	if typeof(payload) ~= "table" then
-		return false
+		return nil
 	end
 	local p = payload :: any
-	return p.skip == true or p.step == "skip"
-end
-
-local function wire()
-	if wired then
-		return
+	if p.skip == true then
+		return "out"
 	end
-	wired = true
-	-- OBSERVAÇÃO PURA: estes dois remotes já são roteados pelo Main (Combat e
-	-- Sintonia decidem). Ouvir de novo aqui não muda nada do jogo — só conta
-	-- para o roteiro. Nenhum dado do cliente vira estado sem validação.
-	Net.event(Net.Names.CastSpell).OnServerEvent:Connect(onCast)
-	Net.event(Net.Names.ProposeSintonia).OnServerEvent:Connect(onPing)
-
-	--- SAÍDA DO CAMPO DE PROVAS — COSTURA QUEBRADA ENTRE AS RAIAS (18/08).
-	--- O Main roteia este remote esperando `payload.skip`; o TutorialUi manda
-	--- `{ step = "skip" }` nos DOIS botões (PULAR e ENTRAR NO ROYALE). Com os
-	--- contratos em desacordo, `Tutorial.skip` nunca era chamado: ninguém saía do
-	--- onboarding, `Tutorial.active` ficava true e o lobby do Match travava para
-	--- o servidor inteiro. Aceitar as duas formas AQUI conserta a saída sem tocar
-	--- em Main nem no cliente (arquivos de outros donos). A escuta dupla com o
-	--- Main é inofensiva: `skip` não faz nada sem sessão aberta.
-	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
-		if wantsOut(payload) then
-			Tutorial.skip(player)
-		end
-	end)
+	return if typeof(p.step) == "string" then INTENT[p.step] else nil
 end
 
 --- Partida em andamento? Require preguiçoso e protegido (o mesmo padrão que o
@@ -767,6 +818,52 @@ local function matchRunning(): boolean
 	end
 	local ok, yes = pcall(matchMod.isPlaying)
 	return ok and yes == true
+end
+
+--- RECUSAR NÃO É PORTA DE MÃO ÚNICA. Quem disse "JOGAR AGORA" fica com o botão
+--- `tutorial.reopen`, e ele mora no MESMO slot do PULAR (topo-centro), que só
+--- existe dentro do Campo de Provas — nenhum pixel novo na tela de quem joga.
+local function decline(player: Player)
+	if seen[player] or sessions[player] then
+		return
+	end
+	offered[player] = "asked"
+	--- durante a prova a tela é do jogo: a recusa é registrada, mas o botão só
+	--- aparece no lobby (quem manda é o `refresh`). Cobre a recusa atrasada de
+	--- um cliente lento — ou hostil — depois da largada.
+	if not matchRunning() then
+		sendTo(player, { step = "reopen" })
+	end
+end
+
+local function wire()
+	if wired then
+		return
+	end
+	wired = true
+	-- OBSERVAÇÃO PURA: estes dois remotes já são roteados pelo Main (Combat e
+	-- Sintonia decidem). Ouvir de novo aqui não muda nada do jogo — só conta
+	-- para o roteiro. Nenhum dado do cliente vira estado sem validação.
+	Net.event(Net.Names.CastSpell).OnServerEvent:Connect(onCast)
+	Net.event(Net.Names.ProposeSintonia).OnServerEvent:Connect(onPing)
+
+	--- ROTEAMENTO DO CAMPO DE PROVAS — UM DONO SÓ (R11). Antes o Main tinha um
+	--- handler paralelo para este mesmo remote, e foi justamente o desacordo
+	--- entre os dois contratos (Main esperava `payload.skip`, o TutorialUi manda
+	--- `{ step = "skip" }`) que travou o servidor inteiro em 18/08: ninguém saía
+	--- do onboarding e o lobby do Match não começava partida nenhuma. Agora o
+	--- protocolo inteiro (entrar, recusar, sair) mora AQUI, ao lado da tabela
+	--- que o autoteste interroga.
+	Net.event(Net.Names.Tutorial).OnServerEvent:Connect(function(player, payload)
+		local intent = intentOf(payload)
+		if intent == "out" then
+			Tutorial.skip(player)
+		elseif intent == "in" then
+			Tutorial.start(player)
+		elseif intent == "no" then
+			decline(player)
+		end
+	end)
 end
 
 -- --------------------------------------------------------- checagem por passo
@@ -835,6 +932,27 @@ local function moveDummies(s: Session, dt: number)
 end
 
 -- ----------------------------------------------------------------------- API
+--- O CONVITE. Substitui o antigo `Tutorial.start` como porta de entrada do
+--- Main: pergunta, e só. A sessão só abre se o jogador ACEITAR (intent "in").
+--- Devolve `false` para quem já foi perguntado, já treinou, ou está no meio de
+--- uma prova — nesse último caso a pergunta fica PENDENTE e sai no lobby
+--- seguinte (servidor público: desconhecido entra a qualquer hora, inclusive no
+--- minuto 4 de uma partida, e não pode ficar sem nunca ver a oferta).
+function Tutorial.offer(player: Player): boolean
+	if not offerable(player) then
+		return false
+	end
+	wire()
+	events()
+	if matchRunning() then
+		offered[player] = "pending"
+		return false
+	end
+	offered[player] = "asked"
+	sendTo(player, { step = "offer" })
+	return true
+end
+
 --- Começa o Campo de Provas. Devolve `false` para quem já passou por ele nesta
 --- sessão (ou para quem ainda não tem corpo) — o tutorial NÃO repete.
 function Tutorial.start(player: Player): boolean
@@ -860,9 +978,11 @@ function Tutorial.start(player: Player): boolean
 		return false -- terreno sem lago/cobertura: não há Campo de Provas a montar
 	end
 
+	--- RETOMADA: quem foi cortado pela largada volta do passo onde parou (ver
+	--- `closeMarks`). Quem nunca entrou começa do 1.
 	local s: Session = {
 		player = player,
-		index = 1,
+		index = math.clamp(resume[player] or 1, 1, #ORDER),
 		t = 0,
 		startedAt = os.clock(),
 		center = center :: Vector3,
@@ -881,6 +1001,8 @@ function Tutorial.start(player: Player): boolean
 		needSwitch = false,
 	}
 	sessions[player] = s
+	resume[player] = nil
+	offered[player] = "asked" -- aceitou: a pergunta está respondida para sempre
 	-- cai DIRETO no Campo de Provas (spec: 0–20s, sem menu, sem loja, sem nada)
 	local char = player.Character
 	if char then
@@ -906,22 +1028,51 @@ function Tutorial.active(player: Player): boolean
 	return sessions[player] ~= nil
 end
 
-function Tutorial.step(dt: number)
-	if next(sessions) == nil then
-		return
+--- Reconciliação de TELA na virada Lobby↔Playing — uma varredura por transição,
+--- não uma por quadro. Durante a prova a coluna central é do jogo (nada de
+--- convite por cima de partida); no lobby seguinte o convite pendente sai e o
+--- botão TREINAR de quem recusou volta sozinho.
+local function refresh(playing: boolean)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if sessions[player] then
+			continue
+		end
+		if playing then
+			sendTo(player, { step = "end" })
+		elseif offered[player] == "pending" and not seen[player] then
+			offered[player] = "asked"
+			sendTo(player, { step = "offer" })
+		elseif reopenable(player) then
+			sendTo(player, { step = "reopen" })
+		end
 	end
+end
+
+function Tutorial.step(dt: number)
 	-- A PARTIDA COMEÇOU POR CIMA DO ONBOARDING (alpha público). `Tutorial.start`
 	-- já se recusa a abrir sessão durante a prova, mas isso não cobre o caminho
-	-- inverso: o lobby SEGURA pelo tutorial só até o teto dele, e `forceStart`
-	-- (Playtest/harness) não segura nada. Uma sessão que sobrevive à largada fica
-	-- com alvos ANCORADOS e VÁLIDOS (`Combat.registerTarget`) dentro da arena
-	-- viva, um pilar de luz no meio do mapa e passos que apontam para células de
-	-- um terreno que o `startMatch` já reconstruiu. Fechar aqui é fechar no único
-	-- lugar que é dono das sessões — vale para toda porta de entrada de partida.
-	if matchRunning() then
+	-- inverso — e desde a R11 o lobby NÃO ESPERA MAIS por quem treina, então
+	-- este é o caminho NORMAL, não a exceção. Uma sessão que sobrevive à largada
+	-- fica com alvos ANCORADOS e VÁLIDOS (`Combat.registerTarget`) dentro da
+	-- arena viva, um pilar de luz no meio do mapa e passos que apontam para
+	-- células de um terreno que o `startMatch` já reconstruiu. Fechar aqui é
+	-- fechar no único lugar que é dono das sessões — vale para toda porta de
+	-- entrada de partida (`startMatch` e `forceStart`).
+	-- O jogador cortado NÃO fica no prejuízo: o `announce.match.start` que o
+	-- Match acabou de mandar explica o que houve (o Match roda ANTES deste
+	-- módulo no Heartbeat), o passo alcançado fica guardado e o botão TREINAR
+	-- volta no lobby seguinte — ver `closeMarks`.
+	local playing = matchRunning()
+	if playing and next(sessions) ~= nil then
 		for _, s in pairs(sessions) do
 			finish(s, s.index >= #ORDER, "match")
 		end
+	end
+	if playing ~= wasPlaying then
+		wasPlaying = playing
+		refresh(playing)
+	end
+	if playing or next(sessions) == nil then
 		return
 	end
 	local now = os.clock()
@@ -983,7 +1134,11 @@ function Tutorial.onPlayerRemoving(player: Player)
 		setBeacon(s, nil)
 		sessions[player] = nil
 	end
+	-- as três marcas são chaveadas por Player: deixar qualquer uma para trás
+	-- segura o Instance do jogador que já saiu (o servidor roda por horas)
 	seen[player] = nil
+	offered[player] = nil
+	resume[player] = nil
 end
 
 --- Sanidade sem Studio (mesmo padrão de Terrain/Combat/Match.selfTest).
@@ -1016,10 +1171,44 @@ function Tutorial.selfTest(): boolean
 	-- `{ skip = true }` — ninguém saía do onboarding, `Tutorial.active` ficava
 	-- true e o lobby do Match nunca começava partida. O primeiro assert
 	-- reprovaria antes da correção.
-	assert(wantsOut({ step = "skip" }), "o payload REAL do TutorialUi tem de tirar o jogador do Campo de Provas")
-	assert(wantsOut({ skip = true }), "o payload documentado no Main continua valendo")
-	assert(not wantsOut({ step = "combo" }), "passo qualquer não é pedido de saída")
-	assert(not wantsOut(nil) and not wantsOut("skip"), "payload hostil não tira ninguém do tutorial")
+	assert(intentOf({ step = "skip" }) == "out", "o payload REAL do TutorialUi tem de tirar o jogador do Campo de Provas")
+	assert(intentOf({ skip = true }) == "out", "o payload documentado no Main continua valendo")
+	assert(intentOf({ step = "enter" }) == "out" and intentOf({ step = "done" }) == "out", "cliente velho continua saindo")
+	assert(intentOf({ step = "combo" }) == nil, "passo qualquer não é pedido de saída")
+	assert(intentOf(nil) == nil and intentOf("skip") == nil, "payload hostil não mexe no tutorial de ninguém")
+
+	-- ============================ CONVITE, NÃO IMPOSIÇÃO (R11) ============================
+	-- Chave sintética: as três marcas do convite são tabelas comuns indexadas por
+	-- jogador, então dá para interrogar a máquina de estados inteira sem Studio,
+	-- sem jogador e sem tocar em RemoteEvent.
+	local ghost = { Name = "selfTest" } :: any
+	offered[ghost], seen[ghost], resume[ghost] = nil, nil, nil
+
+	-- (a) NINGUÉM ENTRA NO CAMPO DE PROVAS SEM TER ACEITADO
+	assert(intentOf({ step = "accept" }) == "in", "TREINAR é a única porta de entrada do Campo de Provas")
+	assert(intentOf({ step = "offer" }) == nil, "o convite (S→C) devolvido por um cliente NÃO é aceitação")
+	assert(intentOf({ step = "reopen" }) == nil, "o botão (S→C) devolvido por um cliente NÃO é aceitação")
+	assert(intentOf({ step = "decline" }) == "no", "JOGAR AGORA tem de chegar como recusa, não como entrada")
+	assert(offerable(ghost), "quem nunca foi perguntado recebe o convite")
+	offered[ghost] = "asked" -- é tudo que `Tutorial.offer` faz: PERGUNTAR
+	assert(not Tutorial.active(ghost), "o convite não abre sessão — quem abre é o `start`, e só pelo intent 'in'")
+
+	-- (b) QUEM RECUSOU NÃO É PERGUNTADO DE NOVO (nem a cada respawn: o
+	-- `startMatch` recarrega o personagem de todo mundo, toda partida)
+	assert(not offerable(ghost), "a pergunta é UMA por jogador por sessão de servidor")
+	assert(reopenable(ghost), "recusar não é porta de mão única: fica o botão `tutorial.reopen`")
+
+	-- (c) CORTADO PELA LARGADA ≠ "JÁ TREINOU". O lobby não espera mais por quem
+	-- treina, então a interrupção é o caminho NORMAL — se ela consumisse o
+	-- direito ao Campo de Provas, o Diretor teria trocado um tutorial
+	-- obrigatório por um tutorial impossível.
+	closeMarks(ghost, 3, "match")
+	assert(resume[ghost] == 3, "o passo alcançado tem de sobreviver à largada (senão recomeça do 1 para sempre)")
+	assert(not seen[ghost] and reopenable(ghost), "quem foi cortado pela largada continua podendo treinar")
+	closeMarks(ghost, 3, "skip")
+	assert(seen[ghost] and resume[ghost] == nil, "quem saiu por vontade própria não é perguntado nem retomado")
+	assert(not reopenable(ghost) and not offerable(ghost), "quem já passou pelo Campo de Provas não vê mais nada")
+	offered[ghost], seen[ghost], resume[ghost] = nil, nil, nil -- não deixa lixo
 
 	-- ---------------------------------------------------- TETO ABSOLUTO (AFK)
 	-- O último passo não tem teto próprio DE PROPÓSITO (quem chegou lá decide
