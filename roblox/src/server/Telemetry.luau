@@ -796,7 +796,16 @@ local function record(name: string, isBot: boolean, ctx: { [string]: any }, payl
 		oppOpen[pairKeyOf(ctx.user_id_hash, otherKey)] =
 			{ a = ctx.user_id_hash, b = otherKey, isBot = isBot, pinged = false, fused = false }
 	elseif name == N.SintoniaPing then
-		markEngagement(ctx.user_id_hash, false)
+		--- PING DE TREINO NÃO É RESPOSTA DA V1. O Campo de Provas dispara o ping
+		--- de verdade (passo honesto), e ele chega aqui carimbado com
+		--- `tutorial = true`. Contá-lo infla o numerador da única pergunta que
+		--- este produto existe para responder — "duas pessoas coordenam sem que
+		--- alguém mande?" — com gente que estava justamente sendo mandada.
+		--- O evento continua contado no total de eventos; o que ele não faz é
+		--- abrir engajamento no FUNIL.
+		if p.tutorial ~= true then
+			markEngagement(ctx.user_id_hash, false)
+		end
 	elseif name == N.SintoniaFired then
 		markEngagement(ctx.user_id_hash, true)
 	elseif name == N.SintoniaChannelStart then
@@ -1706,6 +1715,7 @@ function Telemetry.selfTest()
 	fake(N.SintoniaPing, true, "Fire", {})
 	assert((human.events[N.SintoniaPing] or 0) == 1 and (all.events[N.SintoniaPing] or 0) == 2, "funil tem de separar bot de gente")
 
+
 	-- 4) TTK ponta a ponta: 1o dano -> KNOCK, na coorte da VITIMA. E a
 	--    eliminacao que vem depois NAO pode contar a mesma morte de novo.
 	table.clear(firstHitAt)
@@ -1752,6 +1762,27 @@ function Telemetry.selfTest()
 	fake(N.SintoniaOpportunity, false, "Fire", { with_user_id = 4242 })
 	fake(N.SintoniaPing, false, "Fire", {})
 	assert(human.oppPinged == 2, "engajamento novo do mesmo par converte de novo")
+
+	-- 4c-bis) PING DE TREINO FORA DO FUNIL (R11). O Campo de Provas dispara o
+	-- ping REAL — é o que torna o passo honesto —, e antes da R11 TODO jogador
+	-- era empurrado para lá: cada sessão injetava treino no numerador da única
+	-- pergunta que este produto existe para responder ("duas pessoas coordenam
+	-- SEM que alguém mande?"). O evento continua contado; o que ele não faz é
+	-- converter engajamento.
+	local pingsBefore = human.events[N.SintoniaPing] or 0
+	fake(N.SintoniaOpportunity, false, "Fire", { with_user_id = 7777 })
+	fake(N.SintoniaPing, false, "Fire", { tutorial = true })
+	assert(
+		human.oppPinged == 2,
+		"ping de TREINO converteu engajamento — o numerador da V1 passa a contar quem estava sendo mandado"
+	)
+	assert(
+		(human.events[N.SintoniaPing] or 0) == pingsBefore + 1,
+		"o ping de treino sumiu da contagem BRUTA: suprimir o evento tira do Diretor quantos praticam o combo"
+	)
+	-- o carimbo não pode virar porta dos fundos: ping normal converte igual
+	fake(N.SintoniaPing, false, "Fire", {})
+	assert(human.oppPinged == 3, "ping normal parou de abrir engajamento — o funil da V1 morreu junto")
 
 	-- 4d) INDICE DE DOMINANCIA (V4): dano proporcional ao uso da' exatamente 1,00x
 	local u = newAgg()

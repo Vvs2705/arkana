@@ -67,17 +67,22 @@ local function boot(tag: string, opts: any?): any
 
 	--- Contador de eventos pela MESMA porta que o run.luau usa (Telemetry.emit).
 	--- Sem `Telemetry.init`: aqui ninguém quer relatório, só o fato "aconteceu".
-	local events = {}
+	local events, lastPayload = {}, {}
 	local Telemetry = req(Server:WaitForChild("Telemetry"))
-	Telemetry.emit = function(name)
+	Telemetry.emit = function(name, _subject, payload)
 		if type(name) == "string" then
 			events[name] = (events[name] or 0) + 1
+			--- guarda o ÚLTIMO payload: um evento que acontece não prova que ele
+			--- acontece CARIMBADO, e carimbo errado é falha calada (o dado sai,
+			--- só sai mentindo). Ver o S1 e a exclusão do treino no funil da V1.
+			lastPayload[name] = payload
 		end
 	end
 
 	local ctx: any = { H = H, Net = Net, Balance = Balance, Terrain = Terrain, Combat = Combat }
 	ctx.Sintonia, ctx.Match, ctx.Bots, ctx.Tutorial = Sintonia, Match, Bots, Tutorial
 	ctx.events, ctx.players, ctx.simulated = events, {}, 0
+	ctx.lastPayload = lastPayload
 
 	--- Mesma fiação por jogador do Main.server.luau (sem a parte de cliente).
 	function ctx.addPlayer(name: string, userId: number)
@@ -176,6 +181,23 @@ local function s1()
 	-- impediu QUALQUER partida de começar, em qualquer servidor.
 	c.Net.event(c.Net.Names.Tutorial).OnServerEvent:Fire(p, { step = "accept" })
 	assert(c.Tutorial.active(p), "aceitar o convite TEM de abrir a sessão (contrato C→S do TutorialUi)")
+
+	-- 2b) O PING DISPARADO DE DENTRO DO TREINO SAI CARIMBADO. O Campo de Provas
+	-- usa o ping REAL (é o que torna o passo honesto) — e sem o carimbo ele entra
+	-- no funil da pergunta V1, que existe para medir se duas pessoas coordenam
+	-- SEM que alguém mande. Antes da R11 todo jogador era empurrado ao tutorial,
+	-- então cada sessão injetava treino no numerador da pergunta central do
+	-- produto. Quem EXCLUI é o Telemetry; aqui se prova que o carimbo chega.
+	local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		c.Sintonia.propose(p, root.Position)
+		local ping = c.lastPayload["sintonia_ping"]
+		assert(ping ~= nil, "pré-condição: o ping do Campo de Provas chega à telemetria")
+		assert(
+			ping.tutorial == true,
+			"ping disparado DENTRO do treino não veio carimbado: ele entra no funil da V1 como coordenação real"
+		)
+	end
 
 	-- 3) O LOBBY NÃO ESPERA. Com bots ligados `ready` é verdadeiro desde o
 	-- primeiro quadro, então a partida tem de sair no tempo normal do lobby —

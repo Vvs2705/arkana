@@ -23,6 +23,13 @@ Events.Name = {
 	MatchStart = "match_start",
 	MatchEnd = "match_end",
 	TutorialStep = "tutorial_step",
+	--- CONVITE do Campo de Provas (R11): aceitou × recusou. É o número que decide
+	--- se o onboarding vale a pena — e ele não existia, porque até a R11 o
+	--- tutorial era EMPURRADO e não havia escolha a medir.
+	--- EVENTO PRÓPRIO, e não um passo falso dentro de `tutorial_step`: um passo
+	--- "offer" entraria no agregado "abandono do onboarding por passo" como 100%
+	--- de abandono para todo mundo que recusou, e o quadro da V5 passaria a mentir.
+	TutorialOffer = "tutorial_offer",
 
 	--- SESSÃO — o par que responde a pergunta V5 ("o combate é gostoso o
 	--- bastante para o jogador VOLTAR?", docs/ROBLOX.md §1). Era a única das

@@ -828,6 +828,7 @@ local function decline(player: Player)
 		return
 	end
 	offered[player] = "asked"
+	emit(Events.Name.TutorialOffer, player, { accepted = false })
 	--- durante a prova a tela é do jogo: a recusa é registrada, mas o botão só
 	--- aparece no lobby (quem manda é o `refresh`). Cobre a recusa atrasada de
 	--- um cliente lento — ou hostil — depois da largada.
@@ -859,6 +860,11 @@ local function wire()
 		if intent == "out" then
 			Tutorial.skip(player)
 		elseif intent == "in" then
+			--- o aceite é contado ANTES do `start`, porque `start` pode recusar
+			--- (sem corpo, terreno sem lago) e a INTENÇÃO do jogador continua
+			--- sendo o dado da pergunta "o convite convence?". Contar só o que
+			--- deu certo mediria o terreno, não a decisão dele.
+			emit(Events.Name.TutorialOffer, player, { accepted = true })
 			Tutorial.start(player)
 		elseif intent == "no" then
 			decline(player)
@@ -1065,6 +1071,13 @@ function Tutorial.step(dt: number)
 	local playing = matchRunning()
 	if playing and next(sessions) ~= nil then
 		for _, s in pairs(sessions) do
+			--- o CORTE tem explicação própria: o anúncio genérico de largada não
+			--- diz que o treino não foi perdido, e sem isso a retomada no lobby
+			--- seguinte parece um bug em vez de um recurso.
+			local ev = evAnnounce
+			if ev then
+				ev:FireClient(s.player, { key = "tutorial.cut", args = {} })
+			end
 			finish(s, s.index >= #ORDER, "match")
 		end
 	end

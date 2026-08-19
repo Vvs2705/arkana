@@ -57,11 +57,18 @@ local PT: { [string]: string } = {
 	--- que treinar é o caminho certo: onboarding que envergonha quem pula é
 	--- onboarding obrigatório com outro nome.
 	["tutorial.offer"] = "QUER TREINAR ANTES?",
-	["tutorial.offer.sub"] = "3 minutos no Campo de Provas",
+	--- NÃO diz "3 minutos": com lobby de 25 s o treino é CORTADO pela largada e
+	--- retomado no lobby seguinte, então os 3 min são acumulados, não corridos.
+	--- Prometer tempo corrido seria mentir na primeira tela que o jogador lê.
+	["tutorial.offer.sub"] = "Aprenda no Campo de Provas",
 	["tutorial.offer.yes"] = "TREINAR",
 	["tutorial.offer.no"] = "JOGAR AGORA",
 	--- fica no HUD depois da recusa: recusar não pode ser porta de mão única
 	["tutorial.reopen"] = "TREINAR",
+	--- explica o CORTE: a prova começou por cima do treino. Sem esta frase o
+	--- jogador só via o anúncio genérico de início e não entendia que o treino
+	--- não foi perdido — ele retoma de onde parou no lobby seguinte.
+	["tutorial.cut"] = "A prova começou — seu treino continua depois.",
 	--- só aparece quando o elemento na mão não resolve o passo
 	["tutorial.switch"] = "Troque para %s",
 	--- indicador de antecipação: aparece ao ERRAR, some ao acertar
@@ -234,10 +241,11 @@ local EN: { [string]: string } = {
 	["tutorial.enter"] = "ENTER THE ROYALE",
 	["tutorial.skip"] = "SKIP",
 	["tutorial.offer"] = "WANT TO PRACTICE FIRST?",
-	["tutorial.offer.sub"] = "3 minutes in the Proving Grounds",
+	["tutorial.offer.sub"] = "Learn in the Proving Grounds",
 	["tutorial.offer.yes"] = "PRACTICE",
 	["tutorial.offer.no"] = "PLAY NOW",
 	["tutorial.reopen"] = "PRACTICE",
+	["tutorial.cut"] = "The trial began — your practice continues later.",
 	["tutorial.switch"] = "Switch to %s",
 	["tutorial.lead"] = "LEAD THE TARGET",
 

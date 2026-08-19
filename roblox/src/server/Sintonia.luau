@@ -379,6 +379,27 @@ end
 
 -- ------------------------------------------------------------------ broadcast
 --- Fato decidido pelo servidor. O cliente SÓ APRESENTA (Net.SintoniaState).
+--- Require preguiçoso e protegido do Tutorial (mesmo padrão do Combat→Sintonia):
+--- se o módulo faltar ou explodir, a resposta é "não está treinando" e o funil
+--- volta a contar tudo — nunca o contrário, e nunca derrubando a partida.
+--- TELEMETRIA NÃO DECIDE JOGO: esta consulta só CARIMBA o evento; o ping em si
+--- acontece igual, com as mesmas regras, treinando ou não.
+local tutorialMod: any = nil
+local function inTutorial(player: any): boolean
+	if tutorialMod == nil then
+		local mod = script.Parent and script.Parent:FindFirstChild("Tutorial")
+		local ok, m = pcall(function()
+			return require(mod :: ModuleScript)
+		end)
+		tutorialMod = (ok and m) or false
+	end
+	if not tutorialMod or not tutorialMod.active then
+		return false
+	end
+	local ok, active = pcall(tutorialMod.active, player)
+	return ok and active == true
+end
+
 local function announceState(payload: { [string]: any }, only: { Teams.Member }?)
 	if only then
 		for _, p in ipairs(only) do
@@ -790,7 +811,19 @@ function Sintonia.propose(player: Player, rawPos: any)
 		end
 	end
 	announceState(payload, audience)
-	emit(Events.Name.SintoniaPing, player, { element = element, pos = pos, allies_reached = heard })
+	--- `tutorial` CARIMBA a origem: o Campo de Provas usa o ping DE VERDADE (é o
+	--- que torna o passo honesto), mas quem está aprendendo não está respondendo
+	--- à pergunta "duas pessoas coordenam sozinhas?" — e antes da R11 TODO
+	--- jogador era empurrado ao tutorial, então cada sessão injetava ping de
+	--- treino no numerador da pergunta central do produto.
+	--- CARIMBAR e não SUPRIMIR: o evento aconteceu, e apagá-lo tiraria do Diretor
+	--- a única medida de quantas pessoas praticam o combo. Quem decide o que
+	--- entra no funil é o Telemetry, que é onde a pergunta V1 é respondida.
+	emit(
+		Events.Name.SintoniaPing,
+		player,
+		{ element = element, pos = pos, allies_reached = heard, tutorial = inTutorial(player) }
+	)
 
 	-- PARCEIRO BOT (débito 2): duo ímpar tem bot de parceiro, e o pilar do jogo
 	-- não pode ser exclusivo de dupla humana. O bot ALIADO ao alcance do ping
