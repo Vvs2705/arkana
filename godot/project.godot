@@ -11,6 +11,7 @@ config/features=PackedStringArray("4.4", "Mobile")
 [autoload]
 Balance="*res://core/Balance.gd"
 Bus="*res://core/Bus.gd"
+Sfx="*res://audio/Sfx.gd"
 
 [display]
 window/size/viewport_width=1280

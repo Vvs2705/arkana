@@ -48,6 +48,12 @@ const ICO_F := [
 ]
 
 var _noise := FastNoiseLite.new()
+# arvores: dados VIVOS p/ a raia TERRENO (GDD §14 — a copa some quando queima)
+var _tree_xforms: Array[Transform3D] = []
+var _tree_shapes: Array[CollisionShape3D] = []
+var _forest_mm: MultiMesh
+var _stump_mm: MultiMesh
+var _burned_trees := {}  # i -> true (estado consultavel; RS nao le' em headless)
 var _toon: ShaderMaterial
 var _water_sea: ShaderMaterial
 var _water_lake: ShaderMaterial
@@ -75,6 +81,19 @@ func _ready() -> void:
 	_mist_mat = ShaderMaterial.new()
 	_mist_mat.shader = load("res://world/mist.gdshader")
 	_build()
+	if not Engine.is_editor_hint():
+		_spawn_terrain()
+
+
+## TERRENO REATIVO (R19): a ilha monta o proprio sistema de reacao — assim o
+## restart do Main (que so remonta a Arena) nao precisa saber que ele existe.
+## Fiacao defensiva: a raia TERRENO pode faltar e a ilha boota do mesmo jeito.
+func _spawn_terrain() -> void:
+	var scr: Variant = load("res://terrain/TerrainSystem.gd")
+	if scr is GDScript:
+		var t: Node = (scr as GDScript).new()
+		t.name = "TerrainSystem"
+		add_child(t)
 
 
 func _build() -> void:
@@ -290,18 +309,28 @@ func _build_forest(parent: Node3D) -> void:
 			continue
 		xf.append(_tree_xform(rng, p, h))
 		extra += 1
-	_multimesh(parent, _tree_mesh(), xf, "Forest")
-	# colisao: tronco = cilindro por arvore
+	_tree_xforms = xf
+	_forest_mm = _multimesh(parent, _tree_mesh(), xf, "Forest").multimesh
+	# tocos de carvao (GDD §14: a copa some DE VERDADE, sobra o toco) — mesmo
+	# truque de MultiMesh: todos pre-alocados escondidos, 1 draw call sempre.
+	var hid := _hidden_xf()
+	var stumps: Array[Transform3D] = []
+	stumps.resize(xf.size())
+	stumps.fill(hid)
+	_stump_mm = _multimesh(parent, _stump_mesh(), stumps, "Stumps").multimesh
+	# colisao: tronco = cilindro por arvore (a raia TERRENO desliga ao queimar)
 	var body := StaticBody3D.new()
 	body.name = "TreeColliders"
 	var cyl := CylinderShape3D.new()
 	cyl.radius = 0.38
 	cyl.height = 3.0
+	_tree_shapes.clear()
 	for t in xf:
 		var cs := CollisionShape3D.new()
 		cs.shape = cyl
 		cs.position = t.origin + Vector3(0, 1.5, 0)
 		body.add_child(cs)
+		_tree_shapes.append(cs)
 	parent.add_child(body)
 
 
@@ -675,7 +704,7 @@ func _add_mesh(parent: Node3D, mesh: Mesh, t: Transform3D, nm: String, shadows :
 
 
 func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: String,
-		shadows := true, colors := PackedColorArray()) -> void:
+		shadows := true, colors := PackedColorArray()) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = colors.size() > 0
@@ -691,6 +720,64 @@ func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: Stri
 	if not shadows:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mmi)
+	return mmi
+
+
+# ------------------------------------------- API da raia TERRENO (GDD §14)
+
+func tree_count() -> int:
+	return _tree_xforms.size()
+
+
+func tree_pos(i: int) -> Vector3:
+	return _tree_xforms[i].origin
+
+
+## Fogo consumiu a arvore `i`: a copa SOME do mesh (instancia escondida),
+## sobra o toco de carvao e o tronco DEIXA de colidir — queimar a floresta
+## abre caminho e linha de tiro (e' a jogada do §14). `burned=false` restaura
+## (porta do restart: estado nao atravessa partida).
+func set_tree_burned(i: int, burned: bool) -> void:
+	if _forest_mm == null or i < 0 or i >= _tree_xforms.size():
+		return
+	if burned:
+		_burned_trees[i] = true
+	else:
+		_burned_trees.erase(i)
+	var hid := _hidden_xf()
+	_forest_mm.set_instance_transform(i, hid if burned else _tree_xforms[i])
+	var stump := Transform3D(Basis(Vector3.UP, float(i) * 2.39996), _tree_xforms[i].origin)
+	_stump_mm.set_instance_transform(i, stump if burned else hid)
+	if i < _tree_shapes.size():
+		_tree_shapes[i].disabled = burned
+
+
+func is_tree_burned(i: int) -> bool:
+	return _burned_trees.has(i)
+
+
+## MultiMesh nao tem visibilidade por instancia: esconder = escala ~0 no fundo.
+func _hidden_xf() -> Transform3D:
+	return Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -60, 0))
+
+
+func _stump_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var char_col := Color(0.13, 0.11, 0.1)
+	_frustum(st, Vector3.ZERO, 0.34, 0.2, 0.9, 5, char_col)
+	# tampa com miolo de brasa apagada (le' como carvao, nao como buraco)
+	st.set_color(Color(0.24, 0.14, 0.09))
+	for i in 5:
+		var a0 := TAU * i / 5.0
+		var a1 := TAU * (i + 1) / 5.0
+		st.add_vertex(Vector3(0, 0.9, 0))
+		st.add_vertex(Vector3(cos(a0) * 0.2, 0.9, sin(a0) * 0.2))
+		st.add_vertex(Vector3(cos(a1) * 0.2, 0.9, sin(a1) * 0.2))
+	st.generate_normals()
+	var m := st.commit()
+	m.surface_set_material(0, _toon)
+	return m
 
 
 ## Quad com winding CW (frente Godot): tris (p0,p1,p2) e (p0,p2,p3).

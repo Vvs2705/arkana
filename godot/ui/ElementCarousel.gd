@@ -1,7 +1,9 @@
 ## Carrossel de elementos — acima do botao de disparo (GDD §19.3).
 ## Cada slot >= 48dp, cor + FORMA no icone (GDD §10 — lei): fogo = gota,
-## agua = crescente, raio = zigzag. OBSERVA a selecao pelo Bus (feedback
-## imediato vem do Bus.element_changed que o Player emite); o toque so' PEDE.
+## agua = crescente, raio = zigzag, terra = pedra facetada, vento = espiral.
+## 5 slots em UMA fileira (5 x 52dp = 260dp, cabe folgado no canto direito).
+## OBSERVA a selecao pelo Bus (feedback imediato vem do Bus.element_changed
+## que o Player emite); o toque so' PEDE.
 class_name ElementCarousel
 extends Control
 
@@ -50,6 +52,18 @@ func _icon(el: String, c: Vector2, r: float, col: Color) -> void:
 				c + Vector2(r * 0.15, r * 0.15), c + Vector2(-r * 0.35, r),
 			])
 			draw_polyline(pts, col, maxf(r * 0.3, 1.0), true)
+		"earth":  # pedra facetada: poligono irregular cheio
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.9, -r * 0.1), c + Vector2(-r * 0.35, -r * 0.9),
+				c + Vector2(r * 0.55, -r * 0.75), c + Vector2(r * 0.9, r * 0.2),
+				c + Vector2(r * 0.3, r * 0.9), c + Vector2(-r * 0.6, r * 0.7),
+			]), col)
+		"wind":  # espiral de ar: linha que enrola para o centro
+			var spiral := PackedVector2Array()
+			for k in 20:
+				var t := float(k) / 19.0
+				spiral.append(c + Vector2.from_angle(t * TAU * 1.6 - PI * 0.5) * r * (1.0 - t * 0.85))
+			draw_polyline(spiral, col, maxf(r * 0.28, 1.0), true)
 		_:  # gota/esfera flamejante: circulo + bico
 			draw_circle(c + Vector2(0, r * 0.25), r * 0.75, col)
 			draw_colored_polygon(PackedVector2Array([

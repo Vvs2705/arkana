@@ -109,6 +109,7 @@ func _try_fire() -> void:
 	if _fire_cd > 0.0 or mana < float(s.mana_cost):
 		return
 	mana -= float(s.mana_cost)
+	Bus.spell_cast.emit(element)  # som do disparo (Sfx observa; costura R19)
 	Bus.mana_changed.emit(mana, float(Balance.PLAYER.mana_max))
 	_fire_cd = float(s.fire_rate)
 	_cast = 0.3

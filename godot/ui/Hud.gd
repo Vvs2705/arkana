@@ -239,7 +239,10 @@ func _build_sticks() -> void:
 		if is_instance_valid(player):
 			player.request_dodge())
 
-	# Carrossel de elementos ACIMA do botao de disparo (GDD §19.3), slots 52dp.
+	# Carrossel de elementos ACIMA do botao de disparo (GDD §19.3). 5 slots de
+	# 52dp (>= 48dp) em UMA fileira: 260dp cabem no canto direito sem invadir a
+	# zona do joystick (35% da esquerda) nem a de olhar — 2 fileiras so' se um
+	# 6o elemento entrar.
 	var slot := Dp.px(52.0)
 	carousel = ElementCarousel.new()
 	carousel.anchor_left = 1.0

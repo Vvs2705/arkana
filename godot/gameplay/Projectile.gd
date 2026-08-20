@@ -3,8 +3,11 @@
 ##   fire      -> esfera/gota flamejante (a original)
 ##   water     -> lamina/crescente d'agua achatada, arco leve na trajetoria
 ##   lightning -> dardo fino serrilhado, o mais rapido, rastro eletrico curto
+##   earth     -> pedra facetada tombando devagar, a mais lenta/pesada, poeira
+##   wind      -> espiral de laminas de ar semi-transparentes girando no eixo
 ## Numeros SO de Balance (spec()). No impacto: dano via Combat (ponto unico),
-## numero flutuante, burst e knockback leve na direcao do voo.
+## numero flutuante, burst, knockback leve — e Bus.terrain_hit SEMPRE (a
+## costura R19: o terreno reage, este script nunca muda o mundo).
 class_name Projectile
 extends Area3D
 
@@ -18,6 +21,8 @@ var travel_left: float = float(Balance.FIRE.range)
 var dmg: float = float(Balance.FIRE.dmg)
 var shooter: Node
 var _fall := 0.0
+var _spin_node: Node3D   # terra tomba, vento gira — so' visual, hitbox parada
+var _spin := Vector3.ZERO  # rad/s em euler local
 
 
 ## Fonte UNICA dos numeros por elemento — espelha Balance, nunca inventa.
@@ -27,6 +32,10 @@ static func spec(el: String) -> Dictionary:
 			return Balance.WATER
 		"lightning":
 			return Balance.LIGHTNING
+		"earth":
+			return Balance.EARTH
+		"wind":
+			return Balance.WIND
 		_:
 			return Balance.FIRE
 
@@ -38,6 +47,10 @@ static func tint(el: String) -> Color:
 			return Color("2AA7FF")
 		"lightning":
 			return Color("F5D90A")
+		"earth":
+			return Color("A8763E")
+		"wind":
+			return Color("8FE8C9")
 		_:
 			return Color("FF5A2A")
 
@@ -69,6 +82,10 @@ func _ready() -> void:
 			_build_water()
 		"lightning":
 			_build_lightning()
+		"earth":
+			_build_earth()
+		"wind":
+			_build_wind()
 		_:
 			_build_fire()
 	body_entered.connect(_on_hit)
@@ -113,6 +130,43 @@ func _build_lightning() -> void:
 	add_child(_make_particles(tint("lightning"), 14, 0.18, false))  # rastro curto = eletrico
 
 
+func _build_earth() -> void:
+	set_meta("shape", "rock")
+	_spin_node = Node3D.new()
+	var mat := _glow_mat(tint("earth"), 1.1)  # brilho baixo = pedra fosca, nao gema
+	for rot: Vector3 in [Vector3.ZERO, Vector3(0.7, 0.5, 0.9)]:
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.30, 0.26, 0.30)
+		mesh.mesh = box
+		mesh.rotation = rot  # dois blocos cruzados = silhueta facetada
+		mesh.material_override = mat
+		_spin_node.add_child(mesh)
+	add_child(_spin_node)
+	_spin = Vector3(2.4, 3.2, 0.0)  # tomba DEVAGAR — leitura de peso
+	add_child(_make_particles(tint("earth"), 8, 0.4, false))  # poeira no voo
+
+
+func _build_wind() -> void:
+	set_meta("shape", "spiral")
+	var mat := _glow_mat(tint("wind"), 1.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(tint("wind"), 0.55)  # lamina de ar semi-transparente
+	_spin_node = Node3D.new()
+	for i in 3:  # 3 laminas torcidas ao redor do eixo do voo = helice/espiral
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.52, 0.05, 0.22)
+		mesh.mesh = box
+		mesh.rotation.z = TAU * float(i) / 3.0
+		mesh.rotation.y = 0.5  # torcao: le como espiral, nao cruz
+		mesh.material_override = mat
+		_spin_node.add_child(mesh)
+	add_child(_spin_node)
+	_spin = Vector3(0.0, 0.0, 13.0)  # gira RAPIDO no eixo do voo
+	add_child(_make_particles(tint("wind"), 12, 0.45, false))  # rastro de vento
+
+
 func _glow_mat(color: Color, energy: float) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -129,6 +183,8 @@ func _physics_process(delta: float) -> void:
 	if element == "water":
 		_fall += WATER_ARC * delta
 		position.y -= _fall * delta
+	if _spin_node:
+		_spin_node.rotation += _spin * delta  # pedra tomba / espiral gira
 	travel_left -= step
 	if travel_left <= 0.0:
 		queue_free()
@@ -142,6 +198,14 @@ func _on_hit(body: Node3D) -> void:
 		_damage_number(int(round(dmg)), hit_pos)
 		if body.has_method("apply_knockback"):
 			body.apply_knockback(dir * KNOCKBACK)  # empurrao leve na direcao do voo
+		# Kill do PLAYER anuncia no Bus — kill feed e audio observam (raias paralelas).
+		if float(body.get("hp")) <= 0.0 and not body.is_in_group("player") \
+				and shooter != null and is_instance_valid(shooter) and shooter.is_in_group("player"):
+			Bus.player_killed_bot.emit(str(body.name))
+	# A COSTURA DO TERRENO (R19): TODO impacto anuncia — chao, arvore, muro,
+	# pawn. O terreno decide se e como reage; este script NUNCA muda o mundo.
+	# strong=false por ora — taticas carregadas vem depois (R20+).
+	Bus.terrain_hit.emit(element, hit_pos, false)
 	burst(get_parent(), hit_pos, tint(element), 16)
 	queue_free()
 

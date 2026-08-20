@@ -29,6 +29,10 @@ func current_speed() -> float:
 ## Caminho UNICO da velocidade horizontal: produto unico + dash + knockback.
 ## Player e Bot passam por aqui — ninguem escreve velocity.x/z por fora.
 func move_velocity(dir: Vector3, delta: float) -> void:
+	## HAZARD (costura R19): dano ambiental no unico tique que player e bot
+	## compartilham. dps_at devolve 0.0 se o terreno nao montou; dano SO por
+	## Combat (que barra <=0), nunca hp direto — o terreno NUNCA aplica dano.
+	Combat.deal(self, TerrainSystem.dps_at(global_position) * delta, "terrain")
 	_dodge_cd = maxf(_dodge_cd - delta, 0.0)
 	iframes_left = maxf(iframes_left - delta, 0.0)
 	knockback = knockback.move_toward(Vector3.ZERO, KNOCK_DECAY * delta)
@@ -64,6 +68,8 @@ func try_dodge(dir: Vector3) -> bool:
 	_dodge_left = float(Balance.DODGE.duration)
 	_dodge_cd = float(Balance.DODGE.cooldown)
 	iframes_left = float(Balance.DODGE.iframes)
+	if is_in_group("player"):
+		Bus.dodge_performed.emit()  # audio/UI observam; esquiva de bot nao vira feedback global
 	return true
 
 

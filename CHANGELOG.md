@@ -2,6 +2,51 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v1.3.0-3d — 2026-08-20 — R19: o mundo que reage, o jogo que soa e o G2 fechado
+
+Quatro raias paralelas + integração. O G2 do ROADMAP_3D ("queimar a floresta
+abre caminho num APK") está cumprido.
+
+**TERRENO REATIVO (o pilar, GDD §14)** — grade lógica 60×60 (célula 3 m) sobre a
+ilha, e as 6 reações: fogo acende a floresta e propaga por ORÇAMENTO (1 rolagem
+por aresta, `fuel_budget` por frente — nunca chance por tique; o selftest
+REINTRODUZ o modelo reprovado e prova 220 células acesas contra teto de 25);
+água apaga (sem carbonizar) e congela o lago em plataforma com colisão real que
+derrete; raio eletrifica só a água conectada (flood 4-vizinhos, gelo isola);
+terra ergue muro destrutível que NÃO nasce em célula ocupada (2º vermelho
+provado: sem a guarda, o muro nasce em cima do corpo); vento espalha fogo
+pagando do MESMO orçamento. Árvore queimada vira carvão permanente: copa some,
+tronco deixa de colidir — queimar a floresta ABRE CAMINHO e linha de tiro.
+63 checagens verdes. Custo ocioso: +2 draw calls; 1 luz por frente de fogo,
+nunca por célula.
+
+**DANO AMBIENTAL** — costura no tique único que player e bot compartilham
+(`Pawn.move_velocity`): `TerrainSystem.dps_at()` publica o perigo (queimando =
+`burn_dps`, eletrizado = `electrify_dps`, 0 se o sistema nem montou) e SÓ
+`Combat.deal` aplica — o terreno nunca toca vida, contrato que segurou 8 fases
+no Roblox.
+
+**ELEMENTOS COMPLETOS (5/5)** — Terra (pedra pesada, lenta, forte) e Vento
+(crescente rápido, leve) entram com cor+FORMA distintas (GDD §10) e números de
+`Balance`. TODO impacto de projétil emite `Bus.terrain_hit` — qualquer magia
+conversa com o mundo. 82 checagens; vermelho provado removendo o emit.
+
+**ÁUDIO (25 checagens)** — 23 sons 100% procedurais (PCM sintetizado em
+GDScript, zero binário no repo): disparo por elemento, impacto, dano, esquiva,
+UI, contagem, vitória/derrota, ambiente. Buses Sfx/-8dB e Ambient/-18dB.
+Áudio OBSERVA o Bus e nunca decide jogo. Só o player emite `spell_cast` por
+ora — 6 bots sem atenuação por distância seria cacofonia (decisão registrada).
+
+**JUICE (27 checagens)** — contagem 3·2·1·LUTE!, kill feed, flash de dano
+(vermelho provado: flash com vida SUBINDO fica vermelho), +1 no abate, shake
+curto, sting de fim. Instanciado defensivamente no boot do gameplay.
+
+Gates: import limpo · 6 selftests verdes (gameplay 82 · characters · menu 13 ·
+audio 25 · juice 27 · terreno 63) · boot 300 frames do menu E da arena sem
+erro · APK 26 MB com as 4 raias verificadas DENTRO do pacote (lição da R17:
+listar o conteúdo, nunca confiar no timestamp). Nenhum número de `Balance`
+mudou fora do bloco `TERRAIN` que a fase introduziu.
+
 ## v1.2.0-3d — 2026-08-20 — R18: gráficos, mecânicas, a porta de entrada e a pasta técnica
 
 Quatro frentes numa fase, pelas ordens do Diretor pós-teste em aparelho.

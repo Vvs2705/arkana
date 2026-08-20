@@ -28,6 +28,10 @@ func _ready() -> void:
 	add_child(hud)
 	hud.restart_pressed.connect(_build_match)
 	Bus.entity_died.connect(_on_entity_died)
+	## Costura R19: o juice observa o Bus — entra ANTES da 1a partida para
+	## nao perder o match_started do boot. Defensivo: sem a raia, nada quebra.
+	if ResourceLoader.exists("res://juice/MatchJuice.tscn"):
+		add_child((load("res://juice/MatchJuice.tscn") as PackedScene).instantiate())
 	_build_match()
 
 
