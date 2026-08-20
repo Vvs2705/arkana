@@ -1,0 +1,73 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://world/Island.gd" id="1_island"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.13, 0.2, 0.46, 1)
+sky_horizon_color = Color(0.96, 0.73, 0.42, 1)
+sky_curve = 0.12
+ground_bottom_color = Color(0.043, 0.063, 0.149, 1)
+ground_horizon_color = Color(0.87, 0.62, 0.38, 1)
+sun_angle_max = 25.0
+sun_curve = 0.18
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_sky_contribution = 1.0
+ambient_light_energy = 1.15
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.95, 0.75, 0.5, 1)
+fog_light_energy = 1.0
+fog_density = 0.0035
+fog_sky_affect = 0.1
+
+[node name="Island" type="Node3D"]
+script = ExtResource("1_island")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.61, 0.72, 0.0)
+light_color = Color(1, 0.87, 0.65, 1)
+light_energy = 1.4
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 80.0
+shadow_bias = 0.08
+
+[node name="Env" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="SpawnForestA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-36, 4, -40)
+
+[node name="SpawnForestB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-22, 4, -30)
+
+[node name="SpawnLakeA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(45, 4, 42)
+
+[node name="SpawnLakeB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(22, 4, 10)
+
+[node name="SpawnRuinsA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(30, 7, -36)
+
+[node name="SpawnRuinsB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(46, 7, -52)
+
+[node name="SpawnMarshA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-33, 1, 27)
+
+[node name="SpawnMarshB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-52, 1, 44)
+
+[node name="SpawnValleyA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(0, 2, 5)
+
+[node name="SpawnValleyB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-6, 2, -10)

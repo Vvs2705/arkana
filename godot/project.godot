@@ -1,0 +1,31 @@
+; ARKANA 3D — Godot 4.4 · 3a pessoa · regua Spellbreak · Android
+; Dono deste arquivo: COORDENADOR. Raias nao editam; pedem.
+config_version=5
+
+[application]
+config/name="Arkana"
+run/main_scene="res://gameplay/Main.tscn"
+config/features=PackedStringArray("4.4", "Mobile")
+
+[autoload]
+Balance="*res://core/Balance.gd"
+Bus="*res://core/Bus.gd"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=4
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+renderer/rendering_method="mobile"
+; Sem esta linha o export Android FALHA EM SILENCIO (erro sem mensagem no 4.4.1)
+; — e' a linha que o proprio wizard do Godot escreve em projetos Mobile. O
+; build_apk.sh falha cedo apontando para ca' se alguem a remover.
+textures/vram_compression/import_etc2_astc=true
+renderer/rendering_method.mobile="mobile"
+anti_aliasing/quality/msaa_3d=1

@@ -2,6 +2,43 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v1.0.0-3d — 2026-08-19 — R16: o pivô — Arkana 3D no Android, régua Spellbreak
+
+**Ordem do Diretor:** abandonar o roadmap incremental, descontinuar o 2D (Roblox
+mantido) e ir direto ao 3D — *"o próximo APK que eu testar quero ver realidade de
+jogo, não mapa de teste"*. Plano novo em `docs/ROADMAP_3D.md` (G0–G6); motor
+**Godot 4.4.1** (a saída que o GDD §19.4 já previa), projeto em `godot/`.
+
+**Da ordem ao APK jogável: uma sessão.** G0 e G1 fechados juntos:
+
+- **Mundo** (`world/`): ilha 180×180m procedural com os 4 POIs do GDD em 3D —
+  floresta (94 árvores), lago com água animada, ruínas, baixada alagada. Céu de
+  entardecer, cel-shading 3 bandas + rim dourado, cores por vértice na paleta §10.
+  30.811 verts / 9 draw calls — folga para 60fps em aparelho médio.
+- **Personagem** (`characters/`): mago low-poly de manto azul-noite com debrum
+  dourado, capuz aberto com dois olhos dourados no vazio, gema emissiva. 2.058
+  verts. Animações idle/run/cast em código, disparo sincronizado com a mão
+  (t=0,22s < fire_rate 0,27s). `set_tint` dá identidade aos bots.
+- **Gameplay** (`gameplay/` + `ui/`): 3ª pessoa sobre o ombro (SpringArm com
+  colisão), joystick + **gesto único do GDD §19.3** (anel = dispara, X = cancela,
+  deadzone em dp), Fogo com tempo de viagem + números de dano + VFX, 6 bots
+  (vagar→perseguir→atacar), **partida de 3 min com vitória/derrota e replay
+  limpo**. Dano num ponto único (`Combat.gd`, NaN barrado com `not (x > 0)`);
+  velocidade é produto único. Selftests: personagem 12/12 · gameplay 32/32, com
+  guarda provada em vermelho.
+- **Pipeline** (`export/`): `build_apk.sh` → APK assinado (debug) em segundos,
+  sem gradle. Armadilha achada e cercada: sem
+  `textures/vram_compression/import_etc2_astc=true` o export Android **falha em
+  silêncio** no 4.4.1 — a linha entrou no `project.godot` e o script falha cedo
+  apontando para ela se alguém a remover.
+
+**Padrões que atravessaram** (via `docs/PONTE.md`, só o PROVADO): dano num ponto
+só · NaN · velocidade-produto · dp para o dedo · cancelar de 1ª classe · clima com
+COR · fiação defensiva (cada cena boota sem as outras).
+
+APK integrado: `godot/build/arkana3d.apk` (25,8 MB), as três raias verificadas
+DENTRO do pacote. Roblox intacto (51/51). 2D descontinuado — nenhuma manutenção.
+
 ## v0.9.0 — 2026-08-19 — R15: o pedido do primeiro playtest em aparelho
 
 **O Diretor instalou o APK e jogou** — primeiro teste em aparelho real desde a
