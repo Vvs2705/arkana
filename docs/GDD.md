@@ -71,78 +71,85 @@
 ## 3. Elenco de lançamento (10 magos detalhados)
 
 > Apex lançou com 8 lendas. Começar com 10 cobre as 5 classes (2 por classe) e mantém o escopo real.
+>
+> **REVISADO 20/08/2026 (ordem do Diretor):** os kits foram DESCOLADOS do Apex —
+> as lendas viraram ponto de partida, não gabarito. Cada mago agora tem uma
+> identidade mágica própria (cicatriz, membro/órgão substituído por magia, pacto,
+> maldição) que JUSTIFICA o kit. Fichas completas (aparência, história, VFX,
+> paleta, modelagem) em `personagens/01..10`. Papéis de classe e counters do §4
+> mantidos.
 
 Formato: **Passiva / Tática / Suprema** + ⚖️ limitadores (o "preço" de cada poder).
 
 ### VANGUARDA
 
-**1. Pyra, a Chama de Guerra** *(Bangalore)*
-- **Passiva — Pés de Brasa:** ganha velocidade por 2s quando magias inimigas passam raspando.
-- **Tática — Cortina de Cinzas:** dispara 3 projéteis que criam paredes de fumaça densa.
-- **Suprema — Chuva de Meteoros:** marca uma área grande; após 4s, meteoros caem em ondas por 8s.
-- ⚖️ A fumaça cega ela e os aliados também (sem visão privilegiada); os meteoros têm círculo de aviso vermelho no chão e som alto — dá tempo de sair; dano alto só no centro.
+**1. Pyra, a Chama de Guerra** *(perdeu o braço esquerdo salvando a legião; um braço de chama viva numa manopla de bronze o substitui)*
+- **Passiva — Coração de Fornalha:** fogo no chão (inclusive o dela) não a machuca e reacende o braço: +10% de velocidade por 2s ao atravessar chamas.
+- **Tática — Muralha de Brasas:** risca uma linha de fogo baixo de 8m por 5s: bloqueia visão rasante; quem atravessa leva dano moderado e sai "aceso" (rastro visível 2s).
+- **Suprema — Braço Livre:** destrava a manopla por 6s: disparos contínuos em leque curto (lança-chamas) e o dash deixa fogo no chão.
+- ⚖️ Água/gelo apagam a muralha e "molham" o braço (+1s de recarga na tática); vento EMPURRA a muralha 3m (§14); a Suprema é telegrafada (rugido + brilho) e ao acabar o braço esfria: 4s sem tática e −15% de velocidade; kitá-la de longe é a contra-jogada.
 
-**2. Ceifadora, a Voz do Vazio** *(Ash)*
-- **Passiva — Sussurro dos Mortos:** caixas de loot de jogadores mortos mostram onde os assassinos estão (marca no mapa 1x por caixa).
-- **Tática — Laço de Almas:** projétil que prende o inimigo no lugar por 2s (ele ainda conjura).
-- **Suprema — Fenda Unidirecional:** rasga um portal reto de ~60m, viagem instantânea.
-- ⚖️ O laço é destrutível com 1 golpe corpo a corpo; a fenda é de mão única e QUALQUER um pode usá-la (inclusive quem te persegue).
+**2. Ceifadora, a Voz do Vazio** *(morreu afogada no Vazio e voltou emendada em luz; não projeta sombra — a sombra ficou lá)*
+- **Passiva — Ecos dos Caídos:** onde alguém morreu há <60s, ela vê o eco espectral dos últimos 3s da luta (replay fantasma, só para ela).
+- **Tática — Mão do Vazio:** marca um ponto a 12m: uma mão de sombra irrompe e AGARRA o primeiro inimigo na área por 1,2s (ele ainda conjura).
+- **Suprema — Travessia:** rasga o Vazio em linha reta (até 60m): ela e aliados que tocarem o rasgo em 3s atravessam juntos.
+- ⚖️ A mão é cortável com 1 golpe corpo a corpo; o rasgo fica ABERTO 3s (inimigos podem entrar atrás); quem atravessa sai revelado 4s e 1s sem conjurar; o eco mostra o passado, nunca posição atual.
 
 ### ERRANTE
 
-**3. Véu, a Andarilha** *(Wraith)*
-- **Passiva — Vozes do Além:** aviso sonoro quando um inimigo mira em você ou arma armadilha perto.
-- **Tática — Passo Etéreo:** entra no plano espectral por 3s: invulnerável, mais rápida, mas não conjura nada e deixa rastro visível.
-- **Suprema — Portal Gêmeo:** cria dois portais ligados que duram 45s.
-- ⚖️ 1,2s de ativação da tática (não é botão de pânico instantâneo); no plano espectral você vê só silhuetas; portais podem ser usados por inimigos.
+**3. Véu, a Andarilha** *(caiu no plano espectral aos 12, voltou 7 anos depois sem envelhecer; a mão esquerda é permanentemente semi-espectral, presa por uma luva rúnica)*
+- **Passiva — Entrelinha:** após 4s sem atacar/tomar dano, desfoca: semi-translúcida a mais de 20m (nítida de perto).
+- **Tática — Atravessar:** 1,5s no plano espectral: invulnerável, mais rápida e atravessa paredes finas (até 2m). Ativação de 0,8s.
+- **Suprema — Maré Espectral:** por 5s, ela e aliados num raio de 6m no cast entram JUNTOS no plano espectral: velozes e intangíveis.
+- ⚖️ Atravessar deixa um eco visível na entrada e ela sai 1s sem conjurar; no plano vê só silhuetas; na Maré ninguém conjura e um SINO espectral toca no mundo real na posição do grupo (counter sonoro); qualquer dano quebra a passiva.
 
-**4. Corvus, o Caçador** *(Bloodhound — com as suas duas ideias de rastreio)*
-- **Passiva — Faro Antigo:** vê pegadas, portas abertas e resíduos de magia dos últimos 60s ao focar a visão.
-- **Tática — Pulso Revelador:** cone de energia que revela inimigos através de paredes por 3s.
-- **Suprema — Forma de Lobisomem (transformação):** 30s como besta — corre 40% mais rápido, cura ao abater, rastros inimigos brilham em vermelho.
-- ⚖️ O pulso AVISA quem foi escaneado e revela sua posição de origem; na forma de lobisomem: **sem magias** (só garras corpo a corpo), visão em tons de cinza, uivo alto ao transformar (o mapa inteiro ouve num raio grande), silhueta maior = alvo mais fácil.
+**4. Corvus, o Caçador** *(cego pelo espírito-lobo com quem hoje divide o corpo; "vê" cheiros como cores)*
+- **Passiva — Mundo de Cheiros:** vê trilhas de cheiro dos últimos 60s como fitas de cor (pegadas, portas, resíduo de magia por elemento).
+- **Tática — Uivo de Caça:** uivo num raio de 25m: inimigos EM MOVIMENTO ficam com o cheiro aceso (contorno enquanto se moverem, 4s).
+- **Suprema — Forma de Lobisomem (transformação):** 30s como besta — corre 40% mais rápido, cura ao abater, todos os rastros do raio brilham.
+- ⚖️ O uivo denuncia a posição dele para todo o raio; ficar PARADO esconde do uivo (contra-jogada de disciplina); na forma: **sem magias** (só garras), silhueta maior, uivo de transformação ouvido num raio enorme; trilhas mostram o passado, nunca o agora.
 
 ### VIDENTE
 
-**5. Corvomante, o Olho Distante** *(Crypto)*
-- **Passiva:** o corvo espectral marca inimigos que vê para todo o esquadrão.
-- **Tática — Familiar:** controla o corvo à distância (voa, escaneia baús e Torres Arcanas).
-- **Suprema — Onda Antimagia:** o corvo detona um pulso que causa 50 de dano em escudo, **derruba 1 nível de escudo evolutivo** e destrói armadilhas/construções na área.
-- ⚖️ Enquanto controla o corvo, o corpo fica parado e indefeso; o corvo tem 60 de vida e faz som de asas audível; a onda também atinge aliados (quebra construções do próprio time).
+**5. Corvomante, o Olho Distante** *(trocou o olho direito pelo pacto: o corvo carrega o olho dele — tudo que o corvo vê, ele vê; na órbita, uma pedra de obsidiana)*
+- **Passiva — Meu Olho Voa:** o corvo marca para o esquadrão os inimigos que vê.
+- **Tática — Voo do Olho:** assume o corvo (voa, escaneia baús e Torres Arcanas) OU o pousa no ombro de um aliado: em modo sentinela, marca automaticamente inimigos a 20m daquele aliado.
+- **Suprema — Grasnido do Fim:** pulso antimagia na área: 50 de dano em escudo, **derruba 1 nível de escudo evolutivo** e destrói armadilhas/construções.
+- ⚖️ Enquanto voa o corvo, o corpo fica parado e indefeso; o corvo tem 60 de vida e bate asas audivelmente; em modo sentinela perde o controle manual (recon OU guarda-costas); o Grasnido quebra construções aliadas também.
 
-**6. Olho-de-Éter, o Observador** *(Seer)*
-- **Passiva — Batimento Arcano:** ao mirar sem atirar, sente a direção de corações batendo a até 75m.
-- **Tática — Espíritos Perscrutadores:** lança um enxame em linha; quem for tocado tem a conjuração/cura **interrompida** e fica revelado 6s.
-- **Suprema — Câmara dos Sussurros:** domo grande e imóvel que revela inimigos que se movam rápido dentro dele.
-- ⚖️ A tática tem 1,4s de atraso e túnel estreito (errável); o domo é visível de longe (anuncia sua posição) e inimigos agachados/lentos não aparecem.
+**6. Olho-de-Éter, o Observador** *(surdo desde a febre da infância; as mariposas-de-éter são os ouvidos dele — sentem vibração e a traduzem em luz)*
+- **Passiva — Pó de Éter:** inimigos que conjuraram nos últimos 5s carregam poeira luminosa visível para ele a até 40m.
+- **Tática — Enxame Perscrutador:** enxame em linha; quem for tocado tem a conjuração/cura **interrompida** e fica revelado 6s.
+- **Suprema — Crisálida:** casulo que eclode após 2s: mariposas pousam nos inimigos num raio grande — revelados por 6s.
+- ⚖️ A passiva só sente quem CONJUROU (segurar a magia é a contra-jogada); o enxame tem 1,4s de atraso e túnel estreito; o casulo é destrutível antes de eclodir (60 de vida); fogo em área queima as mariposas e limpa a marca (§14).
 
 ### GUARDIÃO
 
-**7. Vitalis, a Mão que Cura** *(Lifeline)*
-- **Passiva — Toque Rápido:** revive aliados com uma fada (você continua lutando enquanto a fada revive).
-- **Tática — Fada Curandeira:** a fada cura um alvo (8 hp/s por 12s) enquanto o segue.
-- **Suprema — Baú Celestial:** invoca um baú caindo do céu com escudo/cura/melhoria garantidos.
-- ⚖️ A fada de revive não gera escudo (o Apex removeu o escudo por ser forte demais — copiamos a lição); a fada de cura pode ser dissipada com qualquer dano nela; o baú brilha no céu = todo mundo vê onde você está.
+**7. Vitalis, a Mão que Cura** *(a fada Lúmen é a irmã gêmea dela, presa entre mundos desde o afogamento; o Círculo do §16.6 é o projeto de vida de Vitalis)*
+- **Passiva — Mãos Livres:** Lúmen reergue aliados caídos enquanto Vitalis continua lutando.
+- **Tática — Vai, Lúmen:** envia Lúmen a um aliado a até 30m: cura 8 hp/s por 12s.
+- **Suprema — Jardim da Aurora:** círculo de luz por 10s: aliados dentro regeneram 8 hp/s e reerguer/reviver é 50% mais rápido; inimigos dentro não recebem NENHUMA cura.
+- ⚖️ Lúmen reerguendo não gera escudo (lição do Apex, mantida); qualquer dano dissipa Lúmen (volta para Vitalis; a cura para); com Lúmen longe, Vitalis fica SEM a passiva (escolha real); o Jardim é visível através de paredes para todos.
 
-**8. Ilusionista, o Espelho** *(Mirage)*
-- **Passiva — Último Truque:** ao ser derrubado, fica invisível por 3s e cria um clone caído.
-- **Tática — Reflexo:** envia 1 clone que anda numa direção; se o inimigo atira nele, é revelado.
-- **Suprema — Baile de Espelhos:** cria 5 clones em volta e fica invisível por 2,5s.
-- ⚖️ Clones não causam dano, somem com 1 hit e não atravessam obstáculos direito (observadores atentos percebem); a invisibilidade quebra ao conjurar; um shimmer sutil é visível de perto.
+**8. Ilusionista, o Espelho** *(passou 3 anos preso num espelho e saiu invertido; um dos reflexos do Baile é o original — nem ele sabe qual)*
+- **Passiva — Truque de Fuga:** ao ser derrubado, quebra em cacos de luz: invisível 3s + um reflexo caído no lugar.
+- **Tática — Espelho de Mão:** espelho de corpo inteiro fixo por 2s: DEVOLVE até 3 projéteis mágicos como reflexos com 30% do dano.
+- **Suprema — Baile de Espelhos:** 5 reflexos que ESPELHAM os movimentos dele em tempo real (invertidos) + 2,5s invisível; reflexo quebrado ofusca 0,5s quem o quebrou de perto.
+- ⚖️ O espelho não bloqueia corpo a corpo/área e quebra após 3 devoluções (som de vidro); reflexos não causam dano e movem-se invertidos (observador atento nota); invisibilidade quebra ao conjurar; shimmer visível de perto.
 
 ### DOMINADOR
 
-**9. Vex, o Alquimista da Peste** *(Caustic)*
-- **Passiva — Visão Pestilenta:** vê inimigos dentro do próprio gás com contorno verde.
-- **Tática — Totem de Peste:** até 6 totens-armadilha que explodem em gás quando inimigos chegam perto.
-- **Suprema — Bomba Miasma:** granada que cobre uma área enorme de gás por 12s.
-- ⚖️ O gás causa dano BAIXO (4→10 por tick) e desacelera — mata devagar, o objetivo é negar área, não ser um "mate tudo"; **magias de vento dispersam o gás** e **fogo o incendeia e consome em 2s** (contraplay elemental); totens têm base destrutível com 1 tiro.
+**9. Vex, o Alquimista da Peste** *(perdeu os pulmões na Grande Obra fracassada; um fole alquímico de latão no peito respira por ele — o "gás" é o ar que ele exala, transmutado)*
+- **Passiva — Olhos do Miasma:** vê inimigos dentro da própria névoa com contorno verde.
+- **Tática — Frascos de Reagente:** até 6 frascos que viram poças inertes (armam em 1s); pisar detona a nuvem local — dano baixo + lentidão.
+- **Suprema — A Grande Obra:** transmuta o ar numa área enorme por 12s: névoa que desacelera e SELA consumíveis — ninguém dentro (nem aliado) usa poção, cura ou pergaminho.
+- ⚖️ A névoa causa dano BAIXO (nega área, não mata); **vento dispersa** e **fogo incendeia e consome em 2s** (§14); um tiro no frasco detona a nuvem à distância (desperdiçada); o selo da Grande Obra vale para o time DELE também (dois gumes máximo).
 
-**10. Tessa, a Tecelã de Raios** *(Wattson)*
-- **Passiva — Circuito Vivo:** pergaminhos de escudo restauram escudo completo; regenera escudo lentamente sozinha.
-- **Tática — Cerca de Corrente:** até 12 pilares que criam cercas elétricas (dano + lentidão + revela quem passa).
-- **Suprema — Pilar Devorador:** estrutura que **absorve projéteis mágicos inimigos** no raio e recarrega escudos aliados.
-- ⚖️ Cercas são visíveis e brilhantes (ninguém passa "sem querer" em luta consciente); pilares quebram com 1 golpe; o Pilar Devorador não absorve magias de curtíssimo alcance nem corpo a corpo; máx. 1 pilar por vez.
+**10. Tessa, a Tecelã de Raios** *(sobreviveu a um raio aos 9: cicatrizes de Lichtenberg no braço e um coração sem compasso — corrigido por um marca-passo rúnico que ela mesma forjou)*
+- **Passiva — Compasso Rúnico:** o marca-passo regenera escudo lentamente; pergaminhos de escudo restauram tudo; quando o escudo QUEBRA, +15% de velocidade por 2s.
+- **Tática — Fio do Tear:** fio de raio entre 2 pontos (até 6 fios): tocar = dano + lentidão + revela; brilha e zumbe a menos de 5m.
+- **Suprema — Tear-Mãe:** tear rúnico giratório que **absorve projéteis mágicos inimigos** e TECE o absorvido em escudo para aliados próximos.
+- ⚖️ Fios quebram com 1 golpe em qualquer âncora; brilho + zumbido a 5m (counter em cor + forma + som, §10); o Tear-Mãe não absorve curtíssimo alcance nem corpo a corpo, máx. 1 por vez; água no chão conduz o raio dos fios para TODOS, inclusive o time dela (§14).
 
 ---
 

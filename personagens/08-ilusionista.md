@@ -1,24 +1,41 @@
 # Ilusionista, o Espelho
 
-**Classe:** Guardião · **Inspiração:** Mirage (Apex Legends) · **Fonte do kit:** GDD §3
+**Classe:** Guardião · **Função:** Suporte / engano
+**Origem do conceito:** partiu de Mirage (Apex) — **descolado em 20/08/2026** (ordem do Diretor). Ecos: contos de espelho (Alice, o Espelho de Ojesed), mágicos de palco da era de ouro.
+**Fonte do kit:** GDD §3 (revisado 20/08)
+
+## Aparência física
+1,76m, sorriso fácil de showman — e olhos ESPELHADOS: de perto, não têm íris, refletem quem olha. Aprendiz de um mago de espelhos, ficou PRESO dentro de um espelho do mestre por três anos; saiu pelo lado errado: o corpo voltou invertido (o coração bate à direita, o cabelo cai para o lado oposto do que caía, e ele, que era destro, hoje é canhoto). Pior — ou melhor, ele nunca decide: **um dos reflexos do Baile é o original dele, e nem ele sabe qual.** Faz piada disso. A piada nunca chega inteira aos olhos.
+
+## Vestuário
+Casaca de gala roxa bordada de fio dourado com os botões do lado ERRADO (alfaiate nenhum conserta — a roupa insiste em ser reflexo); cartola opcional de pose; luvas brancas; abotoaduras de caco de espelho do espelho original (ele guarda todos os cacos).
+
+## Personalidade & história curta
+Fala pelos cotovelos, apelida todo mundo no primeiro minuto, odeia silêncio (três anos de silêncio bastaram). Generoso em combate como só quem já ficou sozinho sabe ser: os truques dele existem para os OUTROS escaparem.
 
 ## Kit
-- **Passiva — Último Truque:** ao ser derrubado, fica invisível por 3s e cria um clone caído.
-- **Tática — Reflexo:** envia 1 clone que anda numa direção; se o inimigo atira nele, é revelado.
-- **Suprema — Baile de Espelhos:** cria 5 clones em volta e fica invisível por 2,5s.
+- **Passiva — Truque de Fuga:** ao ser derrubado, quebra em cacos de luz: fica invisível por 3s e deixa um reflexo caído no lugar.
+- **Tática — Espelho de Mão:** conjura um espelho de corpo inteiro fixo por 2s: DEVOLVE até 3 projéteis mágicos como reflexos com 30% do dano, na direção de quem atirou.
+- **Suprema — Baile de Espelhos:** 5 reflexos surgem ao redor e ESPELHAM os movimentos dele em tempo real (invertidos, como num salão de baile); ele fica invisível por 2,5s. Reflexo quebrado solta um flash que ofusca por 0,5s quem o quebrou de perto.
 
 ## ⚖️ Limitadores (o preço do poder — parte do kit, não corte)
-Clones não causam dano, somem com 1 hit e não atravessam obstáculos direito; a invisibilidade quebra ao conjurar; um shimmer sutil é visível de perto.
+O espelho da tática não bloqueia corpo a corpo nem magias de área, e quebra sozinho após 3 devoluções (som de vidro alto — todos sabem); os reflexos do Baile não causam dano e movem-se INVERTIDOS — observador atento nota o passo trocado; a invisibilidade quebra ao conjurar e tem shimmer visível de perto; o flash de 0,5s só pega a curtíssima distância (quem quebra de longe não paga nada).
 
-## Direção visual (proposta da equipe — a arte do Diretor MANDA)
-Showman: sorriso fácil, casaca de gala bordada, gestos largos. Roxos e dourados de palco; os clones usam o MESMO modelo com shader de brilho.
+## VFX de assinatura
+Tudo nele estilhaça e se recompõe em cacos de luz (nunca sangue, nunca dor — vidro e palco); os reflexos têm um brilho de moldura dourada por 1 frame quando surgem; o Espelho de Mão toca um acorde de taça de cristal ao devolver.
+
+## Paleta
+Roxo de palco #6B3FA0 · dourado #F0C75E · prata-espelho #D8D8E0
+
+## Notas de modelagem 3D
+Mesmo modelo para os reflexos com shader de brilho (barato, já planejado); animação dos reflexos = a dele com mirror no eixo X (de graça no rig). Olhos com material reflexivo simples. ~3k vértices.
 
 > **REFORMULADA 20/08 (a arte MANDA):** olhos espelhados e detalhes do traje invertidos (como reflexo). Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
 
 ## Arte do Diretor
 > Solte os arquivos em `personagens/08-ilusionista/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
-> perder (adereço, arma, símbolo).
+> perder (os botões invertidos, os olhos espelhados, as abotoaduras).
 
 - [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
