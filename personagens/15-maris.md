@@ -39,3 +39,5 @@ Silhueta ondulante (o vestido é 60% do modelo), cabelo em fitas verticais flutu
 
 ## Status no jogo
 - [ ] kit aprovado pelo Diretor · [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+
+> **PENDENTE 20/08:** ficou faltando no lote original de imagens — prompt canônico em `arte/prompt.txt`.

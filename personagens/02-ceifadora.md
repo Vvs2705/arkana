@@ -13,15 +13,17 @@ O laço é destrutível com 1 golpe corpo a corpo; a fenda é de mão única e Q
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Elegância fúnebre: silhueta afiada, meia-máscara, lâmina espectral como cajado. Frio e cortante — violetas do Vazio sobre preto, detalhe dourado mínimo.
 
+> **REFORMULADA 20/08 (a arte MANDA):** kintsugi na PELE (rachaduras douradas), a foice, e ela não projeta sombra. Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/02-ceifadora/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

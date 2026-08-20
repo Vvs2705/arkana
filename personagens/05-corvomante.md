@@ -13,15 +13,17 @@ Enquanto controla o corvo, o corpo fica parado e indefeso; o corvo tem 60 de vid
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Erudito recluso: sobretudo de colarinho alto, luneta rúnica no olho, o CORVO espectral é metade do personagem (modelar os dois). Verdes arcanos e cinzas; o corvo em energia translúcida.
 
+> **REFORMULADA 20/08 (a arte MANDA):** olho de obsidiana; o corvo carrega o olho verdadeiro dele. Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/05-corvomante/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

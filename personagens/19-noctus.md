@@ -32,7 +32,7 @@ Silhueta vertical elegante, gola alta + capa-névoa são a assinatura (a névoa 
 ## Arte do Diretor
 > Solte os arquivos em `personagens/19-noctus/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

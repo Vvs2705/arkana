@@ -32,7 +32,7 @@ Silhueta minúscula + mochila ENORME (o personagem é a mochila). Torreta e bobi
 ## Arte do Diretor
 > Solte os arquivos em `personagens/16-fizz/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

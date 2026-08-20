@@ -32,7 +32,7 @@ Silhueta orgânica assimétrica (galhos > simetria), o cabelo-estação é shade
 ## Arte do Diretor
 > Solte os arquivos em `personagens/17-sylva/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

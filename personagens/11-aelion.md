@@ -32,7 +32,7 @@ Silhueta vertical fina, o ARCO longo curvo é o adereço-assinatura (modelar arc
 ## Arte do Diretor
 > Solte os arquivos em `personagens/11-aelion/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

@@ -32,7 +32,7 @@ Silhueta BRUTAL assimétrica (o fragmento de obelisco quebra a simetria). Sem bo
 ## Arte do Diretor
 > Solte os arquivos em `personagens/18-basalto/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

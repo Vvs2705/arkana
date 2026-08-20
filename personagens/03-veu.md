@@ -13,15 +13,17 @@
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Pequena e rápida: capuz fechado, cachecol longo que flutua como fumaça, olhos brancos etéreos. Azuis frios e branco espectral; o rastro dela é parte do visual.
 
+> **REFORMULADA 20/08 (a arte MANDA):** mão esquerda semi-espectral com luva rúnica. Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/03-veu/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

@@ -15,6 +15,19 @@
 ## Funções (a taxonomia do Diretor)
 **Suporte/Vida** · **Ataque/Perseguição** · **Longa distância** · **Curta distância**
 
+## Status das artes (20/08/2026)
+
+**19 de 20 retratos entregues** pelo Diretor (falta só **15-maris**, que ficou
+fora do lote original). Cada um está em `personagens/NN-slug/arte/concept.png`
+e já aparece na vitrine do jogo (`godot/menu/art/NN.png` — troca automática).
+
+**9 imagens marcadas para REGERAÇÃO** (nota do Diretor): os personagens 01–10
+foram reformulados (descolados do Apex, marcas mágicas no corpo) e as imagens
+atuais vieram das fichas antigas — 01, 02, 03, 05, 07, 08, 09, 10 e 15.
+O prompt canônico de cada uma está em `personagens/NN-slug/arte/prompt.txt`;
+a regeração usa créditos do gerador de imagem e é ato do Diretor.
+Já corretas: 04-corvus e 06-olho-de-eter.
+
 | # | Personagem | Raça | Função | Inspiração |
 |---|---|---|---|---|
 | 01 | Pyra, a Chama de Guerra | Humana | Ataque / média dist. | Bangalore |

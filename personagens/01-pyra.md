@@ -13,15 +13,17 @@ A fumaça cega ela e os aliados também (sem visão privilegiada); os meteoros t
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Soldada do fogo: postura militar, armadura leve chamuscada sobre túnica de guerra, brasas vivas nos punhos e na bainha do manto. Paleta: Fogo #FF5A2A sobre azul-noite, metais escurecidos.
 
+> **REFORMULADA 20/08 (a arte MANDA):** braço de chama viva contido numa manopla de bronze + cicatrizes de queimadura no pescoço. Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/01-pyra/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

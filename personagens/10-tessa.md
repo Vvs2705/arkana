@@ -13,15 +13,17 @@ Cercas são visíveis e brilhantes; pilares quebram com 1 golpe; o Pilar Devorad
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Engenheira jovem e simpática: macacão com bobinas, luvas isolantes, faíscas de Raio #F5D90A no cabelo. Amarelos elétricos + azul-noite; PILAR e CERCA também precisam de modelo.
 
+> **REFORMULADA 20/08 (a arte MANDA):** cicatrizes de Lichtenberg + marca-passo rúnico. Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/10-tessa/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

@@ -32,7 +32,7 @@ Silhueta massiva e curvada, o cajado-totem em riste. Totem = modelo próprio. ~4
 ## Arte do Diretor
 > Solte os arquivos em `personagens/14-gromm/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

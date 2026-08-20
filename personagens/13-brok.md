@@ -32,7 +32,7 @@ Silhueta baixa e LARGA (contraste com os elfos), martelo desproporcional. Bigorn
 ## Arte do Diretor
 > Solte os arquivos em `personagens/13-brok/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)

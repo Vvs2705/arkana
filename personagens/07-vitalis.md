@@ -13,15 +13,17 @@ A fada de revive não gera escudo; a fada de cura pode ser dissipada com qualque
 ## Direção visual (proposta da equipe — a arte do Diretor MANDA)
 Curandeira de campo: bolsas de poções, vestes práticas arregaçadas, a FADA luminosa sempre por perto (modelar as duas). Branco + dourado #F0C75E + toques de Água #2AA7FF.
 
+> **REFORMULADA 20/08 (a arte MANDA):** a fada Lumen é uma MENINA de luz (irmã gêmea). Imagem atual foi gerada com a ficha ANTIGA — regeração pendente (prompt canônico em `arte/prompt.txt`).
+
 ## Arte do Diretor
 > Solte os arquivos em `personagens/07-vitalis/arte/` (crie a pasta). O que ajuda a
 > modelagem 3D: frente/costas/lado, paleta, e qualquer detalhe que não pode se
 > perder (adereço, arma, símbolo).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [ ] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado

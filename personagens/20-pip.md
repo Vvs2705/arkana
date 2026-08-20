@@ -32,7 +32,7 @@ Silhueta minúscula VOADORA (âncora de animação: nunca toca o chão), 4 asas 
 ## Arte do Diretor
 > Solte os arquivos em `personagens/20-pip/arte/` (crie a pasta).
 
-- [ ] concept frente
+- [x] concept frente (`arte/concept.png`, 20/08)
 - [ ] concept costas/lado
 - [ ] paleta final
 - [ ] extras (adereços, VFX de assinatura)
