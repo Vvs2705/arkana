@@ -13,6 +13,7 @@ var cam: Camera3D
 var _fire_cd := 0.0
 var _cast := 0.0
 var _want_fire := false
+var _want_dodge := false
 var _aiming := false
 
 
@@ -20,6 +21,15 @@ func _ready() -> void:
 	super()
 	add_to_group("player")
 	_build_camera()
+	Bus.element_changed.emit(element)  # HUD sincroniza carrossel/cadencia no spawn
+
+
+## Troca de elemento (carrossel). So' aceita o que Balance.ELEMENTS conhece.
+func set_element(el: String) -> void:
+	if el == element or not (el in Balance.ELEMENTS):
+		return
+	element = el
+	Bus.element_changed.emit(el)
 
 
 func _build_camera() -> void:
@@ -54,6 +64,10 @@ func request_fire() -> void:
 	_want_fire = true  # consumido no _physics_process (raycast precisa do passo de fisica)
 
 
+func request_dodge() -> void:
+	_want_dodge = true  # consumido no _physics_process (precisa da direcao de movimento)
+
+
 func _physics_process(delta: float) -> void:
 	cam_yaw.global_position = global_position + Vector3(0, 1.5, 0)
 	_fire_cd = maxf(_fire_cd - delta, 0.0)
@@ -63,8 +77,10 @@ func _physics_process(delta: float) -> void:
 		Bus.mana_changed.emit(mana, float(Balance.PLAYER.mana_max))
 	apply_gravity(delta)
 	var dir := _move_dir()
-	velocity.x = dir.x * current_speed()
-	velocity.z = dir.z * current_speed()
+	if _want_dodge:
+		_want_dodge = false
+		try_dodge(dir)
+	move_velocity(dir, delta)  # produto unico + dash + knockback (caminho do Pawn)
 	move_and_slide()
 	if _aiming:
 		rotation.y = lerp_angle(rotation.y, cam_yaw.rotation.y, 12.0 * delta)
@@ -89,16 +105,17 @@ func _move_dir() -> Vector3:
 
 
 func _try_fire() -> void:
-	if _fire_cd > 0.0 or mana < float(Balance.FIRE.mana_cost):
+	var s: Dictionary = Projectile.spec(element)  # custo/cadencia por elemento (Balance)
+	if _fire_cd > 0.0 or mana < float(s.mana_cost):
 		return
-	mana -= float(Balance.FIRE.mana_cost)
+	mana -= float(s.mana_cost)
 	Bus.mana_changed.emit(mana, float(Balance.PLAYER.mana_max))
-	_fire_cd = float(Balance.FIRE.fire_rate)
+	_fire_cd = float(s.fire_rate)
 	_cast = 0.3
 	rotation.y = cam_yaw.rotation.y  # o personagem gira para a mira ao disparar
 	var from := global_position + Vector3(0, 1.4, 0)
 	var aim_dir := (_aim_point() - from).normalized()
-	Projectile.launch(get_parent(), self, from + aim_dir * 0.9, aim_dir)
+	Projectile.launch(get_parent(), self, from + aim_dir * 0.9, aim_dir, element)
 	anim("cast")
 
 
@@ -106,7 +123,7 @@ func _try_fire() -> void:
 func _aim_point() -> Vector3:
 	var cam_from := cam.global_position
 	var cam_dir := -cam.global_transform.basis.z
-	var to := cam_from + cam_dir * float(Balance.FIRE.range)
+	var to := cam_from + cam_dir * float(Projectile.spec(element).range)
 	var q := PhysicsRayQueryParameters3D.create(cam_from, to)
 	q.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)

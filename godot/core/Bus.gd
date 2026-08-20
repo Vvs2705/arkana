@@ -10,3 +10,5 @@ signal match_started
 signal match_over(victory: bool)
 signal mana_changed(current: float, max: float)
 signal health_changed(current: float, max: float)
+signal element_changed(element: String)
+signal game_start_requested  # o menu pede a partida; quem troca de cena e' o Main

@@ -4,12 +4,19 @@ class_name Pawn
 extends CharacterBody3D
 
 const MAGE_SCENE := "res://characters/Mage.tscn"
+const KNOCK_DECAY := 9.0  # m/s^2 — KNOB local; pedir entrada em Balance se sobreviver ao playtest
 
 var hp: float = float(Balance.PLAYER.hp)
+var element := "fire"    # padrao do carrossel (Balance.ELEMENTS)
 var speed_factor := 1.0  # bots reduzem aqui, nunca no Balance
 var terrain_mult := 1.0  # G2 (gelo/agua) escreve aqui
 var status_mult := 1.0   # lentidao/buff escrevem aqui
+var iframes_left := 0.0  # esquiva: Combat.deal barra dano enquanto > 0
+var knockback := Vector3.ZERO
 var visual: Node3D
+var _dodge_left := 0.0
+var _dodge_cd := 0.0
+var _dodge_dir := Vector3.ZERO
 var _cur_anim := ""
 var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 
@@ -17,6 +24,52 @@ var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_grav
 ## Velocidade e' PRODUTO UNICO (regra provada) — ninguem escreve m/s direto.
 func current_speed() -> float:
 	return float(Balance.PLAYER.speed) * terrain_mult * status_mult * speed_factor
+
+
+## Caminho UNICO da velocidade horizontal: produto unico + dash + knockback.
+## Player e Bot passam por aqui — ninguem escreve velocity.x/z por fora.
+func move_velocity(dir: Vector3, delta: float) -> void:
+	_dodge_cd = maxf(_dodge_cd - delta, 0.0)
+	iframes_left = maxf(iframes_left - delta, 0.0)
+	knockback = knockback.move_toward(Vector3.ZERO, KNOCK_DECAY * delta)
+	if _dodge_left > 0.0:
+		_dodge_left -= delta
+		var v := float(Balance.DODGE.distance) / float(Balance.DODGE.duration)
+		velocity.x = _dodge_dir.x * v
+		velocity.z = _dodge_dir.z * v
+		return
+	velocity.x = dir.x * current_speed() + knockback.x
+	velocity.z = dir.z * current_speed() + knockback.z
+
+
+func dodge_ready() -> bool:
+	return _dodge_cd <= 0.0 and hp > 0.0
+
+
+## Fracao 0..1 do cooldown de esquiva (1 = acabou de usar). A UI so' LE.
+func dodge_cd_frac() -> float:
+	return _dodge_cd / float(Balance.DODGE.cooldown)
+
+
+## Dash na direcao do movimento (parado: para onde olha) com i-frames curtos.
+## Todos os numeros vem de Balance.DODGE.
+func try_dodge(dir: Vector3) -> bool:
+	if not dodge_ready():
+		return false
+	dir.y = 0.0
+	if dir.length_squared() < 0.0001:
+		dir = -global_transform.basis.z
+		dir.y = 0.0
+	_dodge_dir = dir.normalized()
+	_dodge_left = float(Balance.DODGE.duration)
+	_dodge_cd = float(Balance.DODGE.cooldown)
+	iframes_left = float(Balance.DODGE.iframes)
+	return true
+
+
+## Empurrao transitorio (feedback de acerto) — decai sozinho em move_velocity.
+func apply_knockback(v: Vector3) -> void:
+	knockback += v
 
 
 func _ready() -> void:

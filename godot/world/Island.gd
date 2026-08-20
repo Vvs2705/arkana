@@ -52,6 +52,9 @@ var _toon: ShaderMaterial
 var _water_sea: ShaderMaterial
 var _water_lake: ShaderMaterial
 var _water_marsh: ShaderMaterial
+var _grass_mat: ShaderMaterial
+var _flower_mat: ShaderMaterial
+var _mist_mat: ShaderMaterial
 
 
 func _ready() -> void:
@@ -60,9 +63,17 @@ func _ready() -> void:
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_toon = ShaderMaterial.new()
 	_toon.shader = load("res://world/toon.gdshader")
-	_water_sea = _water_mat(Color("2f8fe0"), Color("103f8a"), 0.16)
-	_water_lake = _water_mat(Color("2aa7ff"), Color("1668c9"), 0.07)
-	_water_marsh = _water_mat(Color("55c9b0"), Color("1f7f8c"), 0.04)
+	_water_sea = _water_mat(Color("2f8fe0"), Color("103f8a"), 0.16, 0.0)
+	_water_lake = _water_mat(Color("2aa7ff"), Color("1668c9"), 0.07, 1.0)
+	_water_marsh = _water_mat(Color("55c9b0"), Color("1f7f8c"), 0.04, 1.0)
+	var grass_sh := load("res://world/grass.gdshader")
+	_grass_mat = ShaderMaterial.new()
+	_grass_mat.shader = grass_sh
+	_flower_mat = ShaderMaterial.new()
+	_flower_mat.shader = grass_sh
+	_flower_mat.set_shader_parameter("sway", 0.05)
+	_mist_mat = ShaderMaterial.new()
+	_mist_mat.shader = load("res://world/mist.gdshader")
 	_build()
 
 
@@ -79,6 +90,10 @@ func _build() -> void:
 	_build_ruins(gen)
 	_build_marsh(gen)
 	_build_rocks(gen)
+	_build_grass(gen)
+	_build_flowers(gen)
+	_build_fireflies(gen)
+	_build_mist(gen)
 	_snap_spawns()
 
 
@@ -171,12 +186,13 @@ func _build_terrain(parent: Node3D) -> void:
 
 # ---------------------------------------------------------------- agua
 
-func _water_mat(shallow: Color, deep: Color, wave: float) -> ShaderMaterial:
+func _water_mat(shallow: Color, deep: Color, wave: float, edge: float) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = load("res://world/water.gdshader")
 	m.set_shader_parameter("shallow_color", shallow)
 	m.set_shader_parameter("deep_color", deep)
 	m.set_shader_parameter("wave_height", wave)
+	m.set_shader_parameter("edge_foam", edge)
 	return m
 
 
@@ -193,27 +209,43 @@ func _build_water(parent: Node3D) -> void:
 			Transform3D(Basis.IDENTITY, Vector3(MARSH.x, 0.55, MARSH.y)), "MarshWater", false)
 
 
+## Disco em aneis; COLOR.r = fracao do raio (0 centro, 1 borda) — os shaders
+## de agua/nevoa usam isso p/ espuma de margem e fade de borda (G2).
 func _disc_mesh(radius: float, mat: Material) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.set_color(Color.WHITE)
 	var segs := 24
 	var rings := [0.3, 0.55, 0.8, 1.0]
 	for i in segs:
 		var a0 := TAU * i / segs
 		var a1 := TAU * (i + 1) / segs
 		var r0: float = rings[0] * radius
+		st.set_color(Color(0, 0, 0))
 		st.add_vertex(Vector3.ZERO)
+		st.set_color(Color(rings[0], 0, 0))
 		st.add_vertex(Vector3(cos(a0) * r0, 0, sin(a0) * r0))
 		st.add_vertex(Vector3(cos(a1) * r0, 0, sin(a1) * r0))
 		for k in rings.size() - 1:
 			var ri: float = rings[k] * radius
 			var ro: float = rings[k + 1] * radius
-			_quad(st,
-				Vector3(cos(a0) * ri, 0, sin(a0) * ri),
-				Vector3(cos(a0) * ro, 0, sin(a0) * ro),
-				Vector3(cos(a1) * ro, 0, sin(a1) * ro),
-				Vector3(cos(a1) * ri, 0, sin(a1) * ri), Color.WHITE)
+			var ci := Color(rings[k], 0, 0)
+			var co := Color(rings[k + 1], 0, 0)
+			var i0 := Vector3(cos(a0) * ri, 0, sin(a0) * ri)
+			var o0 := Vector3(cos(a0) * ro, 0, sin(a0) * ro)
+			var o1 := Vector3(cos(a1) * ro, 0, sin(a1) * ro)
+			var i1 := Vector3(cos(a1) * ri, 0, sin(a1) * ri)
+			# mesma ordem do _quad(i0,o0,o1,i1), com cor por anel
+			st.set_color(ci)
+			st.add_vertex(i0)
+			st.set_color(co)
+			st.add_vertex(o0)
+			st.add_vertex(o1)
+			st.set_color(ci)
+			st.add_vertex(i0)
+			st.set_color(co)
+			st.add_vertex(o1)
+			st.set_color(ci)
+			st.add_vertex(i1)
 	st.generate_normals()
 	var m := st.commit()
 	m.surface_set_material(0, mat)
@@ -471,6 +503,158 @@ func _rock_mesh() -> ArrayMesh:
 	return m
 
 
+# ---------------------------------------------------------------- vida (G2)
+
+## Normal.y aproximada do terreno (mesmo esquema do _build_terrain).
+func _terrain_ny(x: float, z: float) -> float:
+	var e := 0.6
+	return Vector3(height(x - e, z) - height(x + e, z), 2.0 * e,
+			height(x, z - e) - height(x, z + e)).normalized().y
+
+
+func _build_grass(parent: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 61
+	var xf: Array[Transform3D] = []
+	var cols := PackedColorArray()
+	var tries := 0
+	# ponytail: scatter por rejeicao, roda 1x no load (<100ms); sem checagem
+	# de espacamento — tufos sobrepostos leem como moita, nao como bug
+	while xf.size() < 3000 and tries < 12000:
+		tries += 1
+		var p := Vector2(rng.randf_range(-74, 74), rng.randf_range(-74, 74))
+		if p.length() > 74 or p.distance_to(LAKE) < LAKE_R + 2 or p.distance_to(MARSH) < MARSH_R:
+			continue
+		var h := height(p.x, p.y)
+		if h < 1.05 or h > 7.3 or _terrain_ny(p.x, p.y) < 0.66:
+			continue
+		var s := rng.randf_range(0.7, 1.4)
+		var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU)) \
+				.scaled(Vector3(s, rng.randf_range(0.8, 1.2) * s, s))
+		xf.append(Transform3D(b, Vector3(p.x, h - 0.06, p.y)))
+		var v := rng.randf_range(-0.12, 0.12)
+		cols.append(Color(1.0 + v * 1.6, 1.0 + v, 1.0 + v * 0.4))
+	_multimesh(parent, _grass_mesh(), xf, "Grass", false, cols)
+
+
+func _grass_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var base := Color(0.14, 0.34, 0.18)   # pe' escuro = oclusao de graca
+	var tip := Color(0.5, 0.86, 0.45)
+	for k in 2:
+		var ang := k * PI * 0.5
+		var d := Vector3(cos(ang), 0, sin(ang))
+		var b0 := -d * 0.3
+		var b1 := d * 0.3
+		var t1 := d * 0.11 + Vector3(0, 0.55, 0)
+		var t0 := -d * 0.11 + Vector3(0, 0.55, 0)
+		st.set_color(base)
+		st.add_vertex(b0)
+		st.add_vertex(b1)
+		st.set_color(tip)
+		st.add_vertex(t1)
+		st.set_color(base)
+		st.add_vertex(b0)
+		st.set_color(tip)
+		st.add_vertex(t1)
+		st.add_vertex(t0)
+	st.generate_normals()
+	var m := st.commit()
+	m.surface_set_material(0, _grass_mat)
+	return m
+
+
+func _build_flowers(parent: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 71
+	# petalas na paleta GDD §10: dourado arcano, Vento, rosa, branco
+	var petals: Array[Color] = [Color("f0c75e"), Color("8fe8c9"), Color("ff8ab3"), Color("f5f0ff")]
+	var xf: Array[Transform3D] = []
+	var cols := PackedColorArray()
+	var tries := 0
+	while xf.size() < 240 and tries < 4000:
+		tries += 1
+		var p := Vector2(rng.randf_range(-72, 72), rng.randf_range(-72, 72))
+		var near_poi: bool = p.distance_to(LAKE) < LAKE_R + 9 \
+				or p.distance_to(FOREST) < FOREST_R or p.distance_to(RUINS) < RUINS_R + 6
+		if not near_poi or p.distance_to(LAKE) < LAKE_R + 1 or p.distance_to(MARSH) < MARSH_R:
+			continue
+		var h := height(p.x, p.y)
+		if h < 1.05 or h > 7.2 or _terrain_ny(p.x, p.y) < 0.7:
+			continue
+		var s := rng.randf_range(0.8, 1.2)
+		xf.append(Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(s, s, s)),
+				Vector3(p.x, h - 0.03, p.y)))
+		cols.append(petals[rng.randi_range(0, petals.size() - 1)])
+	_multimesh(parent, _flower_mesh(), xf, "Flowers", false, cols)
+
+
+func _flower_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var stem := Color(0.35, 0.55, 0.3)
+	var head := Color(1, 1, 1)   # a tinta da instancia da' a cor da petala
+	for k in 2:
+		var ang := k * PI * 0.5
+		var d := Vector3(cos(ang), 0, sin(ang))
+		var b0 := -d * 0.09
+		var b1 := d * 0.09
+		var t1 := d * 0.14 + Vector3(0, 0.34, 0)
+		var t0 := -d * 0.14 + Vector3(0, 0.34, 0)
+		st.set_color(stem)
+		st.add_vertex(b0)
+		st.add_vertex(b1)
+		st.set_color(head)
+		st.add_vertex(t1)
+		st.set_color(stem)
+		st.add_vertex(b0)
+		st.set_color(head)
+		st.add_vertex(t1)
+		st.add_vertex(t0)
+	st.generate_normals()
+	var m := st.commit()
+	m.surface_set_material(0, _flower_mat)
+	return m
+
+
+func _build_fireflies(parent: Node3D) -> void:
+	# vagalumes da floresta no entardecer — HDR + glow do Environment acende
+	# ponytail: CPUParticles (24 particulas) — mais previsivel que GPUParticles
+	# na zoologia de drivers Android; 1 draw call
+	var p := CPUParticles3D.new()
+	p.name = "Fireflies"
+	p.amount = 24
+	p.lifetime = 8.0
+	p.preprocess = 8.0
+	p.randomness = 0.5
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(FOREST_R * 0.8, 2.2, FOREST_R * 0.8)
+	p.spread = 180.0
+	p.gravity = Vector3.ZERO
+	p.initial_velocity_min = 0.25
+	p.initial_velocity_max = 0.7
+	p.scale_amount_min = 0.06
+	p.scale_amount_max = 0.11
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(2.3, 1.9, 0.7)   # dourado arcano em HDR
+	quad.material = m
+	p.mesh = quad
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.position = Vector3(FOREST.x, height(FOREST.x, FOREST.y) + 2.6, FOREST.y)
+	parent.add_child(p)
+
+
+func _build_mist(parent: Node3D) -> void:
+	_add_mesh(parent, _disc_mesh(MARSH_R + 3.0, _mist_mat),
+			Transform3D(Basis.IDENTITY, Vector3(MARSH.x, 1.15, MARSH.y)), "MarshMist", false)
+
+
 # ---------------------------------------------------------------- helpers
 
 func _snap_spawns() -> void:
@@ -490,13 +674,17 @@ func _add_mesh(parent: Node3D, mesh: Mesh, t: Transform3D, nm: String, shadows :
 	return mi
 
 
-func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: String, shadows := true) -> void:
+func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: String,
+		shadows := true, colors := PackedColorArray()) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = colors.size() > 0
 	mm.mesh = mesh
 	mm.instance_count = xforms.size()
 	for i in xforms.size():
 		mm.set_instance_transform(i, xforms[i])
+		if mm.use_colors:
+			mm.set_instance_color(i, colors[i])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = nm
 	mmi.multimesh = mm

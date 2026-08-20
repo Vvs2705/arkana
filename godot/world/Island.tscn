@@ -1,18 +1,14 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://world/Island.gd" id="1_island"]
+[ext_resource type="Shader" path="res://world/sky.gdshader" id="2_sky"]
 
-[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
-sky_top_color = Color(0.13, 0.2, 0.46, 1)
-sky_horizon_color = Color(0.96, 0.73, 0.42, 1)
-sky_curve = 0.12
-ground_bottom_color = Color(0.043, 0.063, 0.149, 1)
-ground_horizon_color = Color(0.87, 0.62, 0.38, 1)
-sun_angle_max = 25.0
-sun_curve = 0.18
+[sub_resource type="ShaderMaterial" id="SkyMat"]
+shader = ExtResource("2_sky")
 
 [sub_resource type="Sky" id="Sky"]
 sky_material = SubResource("SkyMat")
+radiance_size = 1
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 2
@@ -21,6 +17,11 @@ ambient_light_source = 3
 ambient_light_sky_contribution = 1.0
 ambient_light_energy = 1.15
 tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.45
+glow_strength = 1.0
+glow_blend_mode = 1
+glow_hdr_threshold = 0.92
 fog_enabled = true
 fog_light_color = Color(0.95, 0.75, 0.5, 1)
 fog_light_energy = 1.0

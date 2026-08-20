@@ -10,12 +10,24 @@ signal aim_delta(rel: Vector2)  # arrasto -> camera/reticulo acompanham
 
 var gesture := FireGesture.new()
 var _touch := -1
+var _color := Projectile.tint("fire")
+var _label := "FOGO"
 
 
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	gesture.deadzone_px = Dp.px(float(Balance.TOUCH.aim_deadzone_dp))
 	gesture.repeat_ms = int(float(Balance.FIRE.fire_rate) * 1000.0)
+	Bus.element_changed.connect(_on_element)  # UI OBSERVA; quem decide e' o Player
+
+
+## O disparo continuo (R17) vale para os 3 elementos: cadencia/cor/rotulo
+## seguem o elemento ativo — numeros de Balance via Projectile.spec.
+func _on_element(el: String) -> void:
+	gesture.repeat_ms = int(float(Projectile.spec(el).fire_rate) * 1000.0)
+	_color = Projectile.tint(el)
+	_label = {"water": "AGUA", "lightning": "RAIO"}.get(el, "FOGO")
+	queue_redraw()
 
 
 func _input(e: InputEvent) -> void:
@@ -50,10 +62,10 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	var c := size / 2.0
 	var r := minf(size.x, size.y) / 2.0 - Dp.px(4.0)
-	draw_circle(c, r, Color(0.85, 0.3, 0.08, 0.6))
+	draw_circle(c, r, Color(_color.darkened(0.25), 0.6))
 	draw_arc(c, r, 0, TAU, 40, Color(1, 1, 1, 0.5), Dp.px(1.5), true)
 	var fs := maxi(int(Dp.px(13.0)), 8)
-	draw_string(get_theme_default_font(), Vector2(0, c.y + fs * 0.35), "FOGO",
+	draw_string(get_theme_default_font(), Vector2(0, c.y + fs * 0.35), _label,
 			HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 0.9))
 	if gesture.visual(Time.get_ticks_msec()) == FireGesture.Visual.RING:
 		draw_arc(c, r + Dp.px(5.0), 0, TAU, 48, Color(0.2, 1.0, 0.4), Dp.px(3.5), true)

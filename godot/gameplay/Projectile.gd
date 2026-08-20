@@ -1,55 +1,134 @@
-## Projetil de Fogo: TEMPO DE VIAGEM (GDD §4.1 — nada de hitscan).
-## Esfera emissiva + trail GPU barato; no impacto, dano via Combat (ponto
-## unico) + numero flutuante + burst de particulas.
+## Projetil elemental: TEMPO DE VIAGEM (GDD §4.1 — nada de hitscan).
+## Cor + FORMA distintas por elemento (GDD §10 — lei):
+##   fire      -> esfera/gota flamejante (a original)
+##   water     -> lamina/crescente d'agua achatada, arco leve na trajetoria
+##   lightning -> dardo fino serrilhado, o mais rapido, rastro eletrico curto
+## Numeros SO de Balance (spec()). No impacto: dano via Combat (ponto unico),
+## numero flutuante, burst e knockback leve na direcao do voo.
 class_name Projectile
 extends Area3D
 
+const KNOCKBACK := 2.2   # m/s de empurrao no acerto — KNOB local; pedir entrada em Balance
+const WATER_ARC := 1.6   # m/s^2 de queda da agua ("arco leve") — KNOB local
+
+var element := "fire"
 var dir := Vector3.FORWARD
 var speed: float = float(Balance.FIRE.projectile_speed)
 var travel_left: float = float(Balance.FIRE.range)
 var dmg: float = float(Balance.FIRE.dmg)
 var shooter: Node
+var _fall := 0.0
 
 
-static func launch(parent: Node, p_shooter: Node, from: Vector3, p_dir: Vector3) -> Projectile:
+## Fonte UNICA dos numeros por elemento — espelha Balance, nunca inventa.
+static func spec(el: String) -> Dictionary:
+	match el:
+		"water":
+			return Balance.WATER
+		"lightning":
+			return Balance.LIGHTNING
+		_:
+			return Balance.FIRE
+
+
+## Cor canonica por elemento (paleta GDD §10). UI e efeitos leem daqui.
+static func tint(el: String) -> Color:
+	match el:
+		"water":
+			return Color("2AA7FF")
+		"lightning":
+			return Color("F5D90A")
+		_:
+			return Color("FF5A2A")
+
+
+static func launch(parent: Node, p_shooter: Node, from: Vector3, p_dir: Vector3, el := "fire") -> Projectile:
 	var p := Projectile.new()
 	p.shooter = p_shooter
 	p.dir = p_dir.normalized()
+	p.element = el
+	var s: Dictionary = spec(el)
+	p.speed = float(s.projectile_speed)
+	p.travel_left = float(s.range)
+	p.dmg = float(s.dmg)
 	parent.add_child(p)
 	p.global_position = from
+	if absf(p.dir.y) < 0.99:
+		p.look_at(from + p.dir)  # lamina e dardo apontam para onde voam
 	return p
 
 
 func _ready() -> void:
 	var col := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
-	sphere.radius = 0.25
+	sphere.radius = 0.25  # hitbox igual para todos — a FORMA e' leitura visual
 	col.shape = sphere
 	add_child(col)
+	match element:
+		"water":
+			_build_water()
+		"lightning":
+			_build_lightning()
+		_:
+			_build_fire()
+	body_entered.connect(_on_hit)
 
+
+func _build_fire() -> void:
+	set_meta("shape", "sphere")
 	var mesh := MeshInstance3D.new()
 	var ball := SphereMesh.new()
 	ball.radius = 0.18
 	ball.height = 0.36
 	mesh.mesh = ball
+	mesh.material_override = _glow_mat(tint("fire"), 2.5)
+	add_child(mesh)
+	add_child(_make_particles(tint("fire"), 10, 0.3, false))
+
+
+func _build_water() -> void:
+	set_meta("shape", "blade")
+	var mesh := MeshInstance3D.new()
+	var lens := SphereMesh.new()
+	lens.radius = 0.22
+	lens.height = 0.44
+	mesh.mesh = lens
+	mesh.scale = Vector3(1.6, 0.28, 0.7)  # lente larga e achatada = lamina/crescente
+	mesh.material_override = _glow_mat(tint("water"), 2.0)
+	add_child(mesh)
+	add_child(_make_particles(tint("water"), 10, 0.35, false))
+
+
+func _build_lightning() -> void:
+	set_meta("shape", "dart")
+	var mat := _glow_mat(tint("lightning"), 3.5)
+	for rot in [0.0, PI / 4.0]:  # duas laminas finas cruzadas a 45° = serrilhado
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.07, 0.07, 0.95)
+		mesh.mesh = box
+		mesh.rotation.z = rot
+		mesh.material_override = mat
+		add_child(mesh)
+	add_child(_make_particles(tint("lightning"), 14, 0.18, false))  # rastro curto = eletrico
+
+
+func _glow_mat(color: Color, energy: float) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1.0, 0.55, 0.15)
+	mat.albedo_color = color
 	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.45, 0.1)
-	mat.emission_energy_multiplier = 2.5
-	mesh.material_override = mat
-	add_child(mesh)
-
-	var trail := _make_particles(Color(1.0, 0.5, 0.1), 10, 0.3, false)
-	add_child(trail)
-
-	body_entered.connect(_on_hit)
+	mat.emission = color
+	mat.emission_energy_multiplier = energy
+	return mat
 
 
 func _physics_process(delta: float) -> void:
 	var step := speed * delta
 	position += dir * step
+	if element == "water":
+		_fall += WATER_ARC * delta
+		position.y -= _fall * delta
 	travel_left -= step
 	if travel_left <= 0.0:
 		queue_free()
@@ -59,9 +138,11 @@ func _on_hit(body: Node3D) -> void:
 	if body == shooter:
 		return
 	var hit_pos := global_position
-	if Combat.deal(body, dmg, "fire"):
+	if Combat.deal(body, dmg, element):
 		_damage_number(int(round(dmg)), hit_pos)
-	burst(get_parent(), hit_pos, Color(1.0, 0.5, 0.12), 16)
+		if body.has_method("apply_knockback"):
+			body.apply_knockback(dir * KNOCKBACK)  # empurrao leve na direcao do voo
+	burst(get_parent(), hit_pos, tint(element), 16)
 	queue_free()
 
 

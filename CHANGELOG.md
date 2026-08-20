@@ -2,6 +2,43 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v1.2.0-3d — 2026-08-20 — R18: gráficos, mecânicas, a porta de entrada e a pasta técnica
+
+Quatro frentes numa fase, pelas ordens do Diretor pós-teste em aparelho.
+
+**GRÁFICOS** — sol com halo e nuvens estilizadas, glow nos emissivos (as magias
+brilham de graça), ~3.000 tufos de grama ao vento em 1 draw call (colapsam além
+de 60m — LOD no vertex shader), flores nos POIs, vagalumes ao entardecer, névoa
+baixa no alagado, água com reflexo dourado e espuma na margem. Draw calls +27%
+(régua: não dobrar). Contorno e vinheta RECUSADOS com medição: cada um custaria
+um passe de tela inteiro no mobile.
+
+**MECÂNICAS** — carrossel de elementos (Fogo esfera · Água crescente com arco ·
+Raio dardo serrilhado, o mais rápido), cada um com cor + FORMA (GDD §10) e
+custo/cadência de `Balance`; esquiva com i-frames e cooldown desenhado no botão;
+knockback leve; bots com elemento fixo e esquiva ocasional; disparo contínuo da
+R17 valendo para os 3. `move_velocity()` virou o caminho ÚNICO da velocidade
+(produto único + dash + knockback). Selftest: 63 checagens, i-frames provados em
+vermelho.
+
+**APRESENTAÇÃO** — o APK deixa de abrir na partida: tela título (Selo vivo com 5
+gemas pulsando, wordmark ARKANA, "toque para começar"), menu JOGAR / PERSONAGENS
+/ SAIR, vitrine dos 20 personagens com silhuetas e "EM BREVE" nos 11–20.
+**A arte do Diretor entra sozinha**: caiu `res://menu/art/NN.png`, o card troca.
+Fim de partida ganhou botão MENU (costura do coordenador). Selftest 13/13.
+
+**INFRA** — pasta `infra/` (7 arquivos): servidores de jogo (Godot dedicated
+server; recomendação G5 = 1 VPS em São Paulo ~US$6–12/mês ou Oracle free tier;
+provedores sem região BR descartados — 120–200ms mata jogo de tiro), backend
+(login anônimo, sem rastreamento, anti-cheat honesto), pipeline, distribuição,
+custos por fase (**R$ 0 até o G5**) e ferramentas locais. Preço mutável marcado
+"verificar vigente"; contratar é ato do Diretor.
+
+Gates: import limpo · boot do menu e da partida sem erro · selftests 3/3 verdes
+(63 + 13 + 12 checagens) · APK 26M com menu, carrossel e grama DENTRO do pacote.
+As 4 raias caíram por limite de sessão no meio e RETOMARAM do ponto exato sem
+perder nada (transcript preservado + git status antes de reescrever).
+
 ## v1.1.0-3d — 2026-08-19 — R17: disparo contínuo aprovado no dedo, e o elenco de 20
 
 **O Diretor aprovou o APK 3D no aparelho** ("ficou ótimo") e pediu dois ajustes.

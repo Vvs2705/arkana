@@ -4,7 +4,8 @@ config_version=5
 
 [application]
 config/name="Arkana"
-run/main_scene="res://gameplay/Main.tscn"
+; A porta de entrada e' o MENU (R18) — a partida e' carregada pelo botao JOGAR.
+run/main_scene="res://menu/Menu.tscn"
 config/features=PackedStringArray("4.4", "Mobile")
 
 [autoload]
