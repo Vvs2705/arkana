@@ -13,8 +13,7 @@
 --     DamageNumber anunciam.
 --
 -- Todo número de balanceamento sai de Shared/Balance. As constantes do bloco
--- "sensação/varredura" abaixo são game feel (mesma separação que o protótipo
--- 2D faz em src/entities/Player.ts e Projectile.ts) — não são balanceamento.
+-- "sensação/varredura" abaixo são game feel e não são balanceamento.
 -- ============================================================================
 
 local Players = game:GetService("Players")

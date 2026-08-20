@@ -15,7 +15,7 @@
 --   durante os 8s de queima — até 16 rolagens para a MESMA aresta:
 --       1 - (1 - 0,30)^16 ≈ 99,67%
 --   Isso não é "propagação de 30%", é "floresta conectada queima inteira, com
---   certeza". É a carbonização que já tinha reprovado no protótipo 2D.
+--   certeza". É o modelo de carbonização que já foi medido e reprovado.
 --   Agora são DUAS regras, e as duas são teto:
 --     a) UMA ROLAGEM POR ARESTA — quando uma célula COMEÇA a queimar, cada
 --        vizinho combustível recebe UMA chance (`spreadChancePerEdge`) e nunca
@@ -440,7 +440,7 @@ local function restState(idx: number): Grid.State
 	return if burnedOut[idx] then "Burned" else "Normal"
 end
 
---- LIÇÃO DO PROTÓTIPO 2D (docs/HISTORICO.md): o fogo consome COBERTURA
+--- Regra validada: o fogo consome COBERTURA
 --- (floresta e grama alta) e NUNCA o campo aberto — senão o incêndio carboniza
 --- o mapa inteiro. `Grid.FLAMMABLE` e `Balance.terrain.grassBurns` são a lei.
 local function isFlammable(idx: number): boolean

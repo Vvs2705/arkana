@@ -3,7 +3,7 @@
 -- RAIA (R3) — BOTS DE PREENCHIMENTO (GDD §19.6: "bots nas primeiras partidas",
 -- retenção de dia 1). Corpo montado em BLOCOS por código (rig R6 de 7 parts —
 -- ZERO Toolbox, zero modelo de terceiros, docs/ROBLOX.md §2) e a MESMA FSM já
--- validada no protótipo 2D (src/entities/Bot.ts):
+-- validada nos testes do Campo de Provas:
 --     WANDER → CHASE → ATTACK, com FLEE_FIRE em prioridade máxima
 -- e um estado a mais que só existe no BR: TO_ZONE (correr para dentro da zona).
 --
@@ -31,7 +31,7 @@ local Teams = require((script.Parent :: Instance):WaitForChild("Teams") :: Modul
 
 local B = Balance.bots
 
--- --- comportamento (porte do TUNE de src/entities/Bot.ts) -------------------
+-- --- comportamento ----------------------------------------------------------
 local TUNE = {
 	--- fração da velocidade em WANDER ("anda devagar")
 	wanderSpeedMult = 0.4,

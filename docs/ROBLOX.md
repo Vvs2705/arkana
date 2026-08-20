@@ -1,7 +1,7 @@
 # ARKANA no ROBLOX — "Campo de Provas" (produto de validação)
 
 > Plano de execução da versão Roblox, decidida pelo Diretor em 17/08/2026
-> (GDD §9 "Decisões travadas" · PROJETO_PRISMA §9). Este documento é o
+> e mantida como frente ativa de validação. Este documento é o
 > **briefing auto-contido** da missão: uma sessão nova deve conseguir executar
 > tudo lendo apenas ele + o GDD.
 
@@ -20,9 +20,9 @@ custo de infraestrutura zero, as perguntas que bots nunca responderão:
 | V4 | Os 5 elementos se equilibram, ou um domina? | R3 |
 | V5 | O combate é gostoso o bastante para o jogador voltar? | R3 |
 
-**NÃO é:** o jogo-troféu. O visual premium (régua Spell Arena, PROJETO_PRISMA
-§1) pertence à versão **first-person Android**, que só inicia depois desta
-validação. Nada de código/asset migra do Roblox — **o GDD é a única ponte.**
+**NÃO é:** o produto Android principal. O visual de qualidade final pertence ao
+jogo 3D em Godot. Código e assets específicos não migram do Roblox; regras
+validadas atravessam pelo **GDD e por `docs/PONTE.md`**.
 
 ---
 
@@ -68,17 +68,17 @@ validação. Nada de código/asset migra do Roblox — **o GDD é a única ponte
   └─ build/                   .rbxlx gerado (ignorado no git)
   ```
 
-### Regra de arquitetura (herdada do que funcionou no 2D)
+### Regra de arquitetura
 **Design antes de código; números viram dados; o código lê dados.** O
-`balance.luau` de `shared/` é o espelho do `src/core/balance.ts` do protótipo —
-rebalancear é editar um arquivo, nunca caçar constantes.
+`Balance.luau` em `shared/` centraliza os números da frente Roblox; rebalancear
+é editar um arquivo coerente com o GDD, nunca caçar constantes.
 
 ### Regra de segurança de servidor (nova, obrigatória no multiplayer)
 **O servidor é autoritativo.** Cliente envia INTENÇÃO (mirei ali, conjurei
 agora); servidor decide dano, cooldown, mana e estado do terreno. Nada de
 `FireServer("tome 40 de dano")`. Todo RemoteEvent valida: cooldown, distância
-plausível, mana disponível, estado vivo. Isso é a base do anti-cheat (EQUIPE.md
-3.3) e não é opcional nem no protótipo.
+plausível, mana disponível e estado vivo. Isso é a base do anti-cheat e não é
+opcional nem no Campo de Provas.
 
 ---
 

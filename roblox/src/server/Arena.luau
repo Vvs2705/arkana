@@ -6,7 +6,7 @@
 --
 -- DETERMINISMO POR CONSTRUÇÃO: nenhum `math.random` neste arquivo. Toda a
 -- variação vem de um hash puro por célula (xorshift32) — mesma arena em toda
--- máquina, toda partida, sem semente global. Porte de src/terrain/layout.ts.
+-- máquina, toda partida, sem semente global.
 --
 -- PASSE DE IDENTIDADE (18/08, auditoria P2: "o jogo fica clicável em thumbnail
 -- e legível em luta?"). O mapa funcionava mas era GENÉRICO — nenhum ponto

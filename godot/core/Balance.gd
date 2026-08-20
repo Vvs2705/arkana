@@ -1,15 +1,14 @@
 ## NUMEROS DO JOGO — espelho do GDD (secoes 4, 5, 14, 19.3).
 ## Dono: COORDENADOR. Rebalancear = editar AQUI, nunca cacar constante em cena.
-## Linhagem: portado de src/core/balance.ts (2D, sancionado pelo GDD) — a raia
-## de gameplay confere os valores la' antes de usar. Marcados como KNOB os que
-## so' o playtest calibra.
+## Os valores compartilhados seguem o GDD e os resultados validos do Campo de
+## Provas. Marcados como KNOB os que so' o playtest calibra.
 extends Node
 
 const PLAYER := {
 	"hp": 100.0,
 	"mana_max": 100.0,
-	"mana_regen": 14.0,      # por segundo — conferir em src/core/balance.ts
-	"speed": 7.5,            # m/s — KNOB (2D usa px; 3D recalibra no aparelho)
+	"mana_regen": 14.0,      # por segundo
+	"speed": 7.5,            # m/s — KNOB, recalibrar no aparelho
 	"jump": 4.5,             # KNOB
 }
 
@@ -88,7 +87,7 @@ const DODGE := {
 }
 
 const TOUCH := {
-	"aim_deadzone_dp": 14.0, # a MESMA regra do 2D/Roblox: dp, nunca px
+	"aim_deadzone_dp": 14.0, # regra mobile compartilhada: dp, nunca px
 	"tap_max_ms": 220,       # KNOB — calibrar SEMPRE junto com a deadzone
 }
 

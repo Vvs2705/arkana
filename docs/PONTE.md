@@ -716,14 +716,10 @@ GDD vai implementar o que o Roblox já descartou.
 > (`server/Combat.luau:722–723`) — é o precedente pronto, telemetria pura, sem remote
 > novo.
 
-**Anexo de B1 — divergência entre documentos, não entre documento e código:**
-`docs/DECISOES_PENDENTES.md` está **vencido**. Ele lista cinco decisões com as linhas
-de "Decisão" em branco; pela leitura do `docs/GDD.md` de hoje (19/08), **quatro já
-foram tomadas e coladas** — gesto único promovido ao §19.3, emenda da frente Android
-no §9, ordem Degrau 3 antes do Degrau 4, público-alvo 10+ — e a quinta (régua de TTK)
-foi resolvida por esclarecimento no §5 (as duas faixas são a mesma régua vista de
-alvos diferentes). Documento de decisões pendentes que lista decisões já tomadas faz a
-próxima sessão trabalhar num problema resolvido.
+**Anexo de B1:** as decisões de gesto único, plataforma, público 10+ e leitura
+das duas faixas de TTK já foram incorporadas ao GDD. Não existe documento de
+decisões pendentes separado; novas divergências devem ser resolvidas diretamente
+na fonte da verdade.
 
 ---
 
@@ -743,9 +739,9 @@ playtest **não vai trazer nenhuma informação**.
 | **B2.5** | §18.1 folclore brasileiro · §18.4 Presságios · §18.5 trilha elemental reativa | **Zero** | O próprio §18 as prioriza para depois; sem novidade. Vale registrar que **as três "baratas" do §18 (Presságios, Selo, Grimório) só uma e meia existem** |
 | **B2.6** | §16.4 química real: vento sufoca chama pequena mas ALIMENTA incêndio grande · explosão de vapor · fulgurito · hipotermia | **Nenhuma das quatro.** O vento no Roblox **sempre espalha** (e paga combustível), sem a decisão de risco dos dois sentidos | A camada "conhecimento é poder" do §16.4 é inteiramente não testada — e é ela que o §18.3 (Grimório) existe para ensinar |
 | **B2.7** | §5: escudo nível 4 (dourado, 125, limiar 900) com perk | **Implementado — e inalcançável.** O perk existe (`Balance.shield.lv4TacticCooldownMult = 0.8`, aplicado em `server/Combat.luau:527` e `765`); o limiar é que nunca foi atingido: varredura deu p50 211 · p90 633 · máx **712**, com **0%** chegando a 900 | **Dívida com número.** O nível 4 é decorativo no build atual. O gatilho pós-playtest já está escrito (`docs/ROBLOX.md` §11.8, nº 1) — mas a medição que ele pede (p90 de dano HUMANO) só existe com gente. Medido com bot: o nível 4 não acontece |
-| **B2.8** | §11 boot/splash/título/menus · §12 spec completa de configurações | Substituídos pelos sistemas da plataforma; existe um subconjunto de opções (11 preferências de conforto, idioma PT/EN) | Escolha coerente com o §9 (*"sistemas da plataforma, incentivados"*), mas não registrada. A **experiência "jogo oficial"** do §11 continua provada só no protótipo 2D |
+| **B2.8** | §11 boot/splash/título/menus · §12 spec completa de configurações | Substituídos pelos sistemas da plataforma; existe um subconjunto de opções (11 preferências de conforto, idioma PT/EN) | Escolha coerente com o papel de validação do Roblox. A experiência completa de produto pertence ao Godot |
 | **B2.9** | §10: tipografia Cinzel / Chakra Petch | Fontes da plataforma. Upload das fontes é ato do Diretor | Limitação declarada desde a v0.2.0. A **paleta** e a regra cor+forma, essas sim, estão implementadas (`shared/Elements.luau:31–95`) |
-| **B2.10** | §19.3: *"layout dos botões **editável e escalável** pelo jogador"* | Existe **escala** (`uiSize`: 0,9 / 1 / 1,15 / 1,3) e espelho canhoto/destro; **não existe layout editável** | O protótipo 2D **tem** o editor de layout (v0.1.1); o Roblox não. Dívida real, e vale notar que a metade implementada (escala + canhoto) cobre a maior parte da queixa ergonômica |
+| **B2.10** | §19.3: *"layout dos botões **editável e escalável** pelo jogador"* | Existe **escala** (`uiSize`: 0,9 / 1 / 1,15 / 1,3) e espelho canhoto/destro; **não existe layout editável** | Dívida real do Roblox; a metade implementada (escala + canhoto) cobre a maior parte da queixa ergonômica |
 
 ---
 

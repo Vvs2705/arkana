@@ -1,7 +1,7 @@
 --!strict
 -- ============================================================================
 -- ARKANA (Roblox) — i18n PT-BR / EN
--- Porte de src/core/strings.ts do protótipo 2D. REGRA: nenhum texto solto no
+-- REGRA: nenhum texto solto no
 -- código de UI — tudo passa por Strings.t(). Chave nova = adicionar nos DOIS
 -- idiomas. Chave desconhecida volta como a própria chave (fica visível no
 -- playtest em vez de sumir).

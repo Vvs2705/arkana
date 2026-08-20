@@ -108,7 +108,7 @@ local SHAKE = {
 local DMG_NUM = {
 	rise = 4.5, -- studs
 	life = 0.75,
-	bigAt = 15, -- dano "grande" = dourado e maior (espelha o HUD do protótipo 2D)
+	bigAt = 15, -- dano "grande" = dourado e maior
 	maxDistance = 140,
 }
 

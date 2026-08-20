@@ -12,11 +12,10 @@
 
 ## Veículo: Godot 4.4 (decidido, não discutir de novo)
 
-Phaser+WebView não faz 3D estilo Spellbreak. Godot 4: gratuito, exporta APK/AAB
-direto, GDScript legível por agentes, cenas em texto (versionáveis), toolchain
-Android já presente na máquina (JDK 21 + SDK). O projeto vive em `godot/` no repo.
-O 2D está **DESCONTINUADO por ordem do Diretor (19/08)** — nenhuma fase, nenhuma
-manutenção; o código fica no git só como histórico.
+Godot 4 é a engine do produto: gratuita, exporta APK/AAB direto, usa cenas em
+texto versionáveis e possui toolchain Android configurada na máquina. O projeto
+vive em `godot/`. O antigo protótipo 2D está descontinuado e foi removido da
+árvore atual; seu registro permanece apenas no histórico do Git.
 
 ## As fases — cada uma termina com APK no telefone do Diretor
 
@@ -27,7 +26,7 @@ Godot instalado + templates Android + projeto `godot/` exportando APK.
 ### G1 · A FATIA REAL — o próximo APK que o Diretor testa
 Nada de mapa de teste. Uma ilha jogável com cara de jogo:
 - **Ambiente**: ilha estilizada cel-shaded (colinas, floresta, lago, ruínas —
-  os 4 POIs do Roblox reinterpretados em 3D), céu/luz do PROJETO_PRISMA.
+  os 4 POIs do Roblox reinterpretados em 3D), céu e luz da direção de `ART.md`.
 - **Personagem**: mago 3D low-poly estilizado (silhueta Spellbreak: manto,
   capuz, mãos que conjuram), com animações idle/correr/conjurar.
 - **Câmera 3ª pessoa** sobre o ombro + **controles do GDD §19.3**: joystick

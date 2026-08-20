@@ -216,35 +216,24 @@ Cada degrau é um jogo lançável que financia e valida o próximo — e o unive
 ## 9. DECISÕES OFICIAIS + Sistema de Conjuração Combinada
 
 ### Decisões travadas
-- **Estratégia de plataforma (Diretor, 17/08/2026):** o próximo produto é
-  **"Arkana: Campo de Provas" no ROBLOX** — terceira pessoa, estética blocky
-  (referência visual: **Pixel Gun 3D**), aproveitando os sistemas nativos da
-  plataforma (multiplayer/replicação, avatares, física, câmera). Papel:
-  **produto de validação** — provar Sintonia com duplas reais, TTK, meta do
-  terreno reativo e equilíbrio de classes com jogadores de verdade a custo de
-  infra zero. A visão **first-person premium no Android** (qualidade régua
-  Spell Arena, PROJETO_PRISMA §1) fica como destino. Nada técnico migra do Roblox — o
-  GDD é a única fonte que serve os dois produtos. Modelos da Toolbox são
-  proibidos (qualidade/segurança); sistemas da plataforma, incentivados.
-- **EMENDA (Diretor, 19/08) — a frente Android começa ANTES de o checklist fechar,
-  em duas velocidades.** O que **não** depende das perguntas V1–V5 anda agora:
-  encanamento de build, identidade no aparelho, conta de loja, ficha, conformidade.
-  O que **depende** — design de combate, números de `Balance`, formato de partida —
-  **espera o playtest**. Motivo de manter o freio na segunda metade: a V4 já enganou
-  o projeto uma vez com dado de piloto automático (a "dominância do Fogo" de 1,42×
-  era taxa de acerto do bot; no eixo do `Balance`, 1,06×).
-- **ORDEM DA FRENTE ANDROID (Diretor, 19/08): a escada da §8 vale — Degrau 3
-  (mini-BR top-down) ANTES do Degrau 4 (first-person).** O top-down já compila em
-  APK hoje e é escopo de dev solo; o first-person é escopo de estúdio e continua
-  sendo o destino, não o próximo passo. Cada degrau é um jogo lançável que financia
-  e valida o próximo (§8).
+- **Estratégia de plataforma (atualizada em 20/08/2026):** o produto principal é
+  **Arkana 3D em Godot 4.4 para Android**, em terceira pessoa. O projeto Roblox
+  continua como **Campo de Provas multiplayer** para validar Sintonia, TTK,
+  terreno reativo e equilíbrio com jogadores reais. As duas frentes compartilham
+  regras pelo GDD e por `docs/PONTE.md`; código específico de engine não atravessa.
+  Modelos da Roblox Toolbox permanecem proibidos.
+- **Desenvolvimento em duas velocidades:** personagens, ambientes, pipeline e
+  apresentação do Godot podem avançar; mudanças em combate, `Balance` e formato
+  de partida dependentes de V1-V5 esperam o playtest humano do Roblox.
+- **Direção visual e de câmera:** terceira pessoa sobre o ombro, magia legível,
+  mobilidade alta e qualidade de jogo 3D publicado em aparelho intermediário.
 - **PÚBLICO-ALVO ETÁRIO: 10+ (Diretor, 19/08).** Combate de fantasia sem sangue,
   sem gore e sem caixa aleatória (§19.1). É a faixa que a ficha de loja declara e a
   base para o questionário IARC/ClassInd — **o questionário é respondido pelo Diretor
   e a classificação final é atribuída pelos órgãos, não por nós**. Postura de dados
-  coerente com a faixa: o protótipo 2D não faz nenhuma chamada de rede, então a
-  declaração é "nenhuma coleta" — e mantê-la assim é a forma mais barata de cumprir
-  o ECA Digital.
+  coerente com a faixa: nenhuma coleta de dados entra sem necessidade de produto,
+  documentação e aprovação explícita. Minimizar dados é a forma mais barata de
+  cumprir o ECA Digital.
 - **Nome:** `Arkana: Magos Battle Royale` no lançamento → encurta para `Arkana Royale` quando a marca se sustentar (caminho Free Fire).
 - **Descrição curta (80c):** *"Caia do castelo voador, domine os 5 elementos e seja o último mago de pé."*
 - **Posicionamento:** não é clone — esqueleto comprovado do gênero + camada de inovação elemental própria. A pergunta-guia do design: **"qual é a invenção que vão copiar DE NÓS?"** Resposta: a Conjuração Combinada.
@@ -382,47 +371,31 @@ O mapa é dividido numa grade de células, cada uma com **material** (grama, gra
 > por design. A contrapartida é que a dupla ainda pode se queimar pelo mapa, que é
 > onde a lição de §14 deve doer.
 
-**Por que isso importa:** junto com a Sintonia, o terreno reativo é a segunda invenção que o Apex não tem. O mapa deixa de ser cenário e vira **recurso** — queimar a floresta do inimigo é uma jogada, congelar o lago é uma rotação. Em 2D top-down com tilemap, isso é tecnicamente simples de prototipar (trocar estado da célula + sprite + timer). É o melhor custo-benefício de inovação do projeto inteiro.
+**Por que isso importa:** junto com a Sintonia, o terreno reativo é a segunda invenção que o Apex não tem. O mapa deixa de ser cenário e vira **recurso** — queimar a floresta do inimigo é uma jogada, congelar o lago é uma rotação. O Godot implementa isso com uma grade lógica separada da apresentação 3D, preservando previsibilidade e orçamento mobile.
 
 ---
 
-## 15. Protótipo "Arkana v0.1" — spec para o Claude Code
+## 15. Implementação atual
 
-### Stack recomendada
-- **Phaser 3 + TypeScript + Vite** — motor 2D maduro, roda no navegador, e você já domina TS (zero curva de linguagem).
-- **Empacotamento "instalável":** **Tauri** (ou Electron) gera um `.exe` — instala, tem ícone, abre com splash. A sensação de jogo oficial que você quer, offline, no seu PC.
-- Alternativa consciente: **Godot 4** é a engine definitiva se o projeto crescer para 3D — mas custa aprender GDScript agora. Recomendação: validar em Phaser primeiro; o design (GDD) migra, o código do protótipo é descartável por definição.
+### Stack
+- **Godot 4.4 / GDScript:** produto principal 3D e export Android.
+- **Roblox / Luau / Rojo:** Campo de Provas multiplayer e telemetria de playtest.
+- **Git:** fonte de verdade do código, documentos e assets canônicos.
 
-### Definition of Done — v0.1 (checklist que o Claude Code deve entregar)
-1. ☐ Boot completo: splash do estúdio → carregamento (key art + logo + barra + dicas rotativas) → título → menu
-2. ☐ Menu principal navegável com música e fundo animado
-3. ☐ Configurações funcionais e persistidas em `settings.json` (todas as abas da seção 12)
-4. ☐ Arena top-down ~60×60 tiles contendo: lago, floresta, grama alta, rochas, campo aberto
-5. ☐ 1 mago jogável: WASD + mira no mouse, ataque básico, tática, esquiva com i-frames curtos
-6. ☐ Troca entre os 5 elementos (Q) — cada um com projétil, cor, ícone e som próprios
-7. ☐ **Terreno reativo funcionando:** árvore queima e propaga · lago congela e eletrocuta · lamaçal · muro de pedra
-8. ☐ Escudo evolutivo: dano causado acumula e sobe o nível (1→4) com feedback visual no HUD
-9. ☐ 5 bots simples (perseguem, atacam, reagem ao fogo) + 1 dummy de treino com números de dano
-10. ☐ HUD: vida, escudo, mana, elemento ativo, minimapa simples, Selo de Sintonia (decorativo no v0.1)
-11. ☐ Pausa (ESC) + contador de FPS
+### Estado entregue
+1. ☑ Boot, título, menu e vitrine de personagens.
+2. ☑ Ilha 3D, câmera sobre o ombro e controles de toque/desktop.
+3. ☑ Partida curta contra bots com HUD, vitória e derrota.
+4. ☑ Cinco elementos com cor, forma, mana e cadência próprias.
+5. ☑ Terreno reativo 3D com fogo, gelo, eletricidade, Terra e Vento.
+6. ☑ Áudio procedural e feedback de combate.
+7. ☑ APK Android de debug exportado e verificado.
+8. ☐ G3: personagem com rig completo, três biomas e VFX de qualidade final.
+9. ☐ G4: loop BR completo no Godot, incluindo squads e Sintonia.
+10. ☐ G5: multiplayer dedicado no Godot.
 
-### Fora do escopo do v0.1 (anotado para o v0.2)
-- Sintonia jogável (precisa de aliado — v0.2 testa com 1 bot aliado que responde ao seu pedido de combo)
-- Queda do castelo (v0.2: tela de queda simplificada escolhendo ponto de pouso)
-- Multiplayer, cosméticos, passe — só depois do combate provar que é divertido
-
-### Documentação (organização do repositório)
-```
-arkana/
-├─ docs/
-│  ├─ GDD.md          ← este documento (fonte da verdade)
-│  ├─ ART.md          ← decisões visuais, paleta, referências
-│  ├─ AUDIO.md        ← direção sonora e lista de faixas
-│  └─ CREDITS.md      ← todo asset externo + licença
-├─ CHANGELOG.md       ← cada versão do protótipo documentada
-└─ src/
-```
-Regra de processo: **toda decisão de design entra no GDD antes de virar código.** O documento manda, o código obedece — é o que permite trocar de engine sem perder o jogo.
+Regra de processo: **toda decisão de design entra no GDD antes de virar código.**
+O documento manda; as engines implementam.
 
 ---
 
@@ -535,7 +508,7 @@ Além de XP: um grimório pessoal onde cada interação descoberta pela 1ª vez 
 No carregamento, uma carta de presságio anuncia a condição arcana da partida: "Lua de Sangue" (curas +20%), "Maré Alta" (mais lagos — buff indireto de Água/Raio), "Noite Sem Vento" (fumaças duram mais). Custo baixo (ajustes numéricos), variedade infinita, e dá pauta diária para criadores de conteúdo ("o presságio de hoje quebrou o meta").
 
 ### 18.5 Trilha sonora elemental reativa
-Cada elemento tem um "stem" musical (camada instrumental). Durante a luta, a música mistura os stems dos elementos em uso: luta de Fogo×Raio soa diferente de Água×Vento. Toda luta tem trilha única — assinatura sensorial do jogo, e cada clipe compartilhado carrega um som que nenhum outro jogo tem. Tecnicamente: áudio em camadas sincronizadas, viável até em Phaser.
+Cada elemento tem um "stem" musical (camada instrumental). Durante a luta, a música mistura os stems dos elementos em uso: luta de Fogo×Raio soa diferente de Água×Vento. Toda luta tem trilha única — assinatura sensorial do jogo, e cada clipe compartilhado carrega um som que nenhum outro jogo tem. Tecnicamente: áudio em camadas sincronizadas no Godot.
 
 ### 18.6 Espírito Errante (pós-morte) + Selo do Campeão
 - **Espírito Errante:** ao morrer em squad, vira um espírito: não ataca, mas pode dar UM "arrepio" (revela 1 inimigo por 2s para os aliados). O morto continua participando — retenção mobile — com counterplay (o inimigo sente o arrepio).
@@ -587,8 +560,8 @@ O inimigo nº 1 de um projeto solo/equipe pequena é feature demais. Regras dura
   acima dos botões.
   *(Promovido em 19/08 por delegação do Diretor, vindo do que funcionou no Roblox.
   Dois gestos separados — mirar e depois atirar — foram REPROVADOS em aparelho real
-  no teste de APK de 17/08; ver PROJETO_PRISMA §0. Esta linha é a ponte oficial: sem
-  ela, a correção não podia atravessar para o Android pela regra da §9.)*
+  no teste de APK de 17/08. Esta linha é a ponte oficial entre o aprendizado e
+  todas as implementações.)*
 - **TECLADO/MOUSE é um esquema DIFERENTE, não uma adaptação do de toque** (Diretor,
   19/08): no PC a mira é contínua pelo cursor e o disparo é um botão próprio. Não se
   força um esquema no outro — o que se compartilha é a REGRA do jogo (dano, mana,
@@ -596,19 +569,18 @@ O inimigo nº 1 de um projeto solo/equipe pequena é feature demais. Regras dura
 - Alvos de toque ≥ 48dp, HUD com zonas seguras para os polegares, layout dos botões **editável e escalável** pelo jogador (padrão dos BRs mobile)
 - **Dois esquemas:** Simples (conjuração assistida leve ao tocar) e Avançado (mira 100% manual, maior teto de habilidade) — ambos gratuitos para todos, competitivo pareia por esquema. Habilidade decide, sempre.
 
-### 19.4 Pipeline PC → APK (real, mesma base de código)
-1. **v0.1 PC:** Phaser 3 + TypeScript + Vite rodando no navegador/desktop (DoD da seção 15, controles de teclado+mouse)
-2. **v0.1m APK:** mesmo código empacotado com **Capacitor** (webview nativa Android — caminho padrão web→APK) + camada de controles de toque da seção 19.3. DoD do APK: os mesmos sistemas do v0.1 + toque funcional + 60fps no seu aparelho + botões confortáveis (o objetivo declarado do teste: sentir a interação com a tela)
-3. **v0.2+:** decisão consciente de permanecer em web-tech ou migrar para Godot 4 levando o GDD (o código do protótipo é descartável por definição; o documento não)
+### 19.4 Pipeline PC → APK
+1. O mesmo projeto Godot roda no desktop para desenvolvimento e no Android para aceite.
+2. `godot/export/build_apk.sh` importa, exporta e verifica o APK de debug.
+3. Cada marco fecha com selftests, boot headless, export limpo e teste no aparelho.
+4. Release usa AAB e keystore própria somente na fase de publicação.
 
-### 19.5 Ordem de execução para a equipe autônoma (Claude Code)
-Contrato de trabalho por fases — cada fase só começa com a anterior aceita por você:
-- **Fase 1:** DoD seção 15 completo (jogo PC com boot oficial, menus, configurações, arena, 5 elementos, terreno reativo, escudo evo, bots)
-- **Fase 2:** APK Capacitor + controles de toque (seção 19.3) — entrega: .apk instalável no seu Android
-- **Fase 3:** v0.2 — Sintonia com bot aliado + tela de queda + Selo do Campeão + Presságios (os 2 baratos da seção 18)
-- Regra permanente: a equipe lê o GDD como fonte da verdade; qualquer ambiguidade vira pergunta para você, nunca invenção silenciosa; CHANGELOG.md atualizado a cada entrega.
+### 19.5 Ordem de execução
+O contrato ativo é `docs/ROADMAP_3D.md`: G0-G2 concluídos; G3 é o próximo marco,
+seguido por G4 (loop BR), G5 (multiplayer dedicado) e G6 (loja). Roblox continua
+em paralelo até responder V1-V5 com jogadores reais.
 
 ### 19.6 Últimas sugestões — ideias "de contenção" (as mais valiosas agora)
-1. **Modo Treino Offline como produto, não só teste:** o v0.1 contra bots VIRA um modo do jogo final ("Campo de Provas"). Jogável sem internet — enorme no Brasil (dados móveis limitados) e transforma todo o trabalho do protótipo em feature entregue, custo zero extra.
+1. **Modo Treino Offline como produto, não só teste:** a partida Godot contra bots permanece como modo do jogo final. Jogável sem internet, reduz dependência de dados móveis e transforma a validação local em feature entregue.
 2. **Bots nas primeiras partidas do jogador novo** (padrão Fortnite/Free Fire): as 3 primeiras partidas misturam bots discretamente — o novato ganha confiança antes de encarar veteranos. Retenção de dia 1, tecnologia que já teremos pronta.
 3. **Uma única arena no lançamento, profundamente polida**, em vez de mapa gigante: arena média com todos os biomas reativos (lago, floresta, areal, ruínas). Mapa grande é a feature mais cara de um BR e a menos sentida em partidas de 20. Crescer o mapa vem com a base de jogadores.

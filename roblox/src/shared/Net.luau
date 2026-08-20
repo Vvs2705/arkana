@@ -6,7 +6,7 @@
 -- O cliente envia INTENÇÃO ("mirei nesta direção", "quero conjurar agora").
 -- O servidor decide dano, cooldown, mana, alcance e estado do terreno, e
 -- VALIDA tudo. Nenhum remote aceita número de dano vindo do cliente — é a
--- base do anti-cheat (EQUIPE.md 3.3) e não é opcional nem no protótipo.
+-- base do anti-cheat e não é opcional no Campo de Provas.
 -- Dono: COORDENADOR.
 -- ============================================================================
 

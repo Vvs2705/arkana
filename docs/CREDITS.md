@@ -1,57 +1,18 @@
-# CREDITS.md — Assets e licenças do Arkana v0.1
+# CREDITS - assets e licencas
 
-> Regra do GDD (seções 13 e 15): **todo asset externo + licença documentados
-> aqui desde o dia 1.**
+Regra permanente: todo asset externo incorporado ao jogo deve registrar origem,
+autor e licenca neste arquivo antes de entrar numa build distribuida.
 
-## 1. Declaração — v0.1 não usa NENHUM asset externo
+## Estado atual
 
-- **Arte:** 100% procedural, gerada em runtime com `Phaser.Graphics`
-  (`src/core/textures.ts`). Zero imagens, spritesheets ou tilesets de
-  terceiros. Ver `docs/ART.md`.
-- **Áudio:** 100% procedural, sintetizado em runtime com WebAudio
-  (`src/core/audio.ts`). Zero samples, faixas ou SFX de terceiros. Ver
-  `docs/AUDIO.md`.
+- Codigo Godot e Roblox: produzido para o projeto.
+- Malha do mago, ilha, terreno, VFX e audio do Godot: gerados por codigo do
+  projeto.
+- Retratos em `personagens/*/arte/concept.png`: fornecidos e aprovados pelo
+  Diretor para uso interno no projeto.
+- O projeto nao inclui modelos da Roblox Toolbox.
+- Nao ha samples de audio, musicas, tilesets ou modelos 3D de terceiros na
+  arvore atual.
 
-## 2. Fontes (origem Google Fonts — licença SIL Open Font License 1.1)
-
-**EMPACOTADAS** em `public/fonts/`, subconjunto `latin`, ~69 KB no total —
-não são mais servidas por `fonts.googleapis.com`. Duas razões, e as duas
-importam para a loja: era a **única chamada de rede do protótipo inteiro**
-(sem ela, a ficha de Segurança de Dados da Play declara "nenhuma coleta"), e
-o GDD §19.6 quer o Modo Treino Offline como produto — com fonte remota o jogo
-abria em modo avião com a tipografia errada.
-
-A SIL OFL permite uso comercial, embed e redistribuição (as fontes em si não
-podem ser vendidas isoladamente). Nenhuma das três declara *Reserved Font Name*.
-Corpos de licença e avisos de copyright em `public/fonts/OFL.txt`.
-
-| Fonte | Uso no jogo | Pesos empacotados | Licença |
-|---|---|---|---|
-| Cinzel | Logo e títulos | 500 + 700 (arquivo variável) | SIL OFL 1.1 |
-| Chakra Petch | UI, HUD e números | 400 · 700 | SIL OFL 1.1 |
-| Inter | Textos corridos | 400 | SIL OFL 1.1 |
-
-Pesos que o `index.html` declarava e o código nunca pediu (Cinzel 900, Chakra
-Petch 600, Inter 600) **não** foram empacotados — peso baixado é peso que o
-jogador paga na abertura.
-
-Um portão no `vite.config.ts` quebra o `npm run build` se alguém reintroduzir
-referência a CDN de fonte, ou se algum `.woff2` sumir do `dist/`.
-
-## 3. Dependências de código (npm)
-
-| Pacote | Papel | Licença |
-|---|---|---|
-| Phaser 3 | Engine 2D | MIT |
-| Vite | Bundler / dev server | MIT |
-| TypeScript | Linguagem / compilador | Apache-2.0 |
-
-Licenças permissivas, compatíveis com distribuição comercial; os textos das
-licenças acompanham cada pacote em `node_modules/`.
-
-## 4. Processo para novos assets
-
-Qualquer asset externo que entrar no projeto (mesmo placeholder temporário)
-deve, **no mesmo commit**: (1) ganhar uma linha nesta tabela com fonte, autor e
-licença; (2) ter a licença verificada arquivo a arquivo (atenção especial a
-freesound.org, onde a licença varia por arquivo — GDD seção 13).
+Antes de publicar, as artes finais devem ter sua origem e permissao documental
+confirmadas aqui, inclusive assets gerados por ferramentas externas.

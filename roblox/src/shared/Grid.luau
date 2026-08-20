@@ -1,7 +1,7 @@
 --!strict
 -- ============================================================================
 -- ARKANA (Roblox) — GRID DO TERRENO REATIVO (contrato compartilhado)
--- Porte da grade lógica do protótipo 2D (src/terrain/) para 3D em blocos.
+-- Grade lógica do terreno reativo em blocos.
 -- Fonte: GDD §14 (a tabela de ações/resultados/contra-jogadas é LEI).
 --
 -- Arquitetura herdada das 3 regras do chemistry engine de BotW (GDD §16.1):
@@ -24,7 +24,7 @@ Grid.FLOOR_Y = 0
 Grid.WIDTH_STUDS = Grid.COLS * Grid.CELL_SIZE
 Grid.DEPTH_STUDS = Grid.ROWS * Grid.CELL_SIZE
 
--- Materiais (imutáveis por célula) — espelham o protótipo 2D
+-- Materiais imutáveis por célula
 --- `Slab` e `Silt` existem para os dois POIs terem COR PRÓPRIA (R9): a laje das
 --- ruínas nascia como `Road` e o lodo da baixada como `Dirt`, então os dois
 --- lugares mais característicos da arena se pintavam com a cor do caminho e a do
@@ -49,7 +49,7 @@ export type Cell = {
 }
 
 --- materiais que o fogo consome (LIÇÃO DO 2D: campo aberto NÃO queima —
---- senão o incêndio carboniza o mapa inteiro; ver docs/HISTORICO.md)
+--- senão o incêndio carboniza o mapa inteiro)
 Grid.FLAMMABLE = {
 	Tree = true,
 	TallGrass = true,

@@ -35,7 +35,7 @@ Elements.List = {
 		en = "Fire",
 		color = Color3.fromHex("#FF5A2A"),
 		glow = Color3.fromHex("#FFB07A"),
-		--- lágrima/cone → cunha apontada (PROJETO_PRISMA §6)
+		--- lágrima/cone → cunha apontada (regra de silhueta do GDD §10)
 		shape = "Wedge" :: Shape,
 		order = 1,
 	},

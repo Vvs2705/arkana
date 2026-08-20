@@ -1,16 +1,13 @@
 --!strict
 -- ============================================================================
 -- ARKANA (Roblox) — DADOS DE BALANCEAMENTO
--- Porte fiel de src/core/balance.ts do protótipo 2D. Fontes: GDD §4, §5, §14.
+-- Fontes: GDD §4, §5, §14 e resultados de calibracao do Campo de Provas.
 -- Regra do projeto: "design antes de código; números viram dados; o código lê
 -- dados". Rebalancear o jogo = editar este arquivo. NUNCA constante inline.
 -- Dono: COORDENADOR.
 --
--- CONVERSÃO DE UNIDADES (2D → 3D):
---   protótipo: 1 célula = 32 px · aqui: 1 célula = Grid.CELL_SIZE studs (4)
---   logo, 8 px ≈ 1 stud. Valores de DANO/MANA/COOLDOWN portam 1:1 (sem unidade).
---   Valores de VELOCIDADE foram convertidos e depois AJUSTADOS para o feel 3D —
---   ver `speed` abaixo: são knobs de calibração, não verdades matemáticas.
+-- UNIDADES: espaco em studs e tempo em segundos. Dano, mana e cooldown seguem
+-- o GDD; velocidade e alcance sao knobs de calibracao desta engine.
 -- ============================================================================
 
 export type BasicSpell = {
@@ -129,7 +126,7 @@ Balance.terrain = {
 	--- dano de projétil em muros/árvores ao colidir
 	projectileCellDmg = 34,
 	tallGrassSpeedMult = 0.92,
-	--- LIÇÃO DO PROTÓTIPO 2D (docs/HISTORICO.md): fogo consome COBERTURA
+	--- Regra validada: fogo consome COBERTURA
 	--- (floresta e grama alta), nunca o campo aberto — senão carboniza o mapa.
 	grassBurns = false,
 }
