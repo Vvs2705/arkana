@@ -57,7 +57,13 @@ echo "== 2/3 export debug =="
 echo "== 3/3 verificacao =="
 [[ -f "$OUT" ]] || fail "APK nao foi gerado em $OUT"
 SIZE=$(du -h "$OUT" | cut -f1)
-unzip -l "$OUT" | grep -q "libgodot_android.so" || fail "APK sem libgodot_android.so"
+# Windows: logo apos o export, o primeiro unzip pode ler o zip ainda em flush
+# e listar VAZIO (visto na R17: grep falhava com o APK integro). Uma pausa e
+# uma retentativa separam "arquivo quebrado" de "arquivo ainda fechando".
+if ! unzip -l "$OUT" | grep -q "libgodot_android.so"; then
+	sleep 2
+	unzip -l "$OUT" | grep -q "libgodot_android.so" || fail "APK sem libgodot_android.so"
+fi
 unzip -l "$OUT" | grep -q "assets/" || fail "APK sem assets/ (pck do projeto)"
 echo "OK: $OUT ($SIZE)"
 unzip -l "$OUT" | grep -E "lib/|\.pck|assets/.*\.(pck|so)" | head -8 || true

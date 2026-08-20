@@ -84,29 +84,30 @@ func _test_combat_nan() -> void:
 
 
 func _test_gesture() -> void:
-	print("[FireGesture: maquina pura do gesto unico]")
+	print("[FireGesture: clicar dispara · segurar auto-fogo · arrastar mira (R17)]")
 	var g: RefCounted = _fg.new()
 	g.deadzone_px = 20.0
-	g.tap_max_ms = 220
+	g.repeat_ms = 270
 	var res: Dictionary = _fg.Result
 	var vis: Dictionary = _fg.Visual
-	# toque curto dispara na direcao da camera
-	g.press(Vector2.ZERO, 0)
-	_check(g.release(100) == res.TAP, "tap curto = TAP (dispara)")
-	# arrastar para fora e soltar = FIRE, mostrando ANEL
-	g.press(Vector2.ZERO, 0)
+	# clicar DISPARA na hora — o veredito do Diretor no aparelho
+	_check(g.press(Vector2.ZERO, 0) == res.FIRE, "clicar dispara imediatamente")
+	_check(g.visual(10) == vis.RING, "anel aceso enquanto o dedo esta' no botao")
+	# segurar = um disparo por cadencia, nunca por frame
+	_check(g.poll(100) == res.NONE, "antes da cadencia NAO repete")
+	_check(g.poll(270) == res.FIRE, "na cadencia repete o disparo")
+	_check(g.poll(300) == res.NONE, "um por cadencia, nao um por frame")
+	_check(g.poll(540) == res.FIRE, "segue repetindo enquanto segura")
+	# arrastar direciona SEM interromper o fogo
 	g.drag(Vector2(80, 0))
-	_check(g.visual(50) == vis.RING, "fora da deadzone mostra ANEL")
-	_check(g.release(600) == res.FIRE, "soltar fora = FIRE")
-	# voltar ao centro = CANCEL, mostrando X — e NAO dispara
-	g.press(Vector2.ZERO, 0)
-	g.drag(Vector2(80, 0))
-	g.drag(Vector2(4, 0))
-	_check(g.visual(600) == vis.CROSS, "de volta ao centro mostra X")
-	_check(g.release(600) == res.CANCEL, "cancelamento NAO dispara")
-	# segurar parado alem do tap tambem cancela
-	g.press(Vector2.ZERO, 0)
-	_check(g.release(500) == res.CANCEL, "segurar parado cancela")
+	_check(g.has_aimed(), "arrasto alem da deadzone vira mira")
+	_check(g.poll(810) == res.FIRE, "mirando continua disparando")
+	# soltar para o fogo
+	g.release(900)
+	_check(g.poll(1200) == res.NONE, "soltou = parou")
+	_check(g.visual(1200) == vis.NONE, "anel apaga ao soltar")
+	# a MANA nao mora na maquina: quem barra e' o Player (autoridade de custo).
+	# O gate disso e' o teste de mana do Player logo abaixo no fluxo da partida.
 
 
 func _test_bot_death() -> void:

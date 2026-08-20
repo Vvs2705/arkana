@@ -2,6 +2,37 @@
 
 Cada versão do protótipo documentada (regra do GDD, seção 15).
 
+## v1.1.0-3d — 2026-08-19 — R17: disparo contínuo aprovado no dedo, e o elenco de 20
+
+**O Diretor aprovou o APK 3D no aparelho** ("ficou ótimo") e pediu dois ajustes.
+
+### O botão de Fogo virou gatilho de verdade
+Clicar **dispara na hora**; **segurar mantém disparando** por cadência enquanto
+houver mana; arrastar direciona a magia sem parar o fogo; soltar para. O disparo
+saiu do "soltar" e foi para o apertar + repetição — e o X de cancelamento morreu
+junto com o disparo-no-soltar (não há mais o que cancelar; o anel aceso = disparando).
+A mana continua sendo barrada só no Player (autoridade única de custo — a máquina
+do gesto PEDE, nunca decide). Selftest reescrito: 12 verificações do novo fluxo,
+incluindo "um disparo por cadência, nunca um por frame".
+
+### `personagens/` — o elenco completo, um arquivo por mago
+- **01–10**: o elenco de LANÇAMENTO do GDD §3 (base Apex), ficha completa + espaço
+  para a arte do Diretor (`personagens/NN-slug/arte/`).
+- **11–20**: o elenco de TEMPORADAS (ordem do Diretor): raças fantásticas — Alto
+  Elfo sniper, Drow assassina, Anão de runas, Orc xamã, Nereida, Gnomo artífice,
+  Dríade, Golem rúnico, Vampiro arcano (drena ÉTER, não sangue — 10+), Fada da
+  tempestade. Cada um com aparência física, vestuário, personalidade, kit proposto
+  com ⚖️ limitadores, VFX de assinatura, paleta e notas de modelagem. Funções na
+  taxonomia do Diretor: Suporte/Vida · Ataque/Perseguição · Longa · Curta.
+- Kits 11–20 são **proposta** até o Diretor aprovar; aprovados, sobem ao GDD.
+
+### Pipeline
+Corrida de flush do Windows cercada no `build_apk.sh`: o primeiro `unzip` logo
+após o export podia ler o zip vazio e reprovar um APK íntegro — agora retenta.
+
+Gates: import limpo · boot 300 frames sem erro · selftests verdes · APK compilado
+com o auto-fogo dentro. Roblox intacto.
+
 ## v1.0.0-3d — 2026-08-19 — R16: o pivô — Arkana 3D no Android, régua Spellbreak
 
 **Ordem do Diretor:** abandonar o roadmap incremental, descontinuar o 2D (Roblox

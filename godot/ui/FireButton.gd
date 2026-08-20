@@ -1,11 +1,10 @@
-## Botao de Fogo — o GESTO UNICO do GDD §19.3 (LEI). Embrulha a maquina pura
-## FireGesture e MOSTRA o estado no proprio botao: ANEL verde = soltar
-## dispara · X vermelho = soltar cancela (cor + FORMA, regra do projeto).
+## Botao de Fogo — REVISADO NA R17 pelo veredito do Diretor no aparelho:
+## clicar DISPARA na hora; SEGURAR mantem disparando enquanto houver mana;
+## arrastar direciona a magia. ANEL verde aceso = disparando.
 class_name FireButton
 extends Control
 
-signal fired                    # TAP e FIRE: ambos disparam pela camera
-signal canceled
+signal fired                    # um pedido de disparo (o Player barra por mana)
 signal aim_state(aiming: bool)  # o player gira para a mira enquanto true
 signal aim_delta(rel: Vector2)  # arrasto -> camera/reticulo acompanham
 
@@ -16,23 +15,20 @@ var _touch := -1
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	gesture.deadzone_px = Dp.px(float(Balance.TOUCH.aim_deadzone_dp))
-	gesture.tap_max_ms = int(Balance.TOUCH.tap_max_ms)
+	gesture.repeat_ms = int(float(Balance.FIRE.fire_rate) * 1000.0)
 
 
 func _input(e: InputEvent) -> void:
 	if e is InputEventScreenTouch:
 		if e.pressed and _touch == -1 and get_global_rect().has_point(e.position):
 			_touch = e.index
-			gesture.press(e.position, Time.get_ticks_msec())
+			if gesture.press(e.position, Time.get_ticks_msec()) == FireGesture.Result.FIRE:
+				fired.emit()  # clicar JA' dispara — pedido do Diretor no aparelho
 			queue_redraw()
 		elif not e.pressed and e.index == _touch:
 			_touch = -1
-			var r := gesture.release(Time.get_ticks_msec())
+			gesture.release(Time.get_ticks_msec())
 			aim_state.emit(false)
-			if r == FireGesture.Result.TAP or r == FireGesture.Result.FIRE:
-				fired.emit()
-			elif r == FireGesture.Result.CANCEL:
-				canceled.emit()
 			queue_redraw()
 	elif e is InputEventScreenDrag and e.index == _touch:
 		gesture.drag(e.position)
@@ -44,7 +40,11 @@ func _input(e: InputEvent) -> void:
 
 func _process(_delta: float) -> void:
 	if _touch != -1:
-		queue_redraw()  # o visual RING->CROSS tambem muda com o tempo (tap_max)
+		# SEGURAR = auto-fogo por cadencia. A mana quem barra e' o Player
+		# (autoridade unica de custo) — aqui so' se PEDE.
+		if gesture.poll(Time.get_ticks_msec()) == FireGesture.Result.FIRE:
+			fired.emit()
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -55,11 +55,5 @@ func _draw() -> void:
 	var fs := maxi(int(Dp.px(13.0)), 8)
 	draw_string(get_theme_default_font(), Vector2(0, c.y + fs * 0.35), "FOGO",
 			HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 0.9))
-	match gesture.visual(Time.get_ticks_msec()):
-		FireGesture.Visual.RING:
-			draw_arc(c, r + Dp.px(5.0), 0, TAU, 48, Color(0.2, 1.0, 0.4), Dp.px(3.5), true)
-		FireGesture.Visual.CROSS:
-			var k := r * 0.7
-			var w := Dp.px(4.0)
-			draw_line(c + Vector2(-k, -k), c + Vector2(k, k), Color(1.0, 0.15, 0.15), w)
-			draw_line(c + Vector2(-k, k), c + Vector2(k, -k), Color(1.0, 0.15, 0.15), w)
+	if gesture.visual(Time.get_ticks_msec()) == FireGesture.Visual.RING:
+		draw_arc(c, r + Dp.px(5.0), 0, TAU, 48, Color(0.2, 1.0, 0.4), Dp.px(3.5), true)

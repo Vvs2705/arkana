@@ -1,64 +1,65 @@
-## Maquina PURA do gesto unico do botao de Fogo (GDD §19.3 — e' LEI).
-## Sem nos, sem cena, sem Input: testavel headless. A UI converte dp->px
-## e alimenta press/drag/release; a maquina so' classifica.
-##   dedo desce -> arrastar mira -> soltar dispara
-##   toque curto (<= tap_max_ms, sem sair da deadzone) -> TAP (dispara na camera)
-##   voltar ao centro (ou segurar parado alem do tap) -> CANCEL
+## Maquina PURA do botao de Fogo — REVISADA NA R17 pelo veredito do Diretor no
+## aparelho: "clicar dispara; SEGURAR mantem disparando enquanto houver mana;
+## arrastar direciona". O disparo saiu do RELEASE e foi para o PRESS + repeticao.
+## Sem nos, sem cena, sem Input: testavel headless. A UI converte dp->px e
+## alimenta press/drag/poll/release; a maquina so' classifica.
+##   dedo desce  -> DISPARA ja' (e comeca o auto-fogo)
+##   segurar     -> poll() pede um disparo por cadencia (mana quem barra e' o Player)
+##   arrastar    -> direciona a mira (continua disparando)
+##   soltar      -> para
+## O CANCEL de "voltar ao centro" morreu COM o disparo-no-soltar: nao ha' mais
+## "soltar dispara" para cancelar. O visual RING agora significa "disparando".
 class_name FireGesture
 extends RefCounted
 
-enum { IDLE, AIMING }
-enum Result { NONE, TAP, FIRE, CANCEL }
-enum Visual { NONE, RING, CROSS }  # anel = soltar dispara · X = soltar cancela
+enum { IDLE, FIRING }
+enum Result { NONE, FIRE }
+enum Visual { NONE, RING }
 
 var deadzone_px := 20.0  # a UI calcula de Balance.TOUCH.aim_deadzone_dp
-var tap_max_ms := 220    # a UI copia de Balance.TOUCH.tap_max_ms
+var repeat_ms := 270     # a UI copia de Balance.FIRE.fire_rate (em ms)
 
 var state := IDLE
 var _origin := Vector2.ZERO
 var _offset := Vector2.ZERO
-var _press_ms := 0
-var _ever_aimed := false
+var _next_ms := 0
 
 
-func press(pos: Vector2, now_ms: int) -> void:
-	state = AIMING
+## Devolve FIRE imediatamente: clicar ja' dispara (pedido do Diretor).
+func press(pos: Vector2, now_ms: int) -> Result:
+	state = FIRING
 	_origin = pos
 	_offset = Vector2.ZERO
-	_press_ms = now_ms
-	_ever_aimed = false
+	_next_ms = now_ms + repeat_ms
+	return Result.FIRE
 
 
 func drag(pos: Vector2) -> void:
-	if state != AIMING:
+	if state != FIRING:
 		return
 	_offset = pos - _origin
-	if _offset.length() > deadzone_px:
-		_ever_aimed = true
 
 
-func release(now_ms: int) -> Result:
-	if state != AIMING:
+## Chamado todo frame pela UI enquanto o dedo esta' no botao: um FIRE por
+## cadencia. A MANA nao mora aqui de proposito — quem decide se o disparo sai
+## e' o Player (autoridade unica de custo), esta maquina so' pede.
+func poll(now_ms: int) -> Result:
+	if state != FIRING or now_ms < _next_ms:
 		return Result.NONE
+	_next_ms = now_ms + repeat_ms
+	return Result.FIRE
+
+
+func release(_now_ms: int) -> Result:
 	state = IDLE
-	if _offset.length() > deadzone_px:
-		return Result.FIRE
-	if not _ever_aimed and now_ms - _press_ms <= tap_max_ms:
-		return Result.TAP
-	return Result.CANCEL  # voltou ao centro (ou segurou parado): NAO dispara
+	return Result.NONE
 
 
 func has_aimed() -> bool:
-	return state == AIMING and _ever_aimed
+	return state == FIRING and _offset.length() > deadzone_px
 
 
-## O botao MOSTRA o que soltar faz AGORA (cancelar e' estado de 1a classe;
-## cor + FORMA, regra do projeto).
-func visual(now_ms: int) -> Visual:
-	if state != AIMING:
-		return Visual.NONE
-	if _offset.length() > deadzone_px:
-		return Visual.RING
-	if not _ever_aimed and now_ms - _press_ms <= tap_max_ms:
-		return Visual.RING  # soltar agora seria TAP: ainda dispara
-	return Visual.CROSS
+## O anel aceso = disparando. (O X de cancelamento morreu junto com o
+## disparo-no-soltar; se um dia voltar um gesto cancelavel, ele volta.)
+func visual(_now_ms: int) -> Visual:
+	return Visual.RING if state == FIRING else Visual.NONE
