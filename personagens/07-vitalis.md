@@ -13,6 +13,35 @@ Vestes de curandeira de campo em branco e dourado, bolsas de poções penduradas
 ## Personalidade & história curta
 Calma de enfermeira de guerra, teimosia de irmã mais velha (por 4 minutos). Conversa com Lúmen o tempo todo, em meia-voz — quem joga com ela aprende a ler as respostas na luz. Nunca diz "minha fada". Corrige: "minha irmã".
 
+## História
+
+**Bio de tela**
+> No rio Claro, Vitalis segurou a mão da irmã gêmea até o fim — e o fim não veio
+> inteiro. Lúmen não morreu: ficou ENTRE os mundos, e o que restou dela deste lado é
+> uma pequena luz em forma de menina que nunca se afasta. A mecha branca nasceu
+> naquela noite; os dedos da mão esquerda nunca mais esquentaram. Ela cura estranhos
+> de graça e estuda Círculos de Invocação em segredo. Um dia vai devolver um corpo à
+> irmã.
+
+**Fundo**
+São gêmeas com quatro minutos de diferença, e Vitalis nunca deixou ninguém esquecer
+de que lado desses quatro minutos ela está. Virou curandeira de campo porque era o
+ofício que mais chegava perto do problema real: gente indo embora enquanto alguém
+segura a mão. O Círculo de Invocação traz de volta o jogador caído, mas só com a
+varinha comum e as magias base — traz a pessoa, não o poder. Ninguém nunca tentou
+com alguém que não chegou a morrer de verdade, e é exatamente isso que ela pesquisa,
+caderno por caderno, ritual por ritual.
+
+Vex foi o único que se dispôs a calcular o preço em voz alta, do começo ao fim, com
+a honestidade cruel de sempre. Ela ouviu tudo, agradeceu e foi embora sem dizer não —
+e não voltou a perguntar. Procurou também a Ceifadora, que atravessou e voltou, e
+recebeu silêncio. O que Vitalis quer cabe numa frase; o que teme cabe em outra: que
+devolver o corpo à irmã custe justamente a luz que ainda restou dela. Pip foi a
+primeira criatura a olhar para Lúmen e dizer, indignada, que aquilo ali não é fada —
+e por isso Vitalis gosta dela para sempre.
+
+**Assinatura:** *"Não é minha fada. É minha irmã."*
+
 ## Kit
 - **Passiva — Mãos Livres:** Lúmen reergue aliados caídos enquanto Vitalis continua lutando.
 - **Tática — Vai, Lúmen:** envia Lúmen a um aliado a até 30m: cura 8 hp/s por 12s enquanto o segue.

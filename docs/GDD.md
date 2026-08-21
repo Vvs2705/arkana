@@ -52,7 +52,7 @@
 | Apex | Mago | Conceito |
 |---|---|---|
 | Gibraltar | **Rochedo** | Braço-escudo + domo de proteção |
-| Lifeline | **Vitalis** | Fada curandeira + baú celestial |
+| Lifeline | **Vitalis** | Fada curandeira (Lúmen, a irmã) + Jardim da Aurora |
 | Loba | **Ladra** | Vê loot raro através de paredes + anel de translocação |
 | Mirage | **Ilusionista** | Clones ilusórios + troca invisível |
 | Newcastle | **Baluarte** | Escudo móvel ao reviver + muralha de energia |
@@ -356,7 +356,7 @@ O mapa é dividido numa grade de células, cada uma com **material** (grama, gra
 | Fogo em grama alta | queima e **revela** quem estava escondido | — |
 | Água em lago | **congela a superfície** por ~10s: vira ponte/rota nova | Fogo derrete; quem estiver em cima cai |
 | Raio em água/lago | **eletrocuta** todos em contato com a água | sair da água; Terra isola |
-| Terra em qualquer chão | ergue **muro de pedra** (cobertura destrutível, ~200hp) | qualquer dano destrói; Raio racha mais rápido |
+| Terra em qualquer chão | ergue **muro de pedra** (cobertura destrutível, **60hp**) | qualquer dano destrói; **Terra** racha mais rápido (fator 2.0 contra 1.6 do Raio) |
 | Água + chão de terra | **lamaçal**: lentidão severa na área | Fogo seca; Vento não afeta |
 | Vento em fogo/névoa/gás | **espalha ou dissipa** (decisão tática) | — |
 

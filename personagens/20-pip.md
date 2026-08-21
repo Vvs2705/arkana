@@ -12,6 +12,35 @@ Vestido-pétala em camadas azul-elétrico com barra chamuscada (voa perto demais
 ## Personalidade & história curta
 Caótica boa: ri no meio do combate, coleciona botões roubados dos casacos das vítimas (o do Noctus é o troféu da coleção). Velocidade é o idioma dela — parada, definha.
 
+## História
+
+**Bio de tela**
+> Sessenta centímetros de fada, quatro asas de libélula com desenho de circuito e
+> velocidade suficiente para chegar quase antes do próprio barulho. Quase: o sino no
+> tornozelo dela é maldição de infância que magia nenhuma tira, e é por ele que todo
+> mundo sabe que ela está por perto. Pip coleciona botões arrancados de casacos
+> alheios — o do Noctus é a joia da coleção e ela o usa como pingente. Parada, ela
+> definha. Então ela não para.
+
+**Fundo**
+A maldição do sino foi lançada quando ela era pequena demais para entender e
+travessa demais para não merecer um pouco, e nem ela lembra direito por quê. Podia
+ser tragédia; ela transformou em piada e em desafio: "vocês me ouvem chegando e mesmo
+assim não me pegam". A coleção de botões nasceu do mesmo espírito — cada botão é um
+lugar onde ela esteve e de onde saiu antes de alguém fechar a mão.
+
+O botão do Noctus é o troféu absoluto, arrancado em pleno voo de uma casaca vitoriana,
+e o vampiro sabe exatamente onde ele está sem nunca conseguir chegar lá. Rouba
+bobinas de cobre da Tessa toda semana e finge que ninguém percebe; Tessa finge junto,
+e deixa as fáceis por perto. Olho-de-Éter é o único que não se irrita com o sino — ele
+o enxerga como uma pulsação bonita de luz e sinalizou isso para ela uma vez, o que
+bastou para virar o favorito dela para sempre. E foi Pip quem olhou para Lúmen, a
+irmã de luz da Vitalis, e disse indignada que aquilo ali não é fada, obrigada — o que
+lhe garantiu a lealdade de uma curandeira. O que Pip teme é o silêncio: no dia em que
+o sino parar, alguma coisa terá dado muito errado.
+
+**Assinatura:** *"Se você me ouviu, já era tarde."*
+
 ## Kit (proposta)
 - **Passiva — Nunca Pousar:** voa sempre (ignora lama/água/gelo no chão); se ficar 2s sem se mover, começa a perder 2 hp/s (definha parada — agressão obrigatória).
 - **Tática — Zip-Zag:** três dashes encadeados em zigue-zague (0,8s entre cada); cada dash que ATRAVESSA um inimigo solta uma faísca que salta para o inimigo mais próximo.

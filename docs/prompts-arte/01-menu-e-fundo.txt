@@ -1,0 +1,219 @@
+========================================================================
+01 — MENU E FUNDOS
+Peças: M1 key art do menu · M2 tela de carregamento/splash · M3 fundo da
+vitrine do elenco · M4 fundo de pausa/configurações
+Fonte: GDD §10 (key art de referência) e §11 (boot, splash, fluxo de menus)
+========================================================================
+
+Nenhuma peça deste arquivo leva fundo transparente — são imagens de tela
+cheia, opacas. Todas devem funcionar com TEXTO POR CIMA: o código escreve o
+wordmark, os botões e as dicas sobre elas. Por isso todo prompt aqui pede
+uma zona calma (baixo contraste, pouco detalhe) onde a interface vai morar.
+
+
+------------------------------------------------------------------------
+M1 — KEY ART DO MENU PRINCIPAL (celular, vertical)
+Proporção 9:16 · exportar 1080x1920 · SEM transparência
+Salvar em: godot/menu/art/ui/bg-menu.png
+------------------------------------------------------------------------
+
+Ilustração de key art de fantasia épica para tela de menu de um jogo mobile
+de battle royale de magos, composição VERTICAL de celular.
+
+CENA: câmera baixa apontada para cima, em contra-plongée. Um CASTELO
+VOADOR colossal de pedra clara e telhados azul-noite rasga um mar de nuvens
+ao entardecer, suspenso no ar por âncoras de runas douradas que flutuam
+soltas em volta dele. Dezenas de magos minúsculos saltam do castelo em
+VASSOURAS e TAPETES VOADORES, mergulhando em direção ao observador, cada
+grupo deixando uma TRILHA DE LUZ ELEMENTAL longa e curva atrás de si: uma
+trilha laranja de fogo #FF5A2A, uma azul de água #2AA7FF, uma âmbar-terrosa
+#A8763E, uma verde-menta de vento #8FE8C9 e uma amarela de raio #F5D90A —
+cinco trilhas, cinco cores, cruzando o céu como fitas. Ao fundo, distante e
+enorme, uma TEMPESTADE ARCANA se fecha em ANEL no horizonte, um círculo de
+nuvem carregada com relâmpagos violeta correndo por dentro dele.
+
+COMPOSIÇÃO E ZONAS DE INTERFACE (obrigatório):
+- O terço SUPERIOR fica com o céu aberto e as nuvens: pouca informação,
+  contraste baixo — é onde o wordmark ARKANA vai entrar.
+- O terço INFERIOR escurece para azul-noite profundo #05070F em degradê
+  suave, quase liso: é onde os botões do menu vão entrar. Nada de detalhe
+  fino ali embaixo.
+- O castelo e os magos ocupam o terço do MEIO. Nenhum elemento importante
+  encostando nas bordas laterais.
+- Motes de luz âmbar #F0C75E flutuando lentamente por toda a imagem, mais
+  densos perto do castelo.
+
+Os magos são silhuetas distantes e pequenas — nenhum rosto legível, nenhum
+personagem em primeiro plano. Isto é paisagem, não retrato.
+
+[ESTILO ARKANA]
+Estilo: pintura digital de fantasia estilizada, a mesma linguagem visual de
+um character sheet de RPG de fantasia — contornos limpos, sombreamento em
+bandas (cel-shading suave), pinceladas visíveis sem ruído sujo, e a luz
+mágica saindo de DENTRO do objeto (emissiva), nunca um brilho aplicado por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E na marca e nos contornos nobres.
+Cores elementais oficiais: Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E ·
+Vento #8FE8C9 · Raio #F5D90A.
+Iluminação: chave quente dourada vindo de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras (sempre azul-noite).
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue, ferimentos, gore ou imagem
+perturbadora (o jogo é 10+); nenhum TEXTO, letra, número, legenda, marca
+d'água, assinatura ou moldura de galeria dentro da imagem.
+
+NÃO deve aparecer também: nenhum logotipo desenhado (o Selo entra por
+código); nenhuma interface, botão ou HUD desenhado na imagem; nenhum rosto
+em primeiro plano; nenhuma criatura moderna, arma de fogo ou tecnologia.
+
+
+------------------------------------------------------------------------
+M1b — MESMA KEY ART, VERSÃO PAISAGEM (para PC e para material de loja)
+Proporção 16:9 · exportar 1920x1080 · SEM transparência
+Salvar em: godot/menu/art/ui/bg-menu-wide.png
+------------------------------------------------------------------------
+
+Use o prompt M1 inteiro, trocando as instruções de composição por estas:
+
+COMPOSIÇÃO E ZONAS DE INTERFACE (versão horizontal):
+- O castelo voador fica no TERÇO DIREITO da imagem, subindo pelas nuvens.
+- O TERÇO ESQUERDO é céu aberto escurecendo para azul-noite #05070F: zona
+  calma para a coluna de botões do menu.
+- A tempestade em anel fecha o horizonte ao centro-fundo.
+- As cinco trilhas elementais cruzam da direita para a esquerda, altas, sem
+  invadir a metade inferior esquerda.
+
+
+------------------------------------------------------------------------
+M2 — TELA DE CARREGAMENTO / SPLASH DE BOOT
+Proporção 9:16 · exportar 1080x1920 · SEM transparência
+Salvar em: godot/menu/art/ui/bg-loading.png
+(esta é a peça que também vira o boot splash do APK — GDD §11)
+------------------------------------------------------------------------
+
+Ilustração vertical de tela de carregamento para jogo mobile de fantasia
+arcana. Composição MUITO mais calma e escura do que uma key art: ela existe
+para o logo e a barra de carregamento morarem em cima dela.
+
+CENA: um salão de conclave em ruínas visto de dentro, ao entardecer. Ao
+centro, no chão de pedra, um enorme CÍRCULO RÚNICO gravado brilha em
+dourado arcano #F0C75E, com cinco gemas elementais engastadas nas pontas de
+um pentágono — laranja de fogo #FF5A2A, azul de água #2AA7FF, âmbar-terrosa
+#A8763E, verde-menta de vento #8FE8C9 e amarela de raio #F5D90A. Da gravura
+sobem lentamente motes de luz âmbar. Colunas quebradas se perdem na
+penumbra azul-noite ao redor; uma fresta de luz entra pelo teto rompido e
+cai sobre o círculo.
+
+COMPOSIÇÃO:
+- Terço superior: penumbra quase lisa, azul-noite #0B1026 — o logo entra
+  aqui.
+- Centro: o círculo rúnico, visto em perspectiva rasante.
+- Rodapé (últimos 15% da altura): degradê chapado para #05070F, liso, sem
+  detalhe algum — é onde a barra de carregamento dourada e a dica rotativa
+  vão entrar.
+- Imagem escura no geral: contraste baixo, nenhuma área estourada de branco.
+
+[ESTILO ARKANA]
+Estilo: pintura digital de fantasia estilizada, a mesma linguagem visual de
+um character sheet de RPG de fantasia — contornos limpos, sombreamento em
+bandas (cel-shading suave), pinceladas visíveis sem ruído sujo, e a luz
+mágica saindo de DENTRO do objeto (emissiva), nunca um brilho aplicado por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E na marca e nos contornos nobres.
+Cores elementais oficiais: Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E ·
+Vento #8FE8C9 · Raio #F5D90A.
+Iluminação: chave quente dourada vindo de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras (sempre azul-noite).
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue, ferimentos, gore ou imagem
+perturbadora (o jogo é 10+); nenhum TEXTO, letra, número, legenda, marca
+d'água, assinatura ou moldura de galeria dentro da imagem.
+
+NÃO deve aparecer também: nenhuma pessoa, nenhum mago, nenhuma criatura;
+nenhuma barra de progresso desenhada; nenhum símbolo religioso real;
+nenhuma runa que pareça alfabeto real (as marcas são inventadas, abstratas).
+
+
+------------------------------------------------------------------------
+M3 — FUNDO DA VITRINE DO ELENCO (tela "PERSONAGENS")
+Proporção 9:16 · exportar 1080x1920 · SEM transparência
+Salvar em: godot/menu/art/ui/bg-elenco.png
+------------------------------------------------------------------------
+
+Fundo vertical para uma tela de seleção de personagens de jogo de fantasia.
+Esta imagem fica ATRÁS de uma grade de 20 cards — ela precisa desaparecer
+sob eles, não competir.
+
+CENA: uma parede alta de biblioteca-conclave, muito desfocada, como se a
+câmera estivesse com pouca profundidade de campo: prateleiras de grimórios,
+tapeçarias azul-noite pesadas, castiçais de bronze com chama baixa,
+arcos de pedra ao longe. Tudo em azul-noite #0B1026 e #05070F com pontos
+quentes de dourado #F0C75E dos castiçais. Motes de poeira luminosa no ar.
+
+COMPOSIÇÃO:
+- Desfoque forte e uniforme na imagem inteira: nenhum detalhe deve estar
+  nítido. É atmosfera, não cenário.
+- Contraste baixíssimo: a variação de luminosidade entre a área mais clara
+  e a mais escura da imagem é pequena.
+- Uma vinheta escura fecha as quatro bordas.
+- Sem ponto focal: nenhuma área rouba o olho, porque os cards dos magos são
+  o assunto.
+
+[ESTILO ARKANA]
+Estilo: pintura digital de fantasia estilizada, a mesma linguagem visual de
+um character sheet de RPG de fantasia — contornos limpos, sombreamento em
+bandas (cel-shading suave), pinceladas visíveis sem ruído sujo, e a luz
+mágica saindo de DENTRO do objeto (emissiva), nunca um brilho aplicado por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E na marca e nos contornos nobres.
+Iluminação: chave quente dourada vindo de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras (sempre azul-noite).
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue, ferimentos, gore ou imagem
+perturbadora (o jogo é 10+); nenhum TEXTO, letra, número, legenda, marca
+d'água, assinatura ou moldura de galeria dentro da imagem.
+
+NÃO deve aparecer também: nenhuma pessoa; nenhum objeto nítido; nenhuma
+área de alto contraste; nenhum livro com título legível.
+
+
+------------------------------------------------------------------------
+M4 — SOBREPOSIÇÃO DE PAUSA E CONFIGURAÇÕES
+Proporção 9:16 · exportar 1080x1920 · SEM transparência
+Salvar em: godot/menu/art/ui/bg-pausa.png
+(GDD §12 — as 4 abas de configuração moram sobre este fundo)
+------------------------------------------------------------------------
+
+Fundo vertical quase abstrato para o menu de pausa de um jogo de fantasia
+arcana. É a peça mais discreta do pacote: o jogo continua congelado atrás
+dela e o jogador precisa ler texto pequeno em cima.
+
+CENA: campo azul-noite profundo #05070F preenchido por uma malha rúnica
+muito sutil — linhas geométricas finas em dourado #F0C75E com 10% de
+opacidade formando um padrão de pentágonos entrelaçados, como um vitral
+apagado. Ao centro, um halo radial dourado muito fraco. Poucos motes de luz
+âmbar dispersos.
+
+COMPOSIÇÃO:
+- Padrão uniforme, sem foco, sem centro dramático.
+- Escuridão dominante: 90% da imagem é azul-noite quase liso.
+- As linhas rúnicas somem completamente nas bordas.
+
+[ESTILO ARKANA]
+Estilo: pintura digital de fantasia estilizada, contornos limpos,
+sombreamento em bandas, luz mágica emissiva saindo de dentro.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E.
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico; pixel
+art; anime chibi; gradientes de interface web; sangue ou gore; nenhum
+TEXTO, letra, número, marca d'água ou assinatura dentro da imagem; nenhuma
+pessoa; nenhum ícone de interface desenhado; nenhum símbolo religioso real.

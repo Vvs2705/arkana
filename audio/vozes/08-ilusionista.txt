@@ -1,0 +1,93 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 08 — ILUSIONISTA, O ESPELHO
+Funcao: Suporte / engano · Slug de arquivo: ilusionista_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 32 anos. Tenor brilhante, projetado, com sorriso audivel. Voz de mestre
+de cerimonias que nunca deixa o publico respirar.
+Ritmo: RAPIDO. Ele termina a frase dos outros e emenda na propria. Odeia
+silencio — tres anos de silencio bastaram para uma vida. Se sobrar meio segundo
+de pausa numa fala dele, o take esta errado.
+Emocao-base: alegria performada. Sublinhado: PERFORMADA.
+DETALHE DE ATUACAO (a chave): a piada sai inteira, o olho nao acompanha. Em
+TODA fala engracada, a ULTIMA palavra cai meio tom e perde um pouco de energia.
+E ai que o personagem aparece. Marcado nas linhas como [a piada nao chega aos
+olhos].
+Nas falas em que ele fala de si mesmo, o registro muda: mais baixo, mais lento,
+sem projecao — a voz de quem ficou tres anos sem ninguem para ouvir.
+NAO fazer: palhaco. Ele e generoso, nao bobo. Os truques dele existem para os
+OUTROS escaparem, e a voz precisa deixar isso claro nas falas de suporte.
+
+AJUSTE SUGERIDO
+Stability 40 · Similarity 80 · Style 60 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [ilusionista_intro_01] [rapido, showman] Um dos reflexos do Baile e o original. Nem eu sei qual! [a piada nao chega aos olhos]
+02 [ilusionista_intro_02] [charmoso] Botao do lado errado, coracao do lado errado. Alfaiate nenhum resolve.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [ilusionista_queda_01] [animado, alto] Senhoras e senhores, a queda mais elegante do arquipelago!
+02 [ilusionista_queda_02] [emendando sem pausa] Fala comigo, fala qualquer coisa, eu nao aguento silencio na descida.
+
+---------------------------------------------------------------
+3. TATICA — ESPELHO DE MAO
+---------------------------------------------------------------
+01 [ilusionista_tatica_01] [curto, brilhante] Espelho! Devolve pra ele!
+02 [ilusionista_tatica_02] [rapido] Bate aqui! Volta com desconto!
+03 [ilusionista_tatica_03] [aviso] Tres devolucoes e o vidro vai! Todo mundo escuta quando quebra!
+
+---------------------------------------------------------------
+4. SUPREMA — BAILE DE ESPELHOS (telegrafada)
+---------------------------------------------------------------
+01 [ilusionista_suprema_01] [grande, de palco] O BAILE COMECOU! CINCO EU! ESCOLHE UM!
+02 [ilusionista_suprema_02] [alto, rindo] SAI DAI QUE EU DOU COBERTURA! CORRE, CORRE, CORRE!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [ilusionista_abate_01] [leve] Voce escolheu errado. Todo mundo escolhe.
+02 [ilusionista_abate_02] [rapido] Aplausos! Ah, e... sem publico. [a piada nao chega aos olhos]
+03 [ilusionista_abate_03] [showman] O passo estava trocado, meu caro. Sempre esta.
+04 [ilusionista_abate_04] [sorrindo] Nao foi truque. Foi ensaio.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [ilusionista_caido_01] [rapido, quebrando em cacos] CACOS! Eu sumo tres segundos, aproveita!
+02 [ilusionista_caido_02] [no chao, sem projecao — registro intimo] Ta muito quieto aqui... alguem fala comigo?
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [ilusionista_reviver_01] [rapido, tagarela de proposito] Fica falando comigo, qualquer coisa, so nao fecha os olhos!
+02 [ilusionista_reviver_02] [sincero, sem palco] Eu ja fiquei sozinho tempo demais. Voce nao vai ficar.
+03 [ilusionista_revivido_01] [voltando com energia total] O MAGICO RETORNA! Sem cortes, sem cacos!
+04 [ilusionista_revivido_02] [mais baixo, verdadeiro] Voce me achou. Nem eu me acho direito.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [ilusionista_vitoria_01] [enorme] MEUS SENHORES! O ORIGINAL VENCEU! Provavelmente!
+02 [ilusionista_vitoria_02] [baixo, sozinho depois do grito] ...um de nos venceu. Ta bom demais pra mim.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [ilusionista_bordao_01] [assinatura] Eu saí do espelho pelo lado errado. Vivo bem assim.
+02 [ilusionista_bordao_02] [rapido] Guardo todos os cacos. Um deles ainda tem a minha cara antiga.
+03 [ilusionista_bordao_03] [brilhante] Se dois de mim discordam, eu sigo o mais bonito.
+04 [ilusionista_bordao_04] [charmoso] Sou canhoto ha tres anos e ainda erro a xicara de cha.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [ilusionista_interacao_pip] [fingindo indignacao] PIP! Meus botoes ja sao do lado errado, nao precisa levar tambem!
+02 [ilusionista_interacao_veu] [mais suave, reconhecendo] Voce voltou atrasada, eu voltei invertido. Somos dois retornos com defeito.
+03 [ilusionista_interacao_ceifadora] [nervoso disfarcado de piada] Voce nao tem sombra e eu tenho cinco. Da pra dividir, se quiser.

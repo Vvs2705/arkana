@@ -1,0 +1,272 @@
+========================================================================
+04 — MOLDURAS E CARDS DA SELEÇÃO DE PERSONAGEM
+C1 moldura do card · C2 moldura do retrato · C3–C7 badges das 5 classes ·
+C8 badges das 4 funções · C9 selo "EM BREVE" · C10 fita de raridade
+Fonte: GDD §1 e §3 (as 5 classes), personagens/00-LEIA.md (as 4 funções),
+GDD §7 (cosméticos/raridade) · godot/menu/Menu.gd (o card real)
+========================================================================
+
+CONTEXTO REAL DA VITRINE (lido de godot/menu/Menu.gd, não inventado):
+  - grade de 5 colunas com 20 cards;
+  - cada card mede 228x204 px de canvas, cantos arredondados de raio 10,
+    borda fina dourada envelhecida e fundo #0E1430;
+  - dentro do card, de cima para baixo: RETRATO com 104 px de altura →
+    nome "NN · Nome do mago" → função em texto menor → e, nos magos 11–20,
+    a etiqueta "EM BREVE" em dourado;
+  - o retrato já entra por arquivo: godot/menu/art/NN.png troca sozinho.
+    As molduras deste arquivo são o que falta em volta dele.
+
+Todas as peças aqui levam FUNDO TRANSPARENTE (00-LEIA.txt seção 2).
+
+
+------------------------------------------------------------------------
+[ESTILO ARKANA] — cole em todos os prompts deste arquivo
+------------------------------------------------------------------------
+Estilo: pintura digital de fantasia estilizada, contornos limpos,
+sombreamento em bandas (cel-shading suave), pinceladas visíveis sem ruído,
+e a luz mágica saindo de DENTRO do objeto (emissiva), nunca aplicada por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado. Paleta base: azul-noite arcano #0B1026 e fundo
+profundo #05070F, com dourado arcano #F0C75E nos contornos nobres.
+Iluminação: chave quente dourada de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras.
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue ou gore; nenhum TEXTO, letra, número,
+marca d'água ou assinatura dentro da imagem.
+------------------------------------------------------------------------
+
+
+########################################################################
+C1 · MOLDURA DO CARD DO MAGO
+Proporção 1:1 (recortar) · exportar 456x408 · COM transparência
+Destino: godot/menu/art/ui/card-moldura.png
+########################################################################
+
+Moldura de card de seleção de personagem para um jogo mobile de fantasia
+arcana. É uma MOLDURA VAZIA: o retrato do mago e os textos entram por
+dentro dela, desenhados pelo jogo.
+
+PEÇA: um painel retangular em pé, levemente mais alto que largo, de cantos
+arredondados suaves, feito de bronze escurecido sobre pedra azul-noite. A
+borda é fina e constante nos quatro lados, com um fio dourado interno
+correndo paralelo a ela. No topo, no centro da borda superior, um pequeno
+ornamento em relevo: um losango facetado do tamanho de uma unha. No rodapé,
+uma faixa horizontal ligeiramente mais escura, lisa, com um terço da altura
+do card — é onde o nome do mago vai ser escrito.
+
+REQUISITOS:
+- O INTERIOR do card é vazio e uniforme: azul-noite chapado, sem gravura,
+  sem textura marcada, sem vinheta forte. Tudo que aparecer ali vai brigar
+  com o retrato.
+- Bordas de espessura igual nos quatro lados, sem ornamento nas laterais
+  nem nos cantos inferiores (o card é repetido 20 vezes numa grade: enfeite
+  demais vira poluição).
+- Cantos arredondados discretos, mesmo raio nos quatro.
+- Contorno externo azul-noite #05070F.
+PALETA: bronze escurecido #8A7336 na borda, dourado #F0C75E no fio interno
+e no losango do topo, azul-noite #0E1430 no interior, #05070F no contorno.
+NÃO: sem retrato dentro, sem personagem, sem rosto, sem texto, sem número,
+sem barra de nível, sem estrelas de raridade, sem ornamento vitoriano
+pesado, sem correntes, sem folhagem decorativa.
++ [ESTILO ARKANA]
+
+VARIANTE C1b — CARD SELECIONADO (gere na mesma sessão):
+mesmo prompt, com a borda ACESA em dourado #F0C75E cheio e um halo dourado
+suave só na parte de dentro da borda. Salvar como
+godot/menu/art/ui/card-moldura-sel.png. O jogo troca uma pela outra ao
+tocar — é o feedback de seleção mais barato que existe.
+
+VARIANTE C1c — CARD BLOQUEADO (magos de temporada):
+mesmo prompt, com a borda em bronze APAGADO e dessaturado, sem fio dourado,
+e o losango do topo escuro. Salvar como
+godot/menu/art/ui/card-moldura-off.png.
+
+
+########################################################################
+C2 · MOLDURA DO RETRATO
+Proporção 1:1 (recortar) · exportar 456x208 · COM transparência
+Destino: godot/menu/art/ui/retrato-moldura.png
+########################################################################
+
+Moldura horizontal de retrato, para emoldurar a concept art de um mago
+dentro de um card de seleção de personagem. Formato deitado, com cerca de
+duas vezes mais largura do que altura.
+
+PEÇA: um arco rebaixado de pedra rúnica — as duas laterais são pilastras
+finas e o topo é um arco muito aberto, quase reto, com uma runa pequena
+gravada na chave do arco. A base é aberta: a moldura não fecha embaixo, o
+retrato "sai" dela para o rodapé do card. Nas duas pontas inferiores das
+pilastras, um pequeno pé chanfrado.
+
+REQUISITOS:
+- ABERTA EMBAIXO: nada de moldura de quadro fechada nos quatro lados.
+- Interior completamente vazio e transparente — é lá que o retrato entra.
+- As pilastras são finas: no máximo 6% da largura da peça cada uma. O
+  retrato é o assunto, a moldura é o cerco.
+- Simetria perfeita no eixo vertical.
+- Contorno externo azul-noite #05070F.
+PALETA: pedra azul-noite #2B2E63 nas pilastras, bronze #A8763E nos
+chanfros, dourado #F0C75E na runa da chave do arco.
+NÃO: sem retrato dentro, sem rosto, sem vidro, sem reflexo, sem cortina,
+sem texto, sem moldura de porta-retratos, sem folhagem, sem arco gótico
+pontudo (o arco é rebaixado, quase reto).
++ [ESTILO ARKANA]
+
+
+########################################################################
+C3–C7 · BADGES DE CLASSE (as 5 classes do GDD §1/§3)
+Proporção 1:1 · exportar 128x128 · COM transparência
+Destino: godot/menu/art/ui/badge-<classe>.png
+########################################################################
+
+São 5 selos minúsculos que marcam a classe do mago no canto do card.
+Tamanho de uso: 24 a 32dp. Isso é MUITO pequeno — a única coisa que
+sobrevive é a silhueta. Cada badge tem a MESMA base (um escudo pentagonal
+de bronze) e um SÍMBOLO INTERNO diferente, com forma distinta. Cor nunca é
+o único diferencial (GDD §10).
+
+------------------------------------------------------------------------
+[BLOCO BADGE] — cole em C3, C4, C5, C6 e C7
+------------------------------------------------------------------------
+Selo/emblema minúsculo de classe para o card de seleção de personagem de um
+jogo mobile de fantasia. BASE IDÊNTICA EM TODOS: um escudo pentagonal
+pequeno de bronze gasto, ponta para baixo, borda fina com um fio dourado
+interno, campo interno liso. Centralizado, ocupando 85% do quadro, resto
+vazio. Símbolo interno em relevo baixo, cheio e maciço, ocupando cerca de
+metade da altura do campo — nenhuma linha fina, nenhum detalhe pequeno:
+este emblema vai ser visto com 28 pixels de altura. Contorno externo
+azul-noite #05070F.
+PALETA BASE: bronze #A8763E no escudo, dourado #F0C75E no fio da borda,
+azul-noite #0B1026 no campo interno.
+NÃO: sem texto, sem letra, sem número, sem fita, sem coroa, sem brasão
+heráldico do mundo real, sem animal realista, sem fundo, sem sombra
+projetada, sem linhas finas.
+------------------------------------------------------------------------
+
+--- C3 · VANGUARDA (quem abre caminho e segura a linha de frente) ---
+SÍMBOLO INTERNO: um ESCUDO MACIÇO visto de frente, base larga e ponta
+inferior, atravessado por uma barra horizontal grossa.
+COR DE ACENTO: fogo #FF5A2A no símbolo.
++ [BLOCO BADGE] + [ESTILO ARKANA]
+
+--- C4 · ERRANTE (quem entra, sai e reposiciona) ---
+SÍMBOLO INTERNO: uma SETA CURVA fechando quase um círculo, grossa, ponta
+afiada, tipo laço de retorno.
+COR DE ACENTO: vento #8FE8C9 no símbolo.
++ [BLOCO BADGE] + [ESTILO ARKANA]
+
+--- C5 · VIDENTE (quem enxerga o que os outros não veem) ---
+SÍMBOLO INTERNO: um OLHO EM LOSANGO — contorno de losango com uma pupila
+circular sólida no centro. Nada de cílios, nada de pálpebra detalhada.
+COR DE ACENTO: verde arcano #2E8B57 no símbolo.
++ [BLOCO BADGE] + [ESTILO ARKANA]
+NÃO ADICIONAL: sem olho dentro de triângulo (símbolo do mundo real), sem
+olho realista, sem íris com textura.
+
+--- C6 · GUARDIÃO (quem mantém o time de pé) ---
+SÍMBOLO INTERNO: uma CRUZ DE BRAÇOS IGUAIS COM AS PONTAS ARREDONDADAS
+transformada em quatro pétalas — um trevo de quatro pontas maciço.
+COR DE ACENTO: dourado #F0C75E no símbolo.
++ [BLOCO BADGE] + [ESTILO ARKANA]
+NÃO ADICIONAL: sem cruz médica, sem cruz religiosa, sem coração.
+
+--- C7 · DOMINADOR (quem nega e controla espaço) ---
+SÍMBOLO INTERNO: um HEXÁGONO MACIÇO com uma faixa vazada cortando o meio na
+horizontal, como área bloqueada.
+COR DE ACENTO: verde reagente #5A8A3C no símbolo.
++ [BLOCO BADGE] + [ESTILO ARKANA]
+
+CHECAGEM: coloque os 5 badges lado a lado a 28px em preto e branco. Se der
+para dizer qual é qual sem cor, passou. Se não, muda o SÍMBOLO.
+
+
+########################################################################
+C8 · BADGES DE FUNÇÃO (a taxonomia do Diretor — personagens/00-LEIA.md)
+Proporção 1:1 · exportar 128x128 · COM transparência
+Destino: godot/menu/art/ui/funcao-<nome>.png
+########################################################################
+
+São 4 pastilhas ainda menores, para a linha de função do card ("Ataque /
+Perseguição", "Longa distância"...). Base diferente da classe DE PROPÓSITO:
+classe é ESCUDO PENTAGONAL, função é PASTILHA REDONDA. Assim o jogador
+nunca confunde as duas informações.
+
+[BLOCO PASTILHA] — cole nas quatro:
+Pastilha circular minúscula de função para o card de personagem de um jogo
+mobile de fantasia. Disco simples de ferro escurecido com aro fino dourado,
+campo interno liso, símbolo cheio e maciço no centro ocupando metade do
+disco. Centralizado, 85% do quadro, resto vazio. Contorno externo azul-
+noite #05070F. Sem texto, sem número, sem fundo, sem sombra projetada, sem
+linha fina.
+PALETA BASE: ferro #4A4A50 no disco, dourado #F0C75E no aro,
+azul-noite #0B1026 no campo.
+
+--- SUPORTE / VIDA ------- SÍMBOLO: gota maciça. Acento: branco #F5F2E8.
+--- ATAQUE / PERSEGUIÇÃO - SÍMBOLO: triângulo apontando para a direita.
+                           Acento: fogo #FF5A2A.
+--- LONGA DISTÂNCIA ------ SÍMBOLO: três traços horizontais paralelos de
+                           comprimentos diferentes, o de cima mais longo.
+                           Acento: verde arcano #2E8B57.
+--- CURTA DISTÂNCIA ------ SÍMBOLO: dois arcos concêntricos fechados, tipo
+                           parênteses grossos. Acento: raio #F5D90A.
++ [BLOCO PASTILHA] + [ESTILO ARKANA]
+
+
+########################################################################
+C9 · SELO "EM BREVE" (magos de temporada, 11–20)
+Proporção 1:1 · exportar 256x256 · COM transparência
+Destino: godot/menu/art/ui/selo-em-breve.png
+########################################################################
+
+Selo de conteúdo bloqueado para card de personagem de jogo mobile.
+
+PEÇA: um CADEADO RÚNICO pequeno e maciço — corpo quadrado de bronze
+envelhecido com cantos chanfrados e arco de fecho grosso em cima; no corpo,
+uma runa curta gravada em baixo relevo, acesa fracamente em dourado. O
+cadeado está fechado, sem corrente.
+
+REQUISITOS:
+- Silhueta de cadeado clássica, lida na hora, mesmo a 32dp.
+- Nenhuma corrente, nenhum elo, nenhum aro extra: só o cadeado.
+- Aparência dessaturada e "adormecida": é conteúdo que ainda não chegou,
+  não conteúdo negado.
+- Contorno externo azul-noite #05070F.
+PALETA: bronze apagado #8A7336 no corpo, dourado #F0C75E fraco na runa,
+azul-noite #0B1026 nas sombras.
+NÃO: sem texto "EM BREVE" desenhado (o jogo escreve por código), sem
+cifrão, sem carrinho de compras, sem ícone de loja, sem corrente, sem
+grade de prisão.
++ [ESTILO ARKANA]
+
+
+########################################################################
+C10 · FITA DE RARIDADE (para o ARSENAL — GDD §7)
+Proporção 1:1 (recortar) · exportar 456x64 cada · COM transparência
+Destino: godot/menu/art/ui/fita-<raridade>.png
+########################################################################
+
+Faixa horizontal fina que atravessa o rodapé de um card de cosmético,
+indicando raridade. Cinco versões, mesma forma, materiais diferentes — de
+novo: a forma marca "isto é raridade", o material marca QUAL raridade, e um
+número de entalhes marca o nível para quem não distingue cor.
+
+[BLOCO FITA] — cole nas cinco:
+Faixa horizontal muito comprida e baixa, proporção de cerca de 7 para 1,
+com as duas pontas cortadas em chanfro para dentro, como uma fita de metal
+esticada. Superfície lisa, sem gravura no centro. Centralizada, ocupando
+toda a largura do quadro, resto vazio. Contorno externo azul-noite #05070F.
+Sem texto, sem número, sem estrela, sem fundo, sem sombra projetada.
+
+--- COMUM ..... material: ferro escurecido #4A4A50 · ZERO entalhes
+--- INCOMUM ... material: bronze #A8763E · UM entalhe triangular na ponta
+                esquerda
+--- RARO ...... material: aço azulado #2AA7FF · DOIS entalhes
+--- ÉPICO ..... material: violeta polido #8A5CF0 · TRÊS entalhes
+--- LENDÁRIO .. material: dourado arcano #F0C75E com brasa correndo por
+                dentro · QUATRO entalhes e uma leve emissão de luz
++ [BLOCO FITA] + [ESTILO ARKANA]
+
+NOTA: a fita lendária é a ÚNICA que emite luz. É o que faz o jogador querer
+uma. GDD §7 — o dourado #F0C75E é a cor de raridade lendária do projeto;
+não invente uma sexta cor.

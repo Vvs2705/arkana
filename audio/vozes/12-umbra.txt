@@ -1,0 +1,92 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 12 — UMBRA, A LAMINA DA NOITE
+Raca: Elfa Negra (Drow) · Funcao: Ataque / Perseguicao · Slug de arquivo: umbra_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, 30 e poucos. Contralto fumacento, encorpado, com um leve arrastar
+preguicoso nas vogais. Voz baixa de quem trabalha em lugar onde falar alto mata.
+Ritmo: DUAS MARCHAS, e a troca entre elas e a assinatura dela.
+  (A) FORA DA LUTA: lenta, arrastada, sarcastica, quase entediada.
+  (B) NO ATAQUE: corta pela metade. Frases de duas palavras, secas, imediatas.
+  Nunca misture as duas no mesmo take.
+Emocao-base: impaciencia divertida. Ela acha todo mundo lento e nao esconde.
+Registro: mercenaria. Fala em preco, contrato, prazo. Nada de honra, nada de
+destino — ela cobra caro e diz isso.
+DETALHE DE ATUACAO: ela odeia luz direta e faz piada disso o tempo todo. As
+falas sobre luz saem com o mesmo tedio de quem reclama do transito.
+NAO fazer: sedutora sussurrante de vilã. O sarcasmo dela e seco e rapido, nao
+felino. E ela nunca sussurra de proposito — ela e SILENCIOSA, que e diferente.
+
+AJUSTE SUGERIDO
+Stability 50 · Similarity 80 · Style 45 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [umbra_intro_01] [arrastada, entediada] Umbra. Eu cobro caro e entrego rapido. Nessa ordem.
+02 [umbra_intro_02] [seca, meio riso] A corte me exilou. Melhor coisa que fizeram por mim.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [umbra_queda_01] [arrastada] Sol a pino. Claro. Otimo. Adoro.
+02 [umbra_queda_02] [seca] Me larga perto de uma sombra e eu resolvo o resto.
+
+---------------------------------------------------------------
+3. TATICA — VEU UMBRIO
+---------------------------------------------------------------
+01 [umbra_tatica_01] [marcha B, curta] Sumindo.
+02 [umbra_tatica_02] [curta, seca] Veu. Nao me perde.
+03 [umbra_tatica_03] [marcha B] Primeiro golpe e meu. Segura o resto.
+
+---------------------------------------------------------------
+4. SUPREMA — DANCA DAS SOMBRAS (telegrafada)
+---------------------------------------------------------------
+01 [umbra_suprema_01] [alto, o unico grito dela] DANCA! Escolham qual sombra e a verdadeira, boa sorte!
+02 [umbra_suprema_02] [alto, rapida] SEIS SEGUNDOS! Se voce me achar, e porque eu deixei!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [umbra_abate_01] [marcha B, seca] Pago.
+02 [umbra_abate_02] [arrastada, sarcastica] Voce virou pro lado errado. Todo mundo vira.
+03 [umbra_abate_03] [curta] Contrato fechado.
+04 [umbra_abate_04] [seca, sem crueldade] Nem doeu tanto. Confia.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [umbra_caido_01] [contrariada, rapida] Cai! Que vergonha, serio!
+02 [umbra_caido_02] [arrastada, com dor] Muita luz aqui... me tira do sol, por favor.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [umbra_reviver_01] [seca, puxando] Levanta. Eu nao vou carregar voce.
+02 [umbra_reviver_02] [arrastada] Isso vai no seu boleto. Levanta.
+03 [umbra_revivida_01] [contrariada e grata] Ta. Obrigada. Nao repete isso na frente dos outros.
+04 [umbra_revivida_02] [seca] Voce e o unico aqui que trabalha. Anotado.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [umbra_vitoria_01] [arrastada, satisfeita] E agora eu volto pra sombra. Cobro amanha.
+02 [umbra_vitoria_02] [seca, meio riso] Ganhamos. Alguem apaga esse sol.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [umbra_bordao_01] [assinatura] Voce nao me ouve chegar. Voce ouve quando ja acabou.
+02 [umbra_bordao_02] [arrastada] Honra e caro e nao paga aluguel.
+03 [umbra_bordao_03] [seca] Minhas runas acendem no escuro. Ironico, ne? Reclamo com quem?
+04 [umbra_bordao_04] [entediada] Anda logo. Eu envelheco devagar mas nao tanto.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [umbra_interacao_corvus] [contrariada, respeito a contragosto] O cego me acha pelo cheiro. Sabe quanto tempo eu treinei o passo? SABE?
+02 [umbra_interacao_aelion] [sarcastica] Bom te ver, primo da superficie. Ainda atirando de longe pra nao sujar a tunica?
+03 [umbra_interacao_noctus] [seca, quase cumplicidade] Nos dois odiamos o sol e trabalhamos a noite. A diferenca e que eu ao menos cobro.

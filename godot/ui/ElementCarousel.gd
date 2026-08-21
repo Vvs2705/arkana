@@ -35,9 +35,10 @@ func _draw() -> void:
 		var c := Vector2(slot * (i + 0.5), size.y / 2.0)
 		var r := minf(slot, size.y) / 2.0 - Dp.px(4.0)
 		var col: Color = Projectile.tint(el)
-		draw_circle(c, r, Color(col, 0.30 if el != selected else 0.55))
+		draw_circle(c + Vector2(Dp.px(1.5), Dp.px(2.0)), r, Color(0, 0, 0, 0.16))
+		draw_circle(c, r, Color(col.darkened(0.12), 0.18 if el != selected else 0.38))
 		if el == selected:
-			draw_arc(c, r + Dp.px(2.0), 0, TAU, 40, Color.WHITE, Dp.px(2.5), true)
+			draw_arc(c, r + Dp.px(2.0), 0, TAU, 40, Color.WHITE, Dp.px(2.2), true)
 		_icon(el, c, r * 0.55, col)
 
 

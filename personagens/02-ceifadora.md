@@ -13,6 +13,31 @@ Elegância fúnebre: casaca longa de gola alta preta, meia-máscara que cobre o 
 ## Personalidade & história curta
 Fala baixo porque os caídos falam baixo. Ouve os que acabaram de morrer — não como poder, como condição. Voltou do Vazio com uma dívida que não sabe nomear, e persegue como quem cobra.
 
+## História
+
+**Bio de tela**
+> Ela morreu afogada numa fenda do Vazio e voltou remendada — a pele emendada em luz
+> violeta, como louça consertada com ouro. O chão embaixo dela é a prova: a sombra
+> ficou do outro lado e nunca mais voltou. Quem cai perto dela ainda fala por alguns
+> segundos, e ela escuta todos. Não porque queira. Porque não sabe desligar. Voltou
+> devendo alguma coisa a alguém, e persegue como quem cobra.
+
+**Fundo**
+Antes da fenda, ela tinha nome, ofício e sombra. Depois, tem uma travessia e uma
+conta em aberto: alguma coisa do outro lado a empurrou de volta para este, e nada
+do outro lado é de graça. Ela não sabe o preço, não sabe o prazo e não sabe quem
+cobra — sabe apenas que os caídos falam baixo com ela desde então, e que os ecos
+que enxerga são sempre passado, nunca aviso.
+
+Vitalis a procurou uma vez, com a irmã de luz no ombro, para perguntar como se
+atravessa a morte e volta com corpo. Ceifadora ouviu a pergunta inteira e devolveu
+silêncio — não por crueldade, mas porque a resposta honesta era "não fui eu quem
+decidiu". O Ilusionista também lhe fez uma pergunta uma única vez ("sou eu?"), e
+recebeu o mesmo nada. Véu, que também voltou de um lugar que não devolve, a
+reconhece de longe: as duas se cumprimentam com a cabeça e nunca conversam.
+
+**Assinatura:** *"Alguém pagou para eu voltar. Um dia vem cobrar. Até lá, eu cobro."*
+
 ## Kit
 - **Passiva — Ecos dos Caídos:** onde alguém morreu há menos de 60s, ela vê o eco espectral dos últimos 3s da luta (um replay fantasma local, visível só para ela).
 - **Tática — Mão do Vazio:** marca um ponto a até 12m: uma mão de sombra irrompe do chão e AGARRA o primeiro inimigo na área pequena por 1,2s (ele ainda conjura).

@@ -29,7 +29,10 @@ func _update(pos_global: Vector2) -> void:
 	var local := pos_global - get_global_rect().position
 	var radius := size.x / 2.0 * 0.75
 	value = ((local - size / 2.0) / radius).limit_length(1.0)
-	if value.length() < 0.12:
+	# Zona morta: UMA fonte de verdade. O Player reescala a partir deste mesmo
+	# numero (Balance.MOVE.stick_deadzone); dois literais diferentes reabrem o
+	# degrau de velocidade no instante em que o dedo cruza a borda.
+	if value.length() < float(Balance.MOVE.stick_deadzone):
 		value = Vector2.ZERO
 	queue_redraw()
 
@@ -38,5 +41,5 @@ func _draw() -> void:
 	var c := size / 2.0
 	var r := size.x / 2.0 - Dp.px(2.0)
 	draw_arc(c, r, 0, TAU, 48, Color(1, 1, 1, 0.35), Dp.px(2.0), true)
-	draw_circle(c, r * 0.12, Color(1, 1, 1, 0.2))
+	draw_circle(c, r * float(Balance.MOVE.stick_deadzone), Color(1, 1, 1, 0.2))
 	draw_circle(c + value * r * 0.6, Dp.px(22.0), Color(1, 1, 1, 0.45))

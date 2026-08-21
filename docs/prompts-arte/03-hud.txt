@@ -1,0 +1,322 @@
+========================================================================
+03 — HUD
+H1–H5 ícones dos 5 elementos (carrossel) · H6 botão de fogo · H7 botão de
+esquiva · H8 retículo/mira · H9 moldura da barra de vida · H10 moldura da
+barra de mana · H11 selo de Sintonia (bônus)
+Fonte: GDD §10, §14, §19.3 · godot/ui/Hud.gd e godot/ui/ElementCarousel.gd
+========================================================================
+
+CONTEXTO REAL DO HUD (lido do código, não inventado):
+  - vida e mana ficam no CANTO SUPERIOR ESQUERDO, duas barras de 130x12 dp
+    empilhadas, com rótulo "VIDA" e "MANA" à esquerda;
+  - timer e contador de bots no canto superior direito (texto puro);
+  - joystick virtual de 150dp no canto inferior esquerdo;
+  - botão de FOGO redondo de 88dp no canto inferior direito;
+  - botão de ESQUIVA redondo de 64dp à esquerda do de fogo, com arco de
+    cooldown que encolhe em volta dele;
+  - carrossel de 5 elementos ACIMA do botão de fogo, 5 slots de 52dp numa
+    fileira só;
+  - retículo no centro exato da tela, com 4 tracinhos diagonais de
+    hitmarker que piscam por 0,16s ao acertar.
+  A coluna central é território da mira: nada de HUD lá.
+
+REGRA DURA DE MOBILE: tudo aqui é tocado com o polegar numa tela de 6
+polegadas e visto enquanto o jogador está sob pressão. Silhueta forte,
+detalhe interno mínimo, contraste alto contra QUALQUER cenário — inclusive
+lago azul, grama queimada e pedra cinza. Por isso todo prompt pede contorno
+escuro externo: é ele que salva o ícone sobre fundo claro.
+
+Todas as peças deste arquivo levam FUNDO TRANSPARENTE. Gere sobre #05070F
+chapado e remova o fundo depois (00-LEIA.txt seção 2).
+
+
+------------------------------------------------------------------------
+[BLOCO ÍCONE ARKANA] — cole em todos os prompts deste arquivo
+------------------------------------------------------------------------
+Ícone de jogo mobile. UM único objeto, centralizado, isolado, visto de
+frente. A SILHUETA é o que identifica o ícone: precisa ser reconhecível
+reduzida a 48dp (cerca de 48 pixels) numa tela de celular. Forma externa
+distinta e memorável, detalhe interno mínimo, no máximo 3 cores além do
+dourado, contraste alto entre o objeto e o vazio. Contorno externo escuro
+azul-noite #05070F fino em volta do objeto. Margem de segurança de 10%
+vazia em volta. Composição chapada, sem perspectiva dramática, sem cenário,
+sem fundo, sem sombra projetada.
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+[ESTILO ARKANA] — cole em todos os prompts deste arquivo
+------------------------------------------------------------------------
+Estilo: pintura digital de fantasia estilizada, contornos limpos,
+sombreamento em bandas (cel-shading suave), pinceladas visíveis sem ruído,
+e a luz mágica saindo de DENTRO do objeto (emissiva), nunca aplicada por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano. Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F,
+com dourado arcano #F0C75E nos contornos nobres. Cores elementais oficiais:
+Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E · Vento #8FE8C9 · Raio #F5D90A.
+Iluminação: chave quente dourada de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras.
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue ou gore; nenhum TEXTO, letra, número,
+marca d'água ou assinatura dentro da imagem.
+------------------------------------------------------------------------
+
+
+########################################################################
+H1–H5 · OS 5 ÍCONES DE ELEMENTO (carrossel do HUD)
+Proporção 1:1 · exportar 256x256 · COM transparência
+Destino: godot/ui/art/elements/{fire,water,lightning,earth,wind}.png
+########################################################################
+
+AS FORMAS SÃO CANÔNICAS, NÃO SUGESTÃO. O código já desenha estas cinco
+formas em ElementCarousel._icon e o jogador já as aprende assim. A arte
+substitui o desenho procedural, mas mantém a MESMA forma — trocar a forma
+agora reeduca o jogador de graça e quebra a lei cor+forma+som (GDD §10):
+
+    fogo = GOTA FLAMEJANTE · água = CRESCENTE · raio = ZIGUE-ZAGUE
+    terra = PEDRA FACETADA · vento = ESPIRAL
+
+--- H1 · FOGO ---
+Ícone de elemento fogo para o HUD de um jogo mobile de magos. FORMA: uma
+GOTA DE CHAMA — base arredondada e cheia, bico afilado apontando para
+cima. O corpo da gota é fogo em bandas cel-shaded, com um núcleo mais claro
+no centro e três lambidas curtas de chama saindo do bico. Nada além da
+gota: sem lenha, sem fogueira, sem chão.
+PALETA: fogo #FF5A2A no corpo, amarelo raio #F5D90A no núcleo, contorno
+azul-noite #05070F.
+NÃO: sem chama realista, sem fumaça, sem emoji de fogo, sem coração.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+--- H2 · ÁGUA / GELO ---
+Ícone de elemento água para o HUD de um jogo mobile de magos. FORMA: um
+CRESCENTE GROSSO — um arco largo aberto, como uma onda curvada sobre si
+mesma ou uma lua deitada, pontas afinando. O interior do arco é vazio. Duas
+gotas soltas acompanham a curva externa. Uma das pontas tem uma aresta de
+gelo cristalizado, para o elemento ler como "água E gelo".
+PALETA: água #2AA7FF no arco, branco-gelo #E8E6F0 na aresta cristalizada,
+contorno azul-noite #05070F.
+NÃO: sem gota d'água simples (essa é a forma do fogo), sem lua com rosto,
+sem floco de neve, sem oceano.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+--- H3 · RAIO ---
+Ícone de elemento raio para o HUD de um jogo mobile de magos. FORMA: um
+ZIGUE-ZAGUE VERTICAL de quatro segmentos, quinas duras e ângulos agudos,
+mais grosso em cima e afinando embaixo. Traço único, contínuo, sem
+ramificação. Duas faíscas soltas nas quinas.
+PALETA: raio #F5D90A no corpo, branco quente no núcleo do traço, contorno
+azul-noite #05070F.
+NÃO: sem nuvem, sem céu, sem raio ramificado em árvore, sem tomada
+elétrica, sem símbolo de alta tensão.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+--- H4 · TERRA ---
+Ícone de elemento terra para o HUD de um jogo mobile de magos. FORMA: uma
+PEDRA FACETADA — polígono irregular cheio e maciço, seis faces planas de
+tamanhos diferentes, sem simetria, cantos duros. É a única forma SÓLIDA E
+PREENCHIDA dos cinco elementos, de propósito.
+PALETA: terra #A8763E nas faces claras, marrom escurecido nas faces em
+sombra, um veio fino dourado #F0C75E cruzando uma face, contorno azul-noite
+#05070F.
+NÃO: sem montanha, sem planeta Terra, sem folha, sem cristal simétrico de
+joalheria, sem tijolo.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+--- H5 · VENTO ---
+Ícone de elemento vento para o HUD de um jogo mobile de magos. FORMA: uma
+ESPIRAL ABERTA — uma linha única que enrola de fora para dentro em uma
+volta e meia, grossa na ponta externa e afinando até sumir no centro. Duas
+linhas de corrente de ar curtas e paralelas acompanham a espiral por fora.
+PALETA: vento #8FE8C9 na espiral, branco pálido na ponta mais fina,
+contorno azul-noite #05070F.
+NÃO: sem tornado em cone, sem nuvem soprando com bochechas, sem concha,
+sem redemoinho de água.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+NOTA DE MONTAGEM: gere os cinco na MESMA sessão do Firefly, um atrás do
+outro, usando o primeiro aprovado como referência de estilo. Depois cole os
+cinco lado a lado a 48px e confira: se der para nomear os cinco em preto e
+branco, sem cor nenhuma, passou.
+
+
+########################################################################
+H6 · BOTÃO DE FOGO
+Proporção 1:1 · exportar 512x512 · COM transparência
+Destino: godot/ui/art/hud/btn-fogo.png
+########################################################################
+
+Botão redondo de ação para o HUD de um jogo mobile de fantasia, visto de
+frente e perfeitamente circular.
+
+PEÇA: um disco de conjuração — aro externo de bronze gasto com entalhes
+rúnicos curtos e regulares em volta, e um miolo côncavo de vidro arcano
+escuro, translúcido, como uma lente. O aro tem uma leve chanfradura que
+capta a luz em cima à esquerda. O miolo é NEUTRO E VAZIO: o código pinta a
+cor do elemento ativo por cima dele e escreve o rótulo no centro, então o
+centro precisa ficar limpo.
+
+REQUISITOS:
+- Círculo perfeito, centralizado, ocupando 80% do quadro.
+- Aro com espessura constante — nada de aro decorativo assimétrico.
+- Miolo escuro e uniforme, sem gravura, sem símbolo, sem reflexo forte.
+- Contorno externo azul-noite #05070F para o botão destacar sobre cenário
+  claro.
+- Alvo de toque grande: a peça precisa ler como "aperte aqui" a 88dp.
+PALETA: bronze #A8763E no aro, dourado #F0C75E nos entalhes, azul-noite
+#0B1026 no miolo de vidro.
+NÃO: sem ícone dentro, sem texto, sem seta, sem mira, sem gatilho, sem
+botão de estilo iOS/Android, sem sombra projetada, sem anel externo
+brilhante (o anel verde de "disparando" é desenhado pelo código por cima).
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+VARIANTE H6b (opcional, mesmo prompt): gerar uma segunda versão com o aro
+mais claro e os entalhes acesos, para o estado PRESSIONADO.
+Salvar como godot/ui/art/hud/btn-fogo-press.png
+
+
+########################################################################
+H7 · BOTÃO DE ESQUIVA
+Proporção 1:1 · exportar 512x512 · COM transparência
+Destino: godot/ui/art/hud/btn-esquiva.png
+########################################################################
+
+Botão redondo de ação para o HUD de um jogo mobile de fantasia, visto de
+frente, perfeitamente circular e VISIVELMENTE DIFERENTE do botão de fogo —
+o polegar precisa acertar o certo sem olhar.
+
+PEÇA: um disco de ferro escurecido, mais estreito e mais simples que o de
+fogo, com o aro LISO (sem entalhes rúnicos) e uma marca gravada no centro:
+DUAS SETAS CURVAS PARALELAS apontando para a mesma direção, como rastro de
+passo lateral, gravadas em baixo relevo e acesas em verde-menta.
+
+REQUISITOS:
+- Círculo perfeito, menor proporcionalmente que o de fogo (o de esquiva é
+  64dp contra 88dp) — mantenha o objeto ocupando 70% do quadro.
+- A gravura das duas setas é o único detalhe interno: nada mais.
+- Aro liso, sem runas: a diferença de textura entre os dois botões é
+  proposital e é o que o polegar reconhece.
+- Contorno externo azul-noite #05070F.
+PALETA: ferro escurecido #4A4A50 no disco, vento #8FE8C9 na gravura acesa,
+dourado #F0C75E num fio fino do aro.
+NÃO: sem texto, sem ícone de corrida com bonequinho, sem tênis, sem seta de
+navegação de interface, sem arco de cooldown desenhado (o código desenha o
+arco por cima).
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+
+########################################################################
+H8 · RETÍCULO / MIRA
+Proporção 1:1 · exportar 256x256 · COM transparência
+Destino: godot/ui/art/hud/reticulo.png
+########################################################################
+
+Retículo de mira para jogo de ação mobile, visto de frente, centrado.
+
+PEÇA: um anel fino e aberto — quatro arcos curtos formando um círculo com
+quatro FRESTAS nas diagonais — e um ponto sólido pequeno no centro exato.
+Nada mais. O anel é fino o bastante para não tapar o alvo e grosso o
+bastante para ser visto sobre céu claro.
+
+REQUISITOS:
+- Simetria perfeita nos dois eixos; o ponto central é o centro exato do
+  quadro.
+- O anel ocupa cerca de 35% da largura do quadro; o resto é vazio.
+- Traço com contorno escuro por fora e núcleo claro por dentro (é isso que
+  faz o retículo ser legível sobre céu claro E sobre pedra escura).
+- Tudo em branco levemente quente com fio dourado — o retículo é NEUTRO,
+  não muda com o elemento.
+PALETA: branco #F5F2E8 no traço, dourado #F0C75E num fio interno sutil,
+contorno azul-noite #05070F.
+NÃO: sem cruz completa que atravesse o centro, sem números, sem marcadores
+de distância, sem luneta, sem mira de arma de fogo, sem hitmarker desenhado
+(os 4 tracinhos de acerto são desenhados pelo código), sem lente, sem
+efeito de vidro.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+
+########################################################################
+H9 · MOLDURA DA BARRA DE VIDA
+Proporção 16:9 (recortar) · exportar 512x72 · COM transparência
+Destino: godot/ui/art/hud/barra-vida.png
+########################################################################
+
+Moldura horizontal de barra de status para o HUD de um jogo de fantasia.
+A peça é VAZIA por dentro: o preenchimento vermelho é desenhado pelo jogo.
+
+PEÇA: uma calha horizontal muito comprida e baixa, com proporção de cerca
+de 8 para 1, feita de bronze gasto: uma borda fina de metal em cima e
+embaixo, e as duas pontas fechadas por tampas chanfradas um pouco mais
+altas que o corpo. A ponta ESQUERDA tem um pequeno emblema em relevo — uma
+gota estilizada — que identifica a barra como VIDA. O interior da calha é
+escuro, liso e vazio de ponta a ponta.
+
+REQUISITOS:
+- Composição estritamente horizontal, centralizada, ocupando toda a largura
+  do quadro; o resto do quadro em vazio.
+- O interior tem que ser reto e uniforme: o jogo desenha uma barra
+  retangular por dentro e ela precisa encaixar.
+- Cantos com raio pequeno e constante.
+- Contorno externo azul-noite #05070F.
+PALETA: bronze #A8763E no metal, dourado #F0C75E nos chanfros, azul-noite
+#0B1026 no interior vazio, um toque de vermelho-brasa #C2452D só no
+emblema da ponta.
+NÃO: sem preenchimento vermelho dentro da calha, sem números, sem texto,
+sem coração de videogame, sem cruz médica, sem barra segmentada em
+quadradinhos, sem ornamento que quebre a linha reta do interior.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+DICA DE EXPORTAÇÃO: esta peça vira NINE-PATCH no Godot (NinePatchRect) — as
+tampas das pontas ficam fixas e o meio estica. Ao exportar, deixe o miolo
+central com padrão UNIFORME (sem gravura), senão a esticada aparece.
+
+
+########################################################################
+H10 · MOLDURA DA BARRA DE MANA
+Proporção 16:9 (recortar) · exportar 512x72 · COM transparência
+Destino: godot/ui/art/hud/barra-mana.png
+########################################################################
+
+Use o prompt H9 INTEIRO, com estas duas trocas:
+
+- O emblema da ponta ESQUERDA é um LOSANGO facetado (gema), não uma gota —
+  vida e mana precisam se diferenciar por FORMA, não só pela cor do
+  preenchimento (GDD §10).
+- PALETA: bronze #A8763E no metal, dourado #F0C75E nos chanfros, azul-noite
+  #0B1026 no interior vazio, azul de água #2AA7FF só no emblema da ponta.
+
+Mantenha a MESMA calha, a mesma espessura de borda e o mesmo formato de
+tampa da barra de vida: as duas ficam empilhadas no canto superior esquerdo
+e qualquer diferença de altura ou de estilo entre elas fica gritante.
+
+
+########################################################################
+H11 · SELO DE SINTONIA (bônus — a "terceira vida" do Selo, GDD §10)
+Proporção 1:1 · exportar 256x256 · COM transparência
+Destino: godot/ui/art/hud/selo-sintonia.png
+########################################################################
+
+O GDD §10 diz: uma marca, três usos — logo, ÍCONE DA LOJA e MEDIDOR DE
+SINTONIA no HUD. Esta é a versão HUD do Selo, pequena e legível em jogo.
+
+PEÇA: um pentágono rúnico compacto de traço grosso, com uma GEMA em forma
+de losango engastada em cada uma das cinco pontas. As cinco gemas estão
+APAGADAS: escuras, opacas, sem brilho interno — o jogo acende cada uma
+quando o combo correspondente fica disponível. O centro do pentágono é
+vazio e escuro (o código coloca a letra por cima).
+
+REQUISITOS:
+- Muito mais simples que o Selo de marca: este vai ser visto a 40dp em
+  movimento. Traço grosso, sem filigrana, sem anel externo decorado.
+- As cinco gemas em posições exatas de pentágono, ponta para cima.
+- Contorno externo azul-noite #05070F.
+PALETA: dourado envelhecido #8A7336 no pentágono, gemas em versão APAGADA
+das cores elementais (fogo, água, terra, vento, raio escurecidos e
+dessaturados), azul-noite #0B1026 no centro.
+NÃO: sem letra no centro, sem texto, sem gemas acesas ou brilhando, sem
+estrela de cinco pontas vazada, sem pentagrama invertido, sem símbolo
+oculto do mundo real.
++ [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA]
+
+VARIANTE H11b: repetir o prompt com as cinco gemas ACESAS e emitindo luz,
+salvar como godot/ui/art/hud/selo-sintonia-aceso.png. O código alterna
+entre as duas — mais barato que acender gema por gema.

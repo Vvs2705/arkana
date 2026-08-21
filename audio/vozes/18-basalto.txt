@@ -1,0 +1,96 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 18 — BASALTO, O DESPERTO
+Raca: Golem de Pedra Runica · Funcao: Curta distancia / Tanque · Slug de arquivo: basalto_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Sem idade, sem genero definido — mas grave: o registro mais baixo do elenco
+inteiro. Basalto NAO TEM BOCA. A voz sai das fendas do peito, junto com o
+magma. Timbre: pedra contra pedra, com uma ressonancia longa embaixo.
+Ritmo: UMA PALAVRA POR VEZ. Esta e a regra absoluta.
+  - Gere cada palavra praticamente como um take proprio, com um SILENCIO real
+    entre elas. Nao deixe o modelo ligar as palavras numa frase fluida.
+  - Nas linhas abaixo, o ponto final entre palavras nao e pontuacao: e a pausa.
+    Respeite-a. "Fica. Atras. De. Mim." sao quatro sons separados.
+  - A fala mais longa dele tem seis palavras. Se precisar de mais, corte.
+Emocao-base: nenhuma inflexao aparente. A emocao esta na DURACAO da pausa, nao
+no tom. Pausa maior = sentimento maior. Ele e gentil com tudo que e pequeno, e
+isso aparece porque ele demora MAIS antes de falar com quem e pequeno.
+Registro: essencial. Substantivos e verbos. Ele nao usa adjetivo, nao usa giria,
+nao usa nome proprio de coisa que nao conhece.
+NAO fazer: voz de robo, vocoder, pitch down artificial extremo (vira ilegivel).
+Grave natural + reverb longo de caverna + pausa. So isso.
+
+AJUSTE SUGERIDO
+Stability 95 · Similarity 90 · Style 5 · Speaker Boost ON
+(Stability no maximo: ele nao varia. NUNCA.)
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [basalto_intro_01] [pausa longa entre cada palavra] Basalto. Desperto. Ainda. Procurando. O. Nome.
+02 [basalto_intro_02] [grave, tres blocos] A. Ultima. Placa. Esta. Vazia.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [basalto_queda_01] [pesado] Chao. Vem. Depressa.
+02 [basalto_queda_02] [pausa longa antes de "pequenos" — afeto] Fiquem. Perto. Pequenos.
+
+---------------------------------------------------------------
+3. TATICA — PUNHO SISMICO
+---------------------------------------------------------------
+01 [basalto_tatica_01] [impacto] PUNHO.
+02 [basalto_tatica_02] [duas palavras] Saiam. Daqui.
+03 [basalto_tatica_03] [informando] Pedras. Novas. Cobertura.
+
+---------------------------------------------------------------
+4. SUPREMA — MONOLITO (telegrafada)
+---------------------------------------------------------------
+01 [basalto_suprema_01] [o mais alto que ele chega, cada palavra um impacto] MONOLITO. EU. NAO. SAIO. DAQUI.
+02 [basalto_suprema_02] [grave, enorme] ATIREM. EM. MIM. SEIS. SEGUNDOS.
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [basalto_abate_01] [uma palavra so] Quebrou.
+02 [basalto_abate_02] [pausa antes de "pequeno" — pesar real] Voce. Era. Pequeno.
+03 [basalto_abate_03] [seco] Pedra. Ganha.
+04 [basalto_abate_04] [grave] Nao. Levanta. Mais.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [basalto_caido_01] [as runas apagando] Rachei. Venham.
+02 [basalto_caido_02] [pausa muito longa, o olho piscando] O. Coracao. Apagou.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [basalto_reviver_01] [maos enormes, muito cuidado, pausa longa] Devagar. Voce. Quebra. Facil.
+02 [basalto_reviver_02] [grave, gentil] Eu. Seguro. Levanta.
+03 [basalto_revivido_01] [runas reacendendo] Acendeu. De. Novo.
+04 [basalto_revivido_02] [pausa longa antes do nome — e o maximo de emocao dele] Seu. Nome. Vai. Na. Placa.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [basalto_vitoria_01] [pausa enorme no meio] Todos. De. Pe. Bom.
+02 [basalto_vitoria_02] [muito lento] Hoje. Eu. Servi. Bem.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [basalto_bordao_01] [assinatura] Eu. Fui. Feito. Pra. Ficar. Parado.
+02 [basalto_bordao_02] [grave] Montanha. Nao. Corre.
+03 [basalto_bordao_03] [pausa longa] Nao. Tenho. Boca. Tenho. Palavra.
+04 [basalto_bordao_04] [muito lento] Um. Mestre. Por. Placa. Faltam. Um.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [basalto_interacao_sylva] [pausa longa, o mais proximo de carinho que ele chega] Voce. Planta. Flor. Em. Mim. Nao. Tire.
+02 [basalto_interacao_brok] [respeito] Ferreiro. Um. Dia. Grava. Meu. Nome.
+03 [basalto_interacao_noctus] [seco, quase piada de pedra] Voce. Tem. Fome. Eu. Nao. Tenho. Eter.

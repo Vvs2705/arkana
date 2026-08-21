@@ -1,0 +1,573 @@
+========================================================================
+02 — ÍCONES DE HABILIDADE
+30 prompts prontos (elenco de LANÇAMENTO, magos 01–10: passiva, tática,
+suprema) + os 30 de TEMPORADA listados e prontos para virar prompt.
+Fonte: GDD §3 (kits oficiais) e personagens/NN-slug.md (paletas)
+========================================================================
+
+Proporção 1:1 · exportar 512x512 · COM fundo transparente (gere sobre
+#05070F chapado e remova o fundo — ver 00-LEIA.txt seção 2)
+Destino: godot/ui/art/skills/NN-passiva.png, NN-tatica.png, NN-suprema.png
+         (NN = número do mago com dois dígitos, ex.: 01-passiva.png)
+
+
+########################################################################
+COMO USAR ESTE ARQUIVO
+########################################################################
+
+Cada ícone abaixo é uma FICHA de 4 linhas: FORMA, CENA, PALETA e VETO.
+O prompt final que vai para o Firefly é a montagem:
+
+    [CABEÇALHO FIXO]
+    + FORMA + CENA + PALETA da ficha
+    + [BLOCO ÍCONE ARKANA]
+    + [ESTILO ARKANA]
+    + VETO da ficha
+
+Os três blocos entre colchetes estão logo abaixo, prontos para copiar. Eles
+são IDÊNTICOS nos 30 ícones — é isso que faz o Firefly manter a família
+coerente. Não edite os blocos por ícone; a variação mora na ficha.
+
+A LEI: counter em COR + FORMA + SOM (GDD §10). Cada ficha declara uma FORMA
+EXTERNA diferente de propósito. Se dois ícones saírem com a mesma silhueta,
+regere — cor diferente NÃO resolve, daltônico não vê cor.
+
+
+------------------------------------------------------------------------
+[CABEÇALHO FIXO] — cole no início de todo prompt deste arquivo
+------------------------------------------------------------------------
+Ícone de habilidade para o HUD de um jogo mobile de battle royale de magos.
+Um único objeto emblemático, centralizado sobre fundo chapado azul-noite
+profundo #05070F, sem cenário e sem personagem de corpo inteiro.
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+[BLOCO ÍCONE ARKANA] — cole em todo prompt deste arquivo
+------------------------------------------------------------------------
+Ícone de jogo mobile. UM único objeto, centralizado, isolado, visto de
+frente ou em leve 3/4. A SILHUETA é o que identifica o ícone: precisa ser
+reconhecível reduzida a 48dp (cerca de 48 pixels) numa tela de celular.
+Portanto: forma externa distinta e memorável, detalhe interno mínimo, no
+máximo 3 cores além do dourado, contraste alto entre o objeto e o vazio.
+Contorno externo escuro azul-noite #05070F fino em volta do objeto, para
+ele destacar sobre qualquer fundo. Margem de segurança de 10% vazia em
+volta. Composição chapada, sem perspectiva dramática, sem cenário, sem
+personagem de corpo inteiro, sem fundo, sem sombra projetada no chão.
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+[ESTILO ARKANA] — cole em todo prompt deste arquivo
+------------------------------------------------------------------------
+Estilo: pintura digital de fantasia estilizada, a mesma linguagem visual de
+um character sheet de RPG de fantasia — contornos limpos, sombreamento em
+bandas (cel-shading suave), pinceladas visíveis sem ruído sujo, e a luz
+mágica saindo de DENTRO do objeto (emissiva), nunca um brilho aplicado por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E na marca e nos contornos nobres.
+Cores elementais oficiais: Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E ·
+Vento #8FE8C9 · Raio #F5D90A.
+Iluminação: chave quente dourada vindo de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras (sempre azul-noite).
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue, ferimentos, gore ou imagem
+perturbadora (o jogo é 10+); nenhum TEXTO, letra, número, legenda, marca
+d'água, assinatura ou moldura de galeria dentro da imagem.
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+[VETO PADRÃO] — some ao VETO específico de cada ficha
+------------------------------------------------------------------------
+NÃO deve aparecer também: nenhum rosto humano reconhecível; nenhum corpo
+inteiro; nenhum sangue, ferida aberta, caveira realista ou imagem
+perturbadora; nenhuma arma de fogo ou tecnologia moderna; nenhum símbolo
+religioso do mundo real; nenhuma moldura, botão, medalhão ou anel de
+interface em volta do ícone (a moldura entra por código); nenhum fundo
+decorado; nenhuma sombra projetada.
+------------------------------------------------------------------------
+
+
+########################################################################
+ELENCO DE LANÇAMENTO — 30 ÍCONES
+########################################################################
+
+=== 01 · PYRA, A CHAMA DE GUERRA (Vanguarda · Ataque/média distância) ===
+Paleta do mago: fogo #FF5A2A · azul-noite #2B2E63 · bronze #A8763E
+
+--- 01-passiva · "Coração de Fornalha" ---
+FORMA: coração anguloso de placas de metal, visto de frente, mais largo em
+cima e afunilando embaixo. Silhueta de coração ARMADO.
+CENA: um coração estilizado feito de placas de bronze articuladas, com
+respiros de fornalha entre as placas por onde vaza fogo laranja vivo. Uma
+única brasa desprende do topo. O metal é gasto e chamuscado nas bordas.
+PALETA: bronze #A8763E dominante, fogo #FF5A2A na luz interna, azul-noite
+#2B2E63 nas sombras do metal, um fio dourado #F0C75E no contorno superior.
+VETO: sem coração anatômico realista, sem veias, sem carne.
+
+--- 01-tatica · "Muralha de Brasas" ---
+FORMA: BARRA HORIZONTAL LARGA E BAIXA, achatada, ocupando a largura do
+quadro. Silhueta de parede deitada, não de chama vertical.
+CENA: uma linha baixa e comprida de fogo varrendo o chão, formada por
+línguas de chama curtas e recurvadas para o mesmo lado, como brasa soprada
+pelo vento. Sob ela, uma faixa fina de chão carbonizado. Faíscas subindo em
+diagonal.
+PALETA: fogo #FF5A2A no corpo da chama, amarelo #F5D90A no núcleo mais
+quente, azul-noite #2B2E63 no chão queimado.
+VETO: sem parede de tijolos, sem chama em coluna vertical, sem fogueira.
+
+--- 01-suprema · "Braço Livre" ---
+FORMA: LEQUE / TRIÂNGULO ABERTO apontando para a direita, com o vértice
+estreito à esquerda. Silhueta de jato em cone.
+CENA: uma manopla de bronze aberta em pétalas, como uma flor de metal
+destravada, com correntes curtas soltas; do centro dela sai um leque curto
+e largo de chama contínua. A manopla é o vértice, o fogo é o leque.
+PALETA: bronze #A8763E na manopla, fogo #FF5A2A no leque, amarelo #F5D90A
+no núcleo, azul-noite #2B2E63 nas sombras.
+VETO: sem braço humano, sem mão, sem pele, sem lança-chamas mecânico.
+
+
+=== 02 · CEIFADORA, A VOZ DO VAZIO (Ataque / Perseguição) ===
+Paleta do mago: preto-vazio #1A1A22 · violeta #8A5CF0 · fio dourado #F0C75E
+
+--- 02-passiva · "Ecos dos Caídos" ---
+FORMA: TRÊS CONTORNOS CONCÊNTRICOS de uma mesma figura encapuzada, um
+dentro do outro, deslocados — silhueta de rastro/eco em camadas.
+CENA: a silhueta vazada de uma figura encapuzada repetida três vezes com
+pequeno deslocamento lateral, a de trás mais fraca e a da frente mais
+definida, todas feitas só de contorno luminoso, ocas por dentro. Nenhuma é
+sólida — são fantasmas do mesmo instante.
+PALETA: violeta #8A5CF0 nos contornos, preto-vazio #1A1A22 no interior
+vazado, fio dourado #F0C75E no contorno mais nítido.
+VETO: sem rosto dentro do capuz, sem caveira, sem lápide, sem cemitério.
+
+--- 02-tatica · "Mão do Vazio" ---
+FORMA: MÃO ABERTA COM DEDOS LONGOS subindo do rodapé do quadro, garra
+aberta para cima. Silhueta vertical de cinco dedos.
+CENA: uma mão de sombra líquida irrompendo do chão, dedos longos e finos
+curvados como quem vai agarrar, o pulso se dissolvendo em fumaça violeta na
+base. Rachaduras de luz dourada correm pela superfície da mão, como
+cerâmica emendada em ouro.
+PALETA: preto-vazio #1A1A22 na mão, violeta #8A5CF0 na fumaça, fio dourado
+#F0C75E nas rachaduras.
+VETO: sem mão de zumbi, sem carne apodrecida, sem osso exposto, sem túmulo.
+
+--- 02-suprema · "Travessia" ---
+FORMA: FENDA VERTICAL ESTREITA E ALTA, tipo losango muito alongado, com as
+bordas irregulares. Silhueta de rasgo.
+CENA: um rasgo vertical aberto no ar, como tecido da realidade cortado: as
+bordas brilham em violeta e por dentro há escuridão absoluta salpicada de
+pontos de luz distantes. As bordas do rasgo levantam levemente, como pano.
+PALETA: violeta #8A5CF0 nas bordas do rasgo, preto-vazio #1A1A22 no
+interior, pontinhos dourados #F0C75E como estrelas dentro.
+VETO: sem portal circular, sem moldura de porta, sem espelho, sem rosto
+espiando de dentro.
+
+
+=== 03 · VÉU, A ANDARILHA (Perseguição / fuga) ===
+Paleta do mago: azul espectral #4A6FA5 · branco etéreo #E8E6F0 ·
+azul-noite #2B2E63
+
+--- 03-passiva · "Entrelinha" ---
+FORMA: SILHUETA HUMANA DE CORPO ESTREITO cortada ao meio na vertical: a
+metade esquerda sólida, a metade direita dissolvida em traços soltos.
+CENA: a silhueta de uma andarilha de manto, vista de frente, em que a
+metade direita do corpo se desfaz em linhas horizontais interrompidas, como
+sinal falhando. A metade sólida tem contorno nítido; a dissolvida quase
+some.
+PALETA: azul espectral #4A6FA5 na metade sólida, branco etéreo #E8E6F0 nos
+traços dissolvidos, azul-noite #2B2E63 na sombra.
+VETO: sem rosto visível, sem corpo cortado com ferimento, sem sangue.
+
+--- 03-tatica · "Atravessar" ---
+FORMA: SETA GROSSA HORIZONTAL cruzando uma BARRA VERTICAL. Silhueta de
+cruz assimétrica.
+CENA: uma barra vertical de pedra lisa, e atravessando-a da esquerda para a
+direita uma seta larga feita de luz espectral, com um eco pálido da mesma
+seta ficando para trás na entrada. A pedra não está quebrada — a seta passa
+por dentro dela, translúcida onde cruza.
+PALETA: azul-noite #2B2E63 na pedra, azul espectral #4A6FA5 na seta, branco
+etéreo #E8E6F0 no eco deixado para trás.
+VETO: sem parede destruída, sem escombros, sem buraco de impacto.
+
+--- 03-suprema · "Maré Espectral" ---
+FORMA: SINO SUSPENSO sobre uma ONDA BAIXA. Silhueta de sino acima de uma
+curva horizontal.
+CENA: um sino de bronze pálido flutuando, sem badalo visível, com anéis de
+som saindo dele; embaixo, uma onda baixa e larga de névoa espectral
+avançando, com três silhuetas minúsculas e translúcidas correndo dentro
+dela.
+PALETA: azul espectral #4A6FA5 na névoa, branco etéreo #E8E6F0 nos anéis de
+som, azul-noite #2B2E63 no sino em sombra.
+VETO: sem igreja, sem torre, sem corda de sino, sem rosto nas silhuetas.
+
+
+=== 04 · CORVUS, O CAÇADOR (Ataque / Perseguição) ===
+Paleta do mago: terrosos #6B5138 · vento #8FE8C9 (as trilhas) ·
+vermelho-caça #C2452D (só nos rastros da suprema)
+
+--- 04-passiva · "Mundo de Cheiros" ---
+FORMA: PEGADA ÚNICA vista de cima, com TRÊS FITAS ONDULADAS saindo dela
+para cima. Silhueta de pegada com serpentinas.
+CENA: a marca de uma pegada de bota no barro, vista de cima, e saindo dela
+três fitas finas e onduladas de cor subindo pelo ar, cada uma de uma cor,
+como cheiro que virou fita.
+PALETA: terroso #6B5138 na pegada, verde-menta #8FE8C9 na fita mais alta,
+laranja #FF5A2A e azul #2AA7FF nas outras duas.
+VETO: sem nariz humano, sem animal inteiro, sem cão farejador, sem
+narinas em close.
+
+--- 04-tatica · "Uivo de Caça" ---
+FORMA: CABEÇA DE LOBO DE PERFIL, focinho para cima, com TRÊS ARCOS
+CONCÊNTRICOS abrindo à direita. Silhueta de perfil uivando + ondas.
+CENA: a cabeça de um lobo espiritual de perfil, focinho erguido em uivo,
+feita de traço grosso e cheio; à frente do focinho, três arcos concêntricos
+finos representando a onda de som. Os olhos são duas fendas de luz — o
+caçador é cego, o espírito é que vê.
+PALETA: terroso #6B5138 na cabeça, verde-menta #8FE8C9 nos arcos de som,
+azul-noite #2B2E63 no contorno.
+VETO: sem presas ensanguentadas, sem boca cheia de dentes agressiva, sem
+cabeça decepada, sem lobo realista.
+
+--- 04-suprema · "Forma de Lobisomem" ---
+FORMA: GARRA DE TRÊS UNHAS em diagonal, unhas curvas e separadas.
+Silhueta de tridente orgânico.
+CENA: três unhas curvas e grossas de besta, presas a uma pata robusta e
+peluda cortada pelo canto inferior do quadro, riscando o ar em diagonal e
+deixando três traços de luz vermelha atrás.
+PALETA: terroso #6B5138 na pata, vermelho-caça #C2452D nos riscos, azul-
+noite #2B2E63 nas sombras.
+VETO: sem sangue nas unhas, sem carne rasgada, sem vítima, sem
+transformação corporal explícita, sem lobisomem de terror.
+
+
+=== 05 · CORVOMANTE, O OLHO DISTANTE (Longa distância / recon) ===
+Paleta do mago: verde arcano #2E8B57 · cinza-tinta #4A4A50 ·
+obsidiana #1A1A22
+
+--- 05-passiva · "Meu Olho Voa" ---
+FORMA: CORVO POUSADO DE PERFIL, compacto, com um CÍRCULO brilhante no
+peito. Silhueta de ave sentada.
+CENA: um corvo pousado de perfil, asas fechadas, cabeça virada para o
+observador; no peito dele, engastado como uma joia, um olho humano de íris
+verde arcano brilhando. A pena tem reflexo esverdeado.
+PALETA: obsidiana #1A1A22 nas penas, verde arcano #2E8B57 no olho, cinza-
+tinta #4A4A50 no bico e nas patas.
+VETO: sem órbita vazia, sem sangue, sem olho arrancado com nervos, sem
+imagem perturbadora — o olho é uma GEMA, não um órgão.
+
+--- 05-tatica · "Voo do Olho" ---
+FORMA: CORVO DE ASAS TOTALMENTE ABERTAS, envergadura horizontal larga.
+Silhueta de "T" alado — o oposto do ícone da passiva, de propósito.
+CENA: um corvo em pleno voo visto de baixo, asas abertas de ponta a ponta,
+com um CONE DE VISÃO verde translúcido descendo do peito dele para o chão,
+como um facho de farol.
+PALETA: obsidiana #1A1A22 no corvo, verde arcano #2E8B57 no cone de visão,
+cinza-tinta #4A4A50 nas bordas das penas.
+VETO: sem câmera, sem drone, sem lente, sem corvo pousado (essa é a
+passiva).
+
+--- 05-suprema · "Grasnido do Fim" ---
+FORMA: HEXÁGONO RACHADO ao meio, com anéis de pulso saindo. Silhueta
+geométrica de escudo partido.
+CENA: um escudo hexagonal de energia visto de frente, rachado em duas por
+uma fenda vertical irregular, com estilhaços de luz saltando; ao redor,
+dois anéis de pulso sonoro se expandindo. As bordas do hexágono estão
+apagando.
+PALETA: verde arcano #2E8B57 no escudo e nos anéis, obsidiana #1A1A22 na
+fenda, cinza-tinta #4A4A50 nos estilhaços.
+VETO: sem corvo (para não repetir os outros dois ícones do mago), sem
+vidro realista, sem explosão, sem fogo.
+
+
+=== 06 · OLHO-DE-ÉTER, O OBSERVADOR (Longa distância / recon) ===
+Paleta do mago: magenta #C24B8E · dourado #F0C75E · éter #8A5CF0
+
+--- 06-passiva · "Pó de Éter" ---
+FORMA: NUVEM DE PONTOS SOLTOS formando a silhueta oca de uma figura em pé.
+Silhueta pontilhada, sem contorno fechado.
+CENA: o contorno de uma pessoa desenhado APENAS por partículas luminosas
+suspensas no ar — nenhuma linha contínua, só poeira brilhante que sugere um
+corpo. Os pontos são mais densos nos ombros e nas mãos.
+PALETA: magenta #C24B8E nos pontos, éter violeta #8A5CF0 nos mais fracos,
+dourado #F0C75E nos poucos pontos mais quentes.
+VETO: sem rosto, sem corpo sólido, sem contorno de linha contínua, sem
+constelação com linhas ligando pontos.
+
+--- 06-tatica · "Enxame Perscrutador" ---
+FORMA: FAIXA ESTREITA E LONGA na diagonal, feita de formas triangulares
+alinhadas. Silhueta de flecha composta.
+CENA: um enxame apertado de mariposas de éter voando em formação de linha
+reta, todas na mesma direção, o corpo do enxame formando uma faixa estreita
+que atravessa o quadro na diagonal. As mariposas da frente são nítidas, as
+de trás borram em rastro.
+PALETA: magenta #C24B8E nas asas, éter violeta #8A5CF0 no rastro, dourado
+#F0C75E nos pontos de luz das antenas.
+VETO: sem insetos realistas, sem enxame de abelhas, sem nuvem redonda, sem
+mariposa única grande.
+
+--- 06-suprema · "Crisálida" ---
+FORMA: OVAL VERTICAL FECHADO, tipo casulo, com uma FENDA no meio.
+Silhueta de ovo suspenso.
+CENA: um casulo oval suspenso por um fio, superfície de seda luminosa, com
+uma fenda vertical se abrindo no centro por onde escapam três mariposas de
+éter. A luz vem de dentro do casulo.
+PALETA: dourado #F0C75E na seda do casulo, magenta #C24B8E na fenda acesa,
+éter violeta #8A5CF0 nas mariposas.
+VETO: sem larva, sem inseto emergindo com detalhe orgânico, sem imagem
+perturbadora, sem ovo de réptil.
+
+
+=== 07 · VITALIS, A MÃO QUE CURA (Suporte / Vida) ===
+Paleta do mago: branco #F5F2E8 · dourado #F0C75E · água #2AA7FF
+
+--- 07-passiva · "Mãos Livres" ---
+FORMA: DUAS MÃOS ABERTAS, palmas para cima, lado a lado formando uma taça.
+Silhueta larga e baixa, tipo tigela.
+CENA: um par de mãos abertas em concha, vistas de cima, com uma pequena
+fada alada de luz pousada flutuando acima delas. Da concha sobe um filete
+de luz dourada.
+PALETA: branco #F5F2E8 nas mãos, dourado #F0C75E na luz, azul #2AA7FF na
+fada.
+VETO: sem rosto, sem corpo caído, sem paciente ferido, sem cruz médica, sem
+símbolo de hospital.
+
+--- 07-tatica · "Vai, Lúmen" ---
+FORMA: FADA MINÚSCULA no topo com um ARCO LONGO descendo até o canto
+inferior. Silhueta de cometa em curva.
+CENA: uma pequena fada de luz com asas de libélula riscando o ar num arco
+largo, deixando um rastro dourado contínuo atrás; o rastro é a maior parte
+do ícone e a fada é o ponto brilhante na ponta.
+PALETA: dourado #F0C75E no rastro, branco #F5F2E8 no núcleo da fada, azul
+#2AA7FF nas asas.
+VETO: sem rosto de fada detalhado, sem borboleta, sem estrela cadente
+genérica, sem poção.
+
+--- 07-suprema · "Jardim da Aurora" ---
+FORMA: ANEL COMPLETO, círculo grosso e vazado, com raios curtos saindo
+para fora. Silhueta de sol/coroa.
+CENA: um anel de luz visto de leve perspectiva, como um círculo desenhado
+no chão que se ergue em cortina baixa; dentro do anel, três brotos verdes
+nascendo; do aro saem raios curtos de luz para fora.
+PALETA: dourado #F0C75E no anel, branco #F5F2E8 no interior luminoso, azul
+#2AA7FF nos raios externos, verde discreto nos brotos.
+VETO: sem auréola religiosa, sem sol com rosto, sem jardim com flores
+realistas, sem cruz.
+
+
+=== 08 · ILUSIONISTA, O ESPELHO (Suporte / engano) ===
+Paleta do mago: roxo de palco #6B3FA0 · dourado #F0C75E ·
+prata-espelho #D8D8E0
+
+--- 08-passiva · "Truque de Fuga" ---
+FORMA: SILHUETA HUMANA ESTILHAÇADA, quebrada em cacos angulosos que se
+afastam do centro. Silhueta explodida, bordas serrilhadas.
+CENA: a silhueta de um homem de casaca se partindo em cacos de vidro
+angulosos que se afastam para os lados, deixando um vazio no formato do
+corpo no meio. Os cacos refletem luz roxa.
+PALETA: roxo de palco #6B3FA0 na silhueta, prata-espelho #D8D8E0 nos cacos,
+dourado #F0C75E nos brilhos das arestas.
+VETO: sem sangue, sem corpo despedaçado com anatomia, sem ferimento —
+são CACOS DE LUZ, não um corpo partido; sem rosto.
+
+--- 08-tatica · "Espelho de Mão" ---
+FORMA: OVAL VERTICAL COM MOLDURA GROSSA, tipo espelho de mão sem cabo.
+Silhueta de escudo oval.
+CENA: um espelho oval de corpo inteiro com moldura de bronze trabalhada,
+flutuando de pé; uma seta luminosa bate na superfície e ricocheteia para
+cima em ângulo, virando uma seta espelhada mais fraca. Uma trinca fina
+começa no ponto de impacto.
+PALETA: prata-espelho #D8D8E0 na superfície, dourado #F0C75E na moldura,
+roxo #6B3FA0 no reflexo interno.
+VETO: sem rosto refletido, sem cabo de espelho, sem espelho de banheiro,
+sem moldura barroca exagerada que suje a silhueta.
+
+--- 08-suprema · "Baile de Espelhos" ---
+FORMA: CINCO FIGURAS EM PÉ LADO A LADO, formando uma fileira larga e
+baixa — a silhueta é o GRUPO, não o indivíduo.
+CENA: cinco silhuetas idênticas de um mago de casaca e cartola, enfileiradas
+ombro a ombro, todas na mesma pose; a do centro é sólida e opaca, as quatro
+laterais são translúcidas e levemente invertidas.
+PALETA: roxo de palco #6B3FA0 nas silhuetas, prata-espelho #D8D8E0 nas
+translúcidas, dourado #F0C75E no contorno da central.
+VETO: sem rostos, sem plateia, sem palco, sem cortina de teatro, sem
+cartas de baralho.
+
+
+=== 09 · VEX, O ALQUIMISTA DA PESTE (Curta distância / área) ===
+Paleta do mago: verde reagente #5A8A3C · latão #A8763E · vidro #B8D8C0
+
+--- 09-passiva · "Olhos do Miasma" ---
+FORMA: NUVEM ARREDONDADA E BOJUDA com DUAS FENDAS luminosas dentro.
+Silhueta de nuvem baixa e gorda.
+CENA: uma nuvem densa de névoa verde em bandas cel-shaded, bojuda, e dentro
+dela dois traços horizontais de luz verde acesa, como olhos enxergando
+através do próprio gás.
+PALETA: verde reagente #5A8A3C na névoa, verde claro #B8D8C0 nas bordas,
+latão #A8763E num reflexo baixo.
+VETO: sem rosto dentro da nuvem, sem caveira, sem máscara de peste
+assustadora, sem gás tóxico realista, sem imagem perturbadora.
+
+--- 09-tatica · "Frascos de Reagente" ---
+FORMA: FRASCO DE FUNDO REDONDO E GARGALO ESTREITO, vertical. Silhueta de
+ampola clássica.
+CENA: um frasco de vidro grosso com colarinho de latão e rolha, de fundo
+bojudo e gargalo estreito, cheio até a metade de líquido verde luminoso;
+uma gota escorre pelo bico e, no chão logo abaixo, uma pequena poça verde
+começa a se formar.
+PALETA: vidro #B8D8C0 no frasco, verde reagente #5A8A3C no líquido, latão
+#A8763E no colarinho.
+VETO: sem rótulo, sem caveira de veneno, sem seringa, sem frasco de
+laboratório moderno, sem texto no vidro.
+
+--- 09-suprema · "A Grande Obra" ---
+FORMA: CÍRCULO PERFEITO com um TRIÂNGULO inscrito dentro. Silhueta
+geométrica dura — nada de nuvem aqui, para não repetir a passiva.
+CENA: um círculo de transmutação gravado no chão, visto de cima, com um
+triângulo e linhas geométricas finas por dentro, brilhando em verde; da
+gravura sobem quatro colunas finas de vapor nas quinas.
+PALETA: verde reagente #5A8A3C na gravura, latão #A8763E nas linhas
+externas, vidro #B8D8C0 no vapor.
+VETO: sem pentagrama invertido, sem símbolo oculto do mundo real, sem
+alfabeto legível, sem nuvem preenchendo o quadro.
+
+
+=== 10 · TESSA, A TECELÃ DE RAIOS (Curta distância / defesa) ===
+Paleta do mago: raio #F5D90A · azul-noite #2B2E63 · cobre #B07030
+
+--- 10-passiva · "Compasso Rúnico" ---
+FORMA: DISCO CIRCULAR COM DENTES DE ENGRENAGEM na borda, e uma LINHA DE
+PULSO cruzando o meio. Silhueta de roda dentada.
+CENA: um pequeno disco de cobre com dentes de engrenagem na borda, visto de
+frente, com uma linha de batimento cardíaco em zigue-zague de luz amarela
+atravessando o centro de ponta a ponta.
+PALETA: cobre #B07030 no disco, raio #F5D90A na linha de pulso, azul-noite
+#2B2E63 nas sombras entre os dentes.
+VETO: sem coração anatômico, sem peito humano, sem cicatriz na pele, sem
+eletrocardiograma de hospital, sem relógio.
+
+--- 10-tatica · "Fio do Tear" ---
+FORMA: DOIS PINOS VERTICAIS NAS PONTAS com um FIO EM ZIGUE-ZAGUE ESTICADO
+entre eles. Silhueta larga e horizontal, tipo haltere.
+CENA: dois pinos curtos de cobre fincados, um em cada lado do quadro, e
+entre eles um fio de raio esticado em zigue-zague apertado, chiando. Duas
+faíscas soltam do fio.
+PALETA: cobre #B07030 nos pinos, raio #F5D90A no fio, azul-noite #2B2E63 no
+fundo entre eles.
+VETO: sem arame farpado, sem cerca, sem poste elétrico, sem cabo de energia
+moderno, sem raio caindo do céu.
+
+--- 10-suprema · "Tear-Mãe" ---
+FORMA: RODA RADIAL — círculo grande com raios saindo do centro para a
+borda, tipo roda de fiar. Silhueta de mandala circular.
+CENA: uma roda de tear rúnica vista de frente, aro de cobre com raios
+internos e fios de raio tensionados entre eles como uma teia; no centro,
+um núcleo de luz absorvendo dois projéteis que entram pela borda e viram
+fio ao serem tecidos.
+PALETA: cobre #B07030 no aro e nos raios, raio #F5D90A nos fios e no
+núcleo, azul-noite #2B2E63 nos vãos.
+VETO: sem roda de carroça, sem engrenagem industrial, sem teia de aranha
+realista, sem aranha.
+
+
+########################################################################
+TEMPORADAS — magos 11–20 · 30 ÍCONES LISTADOS (NÃO GERAR AINDA)
+########################################################################
+
+Os kits 11–20 são PROPOSTA DA EQUIPE até o Diretor aprovar
+(personagens/00-LEIA.md). Gerar antes da aprovação é queimar crédito de
+imagem em habilidade que pode mudar de nome e de efeito.
+
+Quando aprovar, cada linha vira uma ficha completa usando o MOLDE abaixo,
+que já traz a FORMA EXTERNA sugerida (a parte difícil — é ela que garante a
+lei cor+forma+som) e a paleta oficial do mago.
+
+--- MOLDE DE FICHA (preencha CENA e VETO a partir do texto do kit) ---
+FORMA: <a forma sugerida na lista abaixo>
+CENA: <o objeto emblemático da habilidade, descrito em 2 frases>
+PALETA: <a paleta do mago, abaixo>
+VETO: <o que a habilidade NÃO é, para o Firefly não confundir>
++ [CABEÇALHO FIXO] + [BLOCO ÍCONE ARKANA] + [ESTILO ARKANA] + [VETO PADRÃO]
+----------------------------------------------------------------------
+
+11 · AELION, O ARCO DO CREPÚSCULO (Alto Elfo · Longa distância)
+   paleta: azul-crepúsculo #2B2E63 · dourado #F0C75E · violeta #8A5CF0
+   11-passiva  Olhar do Crepúsculo .. FORMA: losango de mira alongado
+   11-tatica   Flecha de Éter ....... FORMA: flecha única, ponta afiada,
+                                      diagonal longa
+   11-suprema  Chuva do Crepúsculo .. FORMA: leque de riscos verticais
+                                      caindo em faixa estreita
+
+12 · UMBRA, A LÂMINA DA NOITE (Elfa Negra · Ataque / Perseguição)
+   paleta: ardósia #3A3A46 · roxo umbrio #8A5CF0 · branco lunar #E8E6F0
+   12-passiva  Passo de Veludo ...... FORMA: pegada oca sem contorno cheio
+   12-tatica   Véu Umbrio ........... FORMA: cortina baixa e ondulada
+   12-suprema  Dança das Sombras .... FORMA: par de lâminas cruzadas em X
+
+13 · BROK, O FERREIRO DE RUNAS (Anão · Suporte / Proteção)
+   paleta: bronze #A8763E · azul-runa #2AA7FF · brasa #FF5A2A
+   13-passiva  Têmpera Eterna ....... FORMA: bigorna, base larga e chata
+   13-tatica   Runa-Escudo .......... FORMA: escudo pentagonal cheio
+   13-suprema  Forja Viva ........... FORMA: martelo erguido, cabo longo
+
+14 · GROMM, O XAMÃ DA TEMPESTADE (Orc · Suporte / Vida)
+   paleta: verde-oliva #5C6B3C · céu de tempestade #4A5A7A · raio #F5D90A
+   14-passiva  Sangue da Estepe ..... FORMA: chifre curvo isolado
+   14-tatica   Totem das Chuvas ..... FORMA: coluna vertical entalhada
+   14-suprema  Espírito do Trovão ... FORMA: nuvem alta com um só raio
+                                      vertical grosso
+
+15 · MARIS, A VOZ DAS MARÉS (Nereida · Longa distância)
+   paleta: água #2AA7FF · verde-mar #2E8B74 · pérola #EDE8E0
+   15-passiva  Maré Viva ............ FORMA: onda dupla horizontal
+   15-tatica   Onda Prisão .......... FORMA: anel de água fechado, tipo
+                                      argola vertical
+   15-suprema  Maré Cheia ........... FORMA: onda única muito alta,
+                                      crista enrolada
+
+16 · FIZZ, O ARTÍFICE DE BOLSO (Gnomo · Longa distância)
+   paleta: cobre #B07030 · faísca #F5D90A · azul-óculos #2AA7FF
+   16-passiva  Mola nos Calcanhares . FORMA: espiral de mola comprimida
+   16-tatica   Torreta Faísca ....... FORMA: tripé baixo com bico
+   16-suprema  MEGABOBINA ........... FORMA: cilindro com anéis de arame
+                                      empilhados
+
+17 · SYLVA, A FILHA DA FLORESTA (Dríade · Suporte / Vida)
+   paleta: verde-folha #3E7A3A · seiva #F0C75E · flor #E48AB0
+   17-passiva  Seiva Compartilhada .. FORMA: duas folhas ligadas por caule
+   17-tatica   Broto Guardião ....... FORMA: broto vertical de 3 folhas
+   17-suprema  Coração da Mata ...... FORMA: árvore de copa redonda cheia
+
+18 · BASALTO, O DESPERTO (Golem rúnico · Curta distância)
+   paleta: basalto #4A4A50 · magma #FF5A2A · âmbar #F0C75E
+   18-passiva  Pele de Montanha ..... FORMA: bloco hexagonal maciço
+   18-tatica   Punho Sísmico ........ FORMA: punho fechado de pedra
+   18-suprema  Monólito ............. FORMA: pilar vertical alto e estreito
+
+19 · NOCTUS, O SEDENTO DE ÉTER (Vampiro arcano · Ataque / Perseguição)
+   paleta: mármore #E8E4EC · carmesim #8B1E2E · éter violeta #8A5CF0
+   19-passiva  Sede de Éter ......... FORMA: cálice de pé alto
+   19-tatica   Mordida do Vazio ..... FORMA: crescente de duas pontas
+                                      (marca abstrata, NUNCA dentes em
+                                      pescoço — regra 10+, e ele drena
+                                      ÉTER, não sangue)
+   19-suprema  Forma de Névoa ....... FORMA: espiral de fumaça ascendente
+
+20 · PIP, A CENTELHA SELVAGEM (Fada · Ataque / Perseguição)
+   paleta: azul-elétrico #2AA7FF · raio #F5D90A · violeta #8A5CF0
+   20-passiva  Nunca Pousar ......... FORMA: par de asas abertas sem corpo
+   20-tatica   Zip-Zag .............. FORMA: linha em zigue-zague aberto
+                                      (grande, ao contrário do fio apertado
+                                      da Tessa — não podem se confundir)
+   20-suprema  Supercélula .......... FORMA: círculo de nuvem em espiral
+                                      com centro vazado
+
+CHECAGEM DE COLISÃO DE FORMA (faça antes de gerar a temporada):
+imprima as 60 silhuetas em preto sobre branco, 48px cada, e procure pares
+parecidos. Os candidatos conhecidos a colidir: 10-tatica x 20-tatica
+(zigue-zague), 04-suprema x 12-suprema (garra x lâminas), 09-passiva x
+20-suprema (nuvem). Se colidirem, muda a FORMA — não a cor.

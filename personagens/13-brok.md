@@ -12,6 +12,33 @@ Avental de forja em couro sobre cota de malha curta; manoplas com runas entalhad
 ## Personalidade & história curta
 Bonachão e teimoso. Fala com as runas como quem fala com filhos. Acredita que toda magia decente se martela antes de se lançar.
 
+## História
+
+**Bio de tela**
+> Brok martela runa há tempo suficiente para falar com elas como quem fala com filho —
+> e para reclamar quando respondem torto. Foi ele quem forjou a manopla de bronze que
+> prende o fogo vivo no braço da Pyra, a única prisão que aceitou fazer na vida. Foi
+> ele quem olhou o marca-passo torto da Tessa e se recusou a endireitar. E é ele quem
+> carrega há anos a placa em branco que o Basalto pede para gravar — e não grava.
+
+**Fundo**
+Perdeu o olho numa têmpera que deu errado e conta a história como quem conta piada
+contra si mesmo: "a runa avisou; eu não escutei". A gema rúnica azul que ocupa a
+órbita foi a primeira peça que ele forjou para o próprio corpo, e ainda acha que
+ficou grosseira. Acredita, com fé de bigorna, que toda magia decente se martela antes
+de se lançar — o que o coloca em atrito permanente com metade do elenco e em atrito
+divertido com Fizz, que ele considera insuportável e nunca conseguiu odiar.
+
+A regra dele explica o kit inteiro: Brok forja escudo, nunca cura, porque escudo
+falha na frente de todo mundo e cura falha em silêncio. O medo dele é forjar uma peça
+que um dia machuque justamente quem ele quis proteger — por isso a manopla da Pyra
+levou nove dias e por isso ele não endireitou a runa da Tessa ("runa torta que bate é
+runa viva"). E por isso recusa, todas as vezes, gravar a última placa do Basalto:
+nome não se martela por outro. Quando o golem tiver um propósito, ele acende a forja.
+Não antes.
+
+**Assinatura:** *"Se não aguenta a bigorna, não aguenta a batalha."*
+
 ## Kit (proposta)
 - **Passiva — Têmpera Eterna:** aliados perto de Brok (8m) recebem 15% menos dano de terreno (o metal aterra o elemento).
 - **Tática — Runa-Escudo:** martela o chão e ergue uma muralha rúnica curva de 4m que bloqueia projéteis por 6s (vida própria).

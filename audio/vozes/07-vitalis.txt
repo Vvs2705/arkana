@@ -1,0 +1,96 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 07 — VITALIS, A MAO QUE CURA
+Funcao: Suporte / Vida · Slug de arquivo: vitalis_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, 31 anos. Mezzo quente, apoiada, sem tremor. Voz de enfermeira de guerra:
+calma que acalma os outros, porque ela decidiu ha muito tempo que nao vai
+gritar na frente de ninguem ferido.
+Ritmo: firme e constante. Ela conta em voz alta ("dois... um... pronto") —
+isso e marca dela, o ritmo tranquiliza quem esta caido.
+Emocao-base: cuidado teimoso. Irma mais velha por quatro minutos, e usa esses
+quatro minutos como autoridade vitalicia.
+DOIS REGISTROS — importante marcar na geracao:
+  (A) VOZ DE CAMPO: clara, projetada, para o esquadrao.
+  (B) VOZ PARA A LUMEN: meia-voz, quase para dentro, mais aguda e mais jovem —
+      e a voz de quando ela tinha nove anos e a irma estava do lado. Todas as
+      falas marcadas [para Lumen] usam esse registro. O contraste entre (A) e
+      (B) e o personagem inteiro.
+NUNCA diz "minha fada". Sempre "minha irma". Se um take sair com "fada" na boca
+dela, descarta.
+NAO fazer: doçura de conto de fadas, voz de santa. Ela tem lama nas botas.
+
+AJUSTE SUGERIDO
+Stability 65 · Similarity 85 · Style 30 · Speaker Boost ON
+(nas falas [para Lumen]: Stability 45 · Style 45)
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [vitalis_intro_01] [firme, campo] Vitalis. Eu conserto gente. Nao me faz trabalhar dobrado.
+02 [vitalis_intro_02] [para Lumen, meia-voz] Vem, Lumen. Hoje a gente cuida deles e amanha eu cuido de voce.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [vitalis_queda_01] [projetada] Todo mundo respira. A gente cai junto e ninguem fica pra tras.
+02 [vitalis_queda_02] [para Lumen, meia-voz] Nao encosta em ninguem la embaixo, ta? So em mim.
+
+---------------------------------------------------------------
+3. TATICA — VAI, LUMEN
+---------------------------------------------------------------
+01 [vitalis_tatica_01] [campo, curta] Vai, Lumen! Ele ta pior!
+02 [vitalis_tatica_02] [urgente] Manda a luz nele! Doze segundos, aguenta!
+03 [vitalis_tatica_03] [aviso honesto, campo] Minha irma ta longe. Eu to sem ela aqui — cuidado comigo.
+
+---------------------------------------------------------------
+4. SUPREMA — JARDIM DA AURORA (telegrafada)
+---------------------------------------------------------------
+01 [vitalis_suprema_01] [grito de campo] JARDIM ABERTO! Dez segundos! DENTRO DO CIRCULO, TODO MUNDO!
+02 [vitalis_suprema_02] [alto, aviso de risco] O JARDIM APARECE ATRAVES DA PAREDE! Eles vem, entao curem RAPIDO!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [vitalis_abate_01] [seca, sem prazer] Derrubei. Nao gosto disso, mas derrubei.
+02 [vitalis_abate_02] [firme] Voce machucou o meu time. Agora senta.
+03 [vitalis_abate_03] [pratica] Esse nao levanta sem ajuda. Anda!
+04 [vitalis_abate_04] [baixa, honesta] Eu sei fechar ferida. Sei abrir tambem.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [vitalis_caido_01] [urgente, ainda organizada] Cai! Eu to no chao — nao venham em fila, venham por um lado so!
+02 [vitalis_caido_02] [para Lumen, sussurro com dor] Nao chega perto... Lumen, nao chega perto...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [vitalis_reviver_01] [contando, calma] Olha pra mim. Dois... um... pronto. Voltou.
+02 [vitalis_reviver_02] [firme, campo] Eu ja segurei a mao de alguem ate o fim. Nao vou fazer isso duas vezes.
+03 [vitalis_revivido_01] [respirando, agradecida] Voltei. Deixa eu te devolver isso ja ja.
+04 [vitalis_revivido_02] [para Lumen, meia-voz] Ta tudo bem. Ta tudo bem, eu to aqui.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [vitalis_vitoria_01] [alivio, campo] Ninguem meu ficou no chao. E isso que eu conto no fim.
+02 [vitalis_vitoria_02] [para Lumen, meia-voz emocionada] Mais uma, Lumen. Um dia eu junto o bastante e te trago inteira.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [vitalis_bordao_01] [assinatura, firme] Nao e minha fada. E minha irma.
+02 [vitalis_bordao_02] [seca] Minha mao esquerda e fria desde aquele dia. A direita basta.
+03 [vitalis_bordao_03] [pratica] Vocês contam abates. Eu conto quem voltou pra casa.
+04 [vitalis_bordao_04] [meia-voz] Quatro minutos mais velha. Isso me da direito a mandar pra sempre.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [vitalis_interacao_pip] [seca, sem raiva] Voce e uma fada, Pip. A Lumen nao. Nao confunde de novo.
+02 [vitalis_interacao_sylva] [respeito profissional] Voce transfere a dor pra voce, Sylva. Eu ja tentei isso. Nao acaba bem.
+03 [vitalis_interacao_vex] [dura] Seu selo tranca a minha cura, alquimista. Se cair em cima do meu time, a gente briga depois.

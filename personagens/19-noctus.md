@@ -12,6 +12,33 @@ Casaca vitoriana preta de gola alta forrada de carmesim, abotoadura de rubi; col
 ## Personalidade & história curta
 Educado, cortante, dramático sob medida. Não bebe sangue — bebe ÉTER (a mana alheia): mais aceitável para a classificação e mais cruel para o oponente. Considera o BR 'um banquete de má educação'.
 
+## História
+
+**Bio de tela**
+> Noctus foi nobre de uma corte que já não existe, e continua se vestindo como se ela
+> existisse. Não bebe sangue — considera vulgar. Bebe ÉTER: a mana alheia, tomada numa
+> investida curta e num pedido de licença que ninguém tem tempo de recusar. Quanto
+> mais tempo você passa em combate com ele, menos magia lhe sobra e mais sobra a ele.
+> Chama o torneio inteiro de banquete de má educação. E não perde um.
+
+**Fundo**
+A casaca é da época em que havia motivo para usá-la; os anéis-sigilo são de casas que
+ninguém mais sabe pronunciar. Ele sobreviveu à própria corte e resolveu o problema do
+tédio da única maneira compatível com o próprio gosto: descendo ao mapa e cobrando
+educação a magos que nunca tiveram nenhuma. Não caça fora do combate — o sustento
+dele é ficar dentro da briga, não emboscar quem já saiu.
+
+Contratou Umbra uma vez e insistiu em pagar em favores em vez de ouro, porque achou
+mais elegante; ela nunca perdoou, e ele sabe, e acha isso encantador. Contra Basalto
+não rende nada: pedra rúnica não guarda éter que se drene, e ele se refere ao golem
+como "a única companhia insípida do mapa" com um ressentimento que não é totalmente
+de brincadeira. E há o botão. Pip arrancou um botão da casaca dele em pleno voo e o
+usa como pingente; Noctus sabe exatamente onde o botão está, ouve o sino da ladra se
+aproximando toda vez, e nunca conseguiu alcançá-la. É a coisa que mais o incomoda no
+mundo. O que ele teme, no fim, é o dia em que o éter não bastar mais.
+
+**Assinatura:** *"Educação é pedir licença. Nunca disse que esperaria a resposta."*
+
 ## Kit (proposta)
 - **Passiva — Sede de Éter:** dano causado converte 15% em MANA (não vida) para Noctus; abates restauram 25 de vida.
 - **Tática — Mordida do Vazio:** investida curta (6m) que DRENA 20 de mana do alvo (vai para Noctus) e o marca: o próximo acerto dele em Noctus custa +50% de mana.

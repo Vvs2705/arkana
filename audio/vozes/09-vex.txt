@@ -1,0 +1,97 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 09 — VEX, O ALQUIMISTA DA PESTE
+Funcao: Curta distancia / area · Slug de arquivo: vex_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 52 anos. Baixo profundo, denso, abafado pela mascara de bico.
+DETALHE DE ATUACAO (a regra absoluta): VEX NAO TEM PULMOES. Um fole alquimico
+de latao respira por ele, e o fole tem UM ritmo so — ele nunca acelera.
+Consequencias obrigatorias em toda fala:
+  - VOLUME CONSTANTE do inicio ao fim da frase. Nada de crescendo.
+  - Ele NUNCA ofega, nunca perde o folego, nem caido, nem correndo, nem na
+    suprema. Se um take tiver respiracao rapida, descarta.
+  - Frase MEDIDA com uma pausa fixa no meio, sempre no mesmo lugar do compasso.
+    O fole enche, ele fala, o fole enche de novo. Isso da o metro dele.
+  - Onde os outros gritam, ele so fala mais cedo. A urgencia dele e a antecipacao,
+    nao a intensidade.
+Ritmo: lento, mecanico, previsivel — como um relogio de oficina.
+Emocao-base: registro cientifico. Ele descreve o que esta acontecendo, inclusive
+com ele mesmo.
+Registro: seco, honesto ate a crueldade, sem ironia. Ele nao faz piada. Nunca.
+NAO fazer: risada de vilao, voz processada de robo, chiado de mascara exagerado.
+O filtro e leve — a estranheza vem do RITMO, nao do efeito.
+
+AJUSTE SUGERIDO
+Stability 90 · Similarity 85 · Style 10 · Speaker Boost ON
+(Stability alta e proposital: o fole nao varia.)
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [vex_intro_01] [volume constante, pausa fixa no meio] A mina respirou. Eu parei de respirar. A troca foi equivalente.
+02 [vex_intro_02] [seco] Vex. O ar que eu solto ja foi meu. Agora e de voces.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [vex_queda_01] [medido, sem euforia] Vinte equipes. Uma variavel controlada por vez.
+02 [vex_queda_02] [informativo] Terreno fechado a leste. Ali a minha nevoa fica.
+
+---------------------------------------------------------------
+3. TATICA — FRASCOS DE REAGENTE
+---------------------------------------------------------------
+01 [vex_tatica_01] [seco, sem elevar] Frasco no chao. Um segundo pra armar.
+02 [vex_tatica_02] [medido] Nao pisa. Aviso uma vez.
+03 [vex_tatica_03] [registro de caderno] Seis frascos. Anotado.
+
+---------------------------------------------------------------
+4. SUPREMA — A GRANDE OBRA (telegrafada)
+---------------------------------------------------------------
+01 [vex_suprema_01] [mesmo volume de sempre, mas dito CEDO e devagar] A GRANDE OBRA. Doze segundos. Saiam agora — vale pra nos tambem.
+02 [vex_suprema_02] [constante, grave, o fole brilhando] Transmutando o ar. Nada de pocao. Nada de cura. Nada.
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [vex_abate_01] [neutro] Resultado obtido.
+02 [vex_abate_02] [seco] Voce pisou. Eu avisei uma vez.
+03 [vex_abate_03] [registro] Amostra vinte e dois. Reacao esperada.
+04 [vex_abate_04] [sem crueldade, so verdade] Nao foi pessoal. Foi metodo.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [vex_caido_01] [caiu, mesmo volume, sem ofegar — assinatura] Estou no chao. O fole continua. Venham quando puderem.
+02 [vex_caido_02] [medido] Erro meu. Vou anotar depois.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [vex_reviver_01] [seco, maos firmes] Fica parado. Eu ja consertei coisa pior.
+02 [vex_reviver_02] [medido] Voce ainda funciona. Levanta.
+03 [vex_revivido_01] [neutro] De pe. O fole nao para, entao eu tambem nao.
+04 [vex_revivido_02] [seco, mas e gratidao] Isso entra no caderno como credito seu.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [vex_vitoria_01] [constante, sem comemorar] Hipotese confirmada. O ar decide a luta.
+02 [vex_vitoria_02] [baixo, para si] Um dia a Grande Obra sai certa. Hoje ela so ganhou.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [vex_bordao_01] [assinatura] Todo poder cobra. O meu cobrou os meus pulmoes.
+02 [vex_bordao_02] [seco] Eu nao ofego. O fole nao sabe ter medo.
+03 [vex_bordao_03] [medido] Anota tudo. A memoria mente, o caderno nao.
+04 [vex_bordao_04] [neutro] Os frascos estao fora de ordem. Eu sei onde cada um esta.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [vex_interacao_pyra] [seco, sem provocacao] Chama de Guerra: seu fogo come a minha nevoa em dois segundos. Escolha um lado do corredor.
+02 [vex_interacao_gromm] [medido] Sua chuva limpa o meu ar, xama. Uma de nos duas magias esta sobrando aqui.
+03 [vex_interacao_tessa] [quase respeito] Voce forjou o proprio coracao aos quinze anos. Poucos aqui entendem o preco. Eu entendo.

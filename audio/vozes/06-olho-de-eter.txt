@@ -1,0 +1,97 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 06 — OLHO-DE-ETER, O OBSERVADOR
+Funcao: Longa distancia / recon · Slug de arquivo: olhodeeter_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 33 anos. Baritono ressonante e quente, teatral, com peito de ator de
+templo. A voz mais BONITA do elenco, e ele sabe.
+DETALHE DE ATUACAO (a chave do personagem): OLHO-DE-ETER E SURDO desde a
+infancia. Ele nunca ouviu a propria voz. Isso significa:
+  - articulacao EXAGERADAMENTE precisa (ele aprendeu cada palavra pelo formato
+    da boca dos outros, nao pelo som);
+  - controle de volume imperfeito — ele as vezes fala mais alto do que a cena
+    pede, e nao percebe. Aproveite isso: uma fala calma que sai forte demais e
+    caracterizacao, nao erro;
+  - entonacao levemente PROPRIA: a melodia da frase nao segue o padrao comum,
+    sobe onde ninguem sobe. Nao exagerar a ponto de virar caricatura.
+Ritmo: lento e cerimonioso, com pausas grandes — ele espera a vibracao voltar.
+Emocao-base: encantamento. Ele acha o mundo lindo e diz isso o tempo todo.
+VOCABULARIO: ele diz "eu vejo o batimento", "a luz me contou", "as mariposas
+sentiram". Ele NUNCA diz "eu ouvi" — se disser, e ironia deliberada e a fala
+marca isso.
+NAO fazer: voz arrastada de "deficiente", fala infantilizada. Ele e o mais
+elegante e o mais seguro de si do elenco inteiro.
+
+AJUSTE SUGERIDO
+Stability 45 · Similarity 80 · Style 55 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [olhodeeter_intro_01] [teatral, articulacao perfeita] Voces escutam barulho. Eu escuto verdade.
+02 [olhodeeter_intro_02] [mais suave, sorrindo] Se o mundo nao fala comigo, que ao menos me veja.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [olhodeeter_queda_01] [encantado, volume alto demais para a cena] O chao inteiro esta tremendo de gente! Que lindo!
+02 [olhodeeter_queda_02] [confidente] Minhas mariposas ja acordaram. Elas sentem antes de mim.
+
+---------------------------------------------------------------
+3. TATICA — ENXAME PERSCRUTADOR
+---------------------------------------------------------------
+01 [olhodeeter_tatica_01] [aberto, teatral] Enxame! Voa, meus ouvidos!
+02 [olhodeeter_tatica_02] [satisfeito] Cortei a magia dele no meio. Que pena.
+03 [olhodeeter_tatica_03] [aviso ao time] Tocado e revelado. Seis segundos. Aproveitem.
+
+---------------------------------------------------------------
+4. SUPREMA — CRISALIDA (telegrafada)
+---------------------------------------------------------------
+01 [olhodeeter_suprema_01] [grande, de palco] CRISALIDA! DOIS SEGUNDOS E O SEGREDO DE VOCES ACABA!
+02 [olhodeeter_suprema_02] [alto, encantado] ABRE! ABRE E MOSTRA TODO MUNDO PRA MIM!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [olhodeeter_abate_01] [sereno] O batimento dele parou de piscar.
+02 [olhodeeter_abate_02] [gentil, sem deboche] Voce conjurou. Foi so isso que eu precisava.
+03 [olhodeeter_abate_03] [teatral] Uma luz a menos no salao.
+04 [olhodeeter_abate_04] [quase carinhoso] Descanse. O po dourado fica com voce.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [olhodeeter_caido_01] [alto, sem panico, articulado] EU CAI! Nao tem aviso pra mim — venham, por favor!
+02 [olhodeeter_caido_02] [dor, respirando] As mariposas... voltaram todas pra mim...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [olhodeeter_reviver_01] [firme, olhando nos olhos] Olha pra mim. Eu preciso ver sua boca pra te ajudar.
+02 [olhodeeter_reviver_02] [suave] Sua luz nao apagou. Eu estou vendo daqui.
+03 [olhodeeter_revivido_01] [emocionado, forte demais] VOCE VEIO! Eu senti seu passo no chao antes de te ver!
+04 [olhodeeter_revivido_02] [teatral, agradecido] O silencio quase me levou. Voce chegou mais rapido.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [olhodeeter_vitoria_01] [de palco, braços abertos] O templo me chamou de amaldicoado. Olhem pro amaldicoado agora.
+02 [olhodeeter_vitoria_02] [suave, sinceridade] Eu nao vou ouvir a torcida. Mas eu vejo. E basta.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [olhodeeter_bordao_01] [assinatura] Eu nao ouco o sussurro. Eu vejo o sussurro.
+02 [olhodeeter_bordao_02] [tocando o esterno] Meus sinos nao tocam pra mim. Tocam pra voces.
+03 [olhodeeter_bordao_03] [sorrindo] Mentir pra mim e dificil. A sua boca e mais honesta que a sua voz.
+04 [olhodeeter_bordao_04] [suave] Segura a magia perto de mim. E a unica forma de sumir.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [olhodeeter_interacao_corvus] [afeto verdadeiro] Irmao-caca, eu leio seus labios e voce le meu cheiro. Ninguem nos engana juntos.
+02 [olhodeeter_interacao_corvomante] [educado, afiado] Seu corvo pisca, Corvomante. Minhas mariposas nunca fecham.
+03 [olhodeeter_interacao_pyra] [preocupado] Chama de Guerra, seu fogo queima os meus ouvidos. Aponta pro outro lado, por favor.

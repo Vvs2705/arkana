@@ -1,0 +1,8 @@
+# Game-ready character assets. Keep this scoped so existing concept art PNGs
+# are not silently migrated to LFS by future edits.
+godot/characters/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
+godot/characters/modelos/*.GLB filter=lfs diff=lfs merge=lfs -text
+godot/characters/modelos/*.png filter=lfs diff=lfs merge=lfs -text
+godot/characters/modelos/*.PNG filter=lfs diff=lfs merge=lfs -text
+godot/characters/modelos/*.ktx2 filter=lfs diff=lfs merge=lfs -text
+godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text

@@ -13,6 +13,33 @@ Casaca de gala roxa bordada de fio dourado com os botões do lado ERRADO (alfaia
 ## Personalidade & história curta
 Fala pelos cotovelos, apelida todo mundo no primeiro minuto, odeia silêncio (três anos de silêncio bastaram). Generoso em combate como só quem já ficou sozinho sabe ser: os truques dele existem para os OUTROS escaparem.
 
+## História
+
+**Bio de tela**
+> Três anos preso dentro do espelho do próprio mestre. Quando finalmente saiu, saiu
+> pelo lado errado: o coração bate à direita, os botões da casaca insistem no lado
+> trocado e a mão boa dele trocou de lugar. O pior ele conta rindo, sempre no meio de
+> um truque — um dos reflexos que dançam ao redor dele é o original, e nem ele sabe
+> qual. Fala sem parar desde então. Três anos de silêncio foram suficientes.
+
+**Fundo**
+Era aprendiz, era bom, e era apressado — três motivos suficientes para entrar num
+espelho que o mestre tinha mandado não tocar. Do outro lado não havia monstro nenhum:
+havia ele, repetido, sem som e sem ninguém. Quando o vidro cedeu, saiu invertido e
+acompanhado. Guarda até hoje todos os cacos daquele espelho; os maiores viraram
+abotoaduras, e ele os usa como quem usa aliança.
+
+Os truques dele existem para os outros escaparem, e isso não é generosidade abstrata:
+é a lição direta de quem passou três anos aprendendo o que é ficar sozinho. Apelida
+todo mundo no primeiro minuto porque nome dito em voz alta é prova de que tem
+alguém ali. Perguntou uma única vez à Ceifadora, que enxerga ecos de quem se foi, se
+ele era mesmo ele — e a resposta foi silêncio; foi a única vez que alguém o viu
+quieto. Chama a Véu de "colega de retorno" e ela finge não achar graça. O que ele
+teme não é quebrar: é que alguém quebre o reflexo certo e ninguém perceba a
+diferença — nem ele.
+
+**Assinatura:** *"E se eu for a cópia? A cópia é boa gente. Fica tudo certo."*
+
 ## Kit
 - **Passiva — Truque de Fuga:** ao ser derrubado, quebra em cacos de luz: fica invisível por 3s e deixa um reflexo caído no lugar.
 - **Tática — Espelho de Mão:** conjura um espelho de corpo inteiro fixo por 2s: DEVOLVE até 3 projéteis mágicos como reflexos com 30% do dano, na direção de quem atirou.

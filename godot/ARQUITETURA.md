@@ -21,7 +21,14 @@ Dono de `project.godot`, `core/` e deste arquivo: COORDENADOR.
 `Main.tscn` carrega Island/Mage por `load()` com fallback (placeholder simples)
 — uma raia atrasada NÃO quebra as outras. Integração final é do coordenador.
 
+## Personagens game-ready
+`characters/Mage.tscn` continua sendo a fachada estável da raia PERSONAGEM. Quando
+existir `.glb` em `characters/modelos/`, `Mage.gd` pode carregar o modelo externo
+e cair automaticamente no procedural se faltar arquivo, `AnimationPlayer` ou as
+animações `idle`/`run`/`cast`. Binários 3D e texturas dessa pasta devem usar Git
+LFS; a regra de "zero binário grande" segue valendo para o restante do projeto.
+
 ## Gates de toda raia
 1. `"$LOCALAPPDATA/Programs/godot/Godot_v4.4.1-stable_win64.exe" --headless --path godot --import` sem erro.
 2. `--headless --check-only --script` nos .gd tocados (ou boot da cena principal headless por 3s sem erro).
-3. Zero binário grande; malha é PROCEDURAL (ArrayMesh/CSG/primitivas) ou .tscn/.tres texto.
+3. Zero binário grande fora de `characters/modelos/`; assets 3D dessa pasta exigem Git LFS.

@@ -5,7 +5,37 @@
 extends Node
 
 signal damage_dealt(target: Node, amount: int, element: String)
+## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). `damage_dealt` acima nao carrega
+## QUEM causou nem SE bateu em escudo — sem isso ficam impossiveis, todos de uma
+## vez: indicador direcional, hitmarker correto (a HUD usa hoje a heuristica
+## "alvo nao e' o player, logo fui eu"), credito de dano para a evolucao do
+## escudo, kill feed com autor e som por tipo de acerto.
+##   amount    : FLOAT — dano EFETIVO aplicado (escudo + vida). Nunca 0.
+##   source    : quem causou (null = terreno/DoT/ambiente, nao tem direcao)
+##   on_shield : o escudo do alvo absorveu ao menos parte deste acerto
+## `damage_dealt` continua saindo em paralelo so' enquanto ui/Hud.gd e
+## audio/Sfx.gd nao migram — quando migrarem, o legado morre (ver relatorio).
+signal damage_applied(target: Node, amount: float, element: String, source: Node, on_shield: bool)
+## ESCUDO EVOLUTIVO (GDD §5). A HUD OBSERVA; quem muda escudo e' o Combat.
+signal shield_changed(entity: Node, shield: float, shield_max: float, level: int)
+signal shield_broken(entity: Node)
 signal entity_died(entity: Node)
+## DERRUBADO E REERGUER (GDD §3.7/§3.8, §4.5, §18.6 — gameplay/Derrubado.gd).
+## Vida zero nao e' mais morte: quem tem esquadrao CAI, esvaece e pode ser
+## reerguido. `entity_died` continua sendo a morte DE VERDADE e sai uma vez so'
+## — o derrubado nao a emite. Vocabulario 10+: DERRUBADO e ESVAECER, nunca
+## mutilacao, nunca sangue.
+## entity_derrubada: caiu agora. `causador` = quem derrubou (null = ambiente).
+## E' o gancho do Truque de Fuga do Ilusionista (cacos de luz + reflexo caido).
+signal entity_derrubada(entity: Node, causador: Node)
+## entity_reerguida: levantou. `por` = quem canalizou (a Lumen da Vitalis
+## entra aqui como no' proxy, nao a Vitalis).
+signal entity_reerguida(entity: Node, por: Node)
+## derrubado_progresso: os DOIS numeros da HUD, a 4 Hz e so' quando o player
+## esta' envolvido (caido ou resgatando). Ambos 0..1:
+##   esvaecimento : 1.0 acabou de cair, 0.0 apagou (x ESVAECER_S = segundos)
+##   reerguer     : progresso da canalizacao do resgate
+signal derrubado_progresso(entity: Node, esvaecimento: float, reerguer: float)
 signal match_started
 signal match_over(victory: bool)
 signal mana_changed(current: float, max: float)
@@ -24,3 +54,87 @@ signal dodge_performed
 ## cadencia deles viraria cacofonia sem atenuacao por distancia; quando o Sfx
 ## ganhar posicionamento 3D, os bots entram.
 signal spell_cast(element: String)
+
+## LOOT DE ARMAS ARCANAS (GDD §16.2 — R21). A HUD OBSERVA, nunca decide: quem
+## equipa e' o ArmaSlot do pawn e quem troca o ataque e' o proprio spec da arma.
+## loot_prompt: o player entrou/saiu do raio de um loot ("PEGAR: Cajado").
+signal loot_prompt(nome: String, raridade: String, perto: bool)
+## weapon_equipped: alguem trocou de arma. elementos traz 1 (varinha/cajado) ou
+## os 2 FIXOS da manopla.
+signal weapon_equipped(arma_id: String, nome: String, raridade: String, elementos: PackedStringArray)
+
+## HABILIDADES DOS MAGOS (GDD §3 e §4 — raia GAMEPLAY/HABILIDADES). A HUD e o
+## audio OBSERVAM; quem decide habilidade e' um lugar so' (gameplay/KitRunner).
+## SO' O PLAYER emite (6 bots com kit viraria enxurrada) — mesma regra do
+## dodge_performed.
+## kit_bound: que mago entrou em campo e se ele TEM kit implementado (17 dos 20
+## ainda nao tem: a HUD desenha o botao apagado).
+signal kit_bound(slug: String, implementado: bool)
+## kit_cooldown: emitido na BORDA (no instante do uso e no instante em que fica
+## pronto), nunca por frame. tipo = "tatica" | "suprema". A HUD interpola entre
+## as duas bordas, ou le KitRunner.frac_tatica()/frac_suprema() quando quiser
+## o valor exato.
+signal kit_cooldown(tipo: String, restante: float, total: float)
+## kit_telegraph: A LEI DO §4.3 no ar — "se mata rapido, avisa antes". Sai no
+## toque da suprema, com os segundos de aviso ANTES do efeito: o audio toca o
+## som alto e a UI mostra o aviso nesta janela.
+## TODO conjurador emite, nao so' o player: o GDD §4.3 diz que toda suprema e'
+## telegrafada com som alto ANTES do impacto — se a suprema do inimigo fosse
+## muda, a contra-jogada nao existiria. `pos` deixa o audio atenuar por
+## distancia (raia AUDIO ja' faz isso).
+signal kit_telegraph(slug: String, tipo: String, duracao: float, pos: Vector3)
+## kit_state: liga/desliga de um estado nomeado do kit ("braco_livre",
+## "desfocada", "silencio", "sino_espectral", "escudo_quebrado", "revelado",
+## "fio_zumbido", "braco_molhado", "braco_frio"). Nome novo NAO precisa de
+## sinal novo — a HUD ignora o que nao souber desenhar.
+signal kit_state(nome: String, ligado: bool)
+
+## BAU CELESTIAL (GDD §16.2 — evento de mundo, a UNICA porta da manopla).
+## Quem emite: gameplay/BauCelestial.gd. A HUD OBSERVA e desenha; nunca decide.
+## ⚠️ NAO e' a suprema da Vitalis: o kit dela virou "Jardim da Aurora" em 20/08.
+## bau_anunciado: o bau comecou a cair. `pos` = ponto EXATO de pouso (marcador
+## na bussola/minimapa), `segundos` = quanto falta ate' pousar (contagem).
+signal bau_anunciado(pos: Vector3, segundos: float)
+## bau_pousou: da' pra abrir a partir de agora. O marcador vira "aberto ja'".
+signal bau_pousou(pos: Vector3)
+## bau_canalizando: barra de progresso 0..1 do PLAYER abrindo. 0.0 = cancelou
+## (saiu do raio). So' sai quando o player esta' canalizando — bot e' ruido.
+signal bau_canalizando(progresso: float)
+## bau_aberto: acabou. `por_player` diz se a manopla foi para o jogador ou para
+## um bot (kill feed: "a manopla caiu em outras maos"); `elementos` traz os 2
+## FIXOS dela, para a HUD mostrar o par que o carrossel nao pode mais trocar.
+signal bau_aberto(por_player: bool, elementos: PackedStringArray)
+
+## ESTADOS ELEMENTAIS NO ALVO (GDD §10 — o counter e' COR + FORMA + **SOM**; o
+## som e' um terco da leitura, entao estado que so' tem cor esta' pela metade).
+## PEDIDO DA RAIA AUDIO (R21), SEM EMISSOR AINDA: quem deveria emitir e'
+## gameplay/Pawn.gd na BORDA de acender()/molhar()/atordoar()/lentificar() —
+## na borda, nunca por frame, e so' quando o estado MUDA (a queimadura refresca
+## sem re-emitir). `nome` usa o vocabulario que Pawn.estado() ja' devolve:
+## "burn" | "wet" | "frost" | "stun". audio/Sfx.gd ja' OBSERVA e tem um timbre
+## para cada um; nome desconhecido e' silencio, nunca timbre errado.
+signal status_aplicado(alvo: Node, nome: String)
+
+## ZONA / TEMPESTADE ARCANA (gameplay/Zona.gd — o circulo que fecha).
+## ⚠️ Mecanica PROJETADA na raia de gameplay, ainda nao escrita no GDD: ele so'
+## a PRESSUPOE ("zona fechando" no Degrau 3, "revela a proxima zona segura" no
+## Vidente, "ate' a zona entrar na fase final" no resgate). Numeros e fases em
+## Zona.gd, aguardando o carimbo do Diretor.
+## Quem emite: gameplay/Zona.gd. A HUD OBSERVA e desenha; nunca decide.
+## Para o valor CONTINUO (seta da bussola, distancia ate' a borda) a HUD LE'
+## direto `zona.centro` / `zona.raio` / `zona.dentro(pos)` — nao existe sinal
+## por frame, de proposito.
+## zona_avisou: a zona esta' PARADA e o PROXIMO circulo ja' e' publico. `centro`
+## e `raio` sao os do circulo NOVO, `segundos` e' quanto falta ate' a parede
+## comecar a andar (contagem regressiva "A tempestade avanca em X").
+signal zona_avisou(fase: int, centro: Vector3, raio: float, segundos: float)
+## zona_fechando: a parede COMECOU a andar, e leva `duracao` segundos ate' o
+## `raio` novo. O anel do proximo circulo apaga aqui.
+signal zona_fechando(fase: int, centro: Vector3, raio: float, duracao: float)
+## zona_dano: o PLAYER levou o tique da tempestade (1x por segundo, NUNCA por
+## frame — docs/DANO.md §2.3). `dano` = efetivo aplicado, `dps` = o da fase,
+## para a HUD mostrar o quanto vai doer se ele nao correr.
+signal zona_dano(dano: float, dps: float)
+## zona_estado: BORDA (o player atravessou a parede), nao estado por frame.
+## `dentro` false = acende a vinheta e o aviso "VOLTE PARA A ZONA".
+signal zona_estado(dentro: bool)

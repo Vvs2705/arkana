@@ -12,6 +12,33 @@ Couro escuro justo com placas segmentadas nos ombros e antebraços; meia-capa co
 ## Personalidade & história curta
 Sarcástica e impaciente. Exilada da corte subterrânea; caça por contrato e cobra caro. Odeia luz direta — e faz piada disso.
 
+## História
+
+**Bio de tela**
+> A corte subterrânea a expulsou, e ela agradeceu em voz alta na saída — o que garantiu
+> que o exílio fosse definitivo. Umbra caça por contrato e cobra caro, com desconto
+> zero para nobres. As runas roxas na pele acendem quando a luz some, e luz direta a
+> incomoda mais do que qualquer inimigo do mapa. Já aceitou trabalho por menos que uma
+> dívida. Nunca perdoou nenhuma.
+
+**Fundo**
+Foi criada para servir a uma casa e treinada para ser silenciosa, o que funcionou até
+o dia em que ela deixou de ser as duas coisas na mesma frase. O sarcasmo é armadura
+antiga: quem ri primeiro não precisa explicar a cicatriz na sobrancelha. Trabalha
+sozinha por escolha e cobra adiantado por experiência, e a única coisa que odeia mais
+do que dever favor é dever favor a alguém elegante.
+
+Noctus a contratou uma vez e insistiu em pagar em favores em vez de ouro, porque
+achou mais elegante — ela nunca perdoou, e o pior é que ele estava certo sobre a
+elegância. Como lê sombras para trabalhar, foi a primeira criatura do elenco a
+perceber que a Ceifadora não projeta nenhuma; classificou o fato como "falta de
+educação" e evita o assunto desde então. Com Aelion mantém um armistício de
+vocabulário: nenhum dos dois pronuncia a raça do outro, nunca. O que Umbra quer é
+comprar de volta uma coisa que a corte tomou dela, e não diz o quê. O que teme é
+voltar um dia e descobrir que ninguém sentiu falta.
+
+**Assinatura:** *"Escuridão não é esconderijo. É endereço."*
+
 ## Kit (proposta)
 - **Passiva — Passo de Veludo:** corre sem som de passos; abates recarregam 30% da esquiva.
 - **Tática — Véu Umbrio:** fica 2,5s em penumbra (quase invisível PARADA; um vulto ao mover); o primeiro golpe saindo do véu causa +50% de dano.

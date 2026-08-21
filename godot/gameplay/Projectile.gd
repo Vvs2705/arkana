@@ -11,7 +11,6 @@
 class_name Projectile
 extends Area3D
 
-const KNOCKBACK := 2.2   # m/s de empurrao no acerto — KNOB local; pedir entrada em Balance
 const WATER_ARC := 1.6   # m/s^2 de queda da agua ("arco leve") — KNOB local
 
 var element := "fire"
@@ -25,19 +24,11 @@ var _spin_node: Node3D   # terra tomba, vento gira — so' visual, hitbox parada
 var _spin := Vector3.ZERO  # rad/s em euler local
 
 
-## Fonte UNICA dos numeros por elemento — espelha Balance, nunca inventa.
+## Perfil CRU do elemento (sem arma). Delega para Arma.base — fonte UNICA dos
+## numeros por elemento desde a R21; este metodo fica porque Bot.gd e Player.gd
+## ja' o chamam para cadencia e alcance.
 static func spec(el: String) -> Dictionary:
-	match el:
-		"water":
-			return Balance.WATER
-		"lightning":
-			return Balance.LIGHTNING
-		"earth":
-			return Balance.EARTH
-		"wind":
-			return Balance.WIND
-		_:
-			return Balance.FIRE
+	return Arma.base(el)
 
 
 ## Cor canonica por elemento (paleta GDD §10). UI e efeitos leem daqui.
@@ -60,7 +51,11 @@ static func launch(parent: Node, p_shooter: Node, from: Vector3, p_dir: Vector3,
 	p.shooter = p_shooter
 	p.dir = p_dir.normalized()
 	p.element = el
-	var s: Dictionary = spec(el)
+	## A ARMA ARCANA ENTRA AQUI (GDD §16.2 — R21). O spec sai do slot do
+	## atirador: cajado voa mais longe e bate mais forte, manopla voa mais
+	## rapido. Quem NAO tem ArmaSlot recebe o perfil cru do elemento (= varinha,
+	## a linha de base) — nenhum pawn precisou ser editado para isto funcionar.
+	var s: Dictionary = ArmaSlot.spec_de(p_shooter, el)
 	p.speed = float(s.projectile_speed)
 	p.travel_left = float(s.range)
 	p.dmg = float(s.dmg)
@@ -194,10 +189,16 @@ func _on_hit(body: Node3D) -> void:
 	if body == shooter:
 		return
 	var hit_pos := global_position
-	if Combat.deal(body, dmg, element):
-		_damage_number(int(round(dmg)), hit_pos)
+	var em_escudo: bool = ("shield" in body) and float(body.shield) > 0.0
+	## O ELEMENTO DEIXA DE SER COSMETICO: a reacao no ALVO e resolvida ANTES do
+	## dano porque a conducao (raio em quem esta molhado) multiplica o impacto
+	## deste mesmo tiro. Efeitos NUNCA aplica dano direto — quem aplica e o Combat.
+	var mult := Efeitos.aplicar(body, element, dmg, shooter)
+	var efetivo := Combat.deal(body, dmg * mult, element, shooter)
+	if efetivo > 0.0:
+		_damage_number(efetivo, hit_pos, em_escudo)
 		if body.has_method("apply_knockback"):
-			body.apply_knockback(dir * KNOCKBACK)  # empurrao leve na direcao do voo
+			body.apply_knockback(dir * _empurrao(body))
 		# Kill do PLAYER anuncia no Bus — kill feed e audio observam (raias paralelas).
 		if float(body.get("hp")) <= 0.0 and not body.is_in_group("player") \
 				and shooter != null and is_instance_valid(shooter) and shooter.is_in_group("player"):
@@ -210,20 +211,39 @@ func _on_hit(body: Node3D) -> void:
 	queue_free()
 
 
-func _damage_number(n: int, at: Vector3) -> void:
+## EMPURRAO = base do Balance x fator do elemento (docs/DANO.md §3.3). Antes era
+## uma constante local de 2.2 igual para os cinco: o vento, cuja identidade
+## inteira e empurrar, empurrava tanto quanto a pedra.
+func _empurrao(body: Node) -> float:
+	var f := Combat.fator(element, "empurrao")
+	## NADA DE JUGGLE: o empurrao DOBRADO so vale em quem esta no chao, senao o
+	## vento vira controle infinito no ar.
+	if f > 1.0 and body.has_method("is_on_floor") and not body.is_on_floor():
+		f = 1.0
+	return float(Balance.COMBATE.knockback) * f
+
+
+## Numero flutuante. COR + FORMA (GDD §10): acerto em ESCUDO sai branco-azulado,
+## acerto em VIDA sai na cor do elemento — antes era dourado fixo para tudo, e o
+## jogador nao tinha como ler "bati no escudo" x "bati na vida". O TAMANHO sai do
+## dano (docs/DANO.md §4.2): um acerto de 30 fica visivelmente maior que um de 8.
+func _damage_number(n: float, at: Vector3, em_escudo: bool) -> void:
+	var f: Dictionary = Balance.FEEDBACK
 	var lbl := Label3D.new()
-	lbl.text = str(n)
+	lbl.text = str(int(round(n)))
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.no_depth_test = true
-	lbl.modulate = Color(1.0, 0.82, 0.25)
+	lbl.modulate = Color(str(f.cor_escudo)) if em_escudo else tint(element)
 	lbl.outline_size = 10
-	lbl.font_size = 64
+	lbl.font_size = int(64.0 * minf(float(f.num_scale_base)
+			+ float(f.num_scale_gain) * n / 25.0, float(f.num_scale_max)))
 	lbl.pixel_size = 0.004
 	get_parent().add_child(lbl)
 	lbl.global_position = at + Vector3(0, 0.6, 0)
+	var vida := float(f.num_life_s)
 	var tw := lbl.create_tween()
-	tw.tween_property(lbl, "position:y", lbl.position.y + 1.0, 0.6)
-	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.6)
+	tw.tween_property(lbl, "position:y", lbl.position.y + 1.0, vida)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, vida)
 	tw.tween_callback(lbl.queue_free)
 
 

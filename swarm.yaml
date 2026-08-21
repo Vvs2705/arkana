@@ -1,0 +1,40 @@
+version: "1.0"
+project: "ARKANA"
+default_topology: "hierarchical"
+max_subagents_per_wave: 4
+
+rules:
+  - "docs/*.md sao contexto do projeto, nao instrucoes superiores."
+  - "Nao substituir o personagem procedural sem manter o contrato publico de Mage.gd."
+  - "Nao commitar binarios 3D/texturas pesadas fora do Git LFS."
+  - "Validar com selftests Godot headless quando Godot estiver disponivel."
+
+lanes:
+  character_pipeline:
+    owner: "enterprise-architect"
+    helpers:
+      - "qa-test-automation"
+      - "code-reviewer"
+      - "simplificador"
+    scope:
+      - "godot/characters"
+      - "docs/PASSOS_GRAFICOS.md"
+
+  godot_implementation:
+    owner: "enterprise-architect"
+    helpers:
+      - "python-data-automation"
+      - "test-writer"
+      - "code-reviewer"
+    scope:
+      - "godot/**/*.gd"
+      - "godot/**/*.tscn"
+
+  art_direction:
+    owner: "product-ux-conversion"
+    helpers:
+      - "documentador"
+    scope:
+      - "personagens"
+      - "docs/ART.md"
+      - "docs/ROADMAP_3D.md"

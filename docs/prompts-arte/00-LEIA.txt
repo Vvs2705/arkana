@@ -1,0 +1,210 @@
+========================================================================
+ARKANA — PROMPTS DE ARTE DE INTERFACE (para Adobe Firefly)
+Direção de Arte / UI — 21/08/2026
+========================================================================
+
+Este pacote NÃO contém imagens. Contém PROMPTS PRONTOS para o Diretor colar
+no Adobe Firefly e gerar ele mesmo. Fonte da verdade: docs/GDD.md §10
+(identidade visual), §11 (boot/splash/menus), §14 (5 elementos),
+§19.3 (controles de toque), §7 (cosméticos) e personagens/00-LEIA.md.
+
+ARQUIVOS DESTE PACOTE
+  00-LEIA.txt ............. este arquivo (fluxo, bloco de estilo, destinos)
+  01-menu-e-fundo.txt ..... key art, fundo de menu, splash, telas
+  02-icones-habilidades.txt 30 ícones do elenco de lançamento + 30 listados
+  03-hud.txt .............. elementos, barras, botões, retículo
+  04-molduras-e-cards.txt . card do mago, moldura do retrato, badges
+  05-logo-e-marca.txt ..... Selo de Arkana, wordmark, ícone do app Android
+
+
+========================================================================
+1) BLOCO DE ESTILO PADRÃO — COLE EM TODO PROMPT
+========================================================================
+
+Todo prompt deste pacote já traz o bloco embutido. Se o Diretor criar um
+prompt novo, cole este bloco no fim dele. É ele que mantém a coerência entre
+as peças e o casamento com a concept art dos 20 magos.
+
+--- [ESTILO ARKANA] -----------------------------------------------------
+Estilo: pintura digital de fantasia estilizada, a mesma linguagem visual de
+um character sheet de RPG de fantasia — contornos limpos, sombreamento em
+bandas (cel-shading suave), pinceladas visíveis sem ruído sujo, e a luz
+mágica saindo de DENTRO do objeto (emissiva), nunca um brilho aplicado por
+cima. Materiais: bronze gasto, ferro escurecido, pedra rúnica, vidro
+arcano, tecido pesado.
+Paleta base: azul-noite arcano #0B1026 e fundo profundo #05070F, com
+dourado arcano #F0C75E na marca e nos contornos nobres.
+Cores elementais oficiais: Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E ·
+Vento #8FE8C9 · Raio #F5D90A.
+Iluminação: chave quente dourada vindo de cima à esquerda, contraluz fria
+azul-noite, sombras nunca pretas puras (sempre azul-noite).
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue, ferimentos, gore ou imagem
+perturbadora (o jogo é 10+); nenhum TEXTO, letra, número, legenda, marca
+d'água, assinatura ou moldura de galeria dentro da imagem.
+-------------------------------------------------------------------------
+
+--- [ESTILO ARKANA — ADENDO PARA ÍCONES] --------------------------------
+Ícone de jogo mobile. UM único objeto, centralizado, isolado, visto de
+frente ou em leve 3/4. A SILHUETA é o que identifica o ícone: precisa ser
+reconhecível reduzida a 48dp (cerca de 48 pixels) numa tela de celular.
+Portanto: forma externa distinta e memorável, detalhe interno mínimo, no
+máximo 3 cores além do dourado, contraste alto entre o objeto e o vazio.
+Contorno externo escuro azul-noite #05070F fino em volta do objeto, para
+ele destacar sobre qualquer fundo. Margem de segurança de 10% vazia em
+volta. Composição chapada, sem perspectiva dramática, sem cenário, sem
+personagem de corpo inteiro, sem fundo, sem sombra projetada no chão.
+-------------------------------------------------------------------------
+
+LEI DO PROJETO (GDD §10) que governa TODOS os ícones:
+  counter sempre em COR + FORMA + SOM.
+  Dois ícones NUNCA podem se diferenciar só pela cor — daltonismo é
+  requisito, não gentileza. Cada ícone deste pacote tem uma FORMA EXTERNA
+  própria, descrita no prompt. Se o Firefly devolver duas formas parecidas,
+  regere: o problema é de design, não de gosto.
+
+
+========================================================================
+2) FUNDO TRANSPARENTE — COMO FAZER NA PRÁTICA
+========================================================================
+
+O Firefly não é confiável para entregar PNG com alfa direto no prompt.
+Fluxo que funciona:
+
+  1. Gere a peça sobre FUNDO CHAPADO ÚNICO na cor #05070F (os prompts já
+     pedem isso). Fundo chapado recorta bem.
+  2. Leve para o Adobe Express ou Photoshop → Remover fundo.
+  3. Exporte PNG-24 com alfa.
+  4. Confira a borda: se sobrou halo azul, aumente 1px de contração de
+     máscara antes de exportar.
+
+PRECISAM de fundo transparente (alfa):
+  - todos os 30 (+30) ícones de habilidade
+  - os 5 ícones de elemento
+  - botão de fogo, botão de esquiva, retículo
+  - molduras de barra de vida/mana
+  - moldura do retrato, badges de classe
+  - Selo de Arkana e wordmark (variações soltas)
+
+NÃO precisam (ficam opacos, tela cheia):
+  - key art do menu e variações de fundo
+  - tela de carregamento
+  - ícone do app Android (Android não aceita alfa no ícone de loja)
+
+
+========================================================================
+3) FORMATOS, RESOLUÇÕES E ONDE SALVAR O PNG
+========================================================================
+
+O Firefly gera em proporção (1:1, 9:16, 16:9, 4:3, 3:4). Gere na proporção
+indicada, no maior tamanho disponível, e RECORTE/REDIMENSIONE depois para
+o tamanho final da tabela.
+
+| Peça                         | Proporção | Exportar em   | Alfa | Destino no projeto                    |
+|------------------------------|-----------|---------------|------|---------------------------------------|
+| Key art menu (celular)       | 9:16      | 1080x1920     | não  | godot/menu/art/ui/bg-menu.png         |
+| Key art menu (paisagem)      | 16:9      | 1920x1080     | não  | godot/menu/art/ui/bg-menu-wide.png    |
+| Tela de carregamento         | 9:16      | 1080x1920     | não  | godot/menu/art/ui/bg-loading.png      |
+| Fundo da vitrine do elenco   | 9:16      | 1080x1920     | não  | godot/menu/art/ui/bg-elenco.png       |
+| Ícone de habilidade (x30)    | 1:1       | 512x512       | SIM  | godot/ui/art/skills/NN-passiva.png    |
+| Ícone de elemento (x5)       | 1:1       | 256x256       | SIM  | godot/ui/art/elements/fire.png        |
+| Botão de fogo                | 1:1       | 512x512       | SIM  | godot/ui/art/hud/btn-fogo.png         |
+| Botão de esquiva             | 1:1       | 512x512       | SIM  | godot/ui/art/hud/btn-esquiva.png      |
+| Retículo / mira              | 1:1       | 256x256       | SIM  | godot/ui/art/hud/reticulo.png         |
+| Moldura barra de vida        | 16:9→corte| 512x72        | SIM  | godot/ui/art/hud/barra-vida.png       |
+| Moldura barra de mana        | 16:9→corte| 512x72        | SIM  | godot/ui/art/hud/barra-mana.png       |
+| Moldura do card do mago      | 1:1→corte | 456x408       | SIM  | godot/menu/art/ui/card-moldura.png    |
+| Moldura do retrato           | 1:1→corte | 456x208       | SIM  | godot/menu/art/ui/retrato-moldura.png |
+| Badge de classe (x5)         | 1:1       | 128x128       | SIM  | godot/menu/art/ui/badge-vanguarda.png |
+| Selo de Arkana (colorido)    | 1:1       | 1024x1024     | SIM  | godot/menu/art/ui/selo.png            |
+| Selo monocromático dourado   | 1:1       | 1024x1024     | SIM  | godot/menu/art/ui/selo-mono.png       |
+| Selo marca d'água            | 1:1       | 1024x1024     | SIM  | godot/menu/art/ui/selo-agua.png       |
+| Wordmark ARKANA              | 16:9→corte| 1600x420      | SIM  | godot/menu/art/ui/wordmark.png        |
+| Ícone do app (Play Store)    | 1:1       | 512x512       | não  | godot/export/icone-loja.png           |
+| Ícone adaptativo (frente)    | 1:1       | 432x432       | SIM  | godot/export/icone-adaptativo.png     |
+
+NOTA DE ENGENHARIA — leia antes de cobrar:
+  Hoje o menu (godot/menu/Menu.gd) e o HUD (godot/ui/Hud.gd) desenham TUDO
+  proceduralmente: o Selo em _draw, as barras em StyleBoxFlat, os ícones de
+  elemento em ElementCarousel._icon, o botão de fogo e o retículo em código.
+  A ÚNICA porta de entrada de imagem já pronta é godot/menu/art/NN.png
+  (retratos do elenco — troca sozinho). Para as peças acima aparecerem no
+  jogo, a raia de código precisa ligar cada caminho. Gerar a arte e ligar a
+  arte são duas tarefas: esta pasta entrega a primeira.
+
+  As pastas godot/ui/art/ e godot/menu/art/ui/ NÃO existem ainda — crie ao
+  soltar o primeiro PNG.
+
+
+========================================================================
+4) ORDEM DE GERAÇÃO RECOMENDADA
+========================================================================
+
+ONDA 1 — a identidade (nada abaixo funciona sem ela)
+  1. Selo de Arkana colorido ......... 05-logo-e-marca.txt, prompt L1
+  2. Wordmark ARKANA ................. 05, prompt L4
+  3. Ícone do app Android ............ 05, prompt L6
+  4. Key art do menu ................. 01-menu-e-fundo.txt, prompt M1
+  Motivo: o Selo é o átomo da marca (GDD §10 — uma marca, três usos: logo,
+  medidor de Sintonia no HUD, ícone da loja). Gere-o PRIMEIRO e use a
+  imagem aprovada como referência de estilo do Firefly nas ondas seguintes.
+
+ONDA 2 — o que o jogador toca a cada segundo
+  5. Os 5 ícones de elemento ......... 03-hud.txt, prompts H1–H5
+  6. Botão de fogo e de esquiva ...... 03, prompts H6–H7
+  7. Retículo ........................ 03, prompt H8
+  8. Molduras de barra vida/mana ..... 03, prompts H9–H10
+
+ONDA 3 — a vitrine
+  9. Moldura do card e do retrato .... 04-molduras-e-cards.txt, C1–C2
+ 10. Os 5 badges de classe ........... 04, prompts C3–C7
+ 11. Fundos de carregamento e elenco . 01, prompts M2–M3
+
+ONDA 4 — profundidade (a mais cara, 30 imagens)
+ 12. Os 30 ícones de habilidade do elenco de lançamento .. 02
+     Ordem interna: gere os 3 ícones do MESMO mago na mesma sessão do
+     Firefly — a coerência entre passiva/tática/suprema de um personagem
+     importa mais do que entre personagens diferentes.
+
+ONDA 5 — temporada (não gere agora)
+ 13. Os 30 ícones dos magos 11–20 ..... 02, seção "TEMPORADAS"
+     Ficam listados e prontos; os kits 11–20 ainda são PROPOSTA DA EQUIPE
+     até o Diretor aprovar (personagens/00-LEIA.md). Gerar antes da
+     aprovação é queimar crédito de imagem em kit que pode mudar.
+
+
+========================================================================
+5) O QUE É BLOQUEANTE PARA O PRÓXIMO APK
+========================================================================
+
+BLOQUEANTE DE VERDADE (muda o APK sozinho, sem código novo):
+  - Ícone do app Android (05, prompts L6 e L7). Hoje godot/project.godot
+    NÃO tem icon nem boot_splash configurados: o APK sai com o boneco
+    padrão do Godot. É a primeira coisa que o testador vê.
+  - Imagem de boot splash (01, prompt M2). Mesma linha do project.godot.
+
+NÃO BLOQUEANTE (precisa de código para aparecer):
+  - Tudo do 02, 03 e 04. Por mais bonito que fique, sem a raia de código
+    ligar os caminhos da tabela da seção 3 nada disso entra em tela.
+
+RECOMENDAÇÃO: mande a ONDA 1 inteira para o Firefly antes do próximo APK;
+ela resolve o bloqueante e ainda deixa o Selo aprovado servindo de
+referência de estilo para todo o resto.
+
+
+========================================================================
+6) COMO USAR ESTES PROMPTS NO FIREFLY
+========================================================================
+
+  - Cole o prompt INTEIRO, incluindo os blocos de estilo. Não resuma.
+  - Modelo: Firefly Image (o mais recente). Intensidade de estilo média.
+  - Para ícones, marque o tipo de conteúdo como "Arte", não "Foto".
+  - Depois do primeiro resultado aprovado de uma família (ex.: o primeiro
+    ícone de habilidade), use-o como REFERÊNCIA DE ESTRUTURA/ESTILO nas
+    gerações seguintes da mesma família. É isso que segura a coerência.
+  - Gere 4 variações, escolha por SILHUETA: reduza a miniatura a 48px na
+    tela e veja se ainda dá para dizer o que é. Se não der, o ícone falhou,
+    por mais bonito que esteja em tamanho grande.
+  - Firefly às vezes insiste em colocar texto. Se aparecer letra, regere
+    reforçando "sem nenhum texto ou letra na imagem".

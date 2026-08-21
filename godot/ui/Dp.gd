@@ -1,6 +1,6 @@
 ## dp -> px de CANVAS. Numero que o dedo sente vive em dp (regra do projeto):
 ## fisico = dp * dpi/160; com stretch canvas_items o toque chega em px de
-## canvas, entao converte pela razao base/janela.
+## canvas, entao converte pela razao canvas-real/janela (ver Safe.canvas()).
 class_name Dp
 
 
@@ -11,6 +11,7 @@ static func px(dp: float) -> float:
 	var v := dp * float(dpi) / 160.0
 	var win := DisplayServer.window_get_size().x
 	if win > 0:
-		var base := float(ProjectSettings.get_setting("display/window/size/viewport_width", 1280))
-		v *= base / float(win)
+		# Canvas REAL, nunca a base do project.godot: com aspect="expand" os
+		# dois divergem ate' 25% (achado da raia UI, R20 — ver Safe.canvas()).
+		v *= Safe.canvas().x / float(win)
 	return v

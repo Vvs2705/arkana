@@ -7,6 +7,7 @@ config/name="Arkana"
 ; A porta de entrada e' o MENU (R18) — a partida e' carregada pelo botao JOGAR.
 run/main_scene="res://menu/Menu.tscn"
 config/features=PackedStringArray("4.4", "Mobile")
+config/icon="res://menu/art/01.png"
 
 [autoload]
 Balance="*res://core/Balance.gd"
@@ -14,7 +15,16 @@ Bus="*res://core/Bus.gd"
 Sfx="*res://audio/Sfx.gd"
 
 [display]
-window/size/viewport_width=1280
+; BASE 20:9 (nao 16:9) — mudanca da R19.2, raia UI, medida no aparelho.
+; Com stretch aspect="expand" o Godot NAO estica o canvas: ele o AUMENTA no eixo
+; que sobra. Medido no 4.4.1 com base 1280x720 numa janela 20:9, o canvas real
+; sai 1600x720. So' que Safe.gd e Dp.gd convertem px fisico -> px de canvas
+; dividindo pela base DESTE arquivo (1280), entao toda margem horizontal sai
+; ~20% menor que o devido — justo o eixo onde mora o notch em paisagem.
+; Com a base em 1600x720 o canvas de um 20:9 bate exato (erro 0) e o pior caso
+; da faixa 19.5:9-21:9 cai para ~5%. Nada mais no projeto le' estes numeros
+; alem de Safe.gd/Dp.gd (conferido por grep); a UI e' toda ancorada.
+window/size/viewport_width=1600
 window/size/viewport_height=720
 window/handheld/orientation=4
 window/stretch/mode="canvas_items"
@@ -30,4 +40,22 @@ renderer/rendering_method="mobile"
 ; build_apk.sh falha cedo apontando para ca' se alguem a remover.
 textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method.mobile="mobile"
+; VALOR INICIAL, antes do primeiro Config.aplicar(): as Configuracoes mandam
+; nele em runtime (preset de Qualidade). Ajustar aqui so' muda o primeiro frame.
 anti_aliasing/quality/msaa_3d=1
+
+; --- pedidos da raia MUNDO (R20), aplicados pelo COORDENADOR ---
+; Fixa o atlas de sombra do mobile: hoje e' o default, mas se alguem subir o
+; valor de desktop o mobile vai junto sem querer.
+lights_and_shadows/directional_shadow/size.mobile=2048
+; PCF 1 (4 taps): sombra dura de 1 split em 2048 escadinha na borda. Se pesar
+; no aparelho, voltar a 0 — e' o primeiro botao a mexer.
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile=1
+; O mundo tem ZERO luz posicional com sombra: o atlas default e' VRAM parada.
+lights_and_shadows/positional_shadow/atlas_size.mobile=512
+
+; --- ESCALA DE RENDER: NAO MEXER AQUI ---
+; A alavanca de emergencia de fps virou o preset "Baixa" das Configuracoes
+; (menu/Config.gd -> QUALIDADE), aplicado em RUNTIME via Viewport.scaling_3d_scale.
+; Ligar aqui seria sobrescrito no primeiro Config.aplicar() do boot.
+; Para mudar a escala, mexa em Config.QUALIDADE.

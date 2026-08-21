@@ -1,0 +1,293 @@
+========================================================================
+05 — LOGO E MARCA · O SELO DE ARKANA
+L1 Selo colorido · L2 Selo monocromático · L3 Selo marca d'água ·
+L4 wordmark ARKANA · L5 lockup vertical (Selo + wordmark) ·
+L6 ícone do app Android (loja) · L7 ícone adaptativo (frente) ·
+L8 selo do estúdio
+Fonte: GDD §10 (Selo de Arkana, tipografia, paleta) e §11 (boot/splash)
+========================================================================
+
+O QUE O GDD §10 DEFINE (é lei, não sugestão):
+  Símbolo ....... um PENTÁGONO RÚNICO com 5 GEMAS ELEMENTAIS nas pontas
+                  (Fogo, Água, Terra, Vento, Raio) e o "A" de Arkana
+                  gravado no CENTRO.
+  Sacada ........ o MESMO selo é o medidor de Sintonia no HUD e o ícone da
+                  loja. Uma marca, três usos.
+  Wordmark ...... ARKANA em caixa alta, com o traço do "K" estilizado como
+                  um relâmpago sutil.
+  Tipografia .... Cinzel (ou Cinzel Decorative) para logo e títulos,
+                  Chakra Petch para UI/HUD/números, Inter para texto
+                  corrido. Todas Google Fonts, licença OFL.
+  Paleta ........ azul-noite #0B1026 e #05070F, dourado arcano #F0C75E,
+                  gemas em Fogo #FF5A2A · Água #2AA7FF · Terra #A8763E ·
+                  Vento #8FE8C9 · Raio #F5D90A.
+
+AVISO SOBRE TEXTO NO FIREFLY: gerador de imagem NÃO desenha letra
+confiável. Não peça a palavra ARKANA ao Firefly nem a letra "A" do Selo —
+sai torto, sai com serifa errada, sai com letra a mais. O fluxo correto:
+
+  1. Firefly desenha o SÍMBOLO SEM LETRA NENHUMA (os prompts abaixo já
+     pedem o centro vazio).
+  2. O "A" central e o wordmark ARKANA entram por cima no Adobe Express /
+     Illustrator, com CINZEL de verdade, baixada do Google Fonts.
+  3. Só então se achata e exporta o PNG.
+
+Isso vale para L1, L2, L3, L5, L6, L7 e L8. O L4 é uma peça tipográfica
+pura — não passa pelo Firefly.
+
+
+------------------------------------------------------------------------
+[ESTILO ARKANA] — cole em todos os prompts deste arquivo
+------------------------------------------------------------------------
+Estilo: pintura digital de fantasia estilizada, contornos limpos,
+sombreamento em bandas (cel-shading suave), e a luz mágica saindo de DENTRO
+do objeto (emissiva), nunca aplicada por cima. Materiais: bronze gasto,
+ferro escurecido, pedra rúnica, gema de vidro arcano. Paleta base:
+azul-noite arcano #0B1026 e fundo profundo #05070F, com dourado arcano
+#F0C75E na marca. Cores elementais oficiais: Fogo #FF5A2A · Água #2AA7FF ·
+Terra #A8763E · Vento #8FE8C9 · Raio #F5D90A. Iluminação: chave quente
+dourada de cima à esquerda, contraluz fria azul-noite.
+NÃO deve aparecer: fotografia ou fotorrealismo; render 3D plástico e
+brilhante; pixel art; anime chibi; arte vetorial plana de app corporativo;
+gradientes de interface web; sangue ou gore; nenhum TEXTO, letra, número,
+marca d'água ou assinatura dentro da imagem.
+------------------------------------------------------------------------
+
+
+########################################################################
+L1 · SELO DE ARKANA — VERSÃO COLORIDA (a mestra)
+Proporção 1:1 · exportar 1024x1024 · COM transparência
+Destino: godot/menu/art/ui/selo.png
+GERE ESTA PRIMEIRO. É a peça de referência de estilo de todo o pacote.
+########################################################################
+
+Emblema circular de marca para um jogo de fantasia arcana, visto de frente,
+perfeitamente simétrico, centralizado.
+
+PEÇA: um PENTÁGONO de traço grosso, ponta para cima, forjado em dourado
+arcano com a superfície levemente martelada e desgastada, como metal antigo
+polido pelo uso. Em cada uma das cinco pontas do pentágono há uma GEMA
+FACETADA EM FORMA DE LOSANGO, engastada em garras de bronze, cada gema de
+uma cor e cada uma acesa por dentro:
+  - ponta de cima ............ gema de FOGO, laranja #FF5A2A
+  - ponta superior direita ... gema de ÁGUA, azul #2AA7FF
+  - ponta inferior direita ... gema de TERRA, âmbar #A8763E
+  - ponta inferior esquerda .. gema de VENTO, verde-menta #8FE8C9
+  - ponta superior esquerda .. gema de RAIO, amarelo #F5D90A
+Em volta do pentágono, um ANEL FINO de dourado envelhecido, concêntrico e
+completo, um pouco afastado das pontas — como a borda de uma moeda.
+O CENTRO DO PENTÁGONO ESTÁ VAZIO: um campo liso e escuro de azul-noite,
+sem nada gravado. Deixe esse espaço limpo e generoso.
+
+REQUISITOS:
+- Simetria perfeita: pentágono regular, ponta exatamente para cima, gemas
+  em posições exatas.
+- O emblema ocupa 85% do quadro; 15% de margem vazia em volta.
+- Traço do pentágono grosso e constante — a marca precisa sobreviver a
+  64px.
+- As gemas emitem luz para dentro do metal ao redor delas, sutilmente.
+- Contorno externo azul-noite #05070F.
+PALETA: dourado arcano #F0C75E no pentágono e no anel, bronze envelhecido
+#8A7336 nos engastes, azul-noite #0B1026 no campo central vazio, e as cinco
+cores elementais oficiais nas gemas.
+NÃO: nenhuma letra, nenhum símbolo, nenhum monograma no centro (o "A" entra
+por cima depois, em Cinzel); sem estrela de cinco pontas vazada dentro do
+pentágono; sem pentagrama invertido; sem símbolo oculto do mundo real; sem
+fita, sem coroa, sem asas, sem espadas cruzadas; sem fundo, sem sombra
+projetada; sem brilho de lente ou raio de luz atravessando.
++ [ESTILO ARKANA]
+
+PÓS-PRODUÇÃO OBRIGATÓRIA: coloque o "A" no campo central usando CINZEL
+(Google Fonts, OFL), em dourado #F0C75E, tamanho tal que ocupe cerca de 45%
+da largura interna do pentágono.
+
+
+########################################################################
+L2 · SELO MONOCROMÁTICO DOURADO
+Proporção 1:1 · exportar 1024x1024 · COM transparência
+Destino: godot/menu/art/ui/selo-mono.png
+########################################################################
+
+Use o prompt L1 INTEIRO, trocando o parágrafo das gemas por:
+
+  As cinco gemas das pontas são do MESMO material do pentágono — dourado
+  arcano facetado, sem cor própria e sem luz interna. A marca inteira é
+  monocromática, feita de um só metal, diferenciada apenas por relevo,
+  chanfro e sombra.
+
+E trocando a PALETA por:
+  Exclusivamente dourado arcano #F0C75E, bronze envelhecido #8A7336 nas
+  sombras e azul-noite #05070F no contorno. NENHUMA outra cor na imagem.
+
+PARA QUE SERVE: fundo claro, impressão, sobreposição em vídeo, tela de
+créditos, qualquer lugar onde as cinco cores brigariam com a arte de baixo.
+Toda marca precisa de uma versão de um só tom — sem ela, alguém vai
+esticar a colorida onde ela não cabe.
+
+
+########################################################################
+L3 · SELO MARCA D'ÁGUA
+Proporção 1:1 · exportar 1024x1024 · COM transparência
+Destino: godot/menu/art/ui/selo-agua.png
+########################################################################
+
+Use o prompt L2 (monocromático), acrescentando:
+
+  Versão em CONTORNO APENAS: o pentágono, o anel e as gemas são desenhados
+  só por linha, sem preenchimento, sem relevo, sem sombreamento. Traço de
+  espessura uniforme, fino. O interior de cada forma é completamente vazio.
+
+PALETA: linha em dourado #F0C75E puro sobre nada. Sem contorno escuro
+externo nesta versão.
+
+PARA QUE SERVE: marca d'água sobre a key art, gravação nas capturas de tela
+compartilhadas, fundo de tela de carregamento. O código aplica a opacidade
+(15% a 25%) — não escureça a arte no arquivo, entregue o traço cheio.
+
+
+########################################################################
+L4 · WORDMARK ARKANA — NÃO PASSA PELO FIREFLY
+Exportar 1600x420 · COM transparência
+Destino: godot/menu/art/ui/wordmark.png
+########################################################################
+
+Isto se faz no Adobe Express, no Illustrator ou no Photoshop. Gerador de
+imagem não desenha letra confiável e um wordmark torto queima a marca
+inteira.
+
+RECEITA (GDD §10):
+  1. Fonte: CINZEL (Google Fonts, OFL — livre para uso comercial). Se
+     quiser mais ornamento no título, Cinzel Decorative; para o wordmark
+     do jogo, prefira a Cinzel normal, peso Bold ou Black.
+  2. Texto: ARKANA, tudo em CAIXA ALTA.
+  3. Espacejamento entre letras generoso: cerca de 8% a 12% do tamanho da
+     fonte. O menu atual já usa letras bem separadas — mantenha essa
+     largura para a marca continuar reconhecível.
+  4. Cor das letras: dourado arcano #F0C75E.
+  5. O "K": substitua a perna diagonal inferior do K por um traço de
+     RELÂMPAGO — dois segmentos com uma quebra em ângulo no meio, mesma
+     espessura da haste original. Sutil: quem não olhar de perto lê um K
+     normal. Pinte SÓ esse traço em amarelo de raio #F5D90A.
+  6. Contorno: 2 a 3% do corpo da letra em azul-noite #05070F por fora, e
+     uma sombra dura deslocada 4% para baixo na mesma cor. É isso que faz
+     o wordmark sobreviver sobre a key art.
+  7. Exportar PNG com alfa, 1600x420, com 5% de margem vazia em volta.
+
+VARIANTE L4b: a mesma palavra em BRANCO #F5F2E8 com o K em #F5D90A, para
+usar sobre fundo dourado ou claro. Salvar como wordmark-claro.png.
+
+
+########################################################################
+L5 · LOCKUP VERTICAL (Selo + wordmark) — a marca completa
+Exportar 1024x1400 · COM transparência
+Destino: godot/menu/art/ui/lockup.png
+########################################################################
+
+Não se gera: MONTA-SE, a partir de L1 e L4, no Express/Illustrator.
+
+RECEITA DE MONTAGEM:
+  - Selo colorido (L1) em cima, centralizado.
+  - Wordmark (L4) embaixo, centralizado no MESMO eixo vertical.
+  - Espaço entre os dois: exatamente a altura de uma letra do wordmark.
+  - Largura do wordmark: igual à largura do anel externo do Selo, nem mais
+    nem menos. É esse alinhamento que faz um lockup parecer profissional.
+  - Opcional, embaixo do wordmark: a linha "MAGOS BATTLE ROYALE" em CHAKRA
+    PETCH, caixa alta, espacejada, em cinza claro #9A97AD, com 22% da
+    altura do wordmark.
+
+ONDE ISSO É USADO: tela de título, material de loja, capa do vídeo, tela de
+carregamento. Congele este arquivo e reutilize — marca que muda de
+proporção a cada uso deixa de ser marca.
+
+
+########################################################################
+L6 · ÍCONE DO APP ANDROID — VERSÃO DE LOJA
+Proporção 1:1 · exportar 512x512 · SEM transparência (Android exige opaco)
+Destino: godot/export/icone-loja.png
+>>> ESTE É UM DOS DOIS BLOQUEANTES DO PRÓXIMO APK <<<
+########################################################################
+
+Hoje godot/project.godot não tem ícone configurado: o APK sai com o boneco
+padrão do Godot. Este arquivo resolve isso.
+
+Ícone de aplicativo mobile, quadrado, visto de frente, sem transparência.
+
+PEÇA: o mesmo Selo de Arkana do L1 — pentágono dourado com as cinco gemas
+elementais nas pontas e o centro vazio — mas SIMPLIFICADO PARA TAMANHO
+PEQUENO: traço mais grosso, anel externo removido, engastes de bronze
+reduzidos a uma linha, gemas maiores e mais chapadas. O emblema fica sobre
+um FUNDO QUADRADO CHEIO de azul-noite profundo, com um halo radial dourado
+muito suave saindo de trás do pentágono.
+
+REQUISITOS:
+- Fundo quadrado, opaco, preenchendo a imagem inteira de borda a borda.
+- O emblema ocupa cerca de 66% da largura, centralizado, com margem
+  generosa: o Android recorta o ícone em círculo, em squircle e em gota
+  dependendo do aparelho, e o que estiver perto da borda some.
+- Sem detalhe fino: este ícone vai ser visto a 48dp na gaveta de apps.
+- Alto contraste entre o dourado do emblema e o azul-noite do fundo.
+- Nenhum texto: o nome do app aparece embaixo do ícone, escrito pelo
+  sistema.
+PALETA: fundo azul-noite #0B1026 escurecendo para #05070F nas bordas,
+emblema em dourado #F0C75E, gemas nas cinco cores elementais oficiais.
+NÃO: nenhuma letra, nenhum monograma, nenhum wordmark; sem borda
+arredondada desenhada (o sistema aplica a máscara); sem sombra externa; sem
+moldura; sem brilho de lente; sem personagem; sem cenário; sem pentagrama
+invertido.
++ [ESTILO ARKANA]
+
+PÓS-PRODUÇÃO: o "A" central em Cinzel dourado é OPCIONAL aqui. A 48dp uma
+letra vira borrão. Teste as duas versões reduzidas a 48px e escolha a que
+ainda se lê.
+
+
+########################################################################
+L7 · ÍCONE ADAPTATIVO ANDROID — CAMADA DA FRENTE
+Proporção 1:1 · exportar 432x432 · COM transparência
+Destino: godot/export/icone-adaptativo.png
+########################################################################
+
+O Android moderno usa ícone em duas camadas: fundo e frente. A frente
+precisa ser transparente e caber numa "zona segura" central.
+
+Use o prompt L6, com estas trocas:
+  - SEM fundo quadrado e SEM halo: apenas o emblema, isolado, com o resto
+    do quadro completamente vazio/transparente.
+  - O emblema ocupa apenas 50% da largura do quadro, centralizado. Os 25%
+    de cada lado são margem morta — o sistema Android corta e anima essa
+    área, e o que estiver lá vai ser cortado.
+
+A camada de FUNDO não se gera: é uma cor chapada. Use azul-noite #0B1026
+sólido, 432x432, criado no editor de imagem.
+
+
+########################################################################
+L8 · SELO DO ESTÚDIO (splash de 2s no boot — GDD §11)
+Proporção 1:1 · exportar 1024x1024 · COM transparência
+Destino: godot/menu/art/ui/selo-estudio.png
+########################################################################
+
+O GDD §11 abre o jogo com 2 segundos de splash do estúdio sobre fundo
+preto, antes de qualquer coisa. Esta é a peça.
+
+PEÇA: um emblema de estúdio simples e discreto, DIFERENTE do Selo de
+Arkana — não é a marca do jogo, é a marca de quem fez o jogo. Um monograma
+abstrato geométrico dentro de um círculo de traço fino: duas formas
+angulares que se encaixam, como duas peças de uma mesma pedra partida,
+gravadas em dourado envelhecido sobre nada.
+
+REQUISITOS:
+- Muito mais sóbrio que o Selo de Arkana: sem gemas, sem cor elemental,
+  sem brilho.
+- Um só tom, traço fino, muito espaço vazio em volta (o emblema ocupa 55%
+  do quadro).
+- Precisa funcionar sobre fundo preto puro.
+PALETA: dourado envelhecido #8A7336 no traço, sem mais nenhuma cor.
+NÃO: nenhuma letra, nenhuma sigla, nenhum texto (o nome do estúdio entra
+por cima em Cinzel, na pós-produção); sem pentágono (é a marca do jogo, não
+a do estúdio); sem gemas; sem cor; sem fundo; sem sombra.
++ [ESTILO ARKANA]
+
+PÓS-PRODUÇÃO: escreva o nome do estúdio abaixo do emblema em CINZEL, caixa
+alta, espacejada, em #8A7336, com altura de letra igual a 12% do diâmetro
+do círculo.

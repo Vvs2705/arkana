@@ -13,6 +13,32 @@ Armadura leve chamuscada sobre túnica de guerra azul-noite; a manopla de bronze
 ## Personalidade & história curta
 Fala como quem dá ordem, protege como quem já perdeu gente. Não considera o braço uma perda: "eu troquei um braço por quarenta soldados — foi barato." O que ela não perdoa é fogo desperdiçado.
 
+## História
+
+**Bio de tela**
+> O portão de Vharen estava cedendo e quarenta soldados ainda estavam do lado errado
+> do fogo. Pyra segurou o portão aberto com o braço esquerdo até o último passar — e
+> depois não tinha mais braço esquerdo. O incêndio não foi embora com a noite: mora
+> hoje numa manopla de bronze, respirando devagar quando ela está calma. Ela não
+> chama isso de perda. Chama de conta paga.
+
+**Fundo**
+Sargento de linha de frente antes de ser maga de linha de frente, Pyra subiu na
+legião do jeito mais lento que existe: sobrevivendo. O incêndio de Vharen foi o
+único combate que ela perdeu e o único que ela conta. O fogo que a devorou naquela
+noite não a matou porque não quis — grudou nela, virou parte dela, e ficou. O anão
+Brok foi o único ferreiro que aceitou forjar a manopla que contém o braço de chama
+viva: "uma prisão para fogo que ainda é gente", resmungou, e martelou por nove dias.
+
+O que Pyra quer é simples e impossível: nunca mais chegar tarde. O que ela teme é o
+avesso disso — que um dia o braço não obedeça e ela vire o próprio incêndio de
+Vharen para outra gente. Por isso não perdoa fogo desperdiçado: cada chama que ela
+acende tem alvo, hora e motivo. A dríade Sylva sente o cheiro de fornalha antes de
+ver quem chega e trava por um instante — Pyra percebeu, e é a única inimiga que ela
+contorna quando pode.
+
+**Assinatura:** *"Eu não apago. Eu escolho o que queima."*
+
 ## Kit
 - **Passiva — Coração de Fornalha:** fogo no chão (inclusive o dela) não a machuca e reacende o braço: +10% de velocidade por 2s ao atravessar chamas.
 - **Tática — Muralha de Brasas:** risca uma linha de fogo baixo de 8m que dura 5s: bloqueia a visão rasante e quem atravessa leva dano moderado e sai "aceso" (rastro visível por 2s).
@@ -43,4 +69,4 @@ Silhueta militar assimétrica — a manopla esquerda é 2x o volume do braço di
 - [ ] extras (adereços, VFX de assinatura)
 
 ## Status no jogo
-- [x] arte recebida · [ ] modelo 3D · [ ] rig/animações · [ ] kit implementado
+- [x] arte recebida · [x] proxy 3D técnico (`godot/characters/modelos/pyra.glb`) · [ ] modelo 3D final · [ ] rig/animações finais · [ ] kit implementado

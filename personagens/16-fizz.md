@@ -12,6 +12,35 @@ Colete de couro cheio de bolsos numerados (fora de ordem); mochila-oficina com b
 ## Personalidade & história curta
 Fala rápido demais, termina as frases dos outros, pede desculpa explodindo outra coisa. Genial e imprudente na mesma medida.
 
+## História
+
+**Bio de tela**
+> Fizz inventa mais rápido do que documenta, o que é a maneira educada de dizer que
+> ele explode coisas com frequência preocupante. Tem noventa e cinco centímetros, uma
+> mochila-oficina maior que o próprio tronco e molas nos calcanhares porque cair de
+> lugares altos era o último problema que faltava resolver. Pede desculpa explodindo
+> outra coisa. A lente de cima dos óculos está sempre virada, e ele jura que é de
+> propósito.
+
+**Fundo**
+Gnomo de bancada, criado entre engrenagens e reprimendas, cedo aprendeu que ninguém
+o interrompe enquanto ele está falando muito rápido — e nunca mais desacelerou. Os
+bolsos do colete são numerados fora de ordem por um motivo que ele explica com
+entusiasmo e que ninguém consegue acompanhar até o fim. O braço mecânico da mochila
+entrega ferramentas antes de ele pedir, porque ele mesmo o ensinou a prever o que
+vem depois de um estalo.
+
+Pegou emprestado o caderno do Vex uma vez e o devolveu com cinco páginas a mais e uma
+queimada; o alquimista leu tudo, admitiu que três páginas estavam certas, e nunca
+mais o deixou sozinho numa bancada. Implora a Tessa pelo desenho do marca-passo
+rúnico desde o primeiro dia e nunca vai conseguir. Brok o considera insuportável e
+jamais conseguiu odiá-lo — os dois brigam sobre martelo contra parafuso há anos e
+ainda não fizeram as pazes nem pararam de conversar. O que Fizz teme, embaixo de todo
+o barulho, é machucar alguém do lado certo: por isso as torretas dele batem fraco de
+propósito, e ele nunca admitiu isso em voz alta.
+
+**Assinatura:** *"Funciona! ...funcionou. Anoto depois."*
+
 ## Kit (proposta)
 - **Passiva — Mola nos Calcanhares:** o pulo é 50% mais alto e quedas não o machucam (molas).
 - **Tática — Torreta Faísca:** implanta uma mini-torreta arcana (40 de vida) que atira faíscas fracas em quem entrar no cone; máx. 2 ativas.

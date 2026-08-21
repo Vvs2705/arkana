@@ -1,0 +1,78 @@
+ARKANA — BANCO DE FALAS DOS 20 MAGOS (roteiro de voz para ElevenLabs)
+=====================================================================
+Atualizado: 21/08/2026 · Raia: NARRATIVA E DIREÇÃO DE VOZ
+Fonte da verdade dos personagens: personagens/NN-slug.md (NAO editar por aqui)
+
+O QUE E ESTA PASTA
+------------------
+Um arquivo .txt por personagem (01-pyra.txt ... 20-pip.txt) com TODAS as falas
+prontas para colar no ElevenLabs, no modelo Apex Legends: intro, queda, tatica,
+suprema, abate, ser derrubado, reviver, vitoria, bordoes e alfinetadas entre os
+personagens.
+
+Cada arquivo tem:
+  1) CABECALHO DE VOZ — idade, timbre, ritmo, emocao-base, registro e o que NAO
+     fazer. Use isso para escolher/ajustar a voz na biblioteca do ElevenLabs.
+  2) AJUSTE SUGERIDO — valores de partida para Stability / Similarity / Style.
+  3) FALAS — agrupadas por categoria, uma por linha, numeradas, cada uma com o
+     ID de arquivo do audio ja definido.
+
+COMO GERAR (fluxo do Diretor)
+-----------------------------
+1. Abra o .txt do personagem e leia o CABECALHO DE VOZ inteiro antes de gerar.
+2. Escolha a voz no ElevenLabs que bate com o cabecalho (idade + timbre + peso).
+   Guarde o Voice ID na linha "VOZ ESCOLHIDA:" do proprio .txt — assim a proxima
+   leva de falas sai com a MESMA voz. Personagem com voz trocada no meio do
+   caminho e personagem perdido.
+3. Aplique os valores de AJUSTE SUGERIDO. Depois refine no ouvido.
+4. Cole UMA fala por geracao. Falas de combate sao curtas de proposito: gerar em
+   bloco faz o modelo "ler lista" e mata a entonacao.
+5. As notas entre colchetes — ex.: [rouca, contida] — sao DIRECAO, nao texto.
+   NAO cole os colchetes no campo de texto. Use-os para escolher o preset de
+   emocao / regravar ate bater. (Se estiver usando um modelo do ElevenLabs que
+   aceita audio tags, ai sim vale colar a tag equivalente em ingles.)
+6. Gere 2 ou 3 takes das falas de ABATE e SUPREMA. Sao as mais ouvidas do jogo;
+   take ruim ali estraga o personagem inteiro.
+
+ONDE SALVAR O AUDIO
+-------------------
+audio/vozes/gerados/NN-slug/<id>.wav
+
+Exemplo:
+  audio/vozes/gerados/01-pyra/pyra_abate_01.wav
+  audio/vozes/gerados/09-vex/vex_suprema_02.wav
+  audio/vozes/gerados/20-pip/pip_interacao_noctus.wav
+
+Regras do nome de arquivo (o ID ja vem pronto em cada linha do .txt):
+  - minusculo, sem acento, sem espaco, separado por underline
+  - slug do personagem primeiro: pyra_, ceifadora_, veu_, corvus_, corvomante_,
+    olhodeeter_, vitalis_, ilusionista_, vex_, tessa_, aelion_, umbra_, brok_,
+    gromm_, maris_, fizz_, sylva_, basalto_, noctus_, pip_
+  - categorias: intro, queda, tatica, suprema, abate, caido, reviver, revivido,
+    vitoria, bordao, interacao
+  - interacao leva o nome do alvo, nao numero: pyra_interacao_sylva
+
+FORMATO DO ARQUIVO DE AUDIO
+---------------------------
+WAV 48kHz mono para o jogo (o Godot importa direto). Se o ElevenLabs entregar
+MP3, converta antes de commitar — MP3 em loop de combate acumula latencia de
+decode. Guarde o MP3 original em gerados/NN-slug/_raw/ se quiser refazer.
+
+VOLUME: normalize tudo para o mesmo pico. A Ceifadora sussurra e a Pyra grita —
+isso e DIRECAO, resolvido no mixer do jogo, nao no arquivo. Arquivo sai parelho.
+
+REGRAS QUE NAO SE NEGOCIAM (valem para toda fala nova)
+------------------------------------------------------
+- Classificacao 10+: sem palavrao, sem gore, sem crueldade. Ninguem comemora
+  morte. O Noctus drena ETER, nunca sangue. O Corvus REZA pelo abate.
+- Fala de combate e curta. Se nao cabe num grito, nao entra.
+- Sem clichê de RPG generico. Se voce trocar o nome no topo do arquivo e a fala
+  continuar funcionando, ela esta generica demais — reescreva.
+- Toda fala nasce da marca fisica do personagem: o braco de chama da Pyra, o
+  fole do Vex, o sino da Pip, o silencio do Olho-de-Eter. E ai que mora a voz.
+
+QUANDO PRECISAR DE FALA NOVA
+----------------------------
+Abra o .md do personagem em personagens/, releia aparencia + personalidade +
+limitadores, e escreva a partir dai. Depois cole no .txt correspondente
+mantendo a numeracao (proximo numero livre da categoria).

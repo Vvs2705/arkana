@@ -1,0 +1,90 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 03 — VEU, A ANDARILHA
+Funcao: Perseguicao / fuga · Slug de arquivo: veu_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher que soa com 19 anos — porque parou nos 19. Voz pequena, clara, um pouco
+fina, SEM doçura. Corpo de menina, cansaco de quem viveu sete anos de silencio.
+Ritmo: entrecortado. Ela comeca a frase, para meio segundo (as outras Veus
+estao falando), e termina. Essa micro-pausa NO MEIO da frase e a assinatura
+dela — marque no take, nao deixe o modelo alisar.
+Emocao-base: alerta seca. Humor sem sorriso — ela solta a piada e segue andando.
+Registro: pratico, de viajante. Frases de mochileira, nao de heroina.
+Efeito de pos: nas falas de tatica/suprema, uma copia da voz 1 frame atras com
+volume bem baixo (o mesmo "ghosting" do VFX dela). So nessas.
+NAO fazer: voz de fantasminha, sussurro etereo, tom de crianca fofa. Ela e
+concreta. O estranho nela e o TEMPO, nao o timbre.
+
+AJUSTE SUGERIDO
+Stability 60 · Similarity 80 · Style 30 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [veu_intro_01] [seca, pequena pausa no meio] Me chamaram de Veu quando eu voltei... o nome antigo ficou la.
+02 [veu_intro_02] [ajustando a fivela da luva] Sete anos do outro lado. Nao envelheci um dia — e isso nao e sorte.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [veu_queda_01] [alerta] Uma delas ja caiu aqui. Disse pra descer mais a esquerda.
+02 [veu_queda_02] [seca, quase humor] Chao novo. Que raridade.
+
+---------------------------------------------------------------
+3. TATICA — ATRAVESSAR
+---------------------------------------------------------------
+01 [veu_tatica_01] [curta, ja indo] Atravessando!
+02 [veu_tatica_02] [rapida] Parede fina! Passo por dentro!
+03 [veu_tatica_03] [avisando] Deixei eco. Ignora aquilo, sou eu de antes.
+
+---------------------------------------------------------------
+4. SUPREMA — MARE ESPECTRAL (telegrafada)
+---------------------------------------------------------------
+01 [veu_suprema_01] [voz aberta, o sino tocando por baixo] MARE! Todo mundo em seis metros, AGORA!
+02 [veu_suprema_02] [urgente] SINO TOCANDO! Eles sabem que a gente vem — corre!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [veu_abate_01] [seca] Caiu. As vozes ja tinham falado.
+02 [veu_abate_02] [curta] Voce piscou.
+03 [veu_abate_03] [sem comemorar] Esse aqui nao volta diferente. Sorte dele.
+04 [veu_abate_04] [humor seco] Devia ter olhado pro eco.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [veu_caido_01] [rapida, contrariada] Cai! A luva soltou!
+02 [veu_caido_02] [ofegante, encolhida] Elas avisaram... e eu fui mesmo assim.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [veu_reviver_01] [pratica, puxando] Levanta. O mundo nao espera, eu ja testei.
+02 [veu_reviver_02] [baixa] Fica desse lado comigo, ta?
+03 [veu_revivido_01] [voltando, seca] Boa. Eu ja tinha atravessado uma vez demais.
+04 [veu_revivido_02] [pequena, sincera] Valeu. Sério.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [veu_vitoria_01] [surpresa contida] As outras Veus perderam essa. So eu que ganhei.
+02 [veu_vitoria_02] [seca, quase sorriso] Cheguei inteira. Anotem, e raro.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [veu_bordao_01] [assinatura] Eu nao fujo. Eu chego antes.
+02 [veu_bordao_02] [apertando a fivela] Enquanto a luva segurar, eu sou daqui.
+03 [veu_bordao_03] [seca] Ja me perdi num lugar que nao tem lugar. Esse mapa e facil.
+04 [veu_bordao_04] [meio riso] Vocês tem uma vida. Eu tenho umas doze opinioes sobre a minha.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [veu_interacao_ceifadora] [seca, sem hostilidade] Voce ouve os que ficaram. Eu ouco as que nao foram. Nenhuma das duas dorme.
+02 [veu_interacao_ilusionista] [provocando] Voce saiu invertido do espelho. Eu sai atrasada do mundo. Bem-vindo ao clube.
+03 [veu_interacao_corvus] [levemente irritada] Para de me farejar, cacador. Metade de mim nem ta aqui.

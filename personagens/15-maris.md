@@ -12,6 +12,32 @@ Vestido-armadura de conchas polidas e seda d'água (tecido que ondula sozinho); 
 ## Personalidade & história curta
 Serena até o momento em que não é. Fala em maré: frases que sobem e quebram. Antiga sacerdotisa do lago do castelo voador — conhece cada gota do mapa.
 
+## História
+
+**Bio de tela**
+> Sacerdotisa do lago sob o castelo voador, Maris passou tempo demais abençoando uma
+> água que ninguém mais visitava. Quando o castelo começou a cruzar o céu despejando
+> magos sobre o mapa, ela subiu junto — e descobriu, com certa surpresa, que gosta de
+> brigar. Fala em maré: frases que sobem devagar e quebram de uma vez. Os pés dela
+> nunca tocam o chão de verdade; há sempre dois dedos d'água entre ela e o mundo.
+
+**Fundo**
+Nereida de linhagem cerimonial, foi treinada para uma função que o tempo esvaziou: o
+lago continuou lá, os fiéis não. A serenidade dela não é temperamento, é ofício — e o
+ofício rachou no dia em que ela percebeu que preferia a maré cheia à bênção. Conhece
+cada gota do mapa por dever antigo: sabe onde a água empoça depois da chuva, onde o
+lago é fundo, e onde uma inundação vira armadilha.
+
+Com Aelion, que guardou as Torres Arcanas na mesma era, troca exatamente uma
+reverência por partida: sobrou dos dois a mesma corte que já não existe, e nenhum dos
+dois quer falar sobre isso. Sylva a chama quando a mata seca, e Maris vai. Sabe
+perfeitamente que inundar um campo com Tessa viva do outro lado é entregar o próprio
+raio ao inimigo — e mesmo assim já fez, uma vez, e as duas ainda discutem de quem foi
+a culpa. O que Maris teme é o que a define: que a maré cheia, um dia, leve junto
+alguém que ela queria proteger.
+
+**Assinatura:** *"A maré não pede licença. Ela avisa."*
+
 ## Kit (proposta)
 - **Passiva — Maré Viva:** parada sobre água (lago, chuva do Gromm, poça), regenera 3 hp/s e a mana recarrega 25% mais rápido.
 - **Tática — Onda Prisão:** lança uma esfera lenta que, ao tocar, ergue uma coluna d'água que suspende o inimigo 1,2s (ele ainda conjura).

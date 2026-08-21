@@ -1,0 +1,92 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 11 — AELION, O ARCO DO CREPUSCULO
+Raca: Alto Elfo · Funcao: Longa distancia · Slug de arquivo: aelion_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem de idade indeterminavel (soa 35, tem seculos). Tenor cristalino, limpo,
+sem nenhuma aspereza. Voz que nao se cansa porque o corpo dele nao pesa.
+Ritmo: LENTO e cerimonial. Ele tem tempo. Toda a musica da frase e descendente
+— ele termina sempre um pouco mais baixo do que comecou, como uma reverencia.
+Emocao-base: desprezo educado. Nao e raiva: e a certeza tranquila de estar
+acima. Nunca insulta — o que ofende e a delicadeza.
+Registro: cerimonial de guardiao de templo. "Cavalheiro", "criatura", "senhora".
+Trata o disparo como DEVER, nunca como esporte. Ele nao caça, ele cumpre.
+DETALHE DE ATUACAO: nas falas de curta distancia (quando o inimigo chega perto)
+o verniz racha — a voz fica um tom mais alta e rapida. E o unico momento em que
+Aelion soa humano, e por isso vale ouro.
+NAO fazer: elfo de sotaque britanico caricato, voz sussurrada de misticismo.
+Ele e frio, articulado e alto o suficiente para ser ouvido de longe.
+
+AJUSTE SUGERIDO
+Stability 80 · Similarity 85 · Style 25 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [aelion_intro_01] [lento, descendente] Aelion, das Torres. Cada flecha minha e uma cerimonia.
+02 [aelion_intro_02] [frio, educado] Eu falo pouco. Erro menos ainda.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [aelion_queda_01] [sereno] Uma elevacao. Qualquer elevacao. E o resto se resolve.
+02 [aelion_queda_02] [cerimonial] O crepusculo comeca cedo hoje. Convem a mim.
+
+---------------------------------------------------------------
+3. TATICA — FLECHA DE ETER
+---------------------------------------------------------------
+01 [aelion_tatica_01] [calmo] Carregando. Fiquem a minha frente e eu atraveso voces tambem.
+02 [aelion_tatica_02] [seco] Solta.
+03 [aelion_tatica_03] [educado] A parede era fina. Que descuido dele.
+
+---------------------------------------------------------------
+4. SUPREMA — CHUVA DO CREPUSCULO (telegrafada)
+---------------------------------------------------------------
+01 [aelion_suprema_01] [projetado, cerimonial, alto] CHUVA DO CREPUSCULO! Tres segundos! Saiam da linha marcada!
+02 [aelion_suprema_02] [alto, solene] EU RISQUEI O CEU! Todo o mapa acabou de me ver — usem isso!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [aelion_abate_01] [sereno] Cumprido.
+02 [aelion_abate_02] [educado, cortante] Voce ficou parado. Eu apenas fui pontual.
+03 [aelion_abate_03] [descendente] Uma constelacao a menos no campo.
+04 [aelion_abate_04] [frio] Nao houve duelo. Houve distancia.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [aelion_caido_01] [o verniz racha — mais rapido e agudo] Chegaram perto! CHEGARAM PERTO DEMAIS!
+02 [aelion_caido_02] [voltando ao cerimonial, com dor] O arco caiu... eu nao caio junto. Venham.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [aelion_reviver_01] [calmo] Erga-se. Eu cubro a distancia; o chao e seu.
+02 [aelion_reviver_02] [cerimonial] Voce ainda tem um dever. Cumpra-o.
+03 [aelion_revivido_01] [medido, quase constrangido] Obrigado. Isso nao constava no meu plano.
+04 [aelion_revivido_02] [descendente] Eu registro a divida. Elfos registram tudo.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [aelion_vitoria_01] [sereno, alto] As Torres continuam guardadas. Por mim, como sempre foram.
+02 [aelion_vitoria_02] [educado, quase piada] Foi previsivel. Nao me orgulho do previsivel.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [aelion_bordao_01] [assinatura] Eu nao atiro. Eu concedo.
+02 [aelion_bordao_02] [frio] A pressa e um defeito de quem tem pouco tempo.
+03 [aelion_bordao_03] [descendente] O bordado da minha tunica tem constelacoes que voces nunca verao nascer.
+04 [aelion_bordao_04] [educado] Chegue perto, se quiser. E a unica ideia inteligente que voce tera hoje.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [aelion_interacao_umbra] [gelido, historia antiga] Prima do subterraneo. A corte te exilou; eu ainda nao decidi se concordo.
+02 [aelion_interacao_corvomante] [educado, afiado] Voce empresta um olho ao passaro, humano. Eu prefiro manter os dois e mirar melhor.
+03 [aelion_interacao_pip] [visivelmente irritado — raro] Aquele sino. Aquele sino outra vez. Alguem tire a fada do meu campo de tiro.

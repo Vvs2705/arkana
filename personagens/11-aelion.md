@@ -12,6 +12,35 @@ Túnica de gala élfica azul-crepúsculo com bordado de constelações em fio do
 ## Personalidade & história curta
 Arrogante e preciso: fala pouco, erra menos. Antigo guardião das Torres Arcanas — trata cada disparo como um dever cerimonial.
 
+## História
+
+**Bio de tela**
+> Guardião das Torres Arcanas por mais tempo do que dura uma linhagem humana, Aelion
+> tinha uma obrigação só: que nenhuma torre caísse na vigília dele. Uma caiu. Havia
+> uma vila embaixo, e havia uma menina que o mundo deu por perdida — e que não estava.
+> Ele não fala disso. Aliás, fala pouco de qualquer coisa: guarda as palavras como
+> guarda as flechas, e erra menos que ambas.
+
+**Fundo**
+Alto elfo de corte cerimonial, tratava cada disparo como rito antes mesmo de haver
+guerra para justificá-lo. A queda da torre não foi culpa dele por nenhum critério
+que um tribunal élfico aceitaria, e é exatamente por isso que ele nunca levou o caso
+a tribunal nenhum: a única sentença que lhe interessa é a própria. Desde então mede
+cada flecha como se fosse a última que lhe permitem, e acha ofensivo qualquer poder
+que trate o alcance como brincadeira.
+
+Descobriu, anos depois, que a menina da vila voltou — mais velha por sete anos de
+calendário e por nenhum dia de rosto. Nunca se aproximou dela. Reconheceu também, no
+ombro do golem Basalto, o fragmento de obelisco de uma torre antiga, gravado com a
+mesma mão que gravou as suas; não contou a ninguém, e passou a tratar a criatura de
+pedra com uma cortesia que ninguém entende. Considera o corvo espectral do
+Corvomante uma invasão de espaço cerimonial e diz isso em voz alta. Com Maris, que
+foi sacerdotisa do lago sob o castelo voador, troca exatamente uma reverência por
+partida — sobrou dos dois a mesma corte que já não existe. E ele e Umbra se recusam,
+com esmero, a pronunciar a raça um do outro.
+
+**Assinatura:** *"Uma flecha por dever. Nunca duas pelo mesmo alvo."*
+
 ## Kit (proposta)
 - **Passiva — Olhar do Crepúsculo:** acertos a mais de 40m marcam o alvo por 3s (só para Aelion — recompensa a distância sem virar wallhack de squad).
 - **Tática — Flecha de Éter:** projétil retilíneo MUITO rápido que atravessa 1 obstáculo fino; carrega até 1,5s para mais dano.

@@ -1,0 +1,94 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 16 — FIZZ, O ARTIFICE DE BOLSO
+Raca: Gnomo Inventor · Funcao: Longa distancia / Armadilhas · Slug de arquivo: fizz_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Gnomo adulto (idade irrelevante, energia de crianca com doutorado). Timbre
+AGUDO e nasalado de leve, com uma aspereza de fuligem — ele respira poeira de
+oficina o dia inteiro.
+Ritmo: RAPIDO DEMAIS. A marca dele: ele termina a frase dos outros e emenda na
+propria sem respirar. Na geracao, empurre a velocidade ate quase perder a
+dicção — mas nao perca. Cada fala deve caber num folego so.
+Emocao-base: entusiasmo perigoso. Ele acabou de explodir algo de proposito e
+esta empolgado com o resultado.
+Registro: tecnico atropelado. Ele cita numero de bolso, calibre, tensao — sempre
+errado, sempre com confianca total. Pede desculpa e explode outra coisa.
+DETALHE DE ATUACAO: quando ele pede desculpa, NAO desacelera. A desculpa e tao
+rapida quanto o resto — e por isso que ninguem acredita.
+NAO fazer: voz de desenho animado com pitch artificial. Se a voz base ja for
+aguda, NAO suba pitch no pos — vira chipmunk e perde a dicção. A energia vem do
+ritmo, nao do processamento.
+
+AJUSTE SUGERIDO
+Stability 30 · Similarity 75 · Style 70 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [fizz_intro_01] [rapidissimo, um folego] Fizz! Artifice, engenheiro, quimico e um pouco incendiario! Nessa ordem, mais ou menos!
+02 [fizz_intro_02] [rapido] Noventa e cinco centimetros de altura e uma mochila de dois metros de ideia!
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [fizz_queda_01] [atropelado, animado] Cai de qualquer altura! Molas! MOLAS, gente, eu inventei molas!
+02 [fizz_queda_02] [rapido] Me larga num telhado que eu transformo aquilo em problema alheio!
+
+---------------------------------------------------------------
+3. TATICA — TORRETA FAISCA
+---------------------------------------------------------------
+01 [fizz_tatica_01] [curto, rapido] Torreta! Sorria pra ela!
+02 [fizz_tatica_02] [atropelado] Duas ativas, so duas, eu queria seis, o Conselho disse nao!
+03 [fizz_tatica_03] [rapido, honesto] Cone fixo! Se flanquearem, ela nem percebe, coitada!
+
+---------------------------------------------------------------
+4. SUPREMA — MEGABOBINA (telegrafada)
+---------------------------------------------------------------
+01 [fizz_suprema_01] [grito agudo, apito de chaleira por baixo] MEGABOBINA! DOIS SEGUNDOS! ELA CANTA E DEPOIS ELA MORDE!
+02 [fizz_suprema_02] [rapido, alto] TA CARREGANDO! Protege a bobina! Se quebrarem eu choro, eu juro que choro!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [fizz_abate_01] [empolgado] FUNCIONOU! Funcionou de primeira, isso nunca acontece!
+02 [fizz_abate_02] [rapido] Voce entrou no cone. Todo mundo entra no cone!
+03 [fizz_abate_03] [atropelado] Anota ai: teste bem-sucedido, sujeito derrubado, mochila intacta!
+04 [fizz_abate_04] [rapido, sem maldade] Desculpa! Desculpa mesmo! Foi lindo, mas desculpa!
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [fizz_caido_01] [agudo, atropelado] CAI! CAI! Minha mochila! Alguem cuida da minha mochila!
+02 [fizz_caido_02] [rapido, mais fraco] Ta tudo bem, ta tudo bem, isso ja aconteceu... umas onze vezes.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [fizz_reviver_01] [rapidissimo] Deixa comigo deixa comigo deixa comigo, eu conserto qualquer coisa!
+02 [fizz_reviver_02] [rapido] Voce nao ta quebrado, ta so desmontado! Diferente!
+03 [fizz_revivido_01] [explodindo de energia] REMONTADO! Melhor que antes! Provavelmente!
+04 [fizz_revivido_02] [rapido, sincero] Voce ganhou um bolso na minha mochila. E honra maxima, viu.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [fizz_vitoria_01] [agudo, radiante] GANHAMOS E NADA EXPLODIU SEM AUTORIZACAO! Dia perfeito!
+02 [fizz_vitoria_02] [rapido] Ja tenho tres ideias pra proxima e duas sao ilegais!
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [fizz_bordao_01] [assinatura, rapidissimo] Se cabe no bolso, cabe na luta! E tudo cabe no bolso!
+02 [fizz_bordao_02] [atropelado] Meus bolsos sao numerados! Fora de ordem! De proposito! Segredo de seguranca!
+03 [fizz_bordao_03] [rapido] A lente de cima ta virada porque eu gosto do mundo meio torto!
+04 [fizz_bordao_04] [empolgado] Nunca explodi nada por acidente. Por curiosidade, umas quarenta vezes.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [fizz_interacao_brok] [rapido, adorando o desaforo] Anao! A sua parede e linda e pesa uma tonelada! A minha voa! VOA, Brok!
+02 [fizz_interacao_tessa] [empolgacao total] TESSA! Voce tece o raio e eu ENGARRAFO o raio! Junta as duas coisas e a gente e preso!
+03 [fizz_interacao_pip] [atropelado, meio nervoso] Pip, sai de cima da bobina. Pip. PIP. Ela morde, e voce e pequena que nem eu!

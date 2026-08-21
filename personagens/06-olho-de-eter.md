@@ -13,6 +13,34 @@ Torso ornamentado de gala, colares de sinos minúsculos que ele NÃO ouve — se
 ## Personalidade & história curta
 Expressivo com o corpo inteiro (fala por sinais, postura e um sorriso que desarma); lê lábios com precisão de oráculo. Cresceu em um templo que o tratou como amaldiçoado até as mariposas chegarem. Hoje não trocaria o silêncio por nada: "vocês escutam barulho. Eu escuto verdade."
 
+## História
+
+**Bio de tela**
+> A febre da infância levou o som dele e abriu um olho no peito. O templo o tratou
+> como amaldiçoado por anos — até a noite em que as mariposas-de-éter chegaram e não
+> foram mais embora. Elas sentem a vibração do ar, do chão e da magia e devolvem tudo
+> em luz: os ouvidos dele têm asas. Olho-de-Éter nunca escutou uma palavra na vida, e
+> ainda assim é sempre o primeiro a saber que você conjurou.
+
+**Fundo**
+Cresceu num templo onde silêncio era virtude para todos, menos para ele — nele era
+defeito. Aprendeu a ler lábios com precisão de oráculo porque ninguém se deu ao
+trabalho de aprender os sinais dele, e aprendeu a ocupar espaço com o corpo porque
+era o único jeito de ser respondido. Os sinos minúsculos que usa no peito não são
+enfeite nem ironia: ele os sente vibrar no esterno e é assim que percebe o próprio
+andar. O ouro nas maçãs do rosto e o traje mais teatral do elenco são decisão, não
+vaidade — se o mundo não fala com ele, que ao menos olhe.
+
+O que ele quer é que nenhuma criança de templo nenhum seja chamada de maldição
+outra vez. O que teme é fogo: chama em área queima as mariposas pousadas, e quando
+elas se apagam ele fica pela primeira vez em silêncio de verdade — não o silêncio de
+sempre, o silêncio cego. Com Corvus tem o acordo mais curto do elenco: um empresta o
+ouvido, o outro empresta o olho. E é o único no mapa inteiro que não se irrita com o
+sino da Pip — ele vê aquilo como uma pulsação bonita de luz e já sinalizou isso para
+ela, o que garantiu a lealdade eterna de uma fada de sessenta centímetros.
+
+**Assinatura:** *"O mundo me deve uma palavra. Eu recebo em luz."*
+
 ## Kit
 - **Passiva — Pó de Éter:** inimigos que conjuraram nos últimos 5s carregam poeira luminosa visível para ele a até 40m (as mariposas sentem a vibração da magia).
 - **Tática — Enxame Perscrutador:** lança o enxame em linha; quem for tocado tem a conjuração/cura INTERROMPIDA e fica revelado por 6s.

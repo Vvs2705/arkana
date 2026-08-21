@@ -1,0 +1,93 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 15 — MARIS, A VOZ DAS MARES
+Raca: Nereida · Funcao: Longa distancia / Controle · Slug de arquivo: maris_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, idade indefinida (soa 40, tem seculos de sacerdocio). Mezzo com
+ressonancia molhada — voz que soa como se estivesse sempre a um palmo da agua.
+Ritmo: EM MARE. Esta e a regra de ouro do personagem: cada frase SOBE devagar
+e QUEBRA na ultima palavra. Crescendo lento + queda seca. Se a fala sair plana,
+esta errada. Se sair so gritada, esta errada.
+Emocao-base: serenidade sacerdotal ate o momento em que nao e. A troca e
+INSTANTANEA — nada de aquecer aos poucos.
+Registro: liturgico. Ela fala como quem reza numa cerimonia de templo de lago:
+palavras escolhidas, imagens de agua, nenhuma giria.
+DETALHE DE ATUACAO: Maris conhece cada gota do mapa (era a sacerdotisa do lago
+do castelo voador). Ela fala do terreno com INTIMIDADE — "essa poca eu conheco",
+"esse lago era meu".
+NAO fazer: voz de sereia sedutora, eco de caverna, processamento aquatico.
+A agua esta no RITMO e nas imagens, nao no plugin.
+
+AJUSTE SUGERIDO
+Stability 55 · Similarity 85 · Style 45 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [maris_intro_01] [sobe e quebra] Eu fui sacerdotisa do lago daquele castelo. Ele ainda me obedece.
+02 [maris_intro_02] [serena] Maris. Eu subo devagar. Eu quebro de uma vez.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [maris_queda_01] [crescendo, quebra] Tem agua parada em toda parte aqui embaixo... e toda ela e minha.
+02 [maris_queda_02] [liturgica] Levem-me para perto do lago. Perto do lago eu nao canso.
+
+---------------------------------------------------------------
+3. TATICA — ONDA PRISAO
+---------------------------------------------------------------
+01 [maris_tatica_01] [sobe e quebra] Coluna d'agua! Ele nao anda!
+02 [maris_tatica_02] [curta, seca] Suspenso.
+03 [maris_tatica_03] [aviso] Ele ainda conjura ai de cima. Nao encara, ATIRA.
+
+---------------------------------------------------------------
+4. SUPREMA — MARE CHEIA (telegrafada)
+---------------------------------------------------------------
+01 [maris_suprema_01] [crescendo longo ate estourar] Sobe... sobe... MARE CHEIA! DEZ SEGUNDOS!
+02 [maris_suprema_02] [alto, aviso duplo] INUNDEI! Nos deslizamos e eles afundam — MAS A AGUA CONDUZ RAIO PARA OS DOIS LADOS!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [maris_abate_01] [serena] A mare levou.
+02 [maris_abate_02] [sobe e quebra] Voce lutou contra a agua. Ninguem ganha da agua.
+03 [maris_abate_03] [baixa, liturgica] Volta pro fundo. La e quieto.
+04 [maris_abate_04] [seca] Afundou.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [maris_caido_01] [quebrando, urgente] Cai! Me arrastem pra agua, na agua eu volto!
+02 [maris_caido_02] [seca, sem forca] Seco... esta tudo seco aqui...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [maris_reviver_01] [serena, maos na testa] Respira. A mare desce e volta. Voce tambem.
+02 [maris_reviver_02] [sobe e quebra] Nao hoje. Eu disse: NAO HOJE.
+03 [maris_revivido_01] [ar voltando, liturgica] A agua me devolveu por tua mao.
+04 [maris_revivido_02] [serena] Eu guardo isso. O mar guarda tudo.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [maris_vitoria_01] [crescendo, quebra] Subiu... e ficou. O lago volta a ter dona.
+02 [maris_vitoria_02] [serena] Nao houve tempestade. Houve maré. E diferente.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [maris_bordao_01] [assinatura, sobe e quebra] A agua nao briga. A agua espera... e leva tudo.
+02 [maris_bordao_02] [serena] Meus pes nao tocam o teu chao. Nunca tocaram.
+03 [maris_bordao_03] [liturgica] Uma poca ja e um templo, se eu estiver dentro.
+04 [maris_bordao_04] [seca] Eu conheco cada gota deste mapa. Inclusive as suas.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [maris_interacao_tessa] [seria, aviso real] Tecela, se eu inundar e voce tecer, morre todo mundo junto. Combine comigo ANTES.
+02 [maris_interacao_pyra] [serena, provocacao de templo] Chama de Guerra, eu ja apaguei incendios maiores que o teu braco. Sem raiva nenhuma.
+03 [maris_interacao_gromm] [respeito] Xama, a tua chuva e agua honesta. Planta o totem e eu subo nele.

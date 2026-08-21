@@ -1,0 +1,92 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 05 — CORVOMANTE, O OLHO DISTANTE
+Funcao: Longa distancia / recon · Slug de arquivo: corvomante_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 44 anos. Tenor baixo, seco, sem ressonancia — voz de quem passa o dia
+lendo em voz baixa para nao acordar ninguem.
+Volume: BAIXO. Ele fala com o corvo, nao com a sala. O jogador tem que quase se
+inclinar para ouvir — e ai o Grasnido estoura.
+Ritmo: preciso, de escriba. Frases completas, sem giria, com virgulas reais.
+Ele nomeia numeros e direcoes: e o recon do time.
+Emocao-base: concentracao. Um cansaco antigo por baixo.
+DETALHE DE ATUACAO: quando o corvo esta voando, o CORPO dele fica parado e
+indefeso — a voz nessas falas deve soar MAIS DISTANTE e um pouco monocorde
+(ele nao esta no proprio corpo). Sugestao de mix: nas falas de tatica, reduzir
+agudos e adicionar reverb curto — a voz vem de longe, com o passaro.
+NAO fazer: voz de vilao, sussurro sinistro, tom de profeta. Ele e um homem
+metodico e solitario, nao um oraculo.
+
+AJUSTE SUGERIDO
+Stability 80 · Similarity 85 · Style 15 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [corvomante_intro_01] [baixo, medido] Eu vejo mais que todos voces. De perto, quase nada.
+02 [corvomante_intro_02] [falando com o ombro] Vai, meu olho. Me mostra o que eles escondem.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [corvomante_queda_01] [informativo, baixo] Duas equipes a nordeste. Nao e palpite — ele ja passou por la.
+02 [corvomante_queda_02] [para o corvo, meia-voz] Vai na frente. Eu te alcanco com o corpo.
+
+---------------------------------------------------------------
+3. TATICA — VOO DO OLHO
+---------------------------------------------------------------
+01 [corvomante_tatica_01] [voz distante, corpo parado] Assumindo o corvo. Cubram meu corpo, por favor.
+02 [corvomante_tatica_02] [distante, preciso] Torre arcana varrida. Tres marcados no vale.
+03 [corvomante_tatica_03] [normal, para o aliado] Ele fica no seu ombro. Enquanto ele estiver ai, eu sou cego de novo.
+
+---------------------------------------------------------------
+4. SUPREMA — GRASNIDO DO FIM (telegrafada)
+---------------------------------------------------------------
+01 [corvomante_suprema_01] [subindo de volume ate quase gritar — raro nele] CANTA! CANTA A NOTA DO FIM! TIREM AS ARMADILHAS DALI!
+02 [corvomante_suprema_02] [alto, urgente] GRASNIDO! Escudo de todo mundo cai, INCLUSIVE O NOSSO!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [corvomante_abate_01] [baixo, quase anotando] Registrado. Um a menos no mapa.
+02 [corvomante_abate_02] [seco] Ele estava marcado desde o inicio. So demorou.
+03 [corvomante_abate_03] [meia-voz, para o corvo] Bom olho. Bom olho.
+04 [corvomante_abate_04] [baixo] Voce olhou pra cima tarde demais.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [corvomante_caido_01] [urgente, ainda baixo] Cai! Chegaram por perto — e de perto eu nao sirvo!
+02 [corvomante_caido_02] [dor, a mao no rosto] A obsidiana esfriou... ele ta longe demais...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [corvomante_reviver_01] [baixo, concentrado] Fica comigo. Eu ainda preciso de olhos no chao.
+02 [corvomante_reviver_02] [meia-voz] Levanta. Eu conto tres e a gente sai junto.
+03 [corvomante_revivido_01] [aliviado] Voltei. E ele voltou comigo.
+04 [corvomante_revivido_02] [baixo, sincero] Eu anoto tudo. Isso aqui eu anoto duas vezes.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [corvomante_vitoria_01] [baixo, satisfeito] Eu vi o fim antes de todo mundo. Como sempre.
+02 [corvomante_vitoria_02] [para o corvo, quase carinho] Pousa. Hoje voce ja voou o bastante.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [corvomante_bordao_01] [assinatura] Eu troquei um olho por um horizonte. Nao tem devolucao.
+02 [corvomante_bordao_02] [baixo] Falar sozinho e feio. Eu nunca estou sozinho.
+03 [corvomante_bordao_03] [seco] O que voce chama de sorte, eu chamo de leitura previa.
+04 [corvomante_bordao_04] [meia-voz, sem explicar] A luneta e pra obsidiana. Nao pergunta.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [corvomante_interacao_olhodeeter] [educado e competitivo] Suas mariposas sentem, Observador. O meu olho ve. Nao e a mesma coisa.
+02 [corvomante_interacao_pip] [seco, contrariado] Fada, se voce encostar de novo no meu corvo, eu marco voce a partida inteira.
+03 [corvomante_interacao_aelion] [baixo] Voce acerta a quarenta metros, elfo. Eu ja sei o que tem a duzentos.

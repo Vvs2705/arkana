@@ -1,0 +1,93 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 13 — BROK, O FERREIRO DE RUNAS
+Raca: Anao das Montanhas · Funcao: Suporte / Protecao · Slug de arquivo: brok_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 60 e tantos (novo para um anao). Baixo trovejante, peito enorme, com
+uma rouquidao de fumaca de forja. Volume naturalmente ALTO — ele passou a vida
+falando por cima de martelo.
+Ritmo: MARTELADO. Silaba batida, cada frase com um pulso forte. Se a fala for
+lida em ritmo liso, esta errada — ele bate as palavras como bate o ferro.
+Emocao-base: bonachao teimoso. Ri do peito, com facilidade, e a risada e curta
+e grave.
+Registro: avô de oficina. Chama todo mundo de "rapaz", "moca", "menino" — o
+elenco inteiro e mais novo que ele, inclusive os elfos (ele finge que nao sabe).
+DETALHE DE ATUACAO: Brok fala COM as runas, como quem fala com filhos. Nas
+falas de conjuração, o destinatario e a runa, nao o inimigo. Ele agradece o
+metal, elogia o metal, resmunga com o metal.
+NAO fazer: anao de sotaque escoces caricato, grito de guerra generico. O calor
+dele e domestico, nao epico.
+
+AJUSTE SUGERIDO
+Stability 60 · Similarity 85 · Style 45 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [brok_intro_01] [trovejante, martelado] Brok. Toda magia decente se martela ANTES de se lancar.
+02 [brok_intro_02] [caloroso] Fica perto de mim, rapaz. O metal aterra o que quiser te queimar.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [brok_queda_01] [alto, alegre] Chao duro la embaixo! Do jeito que eu gosto!
+02 [brok_queda_02] [martelado] Se tiver pedra, tem parede. Se tem parede, tem casa.
+
+---------------------------------------------------------------
+3. TATICA — RUNA-ESCUDO
+---------------------------------------------------------------
+01 [brok_tatica_01] [batendo o martelo, forte] MURALHA! Atras dela, todo mundo!
+02 [brok_tatica_02] [para a runa, quase carinho] Sobe, minha filha. Sobe bonito.
+03 [brok_tatica_03] [aviso alto] Seis segundos de parede! Nao encosta na borda que pega de lado!
+
+---------------------------------------------------------------
+4. SUPREMA — FORJA VIVA (telegrafada)
+---------------------------------------------------------------
+01 [brok_suprema_01] [enorme, martelado] FORJA VIVA! A BIGORNA TA NO CHAO! Escudo pra todo mundo!
+02 [brok_suprema_02] [alto, honesto] ELA E BARULHENTA! Eles ja sabem onde a gente ta — entao SEGURA!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [brok_abate_01] [curto, grave] Temperado.
+02 [brok_abate_02] [risada curta do peito] Bateu na minha parede, moco. A parede ganhou.
+03 [brok_abate_03] [martelado] Peca torta. Volta pra forja.
+04 [brok_abate_04] [caloroso, sem crueldade] Sem ressentimento, rapaz. Levanta amanha.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [brok_caido_01] [alto, contrariado] CAI! Sessenta anos de forja e eu caio de lado!
+02 [brok_caido_02] [rouco, com dor] A gema... a gema apagou. Vem cá, menino.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [brok_reviver_01] [caloroso, firme] Vem cá. Nenhuma peca minha vai pro ferro-velho.
+02 [brok_reviver_02] [martelado] Levanta, moca. Voce ainda tem tempera boa.
+03 [brok_revivido_01] [risada grave] HA! Voltei! Nem o martelo esfriou!
+04 [brok_revivido_02] [caloroso] Eu gravo o teu nome num anel da barba. Palavra de ferreiro.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [brok_vitoria_01] [trovejante, alegre] Aguentou! A parede aguentou e nos com ela!
+02 [brok_vitoria_02] [caloroso] Boa forja, meus filhos. Descansem na bigorna.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [brok_bordao_01] [assinatura, martelado] Magia que nao passou pelo fogo nao presta.
+02 [brok_bordao_02] [rindo] Um metro e quarenta. E a parede que eu levanto tem quatro.
+03 [brok_bordao_03] [caloroso] Runa e que nem filho: se voce nao conversa, ela sai torta.
+04 [brok_bordao_04] [grave] Essa gema aqui ve o que o olho de carne perdeu. Nao reclamo.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [brok_interacao_basalto] [reverencia sincera, mais baixo] Golem, tua ultima placa ta em branco. Eu gravo, quando tu souberes o nome.
+02 [brok_interacao_fizz] [rindo, implicando] Gnomo, tua torre e bonitinha. Cai com um espirro. Vem aprender a martelar.
+03 [brok_interacao_tessa] [caloroso, respeito real] Tu forjaste o teu proprio coracao aos quinze, menina. Eu levei quarenta anos pra forjar um anel.

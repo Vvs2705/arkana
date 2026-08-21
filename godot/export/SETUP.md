@@ -5,28 +5,27 @@ de `godot/`) e `export/build_apk.sh`. Nada disto vai para o git.
 
 ## O que a maquina precisa
 
-Estado verificado em 20/08/2026: somente o Godot esta presente nos caminhos
-abaixo. Templates, Android SDK, JDK e keystore de debug precisam ser restaurados
-antes de um novo export. O APK existente em `godot/build/arkana3d.apk` foi
-gerado anteriormente.
+Estado verificado em 21/08/2026: Godot, templates, Android SDK, JDK 21 e
+keystore debug estao presentes. O APK debug foi exportado novamente em
+`godot/build/arkana3d.apk`.
 
 | Item | Caminho | Estado atual |
 |---|---|---|
 | Godot 4.4.1 | `%LOCALAPPDATA%/Programs/godot/Godot_v4.4.1-stable_win64.exe` | presente |
-| Templates 4.4.1 | `%APPDATA%/Godot/export_templates/4.4.1.stable/` | ausente |
-| Android SDK | `%LOCALAPPDATA%/Android/Sdk` | ausente |
-| JDK 21 | `%LOCALAPPDATA%/Java/jdk-21.0.12+8` | ausente |
-| Keystore debug | `%APPDATA%/Godot/keystores/debug.keystore` | ausente |
+| Templates 4.4.1 | `%APPDATA%/Godot/export_templates/4.4.1.stable/` | presente |
+| Android SDK | `%LOCALAPPDATA%/Android/Sdk` | presente |
+| JDK 21 | `C:/Program Files/Eclipse Adoptium/jdk-21.0.12.8-hotspot` | presente |
+| Keystore debug | `%APPDATA%/Godot/keystores/debug.keystore` | presente |
 
 ## editor_settings-4.4.tres (em `%APPDATA%/Godot/`)
 
-O Godot headless le os caminhos do Android daqui. As chaves estao configuradas,
-mas hoje apontam para dependencias ausentes:
+O Godot headless le os caminhos do Android daqui. As chaves estao configuradas
+para as dependencias presentes:
 
 ```
 export/android/debug_keystore = "C:/Users/VINICIUS/AppData/Roaming/Godot/keystores/debug.keystore"
 export/android/debug_keystore_pass = "android"
-export/android/java_sdk_path = "C:\\Users\\VINICIUS\\AppData\\Local\\Java\\jdk-21.0.12+8"
+export/android/java_sdk_path = "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot"
 export/android/android_sdk_path = "C:\\Users\\VINICIUS\\AppData\\Local\\Android\\Sdk"
 ```
 

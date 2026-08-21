@@ -5,7 +5,7 @@
 shader_type spatial;
 render_mode cull_disabled, depth_draw_never, unshaded;
 
-uniform vec4 color : source_color = vec4(0.78, 0.94, 0.9, 0.16);
+uniform vec4 color : source_color = vec4(0.78, 0.93, 0.86, 0.13);
 
 varying vec3 wpos;
 varying float ring;

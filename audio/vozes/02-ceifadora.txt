@@ -1,0 +1,91 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 02 — CEIFADORA, A VOZ DO VAZIO
+Funcao: Ataque / Perseguicao · Slug de arquivo: ceifadora_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, idade impossivel de cravar (morreu jovem, voltou sem idade).
+Timbre: meio-soprano GRAVE, sussurrado, com muito ar. Volume baixo constante —
+ela fala baixo porque os caidos falam baixo, e ela aprendeu com eles.
+Ritmo: lento, com pausa ANTES da ultima palavra de cada frase (ela escuta algo
+no meio da propria fala). Nunca atropela.
+Emocao-base: calma de cobrador. Nao e triste, nao e maldosa — e uma divida.
+Registro: formal, quase juridico. Ela fala de morte como quem fala de contrato.
+Efeito de pos: reverb curto e SECO (sala de pedra), nao catedral. Um leve delay
+de 40ms bem baixo por baixo, como se a voz tivesse ficado do outro lado junto
+com a sombra. Nao exagerar — o susto e o conteudo, nao o plugin.
+NAO fazer: gritar, NUNCA. Nem na suprema. Se precisar de urgencia, ela fala
+mais RAPIDO, nunca mais alto. Sem voz demoniaca, sem pitch down: 10+.
+
+AJUSTE SUGERIDO
+Stability 75 · Similarity 85 · Style 20 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [ceifadora_intro_01] [sussurro medido] Eu ja atravessei uma vez. Sei o caminho.
+02 [ceifadora_intro_02] [baixa, olhando o chao] Procura minha sombra. Nao vai achar.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [ceifadora_queda_01] [calma no meio do vento] Este chao ja recebeu muita gente. Vai receber mais.
+02 [ceifadora_queda_02] [quase intima] Estao me chamando la embaixo. Descemos.
+
+---------------------------------------------------------------
+3. TATICA — MAO DO VAZIO
+---------------------------------------------------------------
+01 [ceifadora_tatica_01] [seca, sem levantar a voz] Fica.
+02 [ceifadora_tatica_02] [sussurro apressado] A mao te achou.
+03 [ceifadora_tatica_03] [baixa, avisando o time] Segurei um. Corre.
+
+---------------------------------------------------------------
+4. SUPREMA — TRAVESSIA (telegrafada)
+---------------------------------------------------------------
+01 [ceifadora_suprema_01] [rapida e intensa, ainda sem gritar] RASGUEI! Toca no corte, tres segundos, e vem!
+02 [ceifadora_suprema_02] [voz que corre] Travessia aberta! Nao olha pra dentro, so passa!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [ceifadora_abate_01] [baixa, sem prazer nenhum] Cobrado.
+02 [ceifadora_abate_02] [quase gentil] Descansa. Eu escuto voce daqui.
+03 [ceifadora_abate_03] [seca] Um eco novo no chao.
+04 [ceifadora_abate_04] [sussurro] Voce parou. Eu nao consigo.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [ceifadora_caido_01] [sem panico, informando] Cai. As rachaduras apagaram.
+02 [ceifadora_caido_02] [baixa, quase curiosa] De novo, entao. Que engracado.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [ceifadora_reviver_01] [sussurro firme] Ainda nao. Volta.
+02 [ceifadora_reviver_02] [baixa, puxando] Eu conheco a porta. Voce nao entra hoje.
+03 [ceifadora_revivido_01] [ar voltando devagar] Voce me trouxe do lado errado. Obrigada.
+04 [ceifadora_revivido_02] [seca] Agora eu devo a voce tambem.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [ceifadora_vitoria_01] [muito baixa, quase alivio] Silencio. Enfim ninguem falando comigo.
+02 [ceifadora_vitoria_02] [medida] A divida diminuiu um pouco hoje.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [ceifadora_bordao_01] [assinatura] Quem atravessa, deve. Eu vim cobrar de mim.
+02 [ceifadora_bordao_02] [sussurro] Nao tenho sombra. Nao tenho pressa.
+03 [ceifadora_bordao_03] [baixa] Os mortos nao gritam. Por isso eu escuto tao bem.
+04 [ceifadora_bordao_04] [seca, quase piada] A foice nao pesa. Ela nem existe ate eu chamar.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [ceifadora_interacao_veu] [reconhecimento, baixa] Voce voltou sem envelhecer. Eu voltei sem sombra. Empatamos.
+02 [ceifadora_interacao_noctus] [sem afeto] Voce bebe eter e chama de fome. Eu escuto morto e chamo de trabalho.
+03 [ceifadora_interacao_vitalis] [sussurro, sem crueldade] Sua irma nao esta do meu lado, curandeira. Eu ja procurei.

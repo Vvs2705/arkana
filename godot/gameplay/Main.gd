@@ -1,10 +1,24 @@
 ## CENA PRINCIPAL — a partida jogavel de 3 min (G1: jogo, nao sandbox).
+## COMO A PARTIDA ACABA (revisto ao entrar a Zona): o fim de verdade e' ULTIMO
+## EM PE — o player morre (derrota) ou os 6 bots morrem (vitoria). O cronometro
+## de Balance.MATCH.duration_s (180s) deixou de ser "o fim" e virou REDE DE
+## SEGURANCA: a zona fecha o ultimo circulo aos 165s com 18 dps em quem estiver
+## fora, entao em condicoes normais alguem cai antes dos 180s. Se ninguem cair,
+## o timeout continua encerrando como derrota. Nao mexi na regra do timeout de
+## proposito: mudar o veredito do tempo esgotado e' decisao de Diretor, nao de
+## raia (registrado no relatorio).
 ## Fiacao defensiva: Island/Mage carregam com fallback; esta cena BOOTA
 ## sozinha. Tudo por-partida vive sob "Arena" — restart = arena nova, limpa
 ## (estado que atravessa partida ja' vazou 3x no projeto).
 extends Node3D
 
 const ISLAND_SCENE := "res://world/Island.tscn"
+const PLAYER_MAGE := "01-pyra"
+# Magos ja' cadastrados em characters/mage_identity.gd (o script nao tem
+# class_name; carrega igual ao Mage.gd). Cresce sozinho conforme a raia
+# PERSONAGEM preenche as fichas — nada aqui muda.
+const MAGE_IDS := preload("res://characters/mage_identity.gd")
+
 const BOT_TINTS: Array[Color] = [
 	Color(0.9, 0.3, 0.3), Color(0.3, 0.7, 0.9), Color(0.4, 0.85, 0.4),
 	Color(0.95, 0.8, 0.3), Color(0.75, 0.4, 0.9), Color(0.95, 0.55, 0.25),
@@ -16,13 +30,16 @@ var match_state := PLAYING
 var time_left: float = float(Balance.MATCH.duration_s)
 var bots_alive := 0
 var arena: Node3D
+var island: Node3D
 var player: Player
+var zona: Zona
 var hud: Hud
 var _spawns: Array[Vector3] = []
 
 
 func _ready() -> void:
-	add_child(_load_island())
+	island = _load_island()
+	add_child(island)
 	_collect_spawns()
 	hud = Hud.new()
 	add_child(hud)
@@ -60,16 +77,48 @@ func _build_match() -> void:
 	player = Player.new()
 	arena.add_child(player)
 	player.global_position = pts[0]
+	player.set_mage(PLAYER_MAGE)
+	_dar_arma(player)
 	for i in bots_alive:
 		var b := Bot.new()
 		b.target = player
 		arena.add_child(b)
+		_dar_arma(b)
 		b.global_position = pts[i + 1]
-		b.set_tint(BOT_TINTS[i % BOT_TINTS.size()])
+		# Identidade de mago manda; tint so' entra em quem ainda nao tem ficha
+		# no registro (senao sobrescreveria a paleta — raia PERSONAGEM, R20).
+		var fichas: Array = MAGE_IDS.slugs().filter(func(s: String) -> bool: return s != PLAYER_MAGE)
+		var slug: String = str(fichas[i % fichas.size()]) if not fichas.is_empty() else ""
+		if slug != "":
+			b.set_mage(slug)
+		else:
+			b.set_tint(BOT_TINTS[i % BOT_TINTS.size()])
+	## LOOT DA PARTIDA (GDD §16.2). Nasce sob a Arena: restart = loot novo e
+	## intacto, sem estado atravessando partida. Deterministico (seed fixo).
+	Loot.espalhar(arena, island)
+	## BAU CELESTIAL (GDD §16.2) — o evento que abre a UNICA porta da manopla.
+	## Tambem sob a Arena: o Timer dele para junto no fim da partida e some no
+	## restart (nenhum bau de partida velha caindo na partida nova).
+	BauCelestial.agendar(arena, island)
+	## A TEMPESTADE ARCANA — o circulo que fecha. Sem ela a partida acabava so'
+	## por cronometro: um deathmatch com timer, nao um battle royale. Tambem
+	## nasce sob a Arena (os dois Timers dela param no fim da partida e somem no
+	## restart) e e' DETERMINISTICA pelo proprio seed — mesma sequencia de
+	## circulos toda partida, como manda o contrato do projeto.
+	zona = Zona.criar(arena, island)
 	hud.bind_player(player)
 	hud.hide_end()
 	hud.update_match(time_left, bots_alive)
 	Bus.match_started.emit()
+
+
+## Toda queda do ceu comeca com uma VARINHA (GDD §16.2). O slot e' um no' filho
+## — Player.gd/Bot.gd/Pawn.gd nao sabem que ele existe (composicao); quem
+## precisa da arma de alguem chama ArmaSlot.de(pawn).
+func _dar_arma(pawn: Pawn) -> void:
+	var slot := ArmaSlot.new()
+	slot.name = "ArmaSlot"
+	pawn.add_child(slot)
 
 
 func _on_entity_died(entity: Node) -> void:

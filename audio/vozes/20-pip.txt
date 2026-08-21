@@ -1,0 +1,95 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 20 — PIP, A CENTELHA SELVAGEM
+Raca: Fada da Tempestade · Funcao: Ataque / Perseguicao · Slug de arquivo: pip_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Fada, 60 centimetros. Voz AGUDA e brilhante, com uma vibracao rapida por cima
+(as quatro asas nunca param, e a voz treme junto de leve). NAO e voz de crianca:
+e voz pequena de adulto caotico. A diferenca esta na malicia — Pip sabe
+exatamente o que esta fazendo.
+Ritmo: VELOZ e picotado. Ela ri NO MEIO das frases, nao no fim. Marque a risada
+dentro da linha, nunca depois.
+Emocao-base: alegria caotica boa. Ela nao e cruel — ela e rapida demais para
+pensar em ser.
+DETALHE DE ATUACAO: PIP NUNCA POUSA e definha se ficar parada. A voz nunca
+descansa numa nota: sempre subindo, sempre indo pro proximo assunto. Se um take
+soar calmo, esta errado — exceto as duas falas de derrubada, onde ela fica
+PARADA e a voz fica pequena e assustada. Esse e o unico momento triste dela.
+O SINO do tornozelo e o counter sonoro dela e ela sabe: piada recorrente.
+Colecao de botoes: o troféu e o do Noctus (rubi). Ela cita isso com orgulho.
+NAO fazer: pitch artificial (chipmunk). A voz base ja e pequena; a graca esta na
+VELOCIDADE e no riso, nao no processamento.
+
+AJUSTE SUGERIDO
+Stability 25 · Similarity 75 · Style 75 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [pip_intro_01] [aguda, riso no meio] Pip! Sessenta centimetros de problema — hehe — e cinquenta e cinco de vida!
+02 [pip_intro_02] [rapida, orgulhosa] Ouviu o sino? Entao ja e tarde. Sempre e tarde!
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [pip_queda_01] [gritinho de alegria] EU NAO CAIO, EU DESCO NA MINHA VELOCIDADE!
+02 [pip_queda_02] [rapida, rindo] Botoes! Vinte magos, quantos botoes sera que da?
+
+---------------------------------------------------------------
+3. TATICA — ZIP-ZAG
+---------------------------------------------------------------
+01 [pip_tatica_01] [rapidissima] Zip! Zip! ZAG!
+02 [pip_tatica_02] [rindo no meio] Atravessei ele — hehe — e a faisca pulou pro amigo!
+03 [pip_tatica_03] [aguda, veloz] Tres pulos! Segue a faisca!
+
+---------------------------------------------------------------
+4. SUPREMA — SUPERCELULA (telegrafada)
+---------------------------------------------------------------
+01 [pip_suprema_01] [grito agudo, trovao por cima] SUPERCELULA! MINHA NUVEM CHEGOU E ELA ME AMA!
+02 [pip_suprema_02] [alta, rindo] OITO SEGUNDOS! Ela mira em quem ta MAIS PERTO DE MIM — entao FUJAM DE MIM!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [pip_abate_01] [aguda, empolgada] Peguei! Peguei, peguei, peguei!
+02 [pip_abate_02] [rindo no meio] Voce e grande demais — hehe — pra ser rapido!
+03 [pip_abate_03] [veloz, orgulhosa] BOTAO NOVO! Esse eu levo!
+04 [pip_abate_04] [rapida, sem maldade] Foi rapido, viu? Nem doeu direito!
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [pip_caido_01] [aguda, panico] CAI! CAI! Eu nao consigo ficar parada, DOI ficar parada!
+02 [pip_caido_02] [a voz fica pequena, o unico momento triste dela] To parada... eu nao gosto de ficar parada... vem me buscar...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [pip_reviver_01] [rapida, tagarela] Levanta levanta levanta! Voce e lento mas eu gosto de voce!
+02 [pip_reviver_02] [aguda, apressada] Eu to parada por SUA causa, entao ANDA!
+03 [pip_revivida_01] [explosao de alegria] VOEI! Voltei a voar! Nunca mais!
+04 [pip_revivida_02] [rapida, sincera] Voce ganhou um botao da colecao. Um dos bons!
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [pip_vitoria_01] [aguda, radiante] GANHAMOS E EU NAO POUSEI UMA VEZ! Recorde pessoal!
+02 [pip_vitoria_02] [rindo] Dezessete botoes. DEZESSETE. Alguem me arranja um casaco maior.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [pip_bordao_01] [assinatura, veloz] Parada eu morro. Entao eu simplesmente nao paro!
+02 [pip_bordao_02] [rindo no meio] Esse sino nao sai — hehe — ja tentei de tudo. Agora e meu charme.
+03 [pip_bordao_03] [aguda] Sou a mais frágil daqui. E a mais rapida. Adivinha qual conta mais?
+04 [pip_bordao_04] [rapida, orgulhosa] A barra do meu vestido ta queimada porque eu voo perto demais do meu proprio raio!
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [pip_interacao_noctus] [provocando com gosto] O botao de rubi e o TROFEU da colecao, Noctus! Vem pegar! Devagar do jeitinho que voce anda!
+02 [pip_interacao_vitalis] [rapida, sem entender o problema] Sua irma e feita de luz igual eu! Por que voce fica brava quando eu falo isso?
+03 [pip_interacao_umbra] [rindo] Voce anda sem som e eu ando com sino! Somos o pior esquadrao furtivo do mundo!

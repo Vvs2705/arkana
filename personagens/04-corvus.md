@@ -13,6 +13,32 @@ Máscara de couro com olhos de vidro (não são para ver — são para os OUTROS
 ## Personalidade & história curta
 Formal, arcaico, chama todo mundo de "irmã-caça" e "irmão-caça". Não considera a cegueira perda: "os olhos mentem a distância; o cheiro nunca mentiu." Reza baixinho antes de cada transformação — pede licença ao lobo, todas as vezes.
 
+## História
+
+**Bio de tela**
+> No inverno da fome, o espírito-lobo o encontrou primeiro. Corvus não venceu a luta:
+> caído e já sem os olhos, ofereceu à fera a última caça que tinha. O lobo aceitou — e
+> ficou. Desde então ele não enxerga, ele fareja: cheiros chegam como cores, trilhas e
+> formas no ar, e nada nesse mundo mente tão pouco quanto um rastro. Antes de vestir a
+> forma da fera, ele pede licença. Todas as vezes.
+
+**Fundo**
+A tribo dele conta invernos em nós de corda, e Corvus carrega um nó para cada um que
+sobreviveu — o do inverno da fome é o único com dois. As três cicatrizes sobre os
+olhos são a assinatura do pacto, e a máscara de couro com olhos de vidro não existe
+para ele: existe para que os outros consigam encarar sem desviar. Ele não considera
+a cegueira um preço; considera um contrato, e contrato se honra.
+
+O que Corvus quer é quitar a dívida com o lobo por inteiro, e ele não sabe qual é o
+valor. O que teme é a única coisa que não depende dele: que um dia a fera não
+devolva o corpo. Nas Estepes, Gromm reconheceu no rito dele o mesmo pedido de
+licença que a própria tribo faz à caça, e passou a chamá-lo de irmão-caça — o único
+que usa o vocativo dele de volta. Sylva o deixa atravessar a mata sem cobrar
+pedágio, porque ele é o raro que pergunta antes. E com Olho-de-Éter, que não escuta,
+firmou o acordo mais curto do elenco: um empresta o ouvido, o outro empresta o olho.
+
+**Assinatura:** *"Peço licença ao lobo. Nunca ao inimigo."*
+
 ## Kit
 - **Passiva — Mundo de Cheiros:** vê trilhas de cheiro dos últimos 60s como fitas de cor (cada elemento tem sua cor): pegadas, portas abertas, resíduo de magia.
 - **Tática — Uivo de Caça:** solta um uivo num raio de 25m: inimigos EM MOVIMENTO ficam com o cheiro aceso (contorno visível enquanto se moverem, por 4s).

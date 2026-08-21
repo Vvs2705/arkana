@@ -1,0 +1,95 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 10 — TESSA, A TECELA DE RAIOS
+Funcao: Curta distancia / defesa · Slug de arquivo: tessa_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, 20 anos. Soprano leve, rapida, com sorriso permanente na voz. Energia
+de oficina — ela fala enquanto trabalha e nunca para de fazer as duas coisas.
+Ritmo: TAGARELA. Frases que emendam, entusiasmo que atropela um pouco a
+dicção. Um leve tropeço em uma palavra por fala e bem-vindo — ela nao ensaia.
+Emocao-base: alegria de inventora. Ela AMA o raio que quase a matou. Trata a
+tempestade como socia, nunca como trauma.
+DETALHE DE ATUACAO: o marca-passo runico dela bate levemente FORA do compasso.
+Nas falas calmas, deixe UMA micro-hesitacao no meio da frase, como se ela
+tivesse esperado meio batimento. Ninguem percebe conscientemente — todo mundo
+sente.
+O UNICO medo dela: o marca-passo falhar longe da bancada. Nas duas falas em que
+isso aparece, a voz perde a energia por completo e fica pequena. Contraste
+brutal com o resto — e proposital.
+NAO fazer: voz de crianca, fofura forcada. Ela e jovem e genial, nao infantil.
+Ela chama as proprias invencoes por apelido e trata todo mundo como colega de
+bancada.
+
+AJUSTE SUGERIDO
+Stability 40 · Similarity 80 · Style 55 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [tessa_intro_01] [rapida, orgulhosa, manga curta a mostra] Olha o desenho no meu braco! O raio fez, e eu adorei o resultado!
+02 [tessa_intro_02] [batendo no peito, alegre] Coracao runico, forjado por mim, aos quinze. Aqui o tempo sou eu.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [tessa_queda_01] [empolgada] Ceu carregado! O melhor tipo de ceu!
+02 [tessa_queda_02] [rapida, ja planejando] Me da um lugar com duas paredes e eu faco daquilo uma fortaleza, juro!
+
+---------------------------------------------------------------
+3. TATICA — FIO DO TEAR
+---------------------------------------------------------------
+01 [tessa_tatica_01] [curta, animada] Fio esticado!
+02 [tessa_tatica_02] [rapida] Tecendo! Cuidado onde pisa!
+03 [tessa_tatica_03] [avisando, honesta] Ele zumbe de perto, ta? Ninguem morre sem saber. Regra da casa.
+
+---------------------------------------------------------------
+4. SUPREMA — TEAR-MAE (telegrafada)
+---------------------------------------------------------------
+01 [tessa_suprema_01] [grito alegre] TEAR-MAE NO CHAO! Manda projetil que eu devolvo escudo!
+02 [tessa_suprema_02] [alto, rindo] VOVOZINHA CHEGOU! Fica perto dela e ninguem fica sem escudo!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [tessa_abate_01] [surpresa alegre] Ha! Enroscou no fio!
+02 [tessa_abate_02] [rapida] Eu avisei que zumbia! Voce ouviu e foi mesmo assim!
+03 [tessa_abate_03] [empolgada] Ponto fechado! Proximo!
+04 [tessa_abate_04] [alegre, sem maldade] Tecer e isso: um passa, o outro fica preso.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [tessa_caido_01] [rapida, ainda animada demais] Cai! Cai! Mas os fios continuam ai, usa eles!
+02 [tessa_caido_02] [a voz PERDE toda energia, pequena, o unico medo dela] O marca-passo... ta fora de ritmo... me acha, por favor...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [tessa_reviver_01] [rapida, tagarela para distrair] Fica comigo, fica comigo, eu conserto coisa muito pior que voce!
+02 [tessa_reviver_02] [alegre] Levanta! Voce ta so com o fio solto!
+03 [tessa_revivido_01] [voltando com tudo] BATEU! Bateu de novo! Ai que alivio!
+04 [tessa_revivido_02] [sincera, rapida] Voce e oficialmente minha pessoa favorita da partida.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [tessa_vitoria_01] [radiante] Tecido, amarrado e fechado! A vovo ficaria orgulhosa!
+02 [tessa_vitoria_02] [alegre, batendo no peito] Ta batendo errado e ta batendo. E o que importa!
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [tessa_bordao_01] [assinatura] A vovo tecia la. Eu teco raio. Mesma mao, fio diferente.
+02 [tessa_bordao_02] [rindo] O raio quase me matou e virou meu socio. Otimo acordo!
+03 [tessa_bordao_03] [alegre] Relogio para perto de mim. Eu acho isso um elogio.
+04 [tessa_bordao_04] [rapida] Luva isolante? Eu uso pra dormir. Acordada eu confio nele.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [tessa_interacao_maris] [alegre e perigosa] Maris, se voce inundar isso aqui, o meu raio vai em TODO MUNDO. Inclusive na gente. Combinado?
+02 [tessa_interacao_fizz] [empolgacao de bancada] Fizz! Sua bobina canta que nem chaleira! Me deixa mexer nela! Deixa, deixa, deixa!
+03 [tessa_interacao_basalto] [meio culpada] Desculpa, Basalto. Pedra runica conduz. Voce vai levar um choque a mais e a culpa e da fisica.

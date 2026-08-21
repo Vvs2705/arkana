@@ -1,0 +1,95 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 19 — NOCTUS, O SEDENTO DE ETER
+Raca: Vampiro Arcano · Funcao: Ataque / Perseguicao · Slug de arquivo: noctus_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, aparenta 38, tem seculos. Baritono aveludado, liso, com dicção de salao.
+Cada consoante colocada no lugar por educacao, nao por esforco.
+Ritmo: LANGUIDO. Ele nunca tem pressa, nem correndo. As frases descem no fim
+como quem encerra um assunto que nao valia a pena.
+Emocao-base: tedio aristocratico. O elenco inteiro o entedia, o battle royale o
+entedia, a fome nao.
+DETALHE DE ATUACAO (a unica racha na compostura): quando ele DRENA ETER, a voz
+muda por meio segundo — fica mais baixa, mais rapida, com um prazer que ele nao
+consegue disfarcar. Depois volta ao verniz na mesma frase. Esse contraste e o
+personagem inteiro. Marcado nas linhas como [a fome escapa].
+CLASSIFICACAO 10+: ele bebe ETER — mana — NUNCA sangue. Nenhuma fala pode
+sugerir sangue, mordida em pescoco ou dor. Ele fala em "reserva", "fonte",
+"adega", "safra". E gula, nao violencia.
+Registro: nobreza antiga, cortesia como arma. Ele elogia antes de humilhar.
+NAO fazer: sotaque de conde de filme antigo, risada macabra, sibilo. Sem
+caricatura: o susto e ele ser educado demais.
+
+AJUSTE SUGERIDO
+Stability 70 · Similarity 85 · Style 40 · Speaker Boost OFF
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [noctus_intro_01] [languido, descendente] Noctus. Vinte magos cheios de eter e nenhuma etiqueta. Um banquete de ma educacao.
+02 [noctus_intro_02] [cortes] Eu nao tomo a sua vida. Tomo apenas o que voce ia gastar mal.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [noctus_queda_01] [entediado] Ceu aberto. Que inconveniente. Vamos pela sombra.
+02 [noctus_queda_02] [languido] Sinto as reservas daqui. Algumas sao... excelentes.
+
+---------------------------------------------------------------
+3. TATICA — MORDIDA DO VAZIO
+---------------------------------------------------------------
+01 [noctus_tatica_01] [cortes ate a metade, entao a fome escapa] Com licenca — ah. AH. Essa safra e boa.
+02 [noctus_tatica_02] [curto, elegante] Drenado. Ele conjura caro agora.
+03 [noctus_tatica_03] [a fome escapa, baixo e rapido] Mais. So mais um gole.
+
+---------------------------------------------------------------
+4. SUPREMA — FORMA DE NEVOA (telegrafada)
+---------------------------------------------------------------
+01 [noctus_suprema_01] [alto, teatral, ainda elegante] FORMA DE NEVOA! Quatro segundos! Atirar em mim e desperdicio!
+02 [noctus_suprema_02] [alto] EU ME DISSOLVO! Nao conjuro nada — mas voces tambem nao me tocam!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [noctus_abate_01] [languido] A adega esta vazia. Que decepcao.
+02 [noctus_abate_02] [cortes, cruel na educacao] Voce lutou muito bem. Para o seu nivel.
+03 [noctus_abate_03] [a fome escapa por um instante] Seco. Completamente seco. Obrigado.
+04 [noctus_abate_04] [descendente] Descanse. Voce nao tinha mais nada que me interessasse.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [noctus_caido_01] [contrariado, ainda elegante] Cai. Que constrangedor — venham antes que eu tenha que pedir.
+02 [noctus_caido_02] [a compostura indo] Vazio... eu estou completamente vazio...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [noctus_reviver_01] [cortes, mao estendida] De pe. Voce ainda tem reserva, e reserva nao se joga fora.
+02 [noctus_reviver_02] [languido] Eu insisto. Levante-se. Detesto repetir convite.
+03 [noctus_revivido_01] [ajeitando a gola] Obrigado. Isso foi... surpreendentemente decente.
+04 [noctus_revivido_02] [cortes] Uma divida. Eu pago as minhas. Sempre com juros.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [noctus_vitoria_01] [languido, satisfeito] Um banquete inteiro, e eu fui o unico com modos.
+02 [noctus_vitoria_02] [cortes] Foi uma boa safra. Nao uma grande. Boa.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [noctus_bordao_01] [assinatura] Eu nao tenho sede de sangue. Sangue e vulgar. Eu tenho sede de ETER.
+02 [noctus_bordao_02] [entediado] Voces chamam isso de torneio. Eu chamo de lista de convidados.
+03 [noctus_bordao_03] [cortes] A luz do dia me atrasa. Ela nao me impede. Ha uma diferenca enorme.
+04 [noctus_bordao_04] [languido] Meus anéis-sigilo sao mais velhos que o reino de voces. Todos eles.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [noctus_interacao_basalto] [genuinamente irritado, a unica vez] Pedra. Pedra sem uma gota de eter dentro. Eu detesto essa coisa.
+02 [noctus_interacao_pip] [cortesia com veneno] Fada, aquele botao era de rubi. Eu vou querer de volta. Educadamente, por enquanto.
+03 [noctus_interacao_ceifadora] [languido, sem tedio pela primeira vez] Voce nao projeta sombra e eu nao envelheco. Somos dois erros bem-vestidos.

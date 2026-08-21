@@ -13,6 +13,33 @@ Capuz fechado, cachecol longo que flutua como fumaça mesmo sem vento (ele lembr
 ## Personalidade & história curta
 Quieta, precisa, com humor seco que pega todo mundo de surpresa. Não sabe mais o próprio nome de batismo — ficou do outro lado. "Véu" é o que a primeira pessoa que a viu voltar gritou. Ela adotou.
 
+## História
+
+**Bio de tela**
+> Tinha doze anos quando a torre da vila desabou e a jogou para dentro do plano
+> espectral. Voltou sete anos depois com o mesmo rosto de menina, para um mundo que
+> tinha seguido sem ela. Trouxe de volta uma mão que atravessa paredes quando a
+> concentração falha, e vozes: outras Véus, de planos vizinhos, avisando o que já
+> viveram. O nome de batismo ficou do outro lado. "Véu" foi o que gritaram quando ela
+> apareceu. Serviu.
+
+**Fundo**
+A torre que caiu sobre a vila era uma Torre Arcana, e havia um guardião de vigília
+naquela noite — ela nunca soube, e o guardião nunca contou. Sete anos do lado de lá
+foram sete dias para o corpo dela e uma vida inteira para a cabeça: aprendeu a
+andar entre planos, a ouvir as outras versões de si mesma e a não confiar em nenhuma
+delas completamente. A luva rúnica na mão esquerda foi a primeira coisa que ela
+comprou ao voltar; aperta as fivelas quando fica nervosa, o que é sempre.
+
+Ela nunca desfez as malas porque não decidiu se está de volta ou de passagem. O que
+quer é o próprio nome — em algum plano vizinho existe uma Véu que nunca caiu e ainda
+o usa. O que teme é a mão: um dia ela atravessa tudo e não volta a ser sólida, e o
+resto do corpo aprende o caminho. Ceifadora, que também voltou de onde não se volta,
+é a única de quem ela desvia. O Ilusionista a chama de "colega de retorno", e ela
+finge não achar graça.
+
+**Assinatura:** *"Eu já vi esse erro em outro lugar. Não repita."*
+
 ## Kit
 - **Passiva — Entrelinha:** após 4s sem atacar nem tomar dano, ela desfoca: semi-translúcida para quem está a mais de 20m (nítida de perto). Conjurar ou ser atingida quebra o efeito.
 - **Tática — Atravessar:** 1,5s no plano espectral: invulnerável, mais rápida e ATRAVESSA paredes finas (até 2m de espessura). Ativação de 0,8s.

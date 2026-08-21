@@ -12,6 +12,32 @@ Não veste: É a própria armadura. Correntes cerimoniais penduradas no ombro es
 ## Personalidade & história curta
 Fala uma palavra por vez, com minutos de intervalo. Desperto por acidente na ruína NW do mapa; procura o propósito para gravar na última placa. Gentil com tudo que é pequeno.
 
+## História
+
+**Bio de tela**
+> Ninguém o acordou de propósito. Basalto abriu o olho de âmbar dentro da ruína a
+> noroeste do mapa e não havia mais ninguém ali para explicar por quê. As correntes no
+> ombro dele têm uma placa de bronze para cada mestre que já serviu, e a última está
+> em branco: ele procura um propósito digno de ser gravado. Duas toneladas de pedra
+> rúnica, uma palavra por vez, e um cuidado quase cômico com tudo que é pequeno.
+
+**Fundo**
+As runas de criação no peito dele são antigas e completas — quem o fez sabia
+exatamente o que estava fazendo, e depois foi embora sem deixar recado. O fragmento
+de obelisco cravado no ombro direito veio da própria ruína; Aelion reconheceu ali a
+gravação de uma torre antiga, da mesma mão que gravou as dele, e não contou a
+ninguém. Brok se recusa a gravar a última placa: nome não se martela por outro, e o
+golem terá de trazer o propósito pronto se quiser a forja acesa.
+
+Enquanto isso, Basalto vai levando. Sylva planta flores nas fendas das costas dele e
+ele finge que não gosta — nunca as sacode. Noctus, que se alimenta de éter alheio,
+não consegue tirar absolutamente nada de uma criatura de pedra rúnica e considera
+isso uma ofensa pessoal; Basalto acha graça, uma vez a cada muitos minutos. Ele é o
+maior alvo do campo e sabe disso, o que talvez explique a paciência. O que teme não é
+quebrar: é ser desligado antes de descobrir para que foi ligado.
+
+**Assinatura:** *"Ainda. Não. Sei. Mas. Espero."*
+
 ## Kit (proposta)
 - **Passiva — Pele de Montanha:** imune a lentidão de terreno (lama, gelo); projéteis que o atingem pelas COSTAS causam 20% menos (as placas).
 - **Tática — Punho Sísmico:** soca o chão: onda de pedra em cone curto que empurra e causa dano decente; em TERRA, deixa 3 pedras de cobertura baixa.

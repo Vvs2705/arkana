@@ -13,6 +13,34 @@ Macacão de oficina com bobinas de fio de cobre nos bolsos, luvas isolantes pend
 ## Personalidade & história curta
 Tagarela feliz, apelida as próprias invenções, trata o raio que quase a matou como sócio fundador. Tece raio como a avó tecia lã — literalmente: aprendeu magia no tear da avó, trocando o fio por corrente. Medo real, só um: o dia em que o marca-passo falhar longe da bancada.
 
+## História
+
+**Bio de tela**
+> Aos nove anos, um raio destruiu o moinho da família e atravessou Tessa no caminho.
+> Ela acordou três dias depois com samambaias de luz desenhadas do ombro ao punho — e
+> um coração que perdeu o compasso para sempre. Aos quinze, forjou sozinha o próprio
+> marca-passo rúnico e mandou abrir um recorte no macacão para deixá-lo à mostra: ela
+> QUER que vejam. Relógios param perto dela. Ela acha ótimo.
+
+**Fundo**
+Aprendeu magia no tear da avó, trocando fio por corrente — literalmente o mesmo
+gesto, a mesma contagem de nós, outro material. Por isso trata raio como linha e não
+como explosão, e por isso as duas agulhas de tear vivem cravadas no coque. Ela não
+guarda mágoa do raio: trata o acidente como sócio fundador da carreira e mostra as
+cicatrizes de manga curta, só do lado esquerdo, com um orgulho que desarma quem
+esperava encontrar trauma.
+
+Quando finalmente mostrou o marca-passo a Brok, o anão examinou a runa por um tempo
+longo demais, disse que o ritmo estava torto e se recusou a endireitar: "runa torta
+que bate é runa viva". É a ele que ela correria se o coração falhasse — e o medo real
+dela, o único, é que isso aconteça longe de qualquer bancada. Fizz implora pelo
+desenho do marca-passo desde o primeiro dia e nunca vai conseguir. Maris e ela sabem
+que juntas são um desastre anunciado, porque água conduz raio e o raio não escolhe
+uniforme. E Pip rouba bobinas de cobre dos bolsos dela toda semana; Tessa finge não
+notar, e deixa as bobinas mais fáceis por perto.
+
+**Assinatura:** *"Aqui o tempo sou eu."*
+
 ## Kit
 - **Passiva — Compasso Rúnico:** o marca-passo regenera escudo lentamente; pergaminhos de escudo restauram tudo; quando o escudo QUEBRA, o coração dispara: +15% de velocidade por 2s.
 - **Tática — Fio do Tear:** estica um fio de raio entre 2 pontos (até 6 fios ativos): tocar = dano + lentidão + revela. O fio brilha e ZUMBE para quem está a menos de 5m (honesto de perto, discreto de longe).

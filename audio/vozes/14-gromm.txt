@@ -1,0 +1,92 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 14 — GROMM, O XAMA DA TEMPESTADE
+Raca: Orc das Estepes · Funcao: Suporte / Vida · Slug de arquivo: gromm_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 55 anos. Baixo profundo com raspagem natural (as presas mudam o ar na
+saida — deixe as consoantes um pouco mais pesadas, sem virar rosnado).
+Ritmo: LENTO, de tambor. Pausas grandes entre as frases. Ele fala como quem
+espera o trovao responder — e as vezes espera mesmo.
+Emocao-base: gravidade cerimoniosa com humor de avô por baixo. Ele e engracado
+sem sorrir, e o take precisa deixar a piada passar seca.
+Registro: xamanico e concreto ao mesmo tempo. Ele fala de trovao, estepe,
+tribo, feridos — nunca de destino ou glória.
+DETALHE DE ATUACAO: a ordem de prioridade dele e sempre a mesma e aparece na
+fala: PRIMEIRO OS FERIDOS, DEPOIS A VINGANCA. Quando ele fala de cura, a voz
+amolece bastante; quando fala de troco, endurece de vez.
+NAO fazer: rosnado de orc de videogame, grunhido, voz de monstro. Ele e o mais
+sabio do elenco. A ferocidade dele e o volume, nao a bestialidade.
+
+AJUSTE SUGERIDO
+Stability 75 · Similarity 85 · Style 30 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [gromm_intro_01] [lento, grave] Gromm. Primeiro os feridos. Depois o troco.
+02 [gromm_intro_02] [cerimonioso] O trovao me deu conselho hoje cedo. Ele nunca erra o dia.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [gromm_queda_01] [grave, com pausa] A estepe la em cima e o ceu. La embaixo... e so gente.
+02 [gromm_queda_02] [tambor] Descemos como tribo. Voltamos como tribo.
+
+---------------------------------------------------------------
+3. TATICA — TOTEM DAS CHUVAS
+---------------------------------------------------------------
+01 [gromm_tatica_01] [grave, firme] Totem plantado! Chuva nele!
+02 [gromm_tatica_02] [mais macio, curando] Bebam. Oito segundos de chuva boa.
+03 [gromm_tatica_03] [aviso honesto] A chuva apaga o fogo. O NOSSO tambem. Escolham.
+
+---------------------------------------------------------------
+4. SUPREMA — ESPIRITO DO TROVAO (telegrafada)
+---------------------------------------------------------------
+01 [gromm_suprema_01] [enorme, o trovao antes] ESPIRITO DO BISAO! ELE VEM EM LINHA! SAIAM DA FRENTE!
+02 [gromm_suprema_02] [alto, cerimonioso] TROVAO PRIMEIRO, DEPOIS OS CASCOS! Vocês foram avisados!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [gromm_abate_01] [grave, sem prazer] Deitou.
+02 [gromm_abate_02] [lento] O trovao ja tinha dito o teu nome.
+03 [gromm_abate_03] [firme] Voce machucou os meus. Isso o ceu cobra.
+04 [gromm_abate_04] [baixo, respeitoso] Descansa na terra. Ela e boa.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [gromm_caido_01] [grave, sem panico] Gromm caiu! Peguem o totem, ele ainda chove!
+02 [gromm_caido_02] [rouco, lento] Velho demais pra isso... e novo demais pra parar.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [gromm_reviver_01] [macio, mao grande no ombro] Calma. A chuva ja ta em voce. Respira comigo.
+02 [gromm_reviver_02] [grave, firme] Ninguem fica na estepe. Ninguem.
+03 [gromm_revivido_01] [voltando, profundo] O ceu me devolveu. Por tua mao.
+04 [gromm_revivido_02] [lento, sincero] Voce virou tribo agora. Nao tem volta.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [gromm_vitoria_01] [grave, solene] Todos voltaram. O resto e enfeite.
+02 [gromm_vitoria_02] [lento, quase riso seco] O trovao vai querer os creditos. Deixa ele.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [gromm_bordao_01] [assinatura] Curar um dos meus me cura tambem. A estepe ensinou.
+02 [gromm_bordao_02] [grave] Quem escuta o trovao nunca leva susto.
+03 [gromm_bordao_03] [seco, humor de avô] Meu totem tem oitenta de vida. E mais teimoso que voce.
+04 [gromm_bordao_04] [lento] Vingar e facil. Chegar antes da ferida e que e dificil.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [gromm_interacao_maris] [respeito, quase alianca] Nereida, minha chuva e teu chao. Planta o pe na minha agua e cresce.
+02 [gromm_interacao_vitalis] [grave, caloroso] Curandeira, tu segura a mao. Eu molho a testa. Os feridos precisam das duas coisas.
+03 [gromm_interacao_pyra] [firme, sem hostilidade] Chama de Guerra, a minha chuva vai apagar o teu muro. Nao e ofensa. E o ceu.

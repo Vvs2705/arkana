@@ -13,6 +13,34 @@ Sobretudo de colarinho alto verde-escuro com penas costuradas por dentro da gola
 ## Personalidade & história curta
 Recluso, meticuloso, fala com o corvo em voz baixa como quem fala sozinho — mas nunca está sozinho. Trocou o olho ainda jovem, num inverno em que precisava enxergar longe demais. Se perguntam se valeu: "eu vejo mais que todos vocês. De perto, quase nada."
 
+## História
+
+**Bio de tela**
+> Houve um inverno em que uma notícia levaria dez dias a cavalo e três a asa, e o
+> Corvomante não tinha dez dias. Ofereceu o olho direito e recebeu uma pedra de
+> obsidiana no lugar — o olho verdadeiro voa por aí, dentro de um corvo espectral.
+> Tudo o que a ave vê, ele vê. Enquanto ela voa, o corpo dele fica parado onde estiver,
+> indefeso e sozinho. Ele sabe de cor a rota de todas as Torres Arcanas. De perto,
+> quase não enxerga nada.
+
+**Fundo**
+Escriba antes de mago, ele passou a juventude copiando mapas de gente que nunca
+tinha saído da biblioteca. O pacto foi feito no frio, às pressas, e é literal como
+todo pacto barato: o corvo carrega o olho, e a órbita de obsidiana esquenta quando a
+ave se afasta demais — é assim que ele mede distância. Costurou penas por dentro da
+gola do sobretudo, onde ninguém vê, para o corvo ter onde pousar sem ser observado.
+Usa a luneta rúnica sobre a obsidiana, e não sobre o olho bom. Não explica por quê.
+
+O que ele quer é ver o inteiro — a partida toda, o mapa todo, a jogada antes de
+acontecer. O que teme cabe numa frase que ele nunca disse em voz alta: que o corvo
+não volte. Aelion, que guardou as Torres Arcanas por séculos, considera o corvo uma
+invasão cerimonial e o diz com todas as letras; o Corvomante responde mandando a ave
+justamente por cima dele. Com Olho-de-Éter mantém a rivalidade mais educada do
+elenco: corvo contra mariposa, olho contra vibração, e nenhum dos dois admite que o
+outro chega primeiro metade das vezes.
+
+**Assinatura:** *"Um olho a menos. Um horizonte a mais."*
+
 ## Kit
 - **Passiva — Meu Olho Voa:** o corvo marca para todo o esquadrão os inimigos que vê.
 - **Tática — Voo do Olho:** assume o corvo à distância (voa, escaneia baús e Torres Arcanas) OU o pousa no ombro de um aliado: em modo sentinela, o corvo marca automaticamente inimigos a 20m daquele aliado.

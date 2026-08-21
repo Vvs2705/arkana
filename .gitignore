@@ -39,3 +39,13 @@ $RECYCLE.BIN/
 *.keystore
 *.jks
 keystore.properties
+
+# Modelos 3D — a OFICINA nao vai para o git, o PRODUTO vai.
+# A pasta de trabalho de cada personagem (malha crua da Meshy, FBX, texturas
+# soltas, animacoes separadas) pesa ~114MB so' na Pyra e e' REGENERAVEL:
+#   python tools/meshy/meshy.py tudo 01-pyra && python tools/meshy/montar_glb.py 01-pyra pyra
+# O que o jogo carrega de fato e' godot/characters/modelos/<nome>.glb, que fica
+# versionado. Se um dia o elenco inteiro entrar, migrar esses .glb para Git LFS
+# (docs/PASSOS_GRAFICOS.md secao 6).
+godot/characters/modelos/*/
+!godot/characters/modelos/*.glb

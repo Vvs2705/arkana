@@ -1,0 +1,94 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 04 — CORVUS, O CACADOR
+Funcao: Ataque / Perseguicao · Slug de arquivo: corvus_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Homem, 45 anos. Baritono grave e aspero, gasto por invernos. Voz que sai de
+baixo do peito, abafada pela mascara de couro.
+Ritmo: de reza. Frases cerimoniosas, pausa antes de nomear alguem. Ele leva a
+palavra a serio porque a palavra e a unica coisa que ele nao precisa enxergar.
+Emocao-base: reverencia. Ele nunca comemora — ele agradece.
+Registro: arcaico e formal. Chama todo mundo de "irma-caca" e "irmao-caca".
+Nunca gira. Nunca fala girias.
+DETALHE DE ATUACAO (o mais importante): CORVUS E CEGO. Ele nao diz "eu vi" nem
+"olha ali". Ele diz "eu senti", "o cheiro passou aqui", "o ar mudou". Toda
+descricao dele e olfato transformado em cor. Se a fala funcionar com um
+personagem que enxerga, ela esta errada.
+RESPIRACAO: deixe a inspiracao AUDIVEL antes das falas de tatica e passiva —
+ele fareja antes de falar. Isso vende o personagem sozinho.
+NAO fazer: rosnado de monstro, voz de lobisomem processada. Na forma de besta a
+voz continua HUMANA, so mais grave e mais curta de folego.
+
+AJUSTE SUGERIDO
+Stability 65 · Similarity 85 · Style 30 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [corvus_intro_01] [grave, cerimonioso] Corvus. Os olhos mentem a distancia. O cheiro nunca mentiu.
+02 [corvus_intro_02] [baixa, reza] Irmao lobo, pedimos licenca mais uma vez.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [corvus_queda_01] [inspiracao audivel, depois firme] O vento traz ferro e medo. A caca ja comecou sem nos.
+02 [corvus_queda_02] [grave] Irmaos-caca: pisem devagar. O chao guarda tudo.
+
+---------------------------------------------------------------
+3. TATICA — UIVO DE CACA
+---------------------------------------------------------------
+01 [corvus_tatica_01] [potente, aberto] UIVO! Quem correr, acende!
+02 [corvus_tatica_02] [depois do uivo, grave] Tres cheiros se moveram. Um esta ferido.
+03 [corvus_tatica_03] [aviso honesto] Eles me ouviram tambem. Informacao por informacao.
+
+---------------------------------------------------------------
+4. SUPREMA — FORMA DE LOBISOMEM (telegrafada)
+---------------------------------------------------------------
+01 [corvus_suprema_01] [reza rapida virando grito] Irmao lobo, TOMA MINHAS MAOS! A CACA E TUA!
+02 [corvus_suprema_02] [voz descendo para o grave enquanto muda] EU CORRO AGORA! TODO CHEIRO E MEU!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [corvus_abate_01] [baixa, respeitosa] Caça honrada. Descansa, irmao.
+02 [corvus_abate_02] [grave] O cheiro dele esfriou.
+03 [corvus_abate_03] [sem prazer] Um no atado. Mais um inverno contado.
+04 [corvus_abate_04] [firme] Voce se moveu. Foi so isso.
+
+---------------------------------------------------------------
+6. SER DERRUBADO / CAIR
+---------------------------------------------------------------
+01 [corvus_caido_01] [rouco, sem panico] Cai! O lobo ficou quieto...
+02 [corvus_caido_02] [respirando pesado] Perdi a trilha... perdi a trilha...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDO
+---------------------------------------------------------------
+01 [corvus_reviver_01] [grave, maos firmes] Ergue, irma-caca. A matilha nao deixa ninguem.
+02 [corvus_reviver_02] [baixa] Eu sinto teu cheiro. Ainda esta forte.
+03 [corvus_revivido_01] [voltando, agradecido] O ar voltou a ter cor. Obrigado.
+04 [corvus_revivido_02] [grave] A matilha honrou. Eu honro de volta.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEAO
+---------------------------------------------------------------
+01 [corvus_vitoria_01] [solene] Mais um inverno no meu antebraco. Que o lobo aceite o no.
+02 [corvus_vitoria_02] [baixa, quase reza] Nao vencemos. Sobrevivemos. E diferente.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [corvus_bordao_01] [assinatura] Eu nao cacei o lobo. Eu dividi com ele.
+02 [corvus_bordao_02] [grave] Fica parado e eu perco voce. Poucos tem essa disciplina.
+03 [corvus_bordao_03] [baixa] Voces enxergam o que esta na frente. Eu sinto o que ja passou.
+04 [corvus_bordao_04] [cerimonioso] O medo tem cheiro doce. E o mais facil de seguir.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [corvus_interacao_olhodeeter] [respeito raro] Tu nao ouves e eu nao vejo, irmao. Juntos damos um homem inteiro.
+02 [corvus_interacao_umbra] [firme, sem provocacao] Teu passo e mudo, elfa. Teu cheiro grita.
+03 [corvus_interacao_vex] [contrariado] Tua nevoa apaga o mundo pra mim, alquimista. Avisa antes de me cegar duas vezes.

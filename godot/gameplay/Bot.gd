@@ -38,7 +38,9 @@ func _physics_process(delta: float) -> void:
 	var dir := Vector3.ZERO
 	if alive_target and dist < ATTACK_DIST:
 		face_dir(_flat(target.global_position - global_position), delta)
-		if _fire_cd <= 0.0:
+		# Atordoado (conducao: raio em quem esta' molhado) nao conjura. O corpo
+		# ja' e' travado pelo Pawn; o disparo tem que ser travado aqui.
+		if _fire_cd <= 0.0 and stun_left <= 0.0 and Derrubado.pode_agir(self):
 			_shoot()
 	elif alive_target and dist < CHASE_DIST:
 		dir = _flat(target.global_position - global_position)
@@ -52,7 +54,7 @@ func _physics_process(delta: float) -> void:
 	move_velocity(dir, delta)  # produto unico + dash + knockback (caminho do Pawn)
 	move_and_slide()
 	face_dir(dir, delta, 8.0)
-	anim("cast" if _cast > 0.0 else ("run" if dir.length_squared() > 0.01 else "idle"))
+	anim("cast" if _cast > 0.0 else locomotion_anim())  # pela velocidade REAL
 
 
 func _flat(v: Vector3) -> Vector3:
@@ -74,7 +76,7 @@ func _maybe_dodge(delta: float) -> void:
 
 
 func _shoot() -> void:
-	_fire_cd = float(Projectile.spec(element).fire_rate) * FIRE_RATE_MULT
+	_fire_cd = float(ArmaSlot.spec_de(self, element).fire_rate) * FIRE_RATE_MULT
 	_cast = 0.3
 	var from := global_position + Vector3(0, 1.4, 0)
 	var to := target.global_position + Vector3(0, 1.2, 0)
@@ -93,3 +95,11 @@ func die() -> void:
 		tw.tween_callback(queue_free)
 	else:
 		queue_free()
+
+## Destino imposto de FORA (zona fechando, Bau Celestial caindo). Sobrepoe o
+## vagar e segura o repique, senao o bot sorteia outro destino em 2-5s e volta
+## a morrer na tempestade. Pedido por DUAS raias (Zona e BauCelestial), que ja'
+## chamam isto de forma defensiva com has_method().
+func ir_para(pos: Vector3) -> void:
+	_wander_to = pos
+	_repick = 4.0

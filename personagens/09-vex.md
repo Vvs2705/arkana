@@ -13,6 +13,34 @@ Avental de couro pesado sobre colete de fivelas; o fole de latão no peito com j
 ## Personalidade & história curta
 Metódico, seco, honesto até a crueldade — com os outros e consigo. Não se arrepende da Grande Obra: "a mina respirou. Eu parei de respirar. A troca foi equivalente." Anota TUDO. O caderno dele é o item que salvaria primeiro de um incêndio.
 
+## História
+
+**Bio de tela**
+> A mina estava soterrada e o ar lá dentro matava devagar. Vex transmutou o ar para
+> salvar quem estava embaixo — e funcionou. A Grande Obra explodiu no mesmo instante e
+> levou os dois pulmões dele. Hoje um fole alquímico de latão respira no lugar, num
+> ritmo que nunca acelera: ele não pode ofegar, não pode correr, não pode ter pressa.
+> O que ele exala agora é a própria peste. Ele anotou tudo. Não se arrependeu de nada.
+
+**Fundo**
+Vex é alquimista de escola antiga, daquelas em que a Troca Equivalente não é metáfora
+nem tema de prova: é regra de contabilidade. A mina respirou; ele parou de respirar;
+a conta fecha. As queimaduras químicas atrás das orelhas são de experimentos
+anteriores e ele as usa como currículo. O caderno é o item que ele salvaria primeiro
+de um incêndio, à frente do próprio fole — porque o fole só mantém um homem vivo e o
+caderno mantém o método.
+
+Honestidade nele beira a crueldade, e ele aplica primeiro em si mesmo. Foi por isso
+que, quando Vitalis perguntou o que custaria devolver um corpo à irmã presa entre os
+mundos, ele calculou em voz alta até a última linha, sem suavizar nada, e depois
+anotou com a data que ela não voltou a perguntar. Fizz "pegou emprestado" o caderno
+uma vez e o devolveu com cinco páginas a mais e uma queimada; Vex leu as cinco
+páginas, admitiu que três estavam certas, e nunca mais deixou o gnomo sozinho na
+bancada. O que ele teme é banal e por isso mesmo verdadeiro: que o fole pare no meio
+de uma anotação.
+
+**Assinatura:** *"Todo ganho custa. Eu pago à vista."*
+
 ## Kit
 - **Passiva — Olhos do Miasma:** vê inimigos dentro da própria névoa com contorno verde.
 - **Tática — Frascos de Reagente:** arremessa até 6 frascos que viram poças inertes (armam em 1s): inimigo que pisa detona a nuvem local — dano baixo + lentidão.

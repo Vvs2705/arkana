@@ -16,10 +16,10 @@ Capacitor foi encerrado e removido.
 
 ## Gerar APK de debug
 
-O ultimo APK local existe em `godot/build/arkana3d.apk`. Na verificacao de
-20/08/2026, os templates de export 4.4.1, o Android SDK e o JDK 21 nao estavam
-mais nos caminhos configurados; portanto, um novo export exige restaurar essas
-dependencias. O estado completo esta em `godot/export/SETUP.md`.
+Verificacao de 21/08/2026: **todas as dependencias estao presentes** (Godot
+4.4.1, templates 4.4.1.stable, Android SDK, JDK 21 e keystore de debug). O
+bloqueio anotado em 20/08 nao existe mais — o export roda de ponta a ponta. O
+estado completo esta em `godot/export/SETUP.md`.
 
 ```bash
 bash godot/export/build_apk.sh

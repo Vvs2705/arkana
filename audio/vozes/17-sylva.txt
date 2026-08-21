@@ -1,0 +1,94 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 17 — SYLVA, A FILHA DA FLORESTA
+Raca: Driade · Funcao: Suporte / Vida · Slug de arquivo: sylva_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher de idade impossivel (soa 35, tem seculos de floresta). Contralto lento e
+resinoso, com um pouco de madeira no timbre — grave, seca, sem brilho metalico.
+Ritmo: MUITO lento. Pausas longas ANTES do verbo, como quem procura a palavra
+numa lingua emprestada. O portugues nao e o idioma natural dela; a floresta e.
+Emocao-base: doçura antiga. Ela fala com aliados como quem fala com mudas.
+DETALHE DE ATUACAO (o contraste que define): com fogo, a voz ENDURECE
+completamente — vira grave, rapida e curta. Ninguem no elenco muda tanto entre
+dois registros. As falas marcadas [dura] usam esse segundo modo.
+E ela tem MEDO REAL da Pyra. Nao odio: MEDO. Nas falas com a Pyra, a voz fica
+mais fina e mais rapida — a unica vez que Sylva soa fragil.
+VOCABULARIO: estacao, raiz, seiva, muda, queimada. Ela conta o tempo em invernos
+e chama a barra de vida de "outono" (o cabelo dela muda de estacao conforme cai).
+NAO fazer: voz etérea de fada da natureza, sussurro de vento. Ela e MADEIRA:
+densa, lenta, presente.
+
+AJUSTE SUGERIDO
+Stability 75 · Similarity 85 · Style 30 · Speaker Boost OFF
+(nas falas [dura]: Stability 45 · Style 55)
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [sylva_intro_01] [lenta, pausa antes do verbo] Sylva. Eu... lembro desta floresta de quando ela era semente.
+02 [sylva_intro_02] [doce] Se voce sangrar, eu sangro um pouco junto. E assim que raiz funciona.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [sylva_queda_01] [lenta] A grama la embaixo... me conhece. Vamos por ali.
+02 [sylva_queda_02] [doce, quase resignada] Mais um inverno curto. Vocês vivem tao rapido.
+
+---------------------------------------------------------------
+3. TATICA — BROTO GUARDIAO
+---------------------------------------------------------------
+01 [sylva_tatica_01] [lenta, curta] Broto plantado. Um segundo... e ele floresce.
+02 [sylva_tatica_02] [doce] Fica no polen. Ele cuida de voce.
+03 [sylva_tatica_03] [dura, aviso] Fogo mata o broto na hora. Nao planta perto de chama.
+
+---------------------------------------------------------------
+4. SUPREMA — CORACAO DA MATA (telegrafada)
+---------------------------------------------------------------
+01 [sylva_suprema_01] [voz que sobe do chao, alta e lenta] CORACAO DA MATA! As raizes vem! Fiquem DENTRO!
+02 [sylva_suprema_02] [alta, aviso honesto] AS RAIZES NAO ESCOLHEM! Quem estiver na borda vai ser agarrado tambem!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [sylva_abate_01] [lenta, sem prazer] Voltou pra terra. E o certo.
+02 [sylva_abate_02] [doce, quase triste] Voce era novo. Muito novo.
+03 [sylva_abate_03] [dura] Voce queimou. Agora fica.
+04 [sylva_abate_04] [lenta] A raiz pegou. Elas sempre pegam.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [sylva_caido_01] [lenta com dor] Cai... minhas folhas viraram outono... venham.
+02 [sylva_caido_02] [fraca] Eu peguei a dor dele... e nao aguentei as duas.
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [sylva_reviver_01] [doce, muito lenta] Devagar. A seiva sobe devagar... mas ela sobe.
+02 [sylva_reviver_02] [lenta, firme] Eu ja vi arvore rachada dar flor. Voce da tambem.
+03 [sylva_revivido_01] [voltando, agradecida] Voce me regou. Eu nao esqueco quem rega.
+04 [sylva_revivido_02] [doce] Minha primavera voltou. Obrigada.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [sylva_vitoria_01] [lenta, satisfeita] Nenhuma arvore caiu hoje. E uma boa temporada.
+02 [sylva_vitoria_02] [doce] Vocês vao esquecer isso em um ano. Eu vou lembrar por cem.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [sylva_bordao_01] [assinatura, lenta] Eu levo a sua dor. Nao apago — LEVO. Alguem tem que carregar.
+02 [sylva_bordao_02] [doce] Meu cabelo diz como eu estou. Se virar outono, corre.
+03 [sylva_bordao_03] [dura] Quem queima arvore nao merece sombra. Nunca mais.
+04 [sylva_bordao_04] [lenta] Eu nao visto roupa. Eu visto o que cresceu em mim.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [sylva_interacao_pyra] [mais fina e mais rapida — MEDO real, unica vez] Fica longe. Por favor... fica longe com esse braco.
+02 [sylva_interacao_basalto] [doce, afeto tranquilo] As flores das tuas costas abriram, Basalto. Eu vi. Voce finge que nao gosta.
+03 [sylva_interacao_gromm] [lenta, respeito] Xama, a tua chuva chega onde as minhas raizes nao alcancam. Continua chovendo.

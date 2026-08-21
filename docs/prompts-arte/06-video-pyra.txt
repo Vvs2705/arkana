@@ -1,0 +1,151 @@
+ARKANA — PROMPT DE VÍDEO (Adobe Firefly)
+PERSONAGEM: 01 — PYRA, A CHAMA DE GUERRA
+DURAÇÃO: até 10 segundos · FORMATO: 16:9 (trailer) e 9:16 (social)
+========================================================================
+
+PROMPT CURTO (o que usar primeiro)
+---------------------------------
+Anexe personagens/01-pyra/arte/frente.png e cole:
+
+    She slowly raises her bronze gauntlet and the fire inside it flares,
+    embers drifting past her face. Her hair and the torn hem of her tunic
+    move in the heat. Slow camera push-in. Cinematic fantasy game trailer.
+
+    No text, no logos, no weapons, no other characters.
+
+Se a manopla de bronze sumir ou virar braco normal, ai' sim use o PROMPT A
+completo, que descreve a personagem inteira.
+
+
+COMO USAR
+---------
+O Firefly tem dois caminhos. Prefira o PRIMEIRO — ele mantém a identidade da
+personagem, que é o que mais importa aqui.
+
+  [A] IMAGEM PARA VÍDEO (recomendado)
+      Suba como imagem de referência:
+          personagens/01-pyra/arte/frente.png
+      (é a vista frontal já recortada — uma figura só, sem as outras vistas
+      da folha, que confundem o gerador)
+      Cole o PROMPT A abaixo.
+
+  [B] TEXTO PARA VÍDEO (sem referência)
+      Use só se o caminho A não estiver disponível. A personagem sai
+      "parecida", não idêntica. Cole o PROMPT B.
+
+REGRA DE OURO: 10 segundos comportam UM movimento de câmera e UMA ação.
+Prompt com três acontecimentos vira papinha. Escolha um take e faça bem.
+
+
+========================================================================
+PROMPT A — IMAGEM PARA VÍDEO (com frente.png anexada)
+========================================================================
+
+Cinematic game trailer shot of the woman in the reference image, a battle
+mage in a dark navy war tunic with scorched, ragged hem and tall leather
+boots. Her LEFT ARM is a living-flame prosthetic held inside an articulated
+bronze gauntlet — molten orange fire glows between the bronze plates and
+breathes slowly, like a heartbeat. Burn scars run from her left shoulder up
+her neck to her jaw; she does not hide them.
+
+Motion: she stands in a slow, grounded fighting stance and raises the bronze
+gauntlet toward the camera as the flame inside it flares brighter, embers
+lifting past her face. Her hair and the torn hem of her tunic drift in the
+heat. She holds the viewer's gaze, unblinking, calm — a veteran, not a poser.
+
+Camera: slow push-in from a low three-quarter angle, subtle handheld drift.
+No cuts.
+
+Lighting: warm orange key light from the burning arm on her left side, cool
+deep-blue rim light from behind, dark smoky background with drifting embers
+and shallow depth of field.
+
+Style: high-end fantasy game cinematic, painterly realism, rich saturated
+color, filmic contrast, 24fps motion blur.
+
+Palette: fire orange #FF5A2A, night blue #2B2E63, bronze #A8763E.
+
+Do not include: text, logos, watermarks, other characters, weapons in her
+right hand, modern clothing, gore, blood, distorted hands or faces.
+
+
+========================================================================
+PROMPT B — TEXTO PARA VÍDEO (sem referência)
+========================================================================
+
+Cinematic fantasy game trailer, 10 seconds. A battle-hardened woman mage in
+her thirties, olive skin, dark hair pulled back in a tight military bun,
+standing in a smoky ruined courtyard at dusk. She wears a dark navy war tunic
+over light scorched armor, a heavy leather belt and tall laced boots; the hem
+of her tunic is burned and ragged.
+
+Her LEFT ARM is not flesh — it is living fire contained in an articulated
+bronze gauntlet, with molten orange light glowing between the plates. Burn
+scars climb from her left shoulder to her jaw.
+
+Motion: she slowly raises the burning bronze arm; the flame surges and embers
+spiral upward past her face. She never breaks eye contact with the camera.
+
+Camera: single continuous slow push-in, low three-quarter angle.
+
+Lighting: warm firelight from the arm, cool blue rim light behind, volumetric
+smoke, floating embers, shallow depth of field.
+
+Style: AAA fantasy game cinematic, painterly realism, saturated color, filmic
+contrast, cinematic motion blur.
+
+Do not include: text, logos, watermarks, other characters, gore, blood,
+modern clothing, extra limbs, distorted hands.
+
+
+========================================================================
+VARIAÇÕES (se quiser outro take — troque só o bloco "Motion" e "Camera")
+========================================================================
+
+V1 — A MURALHA DE BRASAS (a tática dela)
+  Motion: she sweeps the bronze gauntlet low across her body and a line of
+  low fire erupts along the ground in front of her, embers scattering.
+  Camera: slow lateral track, following the fire line.
+
+V2 — BRAÇO LIVRE (a suprema)
+  Motion: the bronze gauntlet unlocks and opens outward in petal-like plates,
+  held by short chains, and the whole arm becomes pure flame.
+  Camera: slow orbit around her right side, ending on the open gauntlet.
+
+V3 — A CALMA ANTES (retrato)
+  Motion: she stands still, breathing; the fire in the arm pulses slowly with
+  her heartbeat. Only embers and hair move.
+  Camera: extremely slow push-in on her face and the scars.
+
+V4 — A MARCHA
+  Motion: she walks straight toward the camera through smoke, the burning arm
+  lighting the ground around her feet.
+  Camera: slow dolly backward, keeping her centered.
+
+
+========================================================================
+NOTAS DE PRODUÇÃO
+========================================================================
+
+- CLASSIFICAÇÃO 10+: sem sangue, sem ferimento aberto, sem crueldade. As
+  cicatrizes são CICATRIZES — pele curada, não machucado. Está escrito no
+  "do not include" de propósito.
+
+- O QUE MAIS FALHA nos geradores, nesta ordem: (1) o braço de fogo vira um
+  braço normal com textura laranja; (2) a manopla de bronze some; (3) aparece
+  uma arma na mão direita que ela não tem; (4) mãos deformadas. Se o take
+  sair com qualquer um desses, regere em vez de aceitar — a manopla é a
+  assinatura da personagem.
+
+- SE A MANOPLA SUMIR MESMO NO CAMINHO [A]: recorte um close do braço esquerdo
+  a partir de personagens/01-pyra/arte/concept.png (o inset da manopla, no
+  canto superior direito da folha) e use ESSE recorte como referência, com o
+  bloco V2 (Braço Livre). Menos corpo na tela = mais fidelidade no detalhe.
+
+- ONDE SALVAR o vídeo aprovado:
+      personagens/01-pyra/arte/video/pyra_<take>.mp4
+  (mesma lógica das outras artes: cada personagem carrega o próprio material)
+
+- USO: vitrine do elenco no menu, tela de seleção, material de divulgação.
+  NÃO serve como referência de animação para o jogo — vídeo gerado não vira
+  esqueleto; animação de jogo vem do pipeline da Meshy / Mixamo / Blender.

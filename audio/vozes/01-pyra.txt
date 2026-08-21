@@ -1,0 +1,90 @@
+ARKANA — FALAS DE VOZ
+PERSONAGEM: 01 — PYRA, A CHAMA DE GUERRA
+Funcao: Ataque / media distancia · Slug de arquivo: pyra_
+
+VOZ ESCOLHIDA (preencher): voice_id = ____________________
+
+PERFIL DE VOZ
+-------------
+Mulher, 34 anos. Contralto rouco — voz de quem respirou fumaca de incendio e
+nunca recuperou o brilho de cima. Peito, nunca garganta.
+Ritmo: de comando. Frase curta, ponto final duro, sem enfeite. Ela nao pergunta.
+Emocao-base: brasa contida. O calor esta sempre ali, so nao esta sempre aberto.
+Registro: sargento de campo. Trata todo mundo como tropa, inclusive inimigo.
+Sotaque: PT-BR neutro, dicção limpa e articulada (ordem tem que ser entendida
+na primeira vez).
+NAO fazer: histeria, raiva descontrolada, voz de vila. Pyra nunca perde o
+controle — a chama e dela. O braco esquerdo dela ruge; ela nao precisa.
+DETALHE DE ATUACAO: quando ela cita o braco, a voz BAIXA em vez de subir. E o
+assunto mais intimo dela, nao o mais alto.
+
+AJUSTE SUGERIDO (ponto de partida)
+Stability 55 · Similarity 80 · Style 35 · Speaker Boost ON
+
+---------------------------------------------------------------
+1. INTRODUCAO / SELECAO
+---------------------------------------------------------------
+01 [pyra_intro_01] [firme, sem pressa] Pyra. Vanguarda. Fica atras de mim e voce volta inteiro.
+02 [pyra_intro_02] [mais baixa, quase confidencia] Eu troquei um braco por quarenta soldados. Foi barato.
+
+---------------------------------------------------------------
+2. ENTRADA NA PARTIDA / QUEDA NO MAPA
+---------------------------------------------------------------
+01 [pyra_queda_01] [grito de comando, vento por perto] Formacao! A gente cai junto e desce junto!
+02 [pyra_queda_02] [contida, olhando o chao chegar] Manopla travada. Vamos trabalhar.
+
+---------------------------------------------------------------
+3. TATICA — MURALHA DE BRASAS
+---------------------------------------------------------------
+01 [pyra_tatica_01] [seca, curta] Linha de fogo! Nao cruza!
+02 [pyra_tatica_02] [grito curto] Parede acesa!
+03 [pyra_tatica_03] [aviso ao time] Passou por cima da minha brasa, ta marcado.
+
+---------------------------------------------------------------
+4. SUPREMA — BRACO LIVRE (telegrafada, alto)
+---------------------------------------------------------------
+01 [pyra_suprema_01] [rugido de fornalha por baixo, voz aberta no maximo] SOLTANDO A MANOPLA! AFASTA!
+02 [pyra_suprema_02] [grito, quase alegre] BRACO LIVRE! ESSE LADO E MEU!
+
+---------------------------------------------------------------
+5. ABATE / DERRUBADA
+---------------------------------------------------------------
+01 [pyra_abate_01] [seca, sem comemorar] Apagado. Proximo.
+02 [pyra_abate_02] [firme] Eu avisei da linha.
+03 [pyra_abate_03] [respeito militar, baixa] Levanta nao. Fica ai.
+04 [pyra_abate_04] [rispida, orgulho] Fogo desperdicado e o seu, nao o meu.
+
+---------------------------------------------------------------
+6. SER DERRUBADA / CAIR
+---------------------------------------------------------------
+01 [pyra_caido_01] [rouca, com dor, ainda dando ordem] Caí! Segura a linha sem mim!
+02 [pyra_caido_02] [entredentes, o fogo apagando] O braco esfriou... me da um minuto...
+
+---------------------------------------------------------------
+7. REVIVER ALIADO / SER REVIVIDA
+---------------------------------------------------------------
+01 [pyra_reviver_01] [firme, puxando pelo colarinho] De pé, soldado. Ninguem fica.
+02 [pyra_reviver_02] [baixa, quase carinho] Eu ja segurei portao mais pesado que voce.
+03 [pyra_revivido_01] [respirando fundo, voltando] Reacendeu. Obrigada.
+04 [pyra_revivido_02] [rouca, ja em movimento] Debito anotado. Cobra depois.
+
+---------------------------------------------------------------
+8. VITORIA / CAMPEA
+---------------------------------------------------------------
+01 [pyra_vitoria_01] [peito cheio, controlada] Legiao inteira. E assim que termina.
+02 [pyra_vitoria_02] [baixa, para si mesma] Hoje o fogo obedeceu.
+
+---------------------------------------------------------------
+9. PROVOCACOES E DITADOS
+---------------------------------------------------------------
+01 [pyra_bordao_01] [assinatura da personagem] Fogo nao se desperdica. Fogo se ordena.
+02 [pyra_bordao_02] [seca] O que eu perdi, eu escolhi perder.
+03 [pyra_bordao_03] [meio riso rouco] Voce corre da chama. Eu durmo dentro dela.
+04 [pyra_bordao_04] [olhando a manopla, quase carinhosa] Calma. Ainda nao.
+
+---------------------------------------------------------------
+10. INTERACOES COM OUTROS PERSONAGENS
+---------------------------------------------------------------
+01 [pyra_interacao_sylva] [gentileza desajeitada, ela percebe o medo] Filha da Floresta. Eu fecho a manopla perto de voce. Palavra.
+02 [pyra_interacao_vex] [rispida] Sua nevoa apaga com um estalo, alquimista. Nao me tenta.
+03 [pyra_interacao_maris] [provocacao seca] Molha o meu braco de novo, Maris, e a gente conversa em terra firme.
