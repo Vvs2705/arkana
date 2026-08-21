@@ -11,7 +11,7 @@ signal aim_delta(rel: Vector2)  # arrasto -> camera/reticulo acompanham
 var gesture := FireGesture.new()
 var _touch := -1
 var _color := Projectile.tint("fire")
-var _label := "FOGO"
+var _label: String = Textos.HUD_ELEMENTOS.fire
 
 
 func _ready() -> void:
@@ -33,7 +33,7 @@ func _tune_deadzone() -> void:
 func _on_element(el: String) -> void:
 	gesture.repeat_ms = int(float(Projectile.spec(el).fire_rate) * 1000.0)
 	_color = Projectile.tint(el)
-	_label = {"water": "AGUA", "lightning": "RAIO"}.get(el, "FOGO")
+	_label = str(Textos.HUD_ELEMENTOS.get(el, Textos.HUD_ELEMENTOS.fire))
 	queue_redraw()
 
 

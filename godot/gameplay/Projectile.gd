@@ -196,7 +196,10 @@ func _on_hit(body: Node3D) -> void:
 	var mult := Efeitos.aplicar(body, element, dmg, shooter)
 	var efetivo := Combat.deal(body, dmg * mult, element, shooter)
 	if efetivo > 0.0:
-		_damage_number(efetivo, hit_pos, em_escudo)
+		# O numero de dano e' da HUD (ui/Hud.gd, via Bus.damage_applied). Aqui
+		# desenhava um SEGUNDO Label3D para o MESMO acerto — dois numeros por
+		# tiro. Dono unico: a HUD, que sabe agrupar em 0,35s e colorir por
+		# escudo x vida.
 		if body.has_method("apply_knockback"):
 			body.apply_knockback(dir * _empurrao(body))
 		# Kill do PLAYER anuncia no Bus — kill feed e audio observam (raias paralelas).
@@ -222,29 +225,6 @@ func _empurrao(body: Node) -> float:
 		f = 1.0
 	return float(Balance.COMBATE.knockback) * f
 
-
-## Numero flutuante. COR + FORMA (GDD §10): acerto em ESCUDO sai branco-azulado,
-## acerto em VIDA sai na cor do elemento — antes era dourado fixo para tudo, e o
-## jogador nao tinha como ler "bati no escudo" x "bati na vida". O TAMANHO sai do
-## dano (docs/DANO.md §4.2): um acerto de 30 fica visivelmente maior que um de 8.
-func _damage_number(n: float, at: Vector3, em_escudo: bool) -> void:
-	var f: Dictionary = Balance.FEEDBACK
-	var lbl := Label3D.new()
-	lbl.text = str(int(round(n)))
-	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	lbl.no_depth_test = true
-	lbl.modulate = Color(str(f.cor_escudo)) if em_escudo else tint(element)
-	lbl.outline_size = 10
-	lbl.font_size = int(64.0 * minf(float(f.num_scale_base)
-			+ float(f.num_scale_gain) * n / 25.0, float(f.num_scale_max)))
-	lbl.pixel_size = 0.004
-	get_parent().add_child(lbl)
-	lbl.global_position = at + Vector3(0, 0.6, 0)
-	var vida := float(f.num_life_s)
-	var tw := lbl.create_tween()
-	tw.tween_property(lbl, "position:y", lbl.position.y + 1.0, vida)
-	tw.parallel().tween_property(lbl, "modulate:a", 0.0, vida)
-	tw.tween_callback(lbl.queue_free)
 
 
 ## Burst one-shot reutilizado por impacto e morte de bot.

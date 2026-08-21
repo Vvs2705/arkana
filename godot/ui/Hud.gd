@@ -1,6 +1,23 @@
-## HUD minimo, FORA da coluna central (territorio da mira — licao do projeto):
-## vida/mana sup-esq, timer/bots sup-dir, joystick e Fogo na metade de baixo.
-## OBSERVA o jogo pelo Bus (regra do core); encaminha toque para o player.
+## HUD DE PARTIDA — FORA da coluna central (territorio da mira, licao do
+## projeto). OBSERVA o jogo pelo Bus (regra do core) e encaminha toque para o
+## player. Nada aqui decide jogo.
+##
+## MAPA DA TELA (paisagem):
+##   sup-esq   vida / mana / ESCUDO evolutivo, e os badges de estado do kit
+##   sup-dir   timer / bots / FPS
+##   faixa     UMA linha de aviso no alto, centrada (zona, telegrafo, bau)
+##   anel      arcos de dano direcional e setas de bussola, LONGE do reticulo
+##   inf-esq   joystick
+##   inf-dir   Fogo, Esquiva, TATICA, SUPREMA e o carrossel de elementos
+##   inf-meio  PEGAR (so' aparece com loot ao alcance)
+##
+## A LEI DA PRIORIDADE VISUAL (6 bots + zona + bau + status = sopa): quem salva
+## a vida do jogador ganha a tela. A faixa tem UMA linha e cinco candidatos —
+## ver HudAviso.P_*; o painel de DERRUBADO cala a faixa inteira; badges tem teto
+## de 4. O que perde nao encolhe: SOME.
+##
+## ⚠️ TATICA e SUPREMA pagam COOLDOWN, nunca mana (GDD §4.2). A barra de mana
+## NAO pode reagir a elas — quem cobra e' o KitRunner, e a HUD so' le o frac.
 class_name Hud
 extends CanvasLayer
 
@@ -9,10 +26,16 @@ signal restart_pressed
 var player: Player
 var joystick: VirtualJoystick
 var fire_btn: FireButton
-var dodge_btn: DodgeButton
+var dodge_btn: AcaoButton
+var tatica_btn: AcaoButton
+var suprema_btn: AcaoButton
+var pegar_btn: AcaoButton
 var carousel: ElementCarousel
+var aviso: HudAviso
 var hp_bar: ProgressBar
 var mana_bar: ProgressBar
+var escudo_bar: Control
+var arma_lbl: Label
 var timer_lbl: Label
 var bots_lbl: Label
 var fps_lbl: Label
@@ -27,6 +50,19 @@ var _top_box: VBoxContainer
 var _end_center: CenterContainer
 var _numeros_dano := true
 var _filtro: FiltroDaltonismo
+## Escudo evolutivo (GDD §5) — so' desenha depois que existe.
+var _escudo := 0.0
+var _escudo_max := 0.0
+var _escudo_nivel := 0
+var _escudo_quebrou := 0.0
+## Numeros de dano ACUMULADOS por alvo (docs/DANO.md §4.2): id -> {lbl,total,ate}
+var _nums := {}
+## Casa dos numeros flutuantes. Existe para eles NAO virarem filhos soltos da
+## HUD: com Label solta, todo codigo que varre os filhos (o selftest inclusive)
+## passa a confundir numero de dano com rotulo de arma.
+var _numeros: Control
+## Contagens regressivas vivas: prio da faixa -> {ate, fmt, cor, s}
+var _contagens := {}
 
 
 func _ready() -> void:
@@ -35,6 +71,12 @@ func _ready() -> void:
 	_build_bars()
 	_build_top_right()
 	_build_reticle()
+	_build_aviso()
+	_numeros = Control.new()
+	_numeros.anchor_right = 1.0
+	_numeros.anchor_bottom = 1.0
+	_numeros.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_numeros)
 	_build_sticks()
 	_build_end()
 	_layout()
@@ -43,7 +85,29 @@ func _ready() -> void:
 	get_tree().root.size_changed.connect(_layout)
 	Bus.health_changed.connect(_on_hp)
 	Bus.mana_changed.connect(_on_mana)
-	Bus.damage_dealt.connect(_on_damage)
+	## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). `damage_dealt` NAO e' mais
+	## ouvido aqui: ele nao carrega quem atirou, e sem isso o hitmarker era uma
+	## heuristica que mentia em bot-vs-bot e o arco direcional era impossivel.
+	Bus.damage_applied.connect(_on_damage)
+	Bus.shield_changed.connect(_on_escudo)
+	Bus.shield_broken.connect(_on_escudo_quebrou)
+	Bus.kit_bound.connect(_on_kit_bound)
+	Bus.kit_cooldown.connect(_on_kit_cooldown)
+	Bus.kit_telegraph.connect(_on_kit_telegraph)
+	Bus.kit_state.connect(func(nome: String, ligado: bool) -> void: aviso.estado(nome, ligado))
+	Bus.zona_avisou.connect(_on_zona_avisou)
+	Bus.zona_fechando.connect(_on_zona_fechando)
+	Bus.zona_dano.connect(_on_zona_dano)
+	Bus.zona_estado.connect(_on_zona_estado)
+	Bus.bau_anunciado.connect(_on_bau_anunciado)
+	Bus.bau_pousou.connect(_on_bau_pousou)
+	Bus.bau_canalizando.connect(_on_bau_canalizando)
+	Bus.bau_aberto.connect(_on_bau_aberto)
+	Bus.loot_prompt.connect(_on_loot_prompt)
+	Bus.weapon_equipped.connect(_on_arma)
+	Bus.entity_derrubada.connect(_on_derrubada)
+	Bus.entity_reerguida.connect(_on_reerguida)
+	Bus.derrubado_progresso.connect(_on_derrubado_progresso)
 	# Contador de FPS, numeros de dano e daltonismo sao opcoes do jogador
 	# (GDD par.12) e a HUD e' a dona delas — ver o grupo em menu/Config.gd.
 	add_to_group("config_ouvintes")
@@ -73,17 +137,35 @@ func bind_player(p: Player) -> void:
 	mana_bar.max_value = float(Balance.PLAYER.mana_max)
 	mana_bar.value = p.mana
 	dodge_btn.cd_frac = p.dodge_cd_frac  # Callable morre com o player velho; is_valid() cobre
+	# Cooldown de habilidade e' CONTINUO e o Bus so' emite na BORDA: o valor por
+	# frame vem daqui (KitRunner.frac_*), como manda o contrato do sinal.
+	tatica_btn.cd_frac = func() -> float:
+		var k := KitRunner.de(player)
+		return k.frac_tatica() if k != null else 0.0
+	suprema_btn.cd_frac = func() -> float:
+		var k := KitRunner.de(player)
+		return k.frac_suprema() if k != null else 0.0
+	# Partida nova nao herda aviso, badge nem escudo da partida velha.
+	aviso.player = p
+	aviso.zerar()
+	_contagens.clear()
+	_escudo = 0.0
+	_escudo_max = 0.0
+	_escudo_nivel = 0
+	escudo_bar.get_parent().visible = false
+	pegar_btn.visible = false
+	arma_lbl.text = ""
 
 
 func update_match(time_left: float, bots: int) -> void:
 	var t := maxi(int(ceilf(time_left)), 0)
 	@warning_ignore("integer_division")
 	timer_lbl.text = "%d:%02d" % [t / 60, t % 60]
-	bots_lbl.text = "BOTS %d" % bots
+	bots_lbl.text = Textos.HUD_BOTS % bots
 
 
 func show_end(victory: bool) -> void:
-	end_lbl.text = "VITORIA!" if victory else "DERROTA"
+	end_lbl.text = Textos.HUD_VITORIA if victory else Textos.HUD_DERROTA
 	end_lbl.add_theme_color_override("font_color",
 			Color(0.35, 1.0, 0.45) if victory else Color(1.0, 0.35, 0.35))
 	end_screen.visible = true
@@ -99,47 +181,316 @@ func _process(delta: float) -> void:
 	if _hit_flash > 0.0:
 		_hit_flash = maxf(_hit_flash - delta, 0.0)
 		_reticle.queue_redraw()
+	if _escudo_quebrou > 0.0:
+		_escudo_quebrou = maxf(_escudo_quebrou - delta, 0.0)
+		escudo_bar.queue_redraw()
+	if not _contagens.is_empty():
+		_tick_contagens()
 	if fps_lbl.visible:
-		fps_lbl.text = "%d FPS" % Engine.get_frames_per_second()
+		fps_lbl.text = Textos.HUD_FPS % Engine.get_frames_per_second()
 
 
-## Hitmarker sutil: dano em quem NAO e' o player = acerto do player.
-## ponytail: bots so' atacam o player, entao a heuristica basta; se um dia
-## bot atacar bot, o Bus precisa carregar o atirador.
-func _on_damage(target: Node, amount: int, element: String) -> void:
-	if not target.is_in_group("player"):
+# ---------- dano (docs/DANO.md §4) ----------
+
+## O acerto COMPLETO. Tres leituras diferentes saem do mesmo sinal:
+##   fui EU quem acertou  -> hitmarker + numero flutuante
+##   acertaram em MIM     -> vinheta + arco direcional de quem atirou
+##   bot em bot           -> nada (a heuristica velha acendia o hitmarker aqui)
+func _on_damage(target: Node, amount: float, element: String, source: Node,
+		on_shield: bool) -> void:
+	if not is_instance_valid(player):
+		return
+	if source == player and target != player:
 		_hit_flash = 0.16
 		_reticle.queue_redraw()
 		if _numeros_dano:
-			_numero_dano(target, amount, element)
+			_numero_dano(target, amount, element, on_shield)
+	if target == player:
+		aviso.pulsar(Projectile.tint(element), clampf(amount / 25.0, 0.35, 1.0))
+		# Terreno/DoT nao tem direcao (docs/DANO.md §4.4): sem fonte, sem arco.
+		if source != null and is_instance_valid(source) and source is Node3D:
+			aviso.arco((source as Node3D).global_position, Projectile.tint(element))
 
 
 ## Numero de dano flutuante (GDD par.12): nasce na cabeca do alvo projetada na
-## tela, sobe e some em 0.7s. Cor do elemento — a mesma do projetil e do slot.
-## ponytail: uma Label por acerto, sem pool. Com 6 bots num tiro sao poucas por
-## segundo; se a partida virar 20 jogadores, ai' sim vira pool.
-func _numero_dano(target: Node, amount: int, element: String) -> void:
+## tela, sobe e some. Cor do elemento em VIDA, branco-azulado em ESCUDO, e o
+## TAMANHO sai do dano (docs/DANO.md §4.2 — 30 fica maior que 8).
+##
+## ACUMULACAO: dois acertos no mesmo alvo dentro de `num_merge_s` somam NO MESMO
+## label. Sem isso a manopla (0,21s de cadencia) empilha 5 numeros por segundo e
+## a tela vira escada ilegivel — e' a queixa do Diretor.
+func _numero_dano(target: Node, amount: float, element: String, on_shield: bool) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null or not (target is Node3D):
+		return
+	var f: Dictionary = Balance.FEEDBACK
+	var agora := float(Time.get_ticks_msec()) / 1000.0
+	var id := target.get_instance_id()
+	var e: Dictionary = _nums.get(id, {})
+	if not e.is_empty() and is_instance_valid(e.lbl) and agora < float(e.ate):
+		e.total = float(e.total) + amount
+		e.ate = agora + float(f.num_merge_s)
+		_pintar_numero(e.lbl, float(e.total), element, on_shield)
 		return
 	var mundo: Vector3 = (target as Node3D).global_position + Vector3(0, 1.7, 0)
 	if cam.is_position_behind(mundo):
 		return  # alvo atras da camera projetaria o numero no lugar errado
 	var lbl := Label.new()
-	lbl.text = str(amount)
-	lbl.add_theme_font_size_override("font_size", maxi(int(Dp.px(18.0)), 11))
-	lbl.add_theme_color_override("font_color", Projectile.tint(element))
-	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	lbl.add_theme_constant_override("outline_size", maxi(int(Dp.px(3.0)), 2))
+	_pintar_numero(lbl, amount, element, on_shield)
 	lbl.position = cam.unproject_position(mundo)
-	add_child(lbl)
+	_numeros.add_child(lbl)
+	_nums[id] = {"lbl": lbl, "total": amount, "ate": agora + float(f.num_merge_s)}
+	var vida := float(f.num_life_s)
 	var t := create_tween().set_parallel()
-	t.tween_property(lbl, "position:y", lbl.position.y - Dp.px(34.0), 0.7)
-	t.tween_property(lbl, "modulate:a", 0.0, 0.7).set_ease(Tween.EASE_IN)
+	t.tween_property(lbl, "position:y", lbl.position.y - Dp.px(34.0), vida)
+	t.tween_property(lbl, "modulate:a", 0.0, vida).set_ease(Tween.EASE_IN)
 	t.chain().tween_callback(lbl.queue_free)
 
 
-## Olhar livre: arrastar na metade direita FORA do botao de Fogo gira a camera.
+func _pintar_numero(lbl: Label, total: float, element: String, on_shield: bool) -> void:
+	var f: Dictionary = Balance.FEEDBACK
+	lbl.text = str(int(round(total)))
+	var escala := minf(float(f.num_scale_base) + float(f.num_scale_gain) * total / 25.0,
+			float(f.num_scale_max))
+	lbl.add_theme_font_size_override("font_size", maxi(int(Dp.px(18.0) * escala), 11))
+	lbl.add_theme_color_override("font_color",
+			Color(str(f.cor_escudo)) if on_shield else Projectile.tint(element))
+	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl.add_theme_constant_override("outline_size", maxi(int(Dp.px(3.0)), 2))
+
+
+# ---------- escudo evolutivo (GDD §5) ----------
+
+func _on_escudo(entity: Node, shield: float, shield_max: float, level: int) -> void:
+	if entity != player:
+		return  # 6 bots escudados na barra do jogador nao e' HUD, e' ruido
+	_escudo = shield
+	_escudo_max = shield_max
+	_escudo_nivel = level
+	escudo_bar.get_parent().visible = shield_max > 0.0
+	escudo_bar.queue_redraw()
+
+
+func _on_escudo_quebrou(entity: Node) -> void:
+	if entity != player:
+		return
+	_escudo_quebrou = 0.35  # branco piscando na barra (docs/DANO.md §4.1)
+	escudo_bar.queue_redraw()
+
+
+## Barra SEGMENTADA POR NIVEL: um traco por nivel conquistado. E' o unico
+## indicador de progressao DENTRO da partida — o nivel importa mais que os
+## pontos, entao a segmentacao (forma) vem antes da cor (GDD §10).
+func _draw_escudo() -> void:
+	var cores: Array = Balance.ESCUDO.cores
+	var n := maxi(_escudo_nivel, 1)
+	var cor := Color(str(cores[clampi(n - 1, 0, cores.size() - 1)]))
+	if _escudo_quebrou > 0.0:
+		cor = Color.WHITE
+	var r := Rect2(Vector2.ZERO, escudo_bar.size)
+	escudo_bar.draw_rect(r, Color(0, 0, 0, 0.45))
+	var frac: float = _escudo / maxf(_escudo_max, 0.001)
+	escudo_bar.draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(frac, 0.0, 1.0), r.size.y)),
+			cor)
+	for i in range(1, n):
+		var x := r.size.x * float(i) / float(n)
+		escudo_bar.draw_line(Vector2(x, 0), Vector2(x, r.size.y), Color(0, 0, 0, 0.8),
+				maxf(Dp.px(1.5), 1.0))
+
+
+# ---------- habilidades (GDD §3 / §4) ----------
+
+## Quem entrou em campo e se ele TEM kit. 17 dos 20 magos ainda nao tem: o botao
+## aparece APAGADO, porque esconde-lo faria o jogador achar que o mago nao tem
+## habilidade — e ele tem, na ficha, so' nao no codigo ainda.
+func _on_kit_bound(slug: String, implementado: bool) -> void:
+	for par: Array in [[tatica_btn, "tatica", Textos.HUD_TATICA],
+			[suprema_btn, "suprema", Textos.HUD_SUPREMA]]:
+		var b: AcaoButton = par[0]
+		b.ativo = implementado
+		b.rotulo = str(par[2])
+		b.subtitulo = _nome_habilidade(slug, str(par[1])) if implementado \
+				else Textos.HUD_KIT_EM_BREVE
+		b.total_s = 0.0
+		b.queue_redraw()
+
+
+func _on_kit_cooldown(tipo: String, _restante: float, total: float) -> void:
+	var b: AcaoButton = tatica_btn if tipo == "tatica" else suprema_btn
+	b.total_s = total  # o SEGUNDO no botao; o 0..1 continuo vem do frac_*
+	b.queue_redraw()
+
+
+## A LEI DO §4.3 na tela: "se mata rapido, avisa antes". Vale para a suprema de
+## QUALQUER conjurador — se a do inimigo fosse muda, nao existiria contra-jogada.
+func _on_kit_telegraph(slug: String, _tipo: String, duracao: float, _pos: Vector3) -> void:
+	var nome := _nome_habilidade(slug, "suprema")
+	aviso.avisar(HudAviso.P_TELEGRAFO, Textos.HUD_TELEGRAFO % nome,
+			Color(1.0, 0.75, 0.25), maxf(duracao, 0.6))
+
+
+## O NOME da habilidade e' DADO do elenco (menu/Elenco.gd), nao texto de UI:
+## "Muralha de Brasas — linha de fogo baixo..." vira "Muralha de Brasas".
+static func _nome_habilidade(slug: String, campo: String) -> String:
+	for m: Dictionary in Elenco.MAGOS:
+		if str(m.get("slug", "")) == slug:
+			return str(m.get(campo, "")).split("—")[0].strip_edges()
+	return ""
+
+
+# ---------- zona / tempestade arcana ----------
+
+func _on_zona_avisou(_fase: int, centro: Vector3, _raio: float, segundos: float) -> void:
+	aviso.bussola("zona", centro, Zona.COR)
+	_contar(HudAviso.P_ZONA, segundos, Textos.ZONA_AVISO, Zona.COR)
+
+
+func _on_zona_fechando(_fase: int, centro: Vector3, _raio: float, duracao: float) -> void:
+	aviso.bussola("zona", centro, Zona.COR)
+	_contagens.erase(HudAviso.P_ZONA)
+	aviso.avisar(HudAviso.P_ZONA, Textos.ZONA_FECHANDO, Zona.COR, duracao)
+
+
+## O tique da tempestade (1x por segundo, nunca por frame). A vinheta e o dps
+## juntos respondem "quanto vai doer se eu nao correr".
+func _on_zona_dano(_dano: float, dps: float) -> void:
+	aviso.pulsar(Zona.COR, 0.9)
+	aviso.avisar(HudAviso.P_ZONA_FORA,
+			Textos.ZONA_FORA + Textos.HUD_SEP + Textos.ZONA_DPS % int(round(dps)),
+			Color(1.0, 0.45, 0.45))
+
+
+func _on_zona_estado(dentro: bool) -> void:
+	if dentro:
+		aviso.limpar(HudAviso.P_ZONA_FORA)
+	else:
+		aviso.avisar(HudAviso.P_ZONA_FORA, Textos.ZONA_FORA, Color(1.0, 0.45, 0.45))
+		var z := _zona()
+		if z != null:
+			aviso.bussola("zona", z.centro, Zona.COR)  # a seta e' a saida
+
+
+## O centro/raio CONTINUOS nao tem sinal de proposito: a HUD le a Zona direto.
+## Defensivo porque o selftest monta a HUD sem partida em volta.
+func _zona() -> Zona:
+	var m := get_parent()
+	if m != null and "zona" in m:
+		var z: Variant = m.get("zona")
+		if z is Zona and is_instance_valid(z):
+			return z as Zona
+	return null
+
+
+# ---------- bau celestial (GDD §16.2) ----------
+
+func _on_bau_anunciado(pos: Vector3, segundos: float) -> void:
+	aviso.bussola("bau", pos, _cor_lendaria())
+	_contar(HudAviso.P_BAU, segundos,
+			Textos.BAU_TITULO + Textos.HUD_SEP + Textos.BAU_CAINDO, _cor_lendaria())
+
+
+func _on_bau_pousou(pos: Vector3) -> void:
+	aviso.bussola("bau", pos, _cor_lendaria())
+	_contagens.erase(HudAviso.P_BAU)
+	aviso.avisar(HudAviso.P_BAU, Textos.BAU_POUSOU, _cor_lendaria())
+
+
+## 0.0 = cancelou (saiu do raio). ponytail: a canalizacao e' um numero na faixa,
+## nao uma barra propria — sao 3s e o jogador esta' PARADO olhando o bau.
+func _on_bau_canalizando(progresso: float) -> void:
+	if progresso <= 0.0:
+		aviso.avisar(HudAviso.P_BAU, Textos.BAU_POUSOU, _cor_lendaria())
+		return
+	aviso.avisar(HudAviso.P_BAU,
+			Textos.BAU_ABRINDO + Textos.HUD_SEP + "%d%%" % int(progresso * 100.0),
+			_cor_lendaria())
+
+
+func _on_bau_aberto(por_player: bool, elementos: PackedStringArray) -> void:
+	aviso.bussola("bau", Vector3.ZERO, Color.WHITE, false)
+	_contagens.erase(HudAviso.P_BAU)
+	var txt := Textos.BAU_PERDIDO
+	if por_player and elementos.size() >= 2:
+		txt = Textos.BAU_MANOPLA % [_el(elementos[0]), _el(elementos[1])]
+	aviso.avisar(HudAviso.P_BAU, txt, _cor_lendaria(), 5.0)
+
+
+func _cor_lendaria() -> Color:
+	return Arma.RARIDADES["lendaria"].cor
+
+
+func _el(id: String) -> String:
+	return str(Textos.HUD_ELEMENTOS.get(id, id))
+
+
+# ---------- loot e arma arcana ----------
+
+func _on_loot_prompt(nome: String, raridade: String, perto: bool) -> void:
+	pegar_btn.visible = perto
+	if perto:
+		pegar_btn.subtitulo = nome
+		pegar_btn.cor = Arma.RARIDADES.get(raridade, {"cor": Color.WHITE}).cor
+		pegar_btn.queue_redraw()
+
+
+func _on_arma(arma_id: String, nome: String, raridade: String,
+		elementos: PackedStringArray) -> void:
+	if not is_instance_valid(player) or ArmaSlot.de(player) == null \
+			or ArmaSlot.de(player).arma_id != arma_id:
+		return  # arma de bot nao entra no icone do jogador
+	arma_lbl.text = nome if elementos.size() < 2 \
+			else nome + Textos.HUD_SEP + Textos.ARMA_PAR % [_el(elementos[0]), _el(elementos[1])]
+	arma_lbl.add_theme_color_override("font_color",
+			Arma.RARIDADES.get(raridade, {"cor": Color.WHITE}).cor)
+
+
+# ---------- derrubado (GDD §3.7/§3.8) ----------
+
+func _on_derrubada(entity: Node, _causador: Node) -> void:
+	if entity == player:
+		aviso.derrubar(true)
+
+
+func _on_reerguida(entity: Node, por: Node) -> void:
+	if entity == player:
+		aviso.derrubar(false)
+	if por == player:
+		aviso.resgatar(false)
+
+
+## 4 Hz e SO' quando o player esta' envolvido: caido (a barra de esvaecimento e'
+## dele) ou resgatando (o anel e' do aliado no chao).
+func _on_derrubado_progresso(entity: Node, esvaecimento: float, reerguer: float) -> void:
+	if entity != player:
+		aviso.resgatar(true)
+	aviso.progresso(esvaecimento, reerguer)
+
+
+# ---------- contagens regressivas ----------
+
+## Uma contagem por prioridade de faixa. Reescreve o texto so' quando o SEGUNDO
+## inteiro muda — nao a cada frame.
+func _contar(prio: int, segundos: float, fmt: String, cor: Color) -> void:
+	_contagens[prio] = {
+		"ate": float(Time.get_ticks_msec()) / 1000.0 + segundos,
+		"fmt": fmt, "cor": cor, "s": -1,
+	}
+
+
+func _tick_contagens() -> void:
+	var agora := float(Time.get_ticks_msec()) / 1000.0
+	for prio: int in _contagens.keys():
+		var c: Dictionary = _contagens[prio]
+		var s := int(ceilf(float(c.ate) - agora))
+		if s <= 0:
+			_contagens.erase(prio)
+			aviso.limpar(prio)
+		elif s != int(c.s):
+			c.s = s
+			aviso.avisar(prio, str(c.fmt) % s, c.cor)
+
+
+## Olhar livre: arrastar na metade direita FORA dos botoes gira a camera.
 func _input(e: InputEvent) -> void:
 	if player == null or not is_instance_valid(player):
 		return
@@ -158,8 +509,8 @@ func _in_look_zone(pos: Vector2) -> bool:
 	var vp := get_viewport().get_visible_rect().size
 	if pos.x < vp.x * 0.35:
 		return false  # lado do joystick
-	for c: Control in [fire_btn, dodge_btn, carousel]:
-		if c.get_global_rect().has_point(pos):
+	for c: Control in [fire_btn, dodge_btn, tatica_btn, suprema_btn, pegar_btn, carousel]:
+		if c.visible and c.get_global_rect().has_point(pos):
 			return false
 	return true
 
@@ -189,8 +540,10 @@ func _layout(sl := Safe.left(), st := Safe.top(), sr := Safe.right(), sb := Safe
 	var g := Dp.px(24.0)   # respiro de dedo (controles)
 
 	_bars_box.position = Vector2(sl + m, st + m)
-	for b: ProgressBar in [hp_bar, mana_bar]:
+	for b: Control in [hp_bar, mana_bar, escudo_bar]:
 		b.custom_minimum_size = Vector2(Dp.px(130.0), Dp.px(12.0))
+	# A faixa e os badges desenham a mao: recebem o recorte, nao offsets.
+	aviso.safe = Vector4(sl, st, sr, sb)
 
 	_top_box.offset_left = -sr - Dp.px(180.0)
 	_top_box.offset_right = -sr - m
@@ -210,17 +563,37 @@ func _layout(sl := Safe.left(), st := Safe.top(), sr := Safe.right(), sb := Safe
 	fire_btn.offset_bottom = -(sb + Dp.px(40.0))
 	fire_btn.offset_top = fire_btn.offset_bottom - fb
 
+	# Esquiva, TATICA e SUPREMA na MESMA fileira, a esquerda do Fogo: sao os
+	# tres botoes que o polegar direito alcanca sem sair do lugar. 64dp cada
+	# (>= 48dp) — 3 x 64 + Fogo = 316dp, sobra tela ate' a zona do joystick.
 	var db := Dp.px(64.0)
-	dodge_btn.offset_right = fire_btn.offset_left - Dp.px(12.0)
-	dodge_btn.offset_left = dodge_btn.offset_right - db
-	dodge_btn.offset_bottom = fire_btn.offset_bottom
-	dodge_btn.offset_top = dodge_btn.offset_bottom - db
+	var dir := fire_btn.offset_left
+	for b: AcaoButton in [dodge_btn, tatica_btn, suprema_btn]:
+		b.offset_right = dir - Dp.px(12.0)
+		b.offset_left = b.offset_right - db
+		b.offset_bottom = fire_btn.offset_bottom
+		b.offset_top = b.offset_bottom - db
+		dir = b.offset_left
 
 	var slot := Dp.px(52.0)
 	carousel.offset_right = -(sr + g)
 	carousel.offset_left = carousel.offset_right - slot * float(Balance.ELEMENTS.size())
 	carousel.offset_bottom = fire_btn.offset_top - Dp.px(10.0)
 	carousel.offset_top = carousel.offset_bottom - slot
+
+	# Nome da arma equipada logo ACIMA do carrossel: mesma coluna, mesma leitura.
+	arma_lbl.offset_right = -(sr + g)
+	arma_lbl.offset_left = -sr - Dp.px(320.0)
+	arma_lbl.offset_bottom = carousel.offset_top - Dp.px(4.0)
+	arma_lbl.offset_top = arma_lbl.offset_bottom - Dp.px(16.0)
+
+	# PEGAR no rodape, centrado: e' a UNICA coisa da HUD no meio, e fica na
+	# faixa de baixo (longe do reticulo, que mora no meio da ALTURA).
+	var pb := Dp.px(56.0)
+	pegar_btn.offset_left = -pb / 2.0
+	pegar_btn.offset_right = pb / 2.0
+	pegar_btn.offset_bottom = -(sb + Dp.px(40.0))
+	pegar_btn.offset_top = pegar_btn.offset_bottom - pb
 
 	# O escurecido cobre a tela inteira (fica bonito sangrando ate' a borda);
 	# so' o CONTEUDO respeita a area util.
@@ -234,8 +607,13 @@ func _build_bars() -> void:
 	_bars_box.add_theme_constant_override("separation", int(Dp.px(4.0)))
 	hp_bar = _bar(Color(0.85, 0.2, 0.2))
 	mana_bar = _bar(Color(0.2, 0.45, 0.95))
-	_bars_box.add_child(_bar_row("VIDA", hp_bar))
-	_bars_box.add_child(_bar_row("MANA", mana_bar))
+	escudo_bar = Control.new()
+	escudo_bar.draw.connect(_draw_escudo)
+	_bars_box.add_child(_bar_row(Textos.HUD_VIDA, hp_bar))
+	_bars_box.add_child(_bar_row(Textos.HUD_MANA, mana_bar))
+	var linha := _bar_row(Textos.HUD_ESCUDO, escudo_bar)
+	linha.visible = false  # so' aparece quando o escudo existe (GDD §5)
+	_bars_box.add_child(linha)
 	add_child(_bars_box)
 
 
@@ -268,7 +646,7 @@ func _bar(color: Color) -> ProgressBar:
 	return b
 
 
-func _bar_row(text: String, bar: ProgressBar) -> HBoxContainer:
+func _bar_row(text: String, bar: Control) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	var lbl := Label.new()
 	lbl.text = text
@@ -323,8 +701,13 @@ func _build_reticle() -> void:
 	add_child(ret)
 
 
+func _build_aviso() -> void:
+	aviso = HudAviso.new()
+	add_child(aviso)
+
+
 ## So' cria e liga os sinais — tamanho e margem sao do _layout (area segura).
-## Alvos de toque em dp: joystick 150, Fogo 88, Esquiva 64, slot 52 (min 48dp).
+## Alvos de toque em dp: joystick 150, Fogo 88, acoes 64, PEGAR 56, slot 52.
 func _build_sticks() -> void:
 	joystick = VirtualJoystick.new()
 	joystick.anchor_top = 1.0
@@ -332,11 +715,7 @@ func _build_sticks() -> void:
 	add_child(joystick)
 
 	fire_btn = FireButton.new()
-	fire_btn.anchor_left = 1.0
-	fire_btn.anchor_right = 1.0
-	fire_btn.anchor_top = 1.0
-	fire_btn.anchor_bottom = 1.0
-	add_child(fire_btn)
+	_canto(fire_btn)
 	fire_btn.fired.connect(func() -> void:
 		if is_instance_valid(player):
 			player.request_fire())
@@ -347,30 +726,62 @@ func _build_sticks() -> void:
 		if is_instance_valid(player):
 			player.add_look(rel))
 
-	# Esquiva a' esquerda do disparo — cooldown desenhado no proprio botao.
-	dodge_btn = DodgeButton.new()
-	dodge_btn.anchor_left = 1.0
-	dodge_btn.anchor_right = 1.0
-	dodge_btn.anchor_top = 1.0
-	dodge_btn.anchor_bottom = 1.0
-	add_child(dodge_btn)
-	dodge_btn.dodged.connect(func() -> void:
-		if is_instance_valid(player):
-			player.request_dodge())
+	# Esquiva / TATICA / SUPREMA: mesmo widget, mesmo desenho de cooldown.
+	# Os tres so' PEDEM — quem decide e' o Pawn (esquiva) e o KitRunner (kit).
+	dodge_btn = _acao(Textos.HUD_ESQUIVA, Color(0.25, 0.85, 0.95),
+			func() -> void: player.request_dodge())
+	tatica_btn = _acao(Textos.HUD_TATICA, Color(0.55, 0.80, 1.00),
+			func() -> void: player.request_tatica())
+	suprema_btn = _acao(Textos.HUD_SUPREMA, Color(1.00, 0.72, 0.30),
+			func() -> void: player.request_suprema())
+	tatica_btn.ativo = false   # ate' o kit_bound dizer que o mago tem kit
+	suprema_btn.ativo = false
+
+	# PEGAR (GDD §16.2): nasce escondido e so' aparece com loot ao alcance.
+	pegar_btn = _acao(Textos.LOOT_PEGAR, Color(0.85, 0.90, 1.00),
+			func() -> void: player.request_pegar())
+	pegar_btn.anchor_left = 0.5
+	pegar_btn.anchor_right = 0.5
+	pegar_btn.visible = false
+
+	arma_lbl = Label.new()
+	arma_lbl.anchor_left = 1.0
+	arma_lbl.anchor_right = 1.0
+	arma_lbl.anchor_top = 1.0
+	arma_lbl.anchor_bottom = 1.0
+	arma_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	arma_lbl.add_theme_font_size_override("font_size", maxi(int(Dp.px(11.0)), 8))
+	add_child(arma_lbl)
 
 	# Carrossel de elementos ACIMA do botao de disparo (GDD §19.3). 5 slots de
 	# 52dp (>= 48dp) em UMA fileira: 260dp cabem no canto direito sem invadir a
 	# zona do joystick (35% da esquerda) nem a de olhar — 2 fileiras so' se um
 	# 6o elemento entrar.
 	carousel = ElementCarousel.new()
-	carousel.anchor_left = 1.0
-	carousel.anchor_right = 1.0
-	carousel.anchor_top = 1.0
-	carousel.anchor_bottom = 1.0
-	add_child(carousel)
+	_canto(carousel)
 	carousel.chosen.connect(func(el: String) -> void:
 		if is_instance_valid(player):
 			player.set_element(el))
+
+
+func _acao(rotulo: String, cor: Color, acao: Callable) -> AcaoButton:
+	var b := AcaoButton.new()
+	b.rotulo = rotulo
+	b.cor = cor
+	_canto(b)
+	b.tocado.connect(func() -> void:
+		if is_instance_valid(player):
+			acao.call())
+	return b
+
+
+## Canto inferior direito — a ancora de todo controle de polegar.
+func _canto(c: Control) -> void:
+	c.anchor_left = 1.0
+	c.anchor_right = 1.0
+	c.anchor_top = 1.0
+	c.anchor_bottom = 1.0
+	add_child(c)
 
 
 func _build_end() -> void:
@@ -395,7 +806,7 @@ func _build_end() -> void:
 	end_lbl.add_theme_font_size_override("font_size", maxi(int(Dp.px(30.0)), 18))
 	box.add_child(end_lbl)
 	var btn := Button.new()
-	btn.text = "JOGAR DE NOVO"
+	btn.text = Textos.HUD_JOGAR_DE_NOVO
 	btn.custom_minimum_size = Vector2(Dp.px(200.0), Dp.px(56.0))  # >= 48dp
 	btn.add_theme_font_size_override("font_size", maxi(int(Dp.px(16.0)), 10))
 	btn.pressed.connect(func() -> void: restart_pressed.emit())
@@ -404,7 +815,7 @@ func _build_end() -> void:
 	# reconstroi tudo em _ready, entao a troca de cena e' segura. Fiacao direta,
 	# como o JOGAR do menu — defensiva se a cena sumir.
 	var menu_btn := Button.new()
-	menu_btn.text = "MENU"
+	menu_btn.text = Textos.HUD_MENU
 	menu_btn.custom_minimum_size = Vector2(Dp.px(200.0), Dp.px(56.0))
 	menu_btn.add_theme_font_size_override("font_size", maxi(int(Dp.px(16.0)), 10))
 	menu_btn.pressed.connect(func() -> void:

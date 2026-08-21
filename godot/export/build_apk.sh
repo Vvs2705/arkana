@@ -67,6 +67,17 @@ SIZE=$(du -h "$OUT" | cut -f1)
 # R20: com o modelo 3D da Pyra o APK passou de 31M para 83M e os 2s fixos de
 # espera deixaram de bastar (falso "APK sem libgodot_android.so" num APK
 # integro). Agora tenta ate' 6x com pausa crescente antes de desistir.
+# TODA checagem espera o zip fechar, nao so a primeira: com o APK em 90M+ o
+# unzip le um arquivo ainda em flush e reprova um APK integro (aconteceu com
+# libgodot_android.so e depois com assets/).
+esperar_no_apk() {
+	local t
+	for t in 1 2 3 4 5 6; do
+		unzip -l "$OUT" 2>/dev/null | grep -Eq "$1" && return 0
+		sleep "$t"
+	done
+	fail "$2"
+}
 for tentativa in 1 2 3 4 5 6; do
 	if unzip -l "$OUT" 2>/dev/null | grep -q "libgodot_android.so"; then
 		break
@@ -74,8 +85,8 @@ for tentativa in 1 2 3 4 5 6; do
 	[[ $tentativa -eq 6 ]] && fail "APK sem libgodot_android.so"
 	sleep "$tentativa"
 done
-unzip -l "$OUT" | grep -q "assets/" || fail "APK sem assets/ (pck do projeto)"
-unzip -l "$OUT" | grep -q "assets/characters/modelos/pyra.glb.import" || fail "APK sem configuracao de import da Pyra"
-unzip -l "$OUT" | grep -Eq "assets/\\.godot/imported/pyra\\.glb-.*\\.scn" || fail "APK sem cena importada da Pyra"
+esperar_no_apk "assets/" "APK sem assets/ (pck do projeto)"
+esperar_no_apk "assets/characters/modelos/pyra[.]glb[.]import" "APK sem import da Pyra"
+esperar_no_apk "assets/[.]godot/imported/pyra[.]glb-.*[.]scn" "APK sem cena importada da Pyra"
 echo "OK: $OUT ($SIZE)"
 unzip -l "$OUT" | grep -E "lib/|\.pck|assets/.*\.(pck|so)" | head -8 || true

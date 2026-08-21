@@ -89,6 +89,8 @@ const BAU_PERDIDO := "A MANOPLA CAIU EM OUTRAS MÃOS"
 # ---------------------------------------------------------------- HUD de partida
 ## Rotulos curtos: eles vivem ao lado de barras finas e de botoes de 48dp, entao
 ## palavra comprida quebra o layout no celular. ESQV e' abreviacao de proposito.
+## Separador entre duas informacoes na MESMA linha da faixa de aviso.
+const HUD_SEP := " · "
 const HUD_VIDA := "VIDA"
 const HUD_MANA := "MANA"
 const HUD_ESCUDO := "ESCUDO"
@@ -131,3 +133,18 @@ const DERRUBADO_ALIADO := "ALIADO DERRUBADO"
 ## LOOT E ARMA ARCANA (GDD §16.2).
 const LOOT_PEGAR := "PEGAR"
 const ARMA_PAR := "%s + %s"
+
+## ESTADOS DE KIT (Bus.kit_state). Nome QUE NAO ESTA AQUI nao vira badge — e' a
+## regra do Bus ("a HUD ignora o que nao souber desenhar"), e e' o que deixa a
+## raia de habilidades inventar estado novo sem quebrar a HUD.
+const HUD_ESTADOS := {
+	"braco_livre": "BRAÇO LIVRE",
+	"braco_frio": "BRAÇO FRIO",
+	"braco_molhado": "BRAÇO MOLHADO",
+	"desfocada": "DESFOCADA",
+	"silencio": "SEM CONJURAR",
+	"sino_espectral": "SINO ESPECTRAL",
+	"escudo_quebrado": "ESCUDO QUEBRADO",
+	"revelado": "REVELADO",
+	"fio_zumbido": "FIO ZUMBINDO",
+}
