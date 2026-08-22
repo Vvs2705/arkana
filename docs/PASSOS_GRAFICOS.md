@@ -316,7 +316,8 @@ personagem em diante o tempo costuma cair pela metade.
 
 **Execução técnica em 21/08:** Pyra foi escolhida e recebeu um proxy local
 `godot/characters/modelos/pyra.glb`, gerado por Blender via
-`tools/blender/make_pyra_proxy.py`. O proxy prova importação `.glb`, aliases de
+um proxy descartável (removido em 21/08, quando o modelo real da Meshy
+chegou). O proxy provou importação `.glb`, aliases de
 animação (`Idle`, `Armature|Running`, `Spell Cast`), materiais, esqueleto simples,
 fallback e export Android. Ele **não** substitui escultura, retopologia, UV, bake e
 texturização final.
