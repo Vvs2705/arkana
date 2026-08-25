@@ -194,6 +194,16 @@ func _check_real_pyra_glb() -> void:
 		"pyra.glb real resolve idle/run/cast por aliases")
 	_check(m.get_anim_length("cast") > m.get_cast_fire_time(),
 		"pyra.glb real tem cast sincronizavel")
+
+	# O modelo do glTF olha para +Z; o jogo anda para -Z. Sem a meia-volta o
+	# personagem corre de costas e patina — foi o que o Diretor viu no aparelho
+	# em 25/08. Este teste fica VERMELHO se alguem tirar a correcao do Mage.gd.
+	var externo := m.get_node_or_null("ExternalModel")
+	_check(externo != null, "modelo externo entra como no' 'ExternalModel'")
+	if externo != null:
+		var giro: float = absf(wrapf((externo as Node3D).rotation.y, -PI, PI))
+		_check(absf(giro - PI) < 0.01,
+			"modelo externo recebe a meia-volta (+Z do glTF -> -Z do jogo)")
 	m.queue_free()
 
 

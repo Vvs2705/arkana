@@ -55,6 +55,19 @@ func _ready() -> void:
 	chao.material_override = mat
 	add_child(chao)
 
+	# REGUA DE 1 METRO. A leitura de escala pela API mentiu (get_scale() dizia
+	# 0.01 num modelo que renderiza no tamanho certo). Cubo de tamanho conhecido
+	# ao lado responde "o anao esta baixo?" sem depender de nenhuma API.
+	var regua := MeshInstance3D.new()
+	var cubo := BoxMesh.new()
+	cubo.size = Vector3.ONE
+	regua.mesh = cubo
+	var mr := StandardMaterial3D.new()
+	mr.albedo_color = Color("#F0C75E")
+	regua.material_override = mr
+	regua.position = Vector3(1.1, 0.5, 0)
+	add_child(regua)
+
 	var mago: Node3D = (load("res://characters/Mage.tscn") as PackedScene).instantiate()
 	mago.mage_id = _slug
 	add_child(mago)
@@ -66,7 +79,7 @@ func _ready() -> void:
 
 	# Altura real da malha: enquadrar por numero fixo mente quando o personagem
 	# tem 1,40m (anao) ou 2,30m (golem).
-	var alt := _altura_visivel(mago)
+	var alt := maxf(_altura_visivel(mago), 1.0)   # piso: a regua tem 1 m
 	print("altura medida: %.2f m" % alt)
 
 	var cam := Camera3D.new()
@@ -76,12 +89,12 @@ func _ready() -> void:
 
 	var dir := "user://shots_mago"
 	DirAccess.make_dir_recursive_absolute(dir)
-	var raio := maxf(alt * 2.1, 1.6)
+	var raio := maxf(alt * 2.1, 1.6)   # se alt=0 (medicao falhou) o piso segura
 	var alvo := Vector3(0, alt * 0.55, 0)
 
 	for a in ANGULOS:
 		var rad := deg_to_rad(float(a[1]))
-		cam.position = Vector3(sin(rad) * raio, alt * 0.75, cos(rad) * raio)
+		cam.position = Vector3(sin(rad) * raio, alt * 0.75, -cos(rad) * raio)
 		cam.look_at(alvo, Vector3.UP)
 		await _renderiza("%s/%s_%s.png" % [dir, _slug, a[0]])
 		print("shot ", a[0])
@@ -89,7 +102,7 @@ func _ready() -> void:
 	# Uma pose por animacao obrigatoria, sempre de tres-quartos (o angulo que
 	# mais denuncia deformacao de rig no ombro e no joelho).
 	var rad34 := deg_to_rad(35.0)
-	cam.position = Vector3(sin(rad34) * raio, alt * 0.75, cos(rad34) * raio)
+	cam.position = Vector3(sin(rad34) * raio, alt * 0.75, -cos(rad34) * raio)
 	cam.look_at(alvo, Vector3.UP)
 	for nome in ["idle", "run", "cast"]:
 		if mago.has_method("play_anim"):
@@ -112,12 +125,26 @@ func _renderiza(caminho: String) -> void:
 
 ## Altura visivel = AABB unida de todas as malhas. Usar o valor da ficha aqui
 ## esconderia justamente o defeito que queremos pegar (modelo na escala errada).
+## NAO tem fallback silencioso: um numero plausivel inventado no lugar de uma
+## medicao que falhou e' pior que erro nenhum — foi assim que 1.70 apareceu para
+## a Pyra E para o Brok, escondendo que um deles podia estar na escala errada.
 func _altura_visivel(no: Node) -> float:
+	var malhas := _malhas(no)
 	var topo := 0.0
-	for m in _malhas(no):
-		var aabb: AABB = m.get_aabb()
-		topo = maxf(topo, (m.global_transform * aabb).end.y)
-	return topo if topo > 0.05 else 1.7
+	for m in malhas:
+		# A altura sai da caixa do RECURSO Mesh, em pose de repouso, SEM passar
+		# pelo transform do no. Motivo medido em 25/08: num .glb da Meshy o
+		# global_transform.basis.get_scale() devolveu (0.01, 0.01, 0.01) para um
+		# modelo que renderiza no tamanho certo — base espelhada do glTF faz
+		# get_scale() mentir. A caixa do recurso deu 1,4 para o Brok, que e'
+		# exatamente a altura da ficha dele. Conferido no olho com uma regua de
+		# 1 m ao lado.
+		if m.mesh != null:
+			topo = maxf(topo, m.mesh.get_aabb().size.y)
+	print("  malhas medidas: %d  topo: %.3f m" % [malhas.size(), topo])
+	if topo <= 0.05:
+		push_warning("_shot_mago: nao consegui medir a altura (%d malhas)" % malhas.size())
+	return topo
 
 
 func _malhas(no: Node) -> Array:

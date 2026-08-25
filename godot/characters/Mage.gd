@@ -35,6 +35,21 @@ const SHADER := preload("res://characters/mage_toon.gdshader")
 const IDS := preload("res://characters/mage_identity.gd")
 const MODEL_DIR := "res://characters/modelos"
 const REQUIRED_ANIMS := ["idle", "run", "cast"]
+
+## MEIA-VOLTA OBRIGATORIA NO MODELO EXTERNO — nao e' gosto, e' conversao de
+## convencao. glTF (e a Meshy, que exporta glTF) posiciona o personagem olhando
+## para +Z. O Godot anda para -Z: o Pawn calcula o passo com
+## `-global_transform.basis.z` e vira o corpo com `atan2(-dir.x, -dir.z)`.
+## Sem esta correcao o modelo entra de costas para o mundo e de FRENTE para a
+## camera de 3a pessoa: as pernas correm ao contrario do deslocamento, o que o
+## olho le como PATINACAO, e andar de re' e' o unico momento em que a passada
+## parece certa.
+##
+## MEDIDO em 25/08/2026 no aparelho do Diretor: Pyra e Brok, os dois modelos
+## reais do jogo, apareciam de rosto para a camera. O braco de chama dela — que
+## e' o ESQUERDO na ficha — saia' a direita do quadro, prova de que o que se via
+## era a frente. A Pyra carregava o defeito desde 21/08 sem ninguem notar.
+const MODEL_YAW := PI
 const ANIM_ALIASES := {
 	"idle": ["idle", "Idle", "IDLE", "Armature|Idle", "mixamo.com",
 		"standing_idle", "breathing_idle", "idle_01", "idle_loop",
@@ -384,6 +399,7 @@ func _build_imported_model() -> bool:
 		inst.free()
 		return false
 	inst.name = "ExternalModel"
+	(inst as Node3D).rotation.y = MODEL_YAW   # ver MODEL_YAW: +Z do glTF -> -Z do Godot
 	add_child(inst)
 	_external_player = player
 	_anim_map = aliases

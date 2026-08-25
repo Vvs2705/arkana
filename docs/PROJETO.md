@@ -161,6 +161,15 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
 10. `Balance.PLAYER.jump` é KNOB **órfão**: nenhum código usa. Ou entra um botão
     de pulo, ou o número sai.
 11. Falta animação `"derrubado"`; hoje o caído usa a de locomoção mais lenta.
+12. **A patinação dos pés não está resolvida.** A meia-volta do modelo (25/08)
+    tirou a causa maior — o personagem corria de costas —, mas o casamento entre
+    cadência da animação e velocidade real (`Pawn._sync_anim_speed`) é limitado
+    por um teto em `Balance.ANIM`. O Brok tem 1,40 m e usa um clipe de corrida
+    da biblioteca da Meshy provavelmente feito para ~1,70 m: se a razão
+    necessária estourar o teto, a correção satura e a patinação volta. **Medir
+    com o Diretor no aparelho antes de mexer no número.**
+13. **Não há física de corpo ainda** (observação do Diretor, 25/08): parte do
+    que parece defeito de animação pode ser o corpo escorregando no terreno.
 
 ---
 
