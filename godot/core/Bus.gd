@@ -4,8 +4,7 @@
 ## jogo. Quem aplica dano e' um lugar so' (gameplay/Combat.gd).
 extends Node
 
-signal damage_dealt(target: Node, amount: int, element: String)
-## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). `damage_dealt` acima nao carrega
+## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). O antigo `damage_dealt` nao carregava
 ## QUEM causou nem SE bateu em escudo — sem isso ficam impossiveis, todos de uma
 ## vez: indicador direcional, hitmarker correto (a HUD usa hoje a heuristica
 ## "alvo nao e' o player, logo fui eu"), credito de dano para a evolucao do
@@ -13,8 +12,9 @@ signal damage_dealt(target: Node, amount: int, element: String)
 ##   amount    : FLOAT — dano EFETIVO aplicado (escudo + vida). Nunca 0.
 ##   source    : quem causou (null = terreno/DoT/ambiente, nao tem direcao)
 ##   on_shield : o escudo do alvo absorveu ao menos parte deste acerto
-## `damage_dealt` continua saindo em paralelo so' enquanto ui/Hud.gd e
-## audio/Sfx.gd nao migram — quando migrarem, o legado morre (ver relatorio).
+## O antigo `damage_dealt` foi REMOVIDO em 25/08/2026: ui/Hud.gd e audio/Sfx.gd
+## ja' tinham migrado, e o unico gancho restante era um ramo `else` que nunca
+## rodava. Sinal sem ouvinte de producao e' contrato morto.
 signal damage_applied(target: Node, amount: float, element: String, source: Node, on_shield: bool)
 ## ESCUDO EVOLUTIVO (GDD §5). A HUD OBSERVA; quem muda escudo e' o Combat.
 signal shield_changed(entity: Node, shield: float, shield_max: float, level: int)
@@ -50,7 +50,7 @@ signal terrain_changed(kind: String, pos: Vector3)  # p/ audio/UI observarem
 signal player_killed_bot(bot_name: String)          # p/ kill feed e audio
 signal dodge_performed
 ## O som do disparo toca no INSTANTE do cast (o impacto ja' tem o proprio som
-## via terrain_hit/damage_dealt). So' o PLAYER emite por ora — 6 bots na
+## via terrain_hit/damage_applied). So' o PLAYER emite por ora — 6 bots na
 ## cadencia deles viraria cacofonia sem atenuacao por distancia; quando o Sfx
 ## ganhar posicionamento 3D, os bots entram.
 signal spell_cast(element: String)

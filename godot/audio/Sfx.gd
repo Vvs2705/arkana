@@ -132,12 +132,10 @@ func _connect_bus() -> void:
 	## MIGRACAO DO DANO (Bus.gd §damage_applied): o sinal novo carrega QUEM
 	## causou e SE bateu em escudo — da o "clank" de escudo, separa o tique de
 	## DoT (source == null) do acerto direto e traz o alvo para calcular
-	## distancia. Enquanto ele existir, o legado `damage_dealt` NAO e ouvido:
-	## os dois juntos tocariam o mesmo acerto duas vezes.
-	if bus.has_signal("damage_applied"):
-		_hook(bus, "damage_applied", _on_damage_applied)
-	else:
-		_hook(bus, "damage_dealt", _on_damage_dealt)
+	## distancia. O legado `damage_dealt` foi REMOVIDO em 25/08/2026: so' era
+	## conectado no ramo else, que nunca rodava porque `damage_applied` sempre
+	## existiu. Sinal sem ouvinte de producao e' contrato morto.
+	_hook(bus, "damage_applied", _on_damage_applied)
 	_hook(bus, "entity_died", _on_entity_died)
 	_hook(bus, "player_killed_bot", _on_player_killed_bot)
 	_hook(bus, "dodge_performed", _on_dodge)
@@ -345,11 +343,6 @@ func _on_damage_applied(target: Node, _amount: float, element: String,
 		_play_at("escudo_clank", pos, -7.0, P_NORMAL, 60)
 	else:
 		_play_at("hit", pos, -6.0, P_NORMAL, 60)
-
-
-## Legado: so' e' conectado se o Bus ainda nao tiver `damage_applied`.
-func _on_damage_dealt(_target: Node, _amount: int, _element: String) -> void:
-	_play("hit", -6.0, P_NORMAL, 60)
 
 
 ## "Derrubado" e' um BAQUE, nunca sofrimento (classificacao 10+).

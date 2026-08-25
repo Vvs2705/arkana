@@ -51,7 +51,7 @@ func _run() -> void:
 	_combat = load("res://gameplay/Combat.gd")
 	_fg = load("res://gameplay/FireGesture.gd")
 	_bot_scr = load("res://gameplay/Bot.gd")
-	_bus.damage_dealt.connect(func(t: Node, a: int, e: String) -> void:
+	_bus.damage_applied.connect(func(t: Node, a: float, e: String, _s: Node, _x: bool) -> void:
 		_dmg_events.append([t, a, e]))
 	_bus.damage_applied.connect(func(t: Node, a: float, e: String, src: Node, esc: bool) -> void:
 		_dmg_full.append([t, a, e, src, esc]))
@@ -130,7 +130,11 @@ func _test_combat_damage() -> void:
 	_dmg_events.clear()
 	_check(_combat.deal(d, 13.0, "fire"), "Combat.deal aplica dano")
 	_check(is_equal_approx(float(d.hp), 37.0), "hp reduziu 50 -> 37")
-	_check(_dmg_events.size() == 1 and _dmg_events[0][1] == 13, "Bus.damage_dealt emitiu 13")
+	# Migrado do extinto `damage_dealt` em 25/08/2026. O que a checagem cobre nao
+	# mudou: o VALOR do dano tem que chegar ao barramento. Mudou o sinal que o
+	# leva — e o novo carrega float, entao 13.0 e nao 13.
+	_check(_dmg_events.size() == 1 and is_equal_approx(float(_dmg_events[0][1]), 13.0),
+		"Bus.damage_applied levou 13 ao barramento")
 	d.queue_free()
 
 

@@ -13,7 +13,6 @@ const PLAYER := {
 	## gerenciamento de recurso, o combate esfria e o TTK real sobe.
 	"mana_regen": 16.0,      # por segundo
 	"speed": 7.5,            # m/s — KNOB, recalibrar no aparelho
-	"jump": 4.5,             # KNOB
 }
 
 ## OS 5 PERFIS DE ELEMENTO (retune docs/DANO.md §7.2). Alem dos 5 numeros de
