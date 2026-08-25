@@ -63,6 +63,14 @@ echo "  Godot:   $("$GODOT_BIN" --version 2>/dev/null | tail -1)"
 echo "  Projeto: $PROJECT"
 echo
 
+# IMPORT ANTES DE TUDO. Num clone novo (e no CI) a pasta godot/.godot nao
+# existe — ela e' cache e nao vai para o git. Sem este passo o primeiro teste
+# falha por recurso nao importado, que e' um vermelho pelo motivo errado e
+# manda a pessoa cacar bug onde nao ha'. Com cache quente, e' rapido.
+echo "── import"
+"$GODOT_BIN" --headless --path "$PROJECT" --import >/dev/null 2>&1 || true
+echo
+
 TOTAL=${#SELFTESTS[@]}
 N=0
 for t in "${SELFTESTS[@]}"; do

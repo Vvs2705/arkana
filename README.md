@@ -117,6 +117,15 @@ Ele imprime `ARKANA: 12/12 selftests executados com sucesso.` no fim. Qualquer
 teste que falhe **encerra o script na hora**, sem imprimir essa linha. Use
 `GODOT_BIN=/caminho/para/godot` se o binario nao estiver no PATH.
 
+No GitHub, o workflow **Selftests Godot**
+(`.github/workflows/godot-selftests.yml`) roda esse mesmo script a cada push e
+pull request para `main`. Ele chama `run_all.sh` em vez de repetir a lista de
+testes: CI e maquina local que divergem viram duas verdades, e uma delas passa a
+mentir.
+
+**"Testes verdes" significa status check concluido no pull request** — nao
+mensagem de commit de ninguem, nem print de terminal.
+
 Os doze continuam disponiveis individualmente, que e' como se diagnostica uma
 falha depois que o runner apontou onde ela esta':
 
