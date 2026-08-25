@@ -91,6 +91,20 @@ servidor da Meshy.
 Se um comando for interrompido no meio, rode `status <id>` **dentro de 3 dias** e
 baixe manualmente — depois disso, só pagando outra vez.
 
+### Validação OFFLINE, sem gastar crédito
+
+```bash
+python tools/meshy/test_glb.py
+```
+
+Lê só arquivos em disco. Confere versão do glTF, malha, esqueleto, animações e
+**movimento de raiz** — este último é o mais traiçoeiro: translação na raiz faz
+a animação andar sozinha por cima do passo de física, e o personagem desliza sem
+que nada no jogo explique por quê. Pyra e Brok passam nos dois.
+
+O que este teste NÃO cobre e o Godot cobre: laço das animações, contagem de
+triângulos e escala real. Rodar os dois.
+
 ### Custos em créditos
 
 | Operação | Créditos |
