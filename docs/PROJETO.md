@@ -51,7 +51,34 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI (25/08) — o Diretor precisa testar o APK
+### >>> COMECE POR AQUI — auditoria externa executada (25/08/2026)
+
+Um plano de auditoria em 12 tarefas foi executado na branch
+`chore/auditoria-organizacao-arkana`. **Nada foi mesclado na `main`.**
+
+**O que ele consertou de verdade:**
+- O auditor de modelos media VERTICE num orcamento definido em TRIANGULO, e
+  reprovava os DOIS modelos reais do jogo estando ambos dentro do alvo.
+- `Bus.damage_dealt` parecia ter consumidor, mas o gancho vivia num ramo `else`
+  que nunca rodava. Removido, junto com o mecanismo de troco que so' existia
+  para arredondar o sinal.
+- `weapon_equipped` e `bau_canalizando` nao diziam de QUEM eram: a HUD
+  adivinhava pelo id da arma, e um bot com a mesma arma mudava o icone do
+  jogador. Os dois passaram a carregar o `pawn`.
+- Os 6 bots passaram a CAIR do castelo, sob a mesma lei do jogador.
+- Os 12 autotestes viraram um comando so' (`godot/tests/run_all.sh`) com CI no
+  GitHub. Antes eram 12 linhas copiadas a mao — e comando copiado a mao e' como
+  se esquece um teste.
+
+**O que ficou BLOQUEADO, por falta de entrada externa:**
+- As 160 referencias de arte: falta o documento mestre da direcao aprovada e o
+  manifesto/checksums da entrega. Os 160 PNGs estao integros e com manifesto
+  gerado, mas **existem em UM lugar so', sem copia**.
+
+**O que NAO foi executado:** teste no Poco F4 — nenhum aparelho apareceu em
+`adb devices`. FPS segue sem medicao neste projeto.
+
+### (25/08, manha — o APK anterior, mantido como historico)
 
 O APK esta' em `godot/build/testes/`. **O que mudou e o que olhar:**
 

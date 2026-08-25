@@ -125,5 +125,3 @@ static func _evoluir(who: Node) -> void:
 	who.shield = float(who.shield) + float(niveis[novo - 1]) - float(niveis[lv - 1])
 	who.shield_level = novo
 	Bus.shield_changed.emit(who, float(who.shield), float(niveis[novo - 1]), novo)
-
-
