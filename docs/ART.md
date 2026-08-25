@@ -6,7 +6,27 @@
 |---|---|---|
 | Logo, tipografia, paleta, key art | **GDD §10** | normatizado |
 | Regras permanentes de legibilidade e cosmético | este documento | normatizado |
-| **Estilo de renderização dos personagens** | **ninguém ainda** | **PENDENTE DO DIRETOR** |
+| **Estilo de renderização dos personagens** | Diretor (aprovado FORA do repositório) | **norma ainda não fechada aqui** — ver abaixo |
+
+## A nova direção de arte dos personagens
+
+**Estado em 25/08/2026:** o Diretor **aprovou** uma nova direção artística para
+os personagens **fora deste repositório**, junto com uma nova entrega de
+referências. A norma **não está fechada aqui** porque as entradas ainda não
+chegaram ao projeto.
+
+**O que falta receber para fechar a norma:**
+
+1. o documento mestre aprovado da direção de arte;
+2. os pacotes de imagens da entrega, com manifesto e checksums.
+
+**Regra ao receber:** copiar o conteúdo do documento mestre **exatamente como
+ele veio**. Não reconstruir de memória, não reinterpretar, não "melhorar". A
+direção é decisão do Diretor; este arquivo só a registra.
+
+**Enquanto isso não chega**, o que vale como evidência técnica é a auditoria
+abaixo — que descreve o lote ANTERIOR e continua útil para não repetir os mesmos
+erros de vista e de coerência. Ela **não** é a norma nova.
 
 O ART.md afirmava antes que sua fonte de verdade era "GDD seção 10". Isso estava
 errado e é a razão desta tabela existir: a §10 trata de **marca** — logo,
@@ -129,7 +149,7 @@ premium"). É proposta da equipe, **não decisão**. Não trate como norma.
 ## Estado atual
 
 - **Mundo e ilha:** procedurais, com iluminação, tonemap e shaders próprios.
-- **Personagens:** só a Pyra tem modelo game-ready. Os outros 19 usam o mago
+- **Personagens:** Pyra e Brok tem modelo game-ready. Os outros 18 usam o mago
   procedural genérico.
 
 O plano de fases (G1–G4) mora em `ROADMAP_3D.md`; o caminho técnico de personagem

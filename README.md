@@ -5,7 +5,7 @@
 Arkana e um battle royale de magia em terceira pessoa para Android. O projeto
 mantem duas frentes ativas que compartilham o mesmo GDD:
 
-| Frente | Papel | Estado em 26/08/2026 |
+| Frente | Papel | Estado em 25/08/2026 |
 |---|---|---|
 | **Godot 4.4** | produto principal 3D para Android | jogavel de ponta a ponta; a partida comeca no ar; 2 dos 20 magos com modelo 3D real |
 | **Roblox / Rojo** | Campo de Provas multiplayer | congelado e tecnicamente pronto; aguarda playtest humano |
@@ -42,11 +42,11 @@ O projeto Godot ja entrega:
 **Apresentacao**
 - camera sobre o ombro, controles de toque com gesto unico de mira;
 - audio 100% sintetizado em codigo, sem um arquivo de som no repositorio;
-- menu, configuracoes e selecao dos 20 magos com os retratos entregues.
+- menu, configuracoes e selecao dos **20 magos, com os 20 retratos** no lugar.
 
 **Personagens 3D**
 - **Pyra** e **Brok** com modelo real gerado pela Meshy a partir da concept art,
-  riggados e animados. Os outros 18 usam o mago procedural.
+  riggados e animados. Os outros **18** usam o mago procedural.
 
 O proximo marco e **fechar o elenco**: os 17 kits que faltam e a **Sintonia**, o
 pilar de combinar elementos entre dois jogadores, que ainda nao tem uma linha em
@@ -65,7 +65,7 @@ arkana/
 |- roblox/      Campo de Provas multiplayer (congelado)
 |- personagens/ as 20 fichas e o atelie de arte de cada mago
 |- tools/meshy/ pipeline concept art -> personagem 3D riggado
-|- audio/vozes/ falas dos 20 magos escritas; nenhuma gravada ainda
+|- audio/vozes/ 560 falas escritas (20 magos x 28); nenhuma gravada
 |- docs/        GDD, estado, roadmap e guias ativos
 |- infra/       infraestrutura futura por fase
 `- CHANGELOG.md marcos atuais do projeto
@@ -152,7 +152,8 @@ Escrito aqui de proposito, para o repositorio nao parecer mais adiantado do que 
 - **Os bots nao caem do castelo**: nascem no chao.
 - **Nao ha' colisao no ar** durante a queda, e nem natacao.
 - **FPS nunca foi medido em aparelho** — nenhum celular apareceu em `adb devices`.
-- **As vozes e a arte de UI** estao escritas e com prompts prontos, nada gerado. O
+- **As vozes** (560 falas, criterio de contagem em `docs/PROJETO.md`) e a
+  **arte de UI** estao escritas, nada gerado. O
   APK ainda usa o icone padrao do Godot, o que bloqueia publicar.
 
 ## Regra de produto

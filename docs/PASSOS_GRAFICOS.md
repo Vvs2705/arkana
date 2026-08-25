@@ -31,7 +31,7 @@ saía lavado e dessaturado.
 ### O que NÃO está bom (o problema real)
 
 Os **personagens**. Números medidos em 21/08, não estimados. **Este é o retrato do
-mago procedural**, que em 24/08 ainda vale para 19 dos 20 — só a Pyra tem modelo
+mago procedural**, que em 25/08 vale para 18 dos 20 — Pyra e Brok tem modelo
 game-ready (seção 9).
 
 | Item | Mago procedural |
@@ -87,7 +87,7 @@ excelentes valem mais que vinte medianos.
 | Alvo de FPS | 60 (com modo 30 para aparelho fraco) | não medido em device |
 
 A coluna "Arkana hoje" é o mago procedural. A Pyra já saiu dela: 15.492 triângulos,
-textura 2k, PBR, riggada. Falta ela para os outros 19.
+textura 2k, PBR, riggada. O Brok seguiu o mesmo caminho em 25/08. Faltam 18.
 
 ---
 
