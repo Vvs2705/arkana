@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1536" viewBox="0 0 1024 1536">
+  <rect width="1024" height="1536" fill="#55565A"/>
+  <rect x="72" y="72" width="880" height="1392" rx="38" fill="#F4F1EA"/>
+  <text x="116" y="164" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#1A1A22">CEIFADORA</text>
+  <text x="116" y="214" font-family="Arial, sans-serif" font-size="25" fill="#55565A">PALETA OFICIAL · ARKANA</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="116" y="278" width="792" height="218" rx="24" fill="#1A1A22"/>
+    <text x="150" y="438" font-size="30" font-weight="700" fill="#FFFFFF">PRINCIPAL · PRETO-VAZIO  #1A1A22</text>
+    <rect x="116" y="526" width="792" height="218" rx="24" fill="#C9C3D4"/>
+    <text x="150" y="686" font-size="30" font-weight="700" fill="#1A1A22">SECUNDÁRIA · PELE PORCELANA  #C9C3D4</text>
+    <rect x="116" y="774" width="792" height="218" rx="24" fill="#F0C75E"/>
+    <text x="150" y="934" font-size="30" font-weight="700" fill="#1A1A22">DESTAQUE · FIO DOURADO  #F0C75E</text>
+    <rect x="116" y="1022" width="792" height="218" rx="24" fill="#8A5CF0"/>
+    <text x="150" y="1182" font-size="30" font-weight="700" fill="#FFFFFF">MAGIA · VIOLETA DO VAZIO  #8A5CF0</text>
+  </g>
+  <text x="116" y="1344" font-family="Arial, sans-serif" font-size="23" fill="#55565A">Uso: materiais, texturas, VFX e interface de produção.</text>
+  <circle cx="816" cy="1365" r="48" fill="#F0C75E"/>
+  <circle cx="860" cy="1365" r="48" fill="#8A5CF0" fill-opacity="0.86"/>
+</svg>

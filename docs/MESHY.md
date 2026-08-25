@@ -5,7 +5,9 @@
 > Complementa [PASSOS_GRAFICOS.md](PASSOS_GRAFICOS.md) — este documento é o **como**;
 > aquele é o **porquê** e o plano completo.
 >
-> **Data:** 21/08/2026 · Documentação lida em `docs.meshy.ai` na mesma data.
+> **Escrito em:** 21/08/2026 (documentação lida em `docs.meshy.ai` na mesma data)
+> **Revisado em:** 24/08/2026 — caminho da imagem de entrada, limitação de vista
+> única e retenção de 3 dias.
 
 ---
 
@@ -22,8 +24,8 @@ histórico — e qualquer um com acesso a ele passa a poder gastar seus crédito
    ```
    MESHY_API_KEY=msy_sua_chave_aqui
    ```
-3. Pronto. O `.gitignore` já bloqueia `.env` (confirmado: regra na linha 34), e o
-   script lê a chave de lá sozinho.
+3. Pronto. O `.gitignore` já bloqueia `.env` em qualquer profundidade, e o script
+   lê a chave de lá sozinho.
 
 Alternativa, se preferir não criar arquivo:
 ```bash
@@ -48,10 +50,11 @@ export MESHY_API_KEY=msy_sua_chave_aqui
 
 | Endpoint | Uso no Arkana |
 |---|---|
-| `POST /image-to-3d` | concept art → malha texturizada |
+| `POST /image-to-3d` | **é o que usamos** — 1 vista frontal → malha texturizada |
 | `GET /image-to-3d/{id}` | acompanhar o progresso |
 | `POST /rigging` | malha → esqueleto + animações base |
 | `GET /rigging/{id}` | acompanhar o rig |
+| `POST /multi-image-to-3d` | **não usamos** — até 4 vistas, daria modelo melhor; bloqueado pelo defeito das vistas (§3) |
 
 ### Parâmetros que importam para nós
 
@@ -73,6 +76,21 @@ export MESHY_API_KEY=msy_sua_chave_aqui
 - O personagem precisa **olhar para +Z** (padrão glTF).
 - Rigging entrega **FBX e GLB**, com animações base de **andar e correr**.
 
+### Retenção: 3 dias — o risco de perder trabalho pago
+
+Fora do plano Enterprise, a Meshy guarda os assets gerados pela API por **3 dias**.
+Depois disso as URLs de download morrem. Um `.glb` que custou 20 créditos e não foi
+baixado a tempo tem que ser **pago de novo**.
+
+**Estamos cobertos:** o `meshy.py` baixa cada asset assim que o job termina, dentro
+da mesma execução — verificado na função `baixar()`, chamada logo após `esperar()`
+em `gerar()` e em `riggar()`. Não existe janela em que o arquivo só esteja no
+servidor da Meshy.
+
+**A regra que isso impõe:** nunca disparar um job e sair sem esperar o download.
+Se um comando for interrompido no meio, rode `status <id>` **dentro de 3 dias** e
+baixe manualmente — depois disso, só pagando outra vez.
+
 ### Custos em créditos
 
 | Operação | Créditos |
@@ -83,8 +101,10 @@ export MESHY_API_KEY=msy_sua_chave_aqui
 | Animação | 3 |
 | Converter / redimensionar | 1 |
 
-**Estimativa para a Pyra completa:** ~25–40 créditos. Para os 10 magos de
-lançamento: ~250–400 créditos — cabe folgado num plano de 1.000/mês.
+**Medido na Pyra (21/08):** ~41 créditos para o ciclo completo — é o custo de
+regenerar o ateliê dela do zero. Para os 10 magos de lançamento, projetar ~410
+créditos. Some os 30 queimados na tentativa do *character sheet*: a primeira peça
+sempre custa a lição.
 
 ### Limites de taxa
 
@@ -119,14 +139,38 @@ python tools/meshy/meshy.py status <id>      # consulta uma tarefa
 
 ### O que ele faz sozinho
 
-1. Lê `personagens/01-pyra/arte/concept.png` e envia como data URI
-   (sem precisar hospedar a imagem em lugar nenhum)
+1. Lê `personagens/01-pyra/arte/_originais/master-reference-frente.png` e envia
+   como data URI (sem precisar hospedar a imagem em lugar nenhum)
 2. Pede malha em T-pose, 15k triângulos, PBR, textura 2k
 3. Acompanha o progresso a cada 5s, mostrando a porcentagem
-4. Baixa o `.glb` e as texturas (albedo, normal, roughness, metallic)
+4. **Baixa** o `.glb` e as texturas (albedo, normal, roughness, metallic) assim que
+   o job termina — é o que nos protege da retenção de 3 dias
 5. **Lê a altura na ficha do personagem** e passa ao rigger — o Brok tem 1,40m e
    o Basalto 2,30m; mandar 1,7m para todos apagaria a raça
-6. Salva tudo em `godot/characters/modelos/01-pyra/`
+6. Salva tudo em `godot/characters/modelos/01-pyra/` — o **ateliê**, fora do git.
+   O arquivo que o jogo carrega sai depois, com
+   `python tools/meshy/montar_glb.py 01-pyra pyra` → `modelos/pyra.glb`
+
+### Uma imagem só — a limitação de hoje
+
+O script usa **`/image-to-3d`, que aceita UMA imagem**: a frontal.
+
+A Meshy tem `/multi-image-to-3d`, que aceita até 4 vistas e **daria um modelo
+melhor** — o perfil é o que resolve a espessura lateral do corpo, justamente o que
+uma vista frontal não consegue informar.
+
+**Por que não usamos hoje:** as vistas do lote atual têm defeito medido — a
+`vista-3-4.png` é a frontal repetida (12 de 12 conferidos) e a `vista-lateral.png`
+é um três-quartos de ~60–70°. **Não existe perfil de 90° no lote.** Mandar as
+quatro vistas assim não acrescenta a informação que falta; só gasta crédito.
+
+**O que destrava:** um lote novo com perfil real de 90°. Aí trocar o endpoint vale
+a pena. Detalhe da auditoria em [ART.md](ART.md).
+
+**Lição paga com 30 créditos em 21/08:** mandar o *character sheet* inteiro (3
+vistas + paleta + insets) como uma imagem faz a Meshy extrudar um **painel plano** —
+saiu com 1,9 de largura e 0,05 de profundidade, e o rigging morreu com "pose
+estimation failed". **Uma figura por imagem, sempre.**
 
 ### Erros que ele traduz
 
@@ -146,9 +190,11 @@ faltando:
 
 1. **Revisar a topologia** — geração por IA costuma produzir malha irregular;
    articulações (ombro, cotovelo, joelho) pedem correção no Blender para deformar bem
-2. **Conferir a fidelidade à concept art** — a manopla de bronze da Pyra, o corvo do
-   Corvomante e o fole do Vex podem sair aproximados ou ausentes; peça-assinatura
-   costuma exigir modelagem à mão
+2. **Conferir a fidelidade à concept art** — **confirmado na Pyra: a manopla de
+   bronze saiu ausente.** O corvo do Corvomante e o fole do Vex correm o mesmo
+   risco. Peça-assinatura costuma exigir modelagem à mão. Os três caminhos
+   possíveis estão em [PASSOS_GRAFICOS.md](PASSOS_GRAFICOS.md) §9 — decisão
+   pendente do Diretor
 3. **Ajustar pesos do skinning** — o rig automático erra em roupa larga e capuz
 4. **Animações do jogo** — a Meshy dá andar e correr; conjurar, esquivar, cair e
    reviver saem do Mixamo (grátis) ou do Blender
@@ -159,18 +205,20 @@ faltando:
 
 ## 5. O plano de execução
 
-### Passo 1 — Prova de conceito com a Pyra
-Gerar, importar no Godot, **rodar no celular** e julgar: chegou na qualidade da
-concept art? Essa resposta decide todo o resto (é a Fase 1 de PASSOS_GRAFICOS.md).
+### Passo 1 — Prova de conceito com a Pyra · **parcialmente feito**
+- [x] Gerar pela Meshy e importar no Godot — `modelos/pyra.glb` está no jogo
+- [ ] **Rodar no celular e julgar** — nunca aconteceu; não houve device em
+      `adb devices`. É o portão que decide todo o resto
 
-### Passo 2 — Infraestrutura de código *(equipe técnica, sem você)*
-- Carregar `.glb` por personagem no lugar da malha procedural do `_lathe`
-- Manter o **fallback procedural** para quem ainda não tem modelo
-- Git LFS para os binários (`git lfs track "*.glb"`)
-- LOD e atlas automáticos no import
+### Passo 2 — Infraestrutura de código · **feito**
+- [x] Carregar `.glb` por personagem no lugar da malha procedural do `_lathe`
+- [x] **Fallback procedural** para quem ainda não tem modelo
+- [x] Git LFS para os binários
+- [ ] LOD e atlas automáticos no import
 
 ### Passo 3 — Escalar
-Os 10 magos de lançamento com o pipeline já provado.
+Os 10 magos de lançamento. **Só depois do Passo 1 fechado** e da direção de arte
+decidida ([ART.md](ART.md)) — escalar antes é assinar 20 retrabalhos.
 
 ---
 
@@ -180,9 +228,11 @@ Os 10 magos de lançamento com o pipeline já provado.
 |---|---|
 | Malha não fica fiel à concept art | julgar com 1 personagem antes de gastar créditos nos 20 |
 | Topologia ruim deforma feio na animação | retopologia no Blender por cima da base |
-| Adereço-assinatura sai errado ou some | modelar a peça à mão e acoplar ao rig |
-| Créditos acabam no meio | conferir saldo antes de lote; ~25–40 por personagem |
-| Binários incham o repositório | Git LFS **antes** do primeiro commit de `.glb` |
+| **Adereço-assinatura some** (aconteceu na Pyra) | três caminhos em PASSOS_GRAFICOS.md §9 — pendente do Diretor |
+| **Asset gerado expira em 3 dias e o crédito se perde** | o `meshy.py` baixa na mesma execução; nunca deixar job sem esperar |
+| Créditos acabam no meio | conferir saldo antes de lote; ~41 medidos por personagem |
+| Binários incham o repositório | Git LFS **antes** do primeiro commit de `.glb`; ateliê fica fora do git |
+| Vista única limita a qualidade da malha | só destrava com lote novo de vistas com perfil de 90° (§3) |
 
 ---
 

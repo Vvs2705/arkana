@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1536" viewBox="0 0 1536 1536">
+  <rect width="1536" height="1536" fill="#D8D8DC"/>
+  <text x="110" y="150" font-family="sans-serif" font-size="72" font-weight="700" fill="#1D1B22">NOCTUS — PALETA</text>
+  <text x="110" y="215" font-family="sans-serif" font-size="30" fill="#403C45">Nova Direção de Arte • ARKANA</text>
+  <g font-family="sans-serif" font-size="34" font-weight="600">
+    <rect x="110" y="310" width="1316" height="225" rx="28" fill="#1D1B22"/>
+    <text x="150" y="450" fill="#F5F3F7">NEGRO ABISSAL  #1D1B22</text>
+    <rect x="110" y="575" width="1316" height="225" rx="28" fill="#8B1E2E"/>
+    <text x="150" y="715" fill="#FFFFFF">CARMESIM  #8B1E2E</text>
+    <rect x="110" y="840" width="1316" height="225" rx="28" fill="#8A5CF0"/>
+    <text x="150" y="980" fill="#FFFFFF">ÉTER VIOLETA  #8A5CF0</text>
+    <rect x="110" y="1105" width="1316" height="225" rx="28" fill="#E8E4EC"/>
+    <text x="150" y="1245" fill="#1D1B22">MÁRMORE PÁLIDO  #E8E4EC</text>
+  </g>
+  <text x="110" y="1425" font-family="sans-serif" font-size="28" fill="#403C45">Materiais: couro negro • rubi • metal envelhecido • névoa etérea</text>
+</svg>

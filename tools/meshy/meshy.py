@@ -102,24 +102,20 @@ def concept_em_data_uri(slug: str) -> str:
     um PAINEL PLANO — a malha saiu com 1.9 de largura e 0.05 de profundidade,
     e o rigging morreu com "pose estimation failed". Uma figura por imagem.
 
-    Usa arte/frente.png se existir; senao recorta do concept.png e salva.
+    Desde a entrega de 24/08 cada arquivo ja' e' UMA figura isolada, entao o
+    recorte da folha antiga deixou de existir. Lemos a vista frontal direto.
+
+    LIMITACAO CONHECIDA: mandamos 1 imagem (/image-to-3d) e o atelie tem 4
+    vistas por mago. O endpoint /multi-image-to-3d aceita ate' 4 e daria um
+    modelo melhor — mas as vistas do lote atual estao erradas (o "3/4" e' a
+    frontal repetida e nao existe perfil de 90 graus), entao mandar as quatro
+    hoje nao ajudaria. Ver docs/pipeline-arte/PERSONAGENS/02-REFERENCIAS_MULTI_VIEW.md
     """
     arte = RAIZ / "personagens" / slug / "arte"
-    frente = arte / "frente.png"
+    frente = arte / "_originais" / "master-reference-frente.png"
     if not frente.exists():
-        folha = arte / "concept.png"
-        if not folha.exists():
-            sys.exit(f"ERRO: nem frente.png nem concept.png em {arte}")
-        try:
-            from PIL import Image
-        except ImportError:
-            sys.exit("ERRO: instale Pillow (pip install Pillow) ou crie frente.png a mao")
-        im = Image.open(folha).convert("RGB")
-        w, h = im.size
-        # A vista frontal e' a 1a figura a esquerda nas folhas do projeto.
-        im.crop((int(w * 0.025), int(h * 0.01),
-                 int(w * 0.30), int(h * 0.99))).save(frente)
-        print(f"  recortei a vista frontal -> {frente.name}")
+        sys.exit(f"ERRO: falta {frente}\n"
+                 f"       o atelie de arte nao vai para o git; veja personagens/00-LEIA.md")
     b64 = base64.b64encode(frente.read_bytes()).decode()
     print(f"  imagem: {frente.name} ({frente.stat().st_size // 1024} KB)")
     return f"data:image/png;base64,{b64}"

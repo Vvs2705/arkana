@@ -7,14 +7,22 @@ godot/build/
 # Roblox / Rojo
 roblox/build/
 
-# Downloads e pacotes de importacao de arte
-personagens/*.zip
-personagens/IMAGENS DOS PERSONSAGENS*/
+# Arte dos personagens — o ATELIE nao vai para o git, o RETRATO vai.
+# As folhas de concept (8 vistas por mago, ~1,9MB cada = 307MB no elenco) sao
+# materia-prima da modelagem 3D e vivem so' no disco. O que o jogo carrega e'
+# godot/menu/art/NN.png (512px), esse sim versionado. Backup: os .zip da entrega
+# original do Diretor, guardados por ele fora do repositorio.
+personagens/*/arte/_originais/
+# Zips de entrega em QUALQUER profundidade — a regra antiga era personagens/*.zip
+# e nao pegava subpasta, foi assim que 293MB ficaram expostos em 24/08.
+personagens/**/*.zip
 
 # Logs e caches
 logs/
 *.log
 .cache/
+__pycache__/
+*.pyc
 
 # Editores
 .vscode/*

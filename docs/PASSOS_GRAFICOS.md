@@ -4,11 +4,13 @@
 > sair do visual atual do Arkana e chegar na qualidade das concept arts do elenco —
 > com os programas, formatos, orçamentos técnicos, custos e prazos reais.
 >
-> **Data:** 21/08/2026 · **Autor:** equipe técnica (coordenador + raias)
-> **Status:** decisão + execução técnica parcial. Em 21/08 foi montado o pipeline
-> local, gerado um `pyra.glb` proxy para prova de importação, validado o fallback
-> procedural e exportado APK debug. A arte final game-ready da Pyra ainda não foi
-> produzida.
+> **Escrito em:** 21/08/2026 · **Revisado em:** 24/08/2026
+> **Autor:** equipe técnica (coordenador + raias)
+>
+> **Status:** as seções 1 a 8 são o plano e continuam válidas como plano. A
+> **seção 9 é a única que descreve o estado real** — leia-a antes de agir. O
+> proxy de Blender citado no histórico foi apagado em 21/08; hoje o jogo carrega
+> um modelo real da Meshy.
 
 ---
 
@@ -21,23 +23,24 @@ porque só uma delas é problema.
 
 O **mundo** é procedural, mas com iluminação real, gama corrigida, tonemap ACES,
 névoa por profundidade, oclusão de ambiente assada no vértice e cinco shaders
-próprios. Isso já é qualidade de jogo de verdade. O maior ganho do dia foi
+próprios. Isso já é qualidade de jogo de verdade. O maior ganho daquele dia foi
 descobrir que a cor de vértice entrava no shader **sem conversão de gama** — os hex
 do GDD (sRGB) viravam quase o dobro de intensidade em linear, e o mundo inteiro
 saía lavado e dessaturado.
 
 ### O que NÃO está bom (o problema real)
 
-Os **personagens**. Números medidos hoje, não estimados:
+Os **personagens**. Números medidos em 21/08, não estimados. **Este é o retrato do
+mago procedural**, que em 24/08 ainda vale para 19 dos 20 — só a Pyra tem modelo
+game-ready (seção 9).
 
-| Item | Estado atual |
+| Item | Mago procedural |
 |---|---|
 | Malha do mago | **2.184–2.460 vértices**, gerada por revolução de perfis (`_lathe`) em código |
 | Textura do personagem | **nenhuma** — cor lisa por material |
 | Mapas PBR | nenhum (sem normal, roughness, metallic, AO) |
 | Rig | hierarquia de `Node3D`, sem skinning por peso |
 | Animações | 3 (idle, run, cast), feitas à mão em código |
-| Arquivos de arte 3D no repositório | **zero** (regra "zero binário") |
 
 **A conclusão dura:** um corpo de 2.400 vértices feito por revolução, sem textura e
 sem esqueleto com pesos, **nunca vai parecer a concept art da Pyra**. Não é questão
@@ -47,9 +50,10 @@ articuladas. Nenhuma dessas coisas existe — nem pode existir — numa malha de
 revolução sem textura.
 
 A regra de "zero binário no repositório" foi **ótima para o protótipo** (leve,
-determinística, sem dependência de artista). E é **exatamente o que impede** o jogo
-de ter os personagens que você desenhou. Chegar na qualidade das artes exige
-abandonar essa regra para os personagens.
+determinística, sem dependência de artista). E era **exatamente o que impedia** o
+jogo de ter os personagens que você desenhou. **A regra foi abandonada para os
+personagens** — o `.glb` e a textura da Pyra estão versionados via Git LFS
+(seção 9). A oficina de trabalho de cada mago continua fora do git.
 
 ---
 
@@ -82,6 +86,9 @@ excelentes valem mais que vinte medianos.
 | Personagens simultâneos | 6–20 | 7 |
 | Alvo de FPS | 60 (com modo 30 para aparelho fraco) | não medido em device |
 
+A coluna "Arkana hoje" é o mago procedural. A Pyra já saiu dela: 15.492 triângulos,
+textura 2k, PBR, riggada. Falta ela para os outros 19.
+
 ---
 
 ## 3. O pipeline de personagem — as 9 etapas, em ordem
@@ -89,9 +96,13 @@ excelentes valem mais que vinte medianos.
 Este é o caminho padrão da indústria. Nenhuma etapa pode ser pulada sem custo.
 
 ### Etapa 1 — Concept art ✅ JÁ TEMOS
-As 20 folhas em `personagens/NN-slug/arte/concept.png` já cumprem esse papel:
-frente, lado, costas, paleta e insets de detalhe. **Esta etapa está pronta** — e é
-o ativo mais valioso do projeto hoje.
+As 8 vistas por mago em `personagens/NN-slug/arte/_originais/` cumprem esse papel.
+**Esta etapa está pronta** — e é o ativo mais valioso do projeto hoje. Com uma
+ressalva medida: **não existe perfil de 90° no lote** (ver `ART.md`), o que limita
+o fluxo multi-imagem da Meshy.
+
+A folha única `arte/concept.png` **não existe mais** — foi substituída pelas vistas
+separadas em 24/08. Script ou documento que ainda a procure está quebrado.
 
 ### Etapa 2 — Escultura de alta densidade (high-poly)
 Modelar com todo o detalhe: dobras de pano, placas de metal, cicatrizes, anatomia.
@@ -176,36 +187,30 @@ a partir da própria concept art.
 - **Uso correto:** **base para refinar**, nunca produto final. Gera-se, faz-se a
   retopologia por cima (etapa 3), e segue o pipeline normal.
 
-**Recomendação:** testar com **um** personagem antes de decidir qualquer coisa. Se
-a malha gerada da Pyra servir de base, isso corta cerca de 40% do tempo por
-personagem.
+**Feito em 21–24/08:** a rota por IA foi testada com a Pyra via Meshy e o modelo
+está no jogo (seção 9). A ressalva se confirmou — a manopla de bronze, peça de
+assinatura, saiu ausente.
 
 ---
 
-## 5. A decisão de estilo: realista ou stylized-PBR?
+## 5. A decisão de estilo — ABERTA, mora no ART.md
 
-Esta escolha define tudo o que vem depois, e **é sua**.
+A escolha do estilo de renderização dos personagens **não foi tomada** e **não é
+decidida aqui**. O estado da questão, a evidência medida no elenco e a decisão
+pendente do Diretor estão em [ART.md](ART.md).
 
-### Opção A — PBR realista (o caminho Apex)
-Materiais fisicamente corretos, luz realista, texturas de alta resolução.
-- **Prós:** é literalmente a qualidade de Apex; as concept arts são pinturas
-  semi-realistas e traduzem bem
-- **Contras:** o mais caro em produção e em GPU; exige coerência de iluminação
-  perfeita, senão vira "plástico"; o mundo cel-shaded atual teria que mudar junto
+O que este documento tem a dizer sobre ela é só a parte técnica:
 
-### Opção B — Stylized PBR ⭐ recomendada
-Malha e texturas com qualidade PBR, mas direção de arte estilizada — silhuetas
-fortes, cor saturada, detalhe onde importa. É o caminho de Overwatch, Valorant,
-Genshin Impact e Fortnite.
-- **Prós:** roda **muito** melhor em mobile; envelhece melhor; perdoa imperfeição;
-  **casa com o mundo cel-shaded que já existe e foi calibrado hoje**; as concept
-  arts do Arkana já têm essa pegada
-- **Contras:** não é foto-realista — mas nenhuma das referências acima é, e todas
-  parecem excelentes
+- **PBR realista** custa mais em produção e em GPU, exige coerência de iluminação
+  perfeita, e obrigaria a trocar o mundo cel-shaded já calibrado.
+- **Stylized PBR** (Overwatch, Valorant, Fortnite) roda muito melhor em mobile e
+  casa com os cinco shaders estilizados que já existem.
 
-**Recomendação técnica: Opção B.** O Arkana já tem cinco shaders estilizados
-funcionando e um mundo calibrado. Trocar tudo por PBR realista jogaria fora o
-trabalho de hoje e traria um custo de GPU que celular médio não paga.
+**Recomendação da equipe técnica: stylized PBR** — por custo de GPU e por
+compatibilidade com o mundo atual. É recomendação, não decisão.
+
+**Cuidado ao traduzir isso como "menos realismo".** O `ART.md` mediu que esse
+enunciado empurra o gerador para anime, que é justamente o que quebra o elenco.
 
 ---
 
@@ -235,18 +240,27 @@ trabalho de hoje e traria um custo de GPU que celular médio não paga.
 5. **Um material por personagem** sempre que possível — hoje são ~18 draw calls por
    mago; com atlas cai para 3–5
 
-### Onde os arquivos vão morar
+### Onde os arquivos moram (verificado em 24/08)
 
 ```
 godot/characters/modelos/
-├── pyra.glb                 malha + rig + animações
-├── pyra_albedo.png          cor
-├── pyra_normal.png          relevo
-└── pyra_orm.png             oclusão / rugosidade / metal
+├── pyra.glb                 malha + rig + animações — VERSIONADO (Git LFS)
+├── pyra_texture_0.png       textura                 — VERSIONADO (Git LFS)
+└── 01-pyra/                 OFICINA — fora do git, regenerável
+    ├── 01-pyra.glb          malha crua da Meshy
+    ├── 01-pyra_rigged.glb   saída do rigger
+    ├── 01-pyra_*.png/.jpg   albedo, normal, roughness, metallic soltos
+    └── anim/                animações separadas
 ```
 
-**Isso quebra a regra de "zero binário"** — é a consequência inevitável da decisão.
-Recomenda-se **Git LFS** para os binários: `git lfs track "*.glb" "*.png"`.
+**A regra que isso estabelece:** vai para o git só o que o jogo carrega. A oficina
+(`modelos/<slug>/`) pesa ~102 MB só na Pyra e é regenerável por ~41 créditos da
+Meshy — versioná-la seria pagar peso permanente por um arquivo descartável.
+O `.gitignore` já implementa isso (`godot/characters/modelos/*/` com exceção para
+os `.glb` da raiz).
+
+**Isso quebrou a regra de "zero binário"** — consequência inevitável da decisão.
+Git LFS está configurado para `godot/characters/modelos/*.{glb,png,ktx2}`.
 
 ---
 
@@ -302,67 +316,98 @@ personagem em diante o tempo costuma cair pela metade.
 
 ---
 
-## 9. O plano recomendado, em ordem de execução
+## 9. Estado real (24/08) — leia esta seção antes de agir
 
-### Fase 1 — Prova de conceito (1 personagem)
-1. Escolher a **Pyra** — a mais icônica: braço de chama + manopla de bronze
-2. Testar geração 3D por IA a partir da `concept.png`; avaliar se serve de base
-3. Refinar: retopologia para ~15k triângulos, UV, bake, texturizar
-4. Riggar no Mixamo, ajustar pesos no Blender
-5. Exportar `.glb`, importar no Godot, **rodar no celular**
-6. **Julgar: chegou na qualidade da concept art?**
+As seções acima são plano. **Esta é a única que descreve o que existe.**
 
-**Só depois de responder essa pergunta faz sentido decidir o resto.**
+### O que o jogo carrega hoje
 
-**Execução técnica em 21/08:** Pyra foi escolhida e recebeu um proxy local
-`godot/characters/modelos/pyra.glb`, gerado por Blender via
-um proxy descartável (removido em 21/08, quando o modelo real da Meshy
-chegou). O proxy provou importação `.glb`, aliases de
-animação (`Idle`, `Armature|Running`, `Spell Cast`), materiais, esqueleto simples,
-fallback e export Android. Ele **não** substitui escultura, retopologia, UV, bake e
-texturização final.
+Verificado no disco em 24/08:
 
-Métricas do proxy validado:
+| Caminho | Peso | No git? | O que é |
+|---|---:|---|---|
+| `godot/characters/modelos/pyra.glb` | 7,3 MB | **sim** (Git LFS) | o modelo real da Meshy — **é o que o jogo carrega** |
+| `godot/characters/modelos/pyra_texture_0.png` | 5,9 MB | **sim** (Git LFS) | a textura |
+| `godot/characters/modelos/01-pyra/` | 102 MB | **não** | ateliê local: malha crua, riggada, animações separadas |
 
-| Item | Resultado |
-|---|---:|
-| MeshInstances | 1 |
-| Superfícies / draw calls aprox. | 5 |
-| Materiais | 5 |
-| Vértices | 996 |
-| Ossos | 5 |
-| Animações | 3 (`idle`, `run`, `cast` via aliases) |
-| APK debug | `godot/build/arkana3d.apk` (~32 MB) |
-| Device físico | pendente — nenhum aparelho apareceu em `adb devices` |
+`Mage.gd` resolve o slug `01-pyra` para `res://characters/modelos/pyra.glb` —
+confirmado pelo `characters/selftest.gd`. Quem não tem `.glb` cai no mago
+procedural. **Métricas da Pyra:** 15.492 triângulos, PBR, riggada, 3 animações.
 
-### Fase 2 — Pipeline e infraestrutura *(trabalho de código — a equipe técnica faz)*
-7. Sistema de carregamento de modelo por personagem (substituir o `_lathe`)
-8. Esqueleto compartilhado: um set de animação para todos os magos humanoides
-9. Git LFS configurado
-10. LOD e atlas automáticos no import
-11. Medição de FPS em device com 7 personagens
+O ateliê fica fora do git porque é **regenerável**, por cerca de 41 créditos da
+Meshy:
 
-Status técnico em 21/08:
+```bash
+python tools/meshy/meshy.py tudo 01-pyra
+python tools/meshy/montar_glb.py 01-pyra pyra
+```
 
-- [x] Sistema de carregamento por personagem com fallback procedural em `Mage.gd`.
+### HISTÓRICO — o proxy de Blender (existiu, foi apagado em 21/08)
+
+Antes do modelo da Meshy chegar, a Pyra teve um **proxy descartável** gerado no
+Blender. **Ele não existe mais.** Está registrado aqui porque as lições que ele
+pagou continuam valendo — e porque este documento afirmou o proxy como estado
+atual por três dias depois de ele ter sido apagado.
+
+**O que o proxy provou (continua válido):**
+
+- importação de `.glb` no Godot 4.4 funciona;
+- aliases de animação resolvem nomes de exportador diferentes
+  (`Idle`, `Armature|Running`, `Spell Cast` → `idle`, `run`, `cast`);
+- o fallback procedural entra corretamente para quem não tem modelo;
+- o export Android aceita o pipeline e gera APK debug.
+
+**O que era só do proxy (não vale mais):** 996 vértices, 5 ossos, 5 materiais.
+Esses números descreviam um manequim de teste, nunca a Pyra. **Se você os
+encontrar citados em qualquer outro documento, estão errados.**
+
+### Fidelidade do modelo — três caminhos, PENDENTE DO DIRETOR
+
+A geração acertou o corpo da Pyra mas **perdeu a manopla de bronze**, que é a
+assinatura dela. São três saídas possíveis. **Nenhuma foi escolhida** — são
+opções levantadas pela equipe, não decisão.
+
+| Caminho | Custo | O que se perde |
+|---|---|---|
+| **A — aceitar** e resolver a manopla em textura e VFX | zero | a silhueta da assinatura; de longe a Pyra vira "maga genérica" |
+| **B — modelar a peça à mão** no Blender e acoplar ao rig | horas de modelagem por mago com adereço | nada visual; vira trabalho manual recorrente no elenco |
+| **C — regerar** com a peça-assinatura isolada como referência | créditos de Meshy | tempo, e não há garantia de acerto |
+
+O ateliê já tem `equipamento-isolado.png` por mago, e o padrão da pipeline manda
+gerar peça-assinatura isoladamente — o caminho C tem insumo pronto.
+
+### O que continua pendente de verdade
+
+- [ ] **FPS em aparelho, com vários personagens em cena — nunca foi medido.**
+      Nenhum device apareceu em `adb devices`. Este é o número que decide se o
+      orçamento de 15k triângulos por mago se sustenta; sem ele, tudo aqui é
+      estimativa.
+- [ ] **Esqueleto compartilhado final humanoide.** Sem ele, cada mago precisa do
+      próprio set de animação — o custo multiplica por 20 em vez de somar.
+- [ ] **Atlas e texturas finais.** Sem atlas, as draw calls por mago não caem para
+      a faixa de 3–5.
+- [ ] **19 dos 20 magos sem modelo.** Usam o procedural.
+
+### Infraestrutura de código — o que já está pronto
+
+- [x] Carregamento de modelo por personagem com fallback procedural em `Mage.gd`.
 - [x] Aliases de animação externa para `idle`, `run` e `cast`.
 - [x] `cast_fired` externo sincronizado por adaptador e protegido contra interrupção.
 - [x] `get_model_report()` com métricas de vértices, superfícies, materiais, ossos e animações.
-- [x] Git LFS configurado para `godot/characters/modelos/*.{glb,png,ktx2}`.
+- [x] Git LFS para `godot/characters/modelos/*.{glb,png,ktx2}`.
 - [x] Import Godot headless validado com `pyra.glb`.
 - [x] APK debug exportado e verificado.
-- [ ] Esqueleto compartilhado final humanoide — proxy tem 5 ossos; alvo final é 60–90.
-- [ ] Atlas/texturas finais — proxy usa materiais de cor; sem albedo/normal/ORM finais.
-- [ ] Medição de FPS em device com 7 personagens — bloqueada por ausência de aparelho conectado.
 
-### Fase 3 — Produção do elenco
-12. Os 10 magos de lançamento, um a um, com o pipeline já provado
-13. Os 10 de temporada depois
+### O que vem depois, na ordem
 
-### Fase 4 — Ambiente à altura
-14. Substituir a ilha procedural por assets modelados nos POIs principais
-15. Iluminação assada (lightmaps) para o cenário estático
-16. Reflection probes nos pontos de interesse
+1. **Medir FPS em aparelho** com vários magos em cena. Trava tudo o mais.
+2. **Fechar a direção de arte do elenco** (`ART.md` — pendente do Diretor).
+3. **Elenco:** os 10 magos de lançamento, um a um; os 10 de temporada depois.
+4. **Ambiente à altura:** assets modelados nos POIs, lightmaps no cenário
+   estático, reflection probes nos pontos de interesse.
+
+Os passos 1 e 2 são portões. Escalar o elenco antes deles é assinar retrabalho
+de 20 peças.
 
 ---
 
@@ -391,9 +436,9 @@ Status técnico em 21/08:
 3. **Blender + Substance Painter + Mixamo** cobrem tudo — Blender e Mixamo, grátis
 4. **Entregar em `.glb`** com texturas comprimidas em ASTC/ETC2
 5. **Mirar 12–20k triângulos** e 3–5 draw calls por mago
-6. **Escolher stylized-PBR**, não realismo puro — casa com o mundo atual e roda em
-   celular
-7. **Começar por UM personagem** e julgá-lo no aparelho antes de escalar
+6. **Fechar a direção de arte do elenco** — pendente do Diretor, ver `ART.md`
+7. **Começar por UM personagem** e julgá-lo **no aparelho** antes de escalar —
+   o personagem existe (Pyra); o julgamento no aparelho ainda não aconteceu
 
 **O gargalo não é técnico — é de produção de arte 3D.** Todo o trabalho de código
 (pipeline, importação, rig compartilhado, LOD, troca de personagem, otimização)
@@ -404,9 +449,12 @@ um modelador contratado, ou uma ferramenta de geração 3D com refino humano.
 
 ## 12. A pergunta que decide o próximo passo
 
-> **Modelar de verdade a Pyra e julgá-la no celular — ou espremer o máximo do
-> procedural enquanto isso?**
+A pergunta antiga era "modelar de verdade a Pyra ou espremer o procedural?".
+**Ela foi respondida:** a Pyra está modelada e no jogo. A pergunta atual é outra.
 
-Enquanto a decisão não vem, o procedural continua evoluindo: o shading híbrido, o
-sistema de identidade por mago e o mundo com gama corrigida já entregaram ganho
-real hoje. Mas há um teto, e ele está bem abaixo das concept arts.
+> **A Pyra roda a 60 FPS num celular com mais seis magos em cena — e chegou na
+> qualidade da concept art?**
+
+Ninguém sabe. Nunca houve um aparelho conectado. Enquanto essa resposta não vier,
+qualquer número de orçamento neste documento é estimativa, e escalar o elenco é
+apostar 20 peças num palpite.

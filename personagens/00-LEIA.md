@@ -19,18 +19,55 @@
 ## Funções (a taxonomia do Diretor)
 **Suporte/Vida** · **Ataque/Perseguição** · **Longa distância** · **Curta distância**
 
-## Status das artes (20/08/2026)
+## Status das artes (25/08/2026)
 
-**19 de 20 retratos entregues** pelo Diretor (falta só **15-maris**, que ficou
-fora do lote original). Cada um está em `personagens/NN-slug/arte/concept.png`
-e já aparece na vitrine do jogo (`godot/menu/art/NN.png` — troca automática).
+**Os 20 magos têm conjunto completo de arte.** O Diretor entregou em 24/08 um lote
+novo com 8 vistas por personagem, substituindo o retrato único anterior.
 
-**9 imagens marcadas para REGERAÇÃO** (nota do Diretor): os personagens 01–10
-foram reformulados (descolados do Apex, marcas mágicas no corpo) e as imagens
-atuais vieram das fichas antigas — 01, 02, 03, 05, 07, 08, 09, 10 e 15.
-O prompt canônico de cada uma está em `personagens/NN-slug/arte/prompt.txt`;
-a regeração usa créditos do gerador de imagem e é ato do Diretor.
-Já corretas: 04-corvus e 06-olho-de-eter.
+### Onde cada coisa vive
+
+| O quê | Onde | No git? |
+|---|---|---|
+| As 8 vistas de concept (frente, 3/4, lateral, costas, close de busto, equipamento isolado, marcas isoladas, paleta) | `personagens/NN-slug/arte/_originais/` | **Não** — 307 MB, é ateliê local |
+| Paleta em vetor | `personagens/NN-slug/arte/paleta.svg` | Sim |
+| Prompt de geração | `personagens/NN-slug/arte/prompt.txt` | Sim |
+| O retrato que o jogo usa (512px) | `godot/menu/art/NN.png` | Sim |
+
+O ateliê fica fora do git pelo mesmo motivo dos modelos 3D: é pesado e é
+matéria-prima, não produto. O produto é o retrato de 512px que entra no APK.
+A arte da direção anterior foi removida do disco em 25/08 e vive no commit
+`9643113` — para recuperar uma:
+`git show 9643113:personagens/01-pyra/arte/concept.png > saida.png`
+
+### O que a auditoria de 25/08 mediu
+
+**O elenco tem três linguagens visuais diferentes, não uma.**
+
+| Linguagem | Quantos | Quem |
+|---|---|---|
+| Escultura 3D (o que o Diretor aprovou) | 7 | 04, 09, 13, 14, 16, 17, 18 |
+| Pintura semi-realista | 7 | 01, 03, 05, 06, 07, 10, 12 |
+| Anime / manhwa | 6 | 02, 08, 11, 15, 19, 20 |
+
+**Defeito de vistas, vale para os 20:** a `vista-3-4` é a frontal repetida em
+12 de 12 conferidos, e a `vista-lateral` é um três-quartos de ~60-70°. **Não
+existe perfil de 90° no lote.** Consequência prática: o fluxo multi-imagem da
+Meshy recebe 4 imagens e aproveita 2 ângulos, perdendo justamente a espessura
+lateral do corpo. Corrigir isso vale mais que a discussão de estilo e custa uma
+fração do preço.
+
+**Divergências entre arte e ficha** (a ficha é a fonte da verdade do
+personagem; onde divergem, a arte é que está errada): o kintsugi da Ceifadora
+virou malha regular em vez de porcelana rachada; Véu aparenta 25 anos quando a
+ficha diz que ela voltou aos 19 sem ter envelhecido; faltam as lâminas gêmeas
+da Umbra e os sinos do Olho-de-Éter (que são como ele percebe o próprio andar);
+os olhos de Maris vieram com esclera branca quando deveriam ser verde-mar
+inteiros. Mais fiéis à ficha: Tessa e Vex.
+
+**A direção de arte está PENDENTE DE DECISÃO do Diretor** — o eixo não é
+"realismo" (o rosto do Brok, aprovado, é mais realista que o da Pyra,
+rejeitada), e sim superfície pintada × esculpida, sombra de contato e
+proporção exagerada. Ver `docs/ART.md`.
 
 | # | Personagem | Raça | Função | O que o torna único |
 |---|---|---|---|---|

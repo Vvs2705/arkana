@@ -26,7 +26,10 @@ Godot instalado + templates Android + projeto `godot/` exportando APK.
 ### G1 · A FATIA REAL — o próximo APK que o Diretor testa
 Nada de mapa de teste. Uma ilha jogável com cara de jogo:
 - **Ambiente**: ilha estilizada cel-shaded (colinas, floresta, lago, ruínas —
-  os 4 POIs do Roblox reinterpretados em 3D), céu e luz da direção de `ART.md`.
+  os 4 POIs do Roblox reinterpretados em 3D), com a paleta do `ART.md`.
+  Atenção: **não existe spec de céu, hora do dia nem iluminação** em documento
+  nenhum — o que existe é a paleta e a regra "clima se faz com COR, nunca com
+  falta de luz". Quem precisar de mais que isso escreve a spec antes.
 - **Personagem**: mago 3D low-poly estilizado (silhueta Spellbreak: manto,
   capuz, mãos que conjuram), com animações idle/correr/conjurar.
 - **Câmera 3ª pessoa** sobre o ombro + **controles do GDD §19.3**: joystick
