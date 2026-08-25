@@ -16,6 +16,39 @@
 
 ## CONTINUAR DAQUI
 
+### >>> COMECE POR AQUI (25/08, fim da noite — parado a pedido do Diretor)
+
+**O defeito da corrida esta' DIAGNOSTICADO e NAO corrigido.** Deixei parado de
+proposito; e' a primeira coisa da manha.
+
+**Sintoma, nas palavras do Diretor apos testar o APK no aparelho:** *"da' apenas
+os tres primeiros passos e depois patina, mas agora pelo menos esta' na direcao
+correta, ja' fez diferenca"*.
+
+**A direcao ja' foi corrigida** (commit `a6efe3f`): o modelo entrava virado 180
+graus porque glTF olha para +Z e o Godot anda para -Z. Isso esta' resolvido e
+tem teste de regressao.
+
+**O que sobrou — a patinacao — tem causa confirmada:**
+`Mage.gd` so' define `loop_mode` nas animacoes PROCEDURAIS (ver `_new_anim`,
+que recebe `looped` e aplica `LOOP_LINEAR`). Para o modelo EXTERNO (.glb) nao
+existe nenhum tratamento de laco, e o importador glTF do Godot traz as
+animacoes com `LOOP_NONE` por padrao. Resultado: o clipe "Running" toca UMA vez
+— sao uns tres passos —, congela no ultimo quadro, e o corpo continua
+deslizando. Isso e' exatamente a patinacao descrita.
+
+**O conserto (nao aplicado):** em `_build_imported_model()`, depois de resolver
+os aliases, marcar `LOOP_LINEAR` nas animacoes de `idle` e `run`. **`cast` NAO
+pode entrar no laco** — e' disparo unico e o `cast_fired` depende do fim dela.
+Deixar teste de regressao que fique vermelho sem o laco, como manda a regra.
+
+**Cuidado ao medir depois:** havia um SEGUNDO suspeito para a patinacao — o
+teto de `Balance.ANIM` saturando num anao de 1,40 m que usa clipe feito para
+~1,70 m (`Pawn._sync_anim_speed`). Com o laco consertado, medir de novo ANTES
+de mexer nesse numero: pode ja' nao ser necessario.
+
+---
+
 ### O que ja' foi feito
 O jogo e' **jogavel de ponta a ponta no Android**: menu, selecao de mago,
 partida contra 6 bots, zona que fecha, habilidades, escudo, estado derrubado,
@@ -49,6 +82,8 @@ de primeira classe) nao sao estilo — sao cicatrizes de defeitos medidos.
 5. Contratar servidor e contas de loja quando chegar a hora (G5/G6) e responder o IARC.
 
 **A equipe faz, em ordem de valor:**
+0. **O laco das animacoes do modelo externo** — ver ">>> COMECE POR AQUI".
+   Pequeno, diagnosticado e bloqueia a sensacao de movimento do jogo inteiro.
 1. **Os 17 kits que faltam** — e' o maior buraco de jogabilidade (secao 3).
 2. **A Sintonia** — um dos dois pilares de identidade, sem uma linha em codigo.
 3. **Corrigir os angulos das vistas** da concept art: nao existe perfil de 90
