@@ -76,9 +76,23 @@ const HZ_ALTIMETRO := 10.0
 ## o jogador olharia para a parede em vez do mapa que ele precisa ler.
 const PORTAO := Vector3(0.0, -6.0, 0.0)
 
+## Seed proprio dos bots: mexer no loot ou na zona nao pode mudar onde eles
+## pousam (mesma regra dos outros sistemas deterministicos do projeto).
+const SEED_BOTS := 5171
+
+## Fracao da rota em que um bot pode saltar. Nem no primeiro instante (todos
+## cairiam na ponta de entrada, fora do mapa) nem no ultimo (viraria fila).
+const SALTO_BOT_MIN := 0.18
+const SALTO_BOT_MAX := 0.86
+
 var fase := "no_castelo"     # "no_castelo" | "caindo" | "planando" | "pousou"
 var castelo: Castelo
 
+## Player ou BOT? So' o jogador fala com o Bus (altimetro, fase) e so' ele
+## salta por toque. O bot cai pela MESMA lei — passo de fisica desligado, ou
+## seja, sem magia no ar — e salta sozinho numa hora sorteada.
+var e_player := true
+var _t_salto := -1.0         # bot: instante da rota em que ele pula
 var _player: Node3D
 var _island: Node
 var _t := 0.0                # relogio da rota do castelo
@@ -100,6 +114,35 @@ static func iniciar(arena: Node3D, island: Node, player: Node3D) -> Queda:
 	q.castelo = Castelo.criar(arena, island)
 	player.add_child(q)
 	return q
+
+
+## OS BOTS CAEM JUNTO. Eles compartilham o castelo do jogador (um castelo so'
+## no ceu) e obedecem a MESMA lei: o passo de fisica fica desligado ate' pousar,
+## entao nenhum deles conjura no ar.
+##
+## DETERMINISTICO por seed proprio: a mesma partida sorteia sempre os mesmos
+## instantes de salto. Sem isso, dois testes do mesmo cenario dariam pousos
+## diferentes e o portao viraria moeda.
+static func iniciar_bots(bots: Array, island: Node, castelo_do_player: Castelo,
+		p_seed := SEED_BOTS) -> Array:
+	var fora: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = p_seed
+	for b in bots:
+		if b == null or not is_instance_valid(b) or not (b is Node3D):
+			continue
+		var q := Queda.new()
+		q.name = "Queda"
+		q.e_player = false
+		q._player = b as Node3D
+		q._island = island
+		q.castelo = castelo_do_player
+		## Espalhados pela rota: se todos saltassem juntos, os seis pousariam
+		## no mesmo ponto e a partida abriria com um amontoado.
+		q._t_salto = rng.randf_range(SALTO_BOT_MIN, SALTO_BOT_MAX)
+		(b as Node3D).add_child(q)
+		fora.append(q)
+	return fora
 
 
 ## O jogador esta' no ar AGORA? E' o gancho para quem quiser barrar magia na
@@ -141,8 +184,9 @@ func _physics_process(delta: float) -> void:
 			_cair(delta)
 		"planando":
 			_planar(delta)
-	_camera()
-	_altimetro(delta)
+	if e_player:
+		_camera()          # bot nao tem camera para arrastar
+		_altimetro(delta)  # nem altimetro: a HUD e' do jogador
 
 
 # ------------------------------------------------------------ 1. no castelo
@@ -152,6 +196,9 @@ func _physics_process(delta: float) -> void:
 func _viajar(delta: float) -> void:
 	_t += delta
 	_grudar()
+	if not e_player and _t_salto >= 0.0 and _t >= _t_salto * _duracao_rota():
+		saltar()
+		return
 	if _tocou() or _t >= _duracao_rota():
 		## Quem nao salta e' EMPURRADO no fim da rota: ninguem fica preso num
 		## castelo que ja' saiu do mapa (e que se apaga sozinho la').
@@ -169,6 +216,8 @@ func _grudar() -> void:
 ## em vez de exigir botao novo: a UI e' outra raia e a queda nao pode depender
 ## de ela mudar para funcionar. Botao dedicado, quando existir, chama `saltar()`.
 func _tocou() -> bool:
+	if not e_player:
+		return false          # bot nao tem dedo; ele salta pelo relogio da rota
 	var tocou := bool(_player.get("_want_fire")) or bool(_player.get("_want_dodge"))
 	if tocou:
 		_limpar_intencoes()
@@ -232,7 +281,8 @@ func _pousar() -> void:
 	_player.set_physics_process(true)
 	_anim("idle")
 	_fase("pousou")
-	Bus.queda_altura.emit(0.0, 0.0)          # a HUD apaga o altimetro
+	if e_player:
+		Bus.queda_altura.emit(0.0, 0.0)      # a HUD apaga o altimetro
 	set_physics_process(false)               # acabou: esta maquina nao custa mais nada
 
 
@@ -289,7 +339,8 @@ func _solo(x: float, z: float) -> float:
 
 func _fase(nova: String) -> void:
 	fase = nova
-	Bus.queda_fase.emit(nova)
+	if e_player:
+		Bus.queda_fase.emit(nova)   # a HUD e' do JOGADOR: bot nao mexe nela
 
 
 ## A camera do Player e' reposicionada dentro do `_physics_process` dele, que

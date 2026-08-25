@@ -139,24 +139,52 @@ de primeira classe) nao sao estilo — sao cicatrizes de defeitos medidos.
 4. Playtest do Roblox com gente de verdade (V1–V5). Login e publicacao sao ato dele.
 5. Contratar servidor e contas de loja quando chegar a hora (G5/G6) e responder o IARC.
 
-**A equipe faz, em ordem de valor:**
-1. **Bots nao caem do castelo** — nascem no chao. Mexe em `Bot.gd`. E' o buraco
-   mais visivel da queda hoje, e e' FUNCIONALIDADE ESPECIFICADA: a mesma lei do
-   jogador vale para eles (sem magia antes do pousar).
-2. **Os 17 kits que faltam** — e' o maior buraco de jogabilidade (secao 3).
-3. **A Sintonia** — um dos dois pilares de identidade, sem uma linha em codigo.
-4. **Corrigir os angulos das vistas** da concept art: nao existe perfil de 90
+**A equipe faz.** As pendencias estao separadas em TRES GRUPOS, porque
+misturar correcao com decisao de produto foi o que fez o proximo agente
+implementar por inferencia:
+
+### GRUPO 1 — correcoes tecnicas reproduziveis (pode fazer)
+1.1. **Medir a patinacao no aparelho.** As duas causas achadas foram corrigidas
+   (modelo virado e animacao sem laco). Falta medir se o casamento entre
+   cadencia e velocidade satura o teto de `Balance.ANIM` num anao de 1,40 m
+   usando clipe feito para ~1,70 m.
+1.2. **Corrigir os angulos das vistas** da concept art: nao ha' perfil de 90
+   graus no lote, e o "3/4" e' a frontal repetida. Trava o multi-imagem da Meshy.
+1.3. **Texturas do Brok**: duas de 2048. Consolidar SO' se material e comparacao
+   visual provarem que uma e' redundante.
+
+### GRUPO 2 — funcionalidades ja' especificadas (pode fazer, com teste)
+2.1. ~~Bots caem do castelo~~ **[FEITO 25/08]** — os 6 caem sob a mesma lei do
+   jogador, com 8 checagens no selftest da queda.
+2.2. **Animacao `derrubado`**: hoje o caido usa a de locomocao mais lenta. Entra
+   como OPCIONAL, com o mesmo mecanismo de `cair`/`planar`/`pegar`, para nao
+   derrubar modelo que nao tenha o clipe.
+2.3. **Os 17 kits que faltam** — o maior buraco de jogabilidade.
+2.4. **A Sintonia** — um dos dois pilares, sem uma linha em codigo.
+2.5. **Modelo 3D dos magos restantes.** Caminho provado: 30 creditos cada.
+
+### GRUPO 3 — DECISOES DO DIRETOR (nao implementar por inferencia)
+Cada uma esta' na secao 4 com as opcoes e o impacto. Enquanto nao houver
+resposta, o comportamento atual permanece e NAO deve ser "melhorado" sozinho:
+dano cancelar o bau, resultado do timeout, tabela da zona, colisao aerea,
+mergulho no mar, manopla da Pyra, armazenamento das artes, remocao da branch
+antiga, protecao da main e contas de publicacao.
+
+### O que sobrou fora dos grupos
+ — e' o maior buraco de jogabilidade (secao 3).
+- ~~A Sintonia~~ (ver 2.4) — um dos dois pilares de identidade, sem uma linha em codigo.
+- ~~Angulos das vistas~~ (ver 1.2) da concept art: nao existe perfil de 90
    graus no lote, e o "3/4" e' a frontal repetida. Isso trava o multi-imagem
    da Meshy e independe da decisao de estilo.
-5. Modelo 3D dos magos restantes. **O caminho esta provado de ponta a ponta**
+- ~~Modelo 3D dos restantes~~ (ver 2.5) **O caminho esta provado de ponta a ponta**
    (25/08): concept -> Meshy multi-imagem -> remesh 15k -> rig -> animacoes ->
    .glb -> jogo. Custo medido: **30 creditos** por personagem (remesh, rig e
    animacao saem de graca no webapp; na API o remesh custa 5).
-6. **Corrigir o teto de vertices do `model_audit.gd`**: ele reprova em 20.000 e
+- **[FEITO 25/08]** ~~teto de vertices do model_audit~~ — agora mede TRIANGULO: ele reprova em 20.000 e
    **os dois modelos reais reprovam** (Pyra 22.561, Brok 29.212) mesmo estando
    dentro do orcamento de 15k triangulos. Costura de UV multiplica vertice — o
    teto foi escrito na metrica errada.
-7. **Texturas acima do orcamento**: o Brok trouxe duas de 2048 (13,6 MB no
+- ~~Texturas do Brok~~ (ver 1.3): o Brok trouxe duas de 2048 (13,6 MB no
    pacote). TECH_ART pede 2K para hero, entao passa, mas duas e' desperdicio.
 5. Vozes (560 falas escritas, nenhuma gravada) e arte de UI (68 prompts prontos).
    **Bloqueante para publicar:** o APK ainda usa o icone padrao do Godot.

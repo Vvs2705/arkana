@@ -32,7 +32,7 @@ var _casts: Array = []       # spell_cast — tem que ficar VAZIO no ar
 ## das checagens nunca executadas (aconteceu na 1a rodada desta raia). Cada
 ## bloco se assina no fim; a assinatura que faltar VIRA FALHA.
 var _blocos: Array = []
-const BLOCOS := ["contrato", "rota", "castelo", "fases", "pouso", "sem_magia"]
+const BLOCOS := ["contrato", "rota", "castelo", "fases", "pouso", "sem_magia", "bots"]
 
 
 func _init() -> void:
@@ -65,6 +65,7 @@ func _run() -> void:
 	_test_fases()
 	_test_pouso_no_terreno()
 	_test_sem_magia()
+	_test_bots()
 	print("[Cobertura]")
 	for b in BLOCOS:
 		_check(b in _blocos, "o bloco '%s' rodou ate' o fim" % b)
@@ -112,6 +113,97 @@ func _passo(q: Node, n: int) -> void:
 		if not q.is_physics_processing():
 			return
 		_frame(q, q._player)
+
+
+## OS BOTS CAEM JUNTO — pela MESMA lei do jogador.
+## Ate' 25/08/2026 os seis nasciam no chao enquanto o jogador caia do castelo:
+## a partida abria com o jogador no ar e o mapa ja' povoado.
+func _test_bots() -> void:
+	print("[Os bots caem do castelo, sob a mesma lei]")
+	var ilha := _ilha(300.0, "return 4.0")
+	root.add_child(ilha)
+	var arena := Node3D.new()
+	root.add_child(arena)
+
+	var player: Node3D = _player_scr.new()
+	arena.add_child(player)
+	var q: Node = _queda.iniciar(arena, ilha, player)
+	_check(q != null, "a queda do jogador montou")
+
+	var bots: Array = []
+	for i in 6:
+		var b := CharacterBody3D.new()
+		b.set_script(_player_scr)
+		arena.add_child(b)
+		bots.append(b)
+	var quedas: Array = _queda.iniciar_bots(bots, ilha, q.castelo)
+	_check(quedas.size() == 6, "os 6 bots receberam queda (%d)" % quedas.size())
+
+	var no_ar := 0
+	for qb in quedas:
+		if str(qb.fase) == "no_castelo":
+			no_ar += 1
+	_check(no_ar == 6, "os 6 comecam NO AR, nao no chao (%d)" % no_ar)
+
+	var travados := 0
+	for b in bots:
+		if not b.is_physics_processing():
+			travados += 1
+	_check(travados == 6,
+		"os 6 estao com o passo de fisica DESLIGADO: e' o que barra magia no ar (%d)" % travados)
+
+	_casts.clear()
+	## Roda a partida inteira: cada bot viaja, salta na hora sorteada, cai e pousa.
+	for _i in 3600:
+		for qb in quedas:
+			if qb.is_physics_processing():
+				var alvo: Node = qb._player
+				if alvo != null and is_instance_valid(alvo) and alvo.is_physics_processing():
+					alvo._physics_process(DT)
+				qb._physics_process(DT)
+
+	var pousados := 0
+	var fora_do_chao := 0
+	for i in quedas.size():
+		var qb: Node = quedas[i]
+		if str(qb.fase) == "pousou":
+			pousados += 1
+			var pos: Vector3 = (bots[i] as Node3D).global_position
+			if absf(pos.y - 4.0) > 0.2:
+				fora_do_chao += 1
+	_check(pousados == 6, "os 6 POUSARAM (%d)" % pousados)
+	_check(fora_do_chao == 0, "os 6 pousaram NO TERRENO (%d fora)" % fora_do_chao)
+	_check(_casts.is_empty(),
+		"NENHUM bot conjurou durante a queda (%d disparos)" % _casts.size())
+
+	var religados := 0
+	for b in bots:
+		if b.is_physics_processing():
+			religados += 1
+	_check(religados == 6, "os 6 tiveram o passo de fisica DEVOLVIDO ao pousar (%d)" % religados)
+
+	## DETERMINISMO: o mesmo seed sorteia os mesmos instantes de salto. Sem isto
+	## dois testes do mesmo cenario dariam pousos diferentes e o portao viraria
+	## moeda.
+	var t1: Array = []
+	for qb in quedas:
+		t1.append(qb._t_salto)
+	var bots2: Array = []
+	for i in 6:
+		var b2 := CharacterBody3D.new()
+		b2.set_script(_player_scr)
+		arena.add_child(b2)
+		bots2.append(b2)
+	var quedas2: Array = _queda.iniciar_bots(bots2, ilha, q.castelo)
+	var iguais := 0
+	for i in quedas2.size():
+		if is_equal_approx(float(quedas2[i]._t_salto), float(t1[i])):
+			iguais += 1
+	_check(iguais == 6, "mesmo seed, mesmos instantes de salto (%d/6)" % iguais)
+
+	arena.queue_free()
+	ilha.queue_free()
+	_blocos.append("bots")
 
 
 # ------------------------------------------------------- 1. o contrato do Bus
