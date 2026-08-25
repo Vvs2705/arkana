@@ -549,6 +549,7 @@ func _make_model_report(root: Node, player: AnimationPlayer, source: String) -> 
 		"source": source,
 		"mesh_instances": 0,
 		"vertices": 0,
+		"triangles": 0,
 		"surface_count": 0,
 		"material_slots": 0,
 		"bones": 0,
@@ -574,10 +575,35 @@ func _accumulate_mesh_report(n: Node, report: Dictionary) -> void:
 		return
 	for s in mi.mesh.get_surface_count():
 		report["surface_count"] += 1
-		report["vertices"] += (mi.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		var arrays: Array = mi.mesh.surface_get_arrays(s)
+		var verts := (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		report["vertices"] += verts
+		report["triangles"] += _triangulos_da_superficie(mi.mesh, s, arrays, verts)
 		if mi.material_override != null or mi.get_surface_override_material(s) != null \
 				or mi.mesh.surface_get_material(s) != null:
 			report["material_slots"] += 1
+
+
+## Triangulos de UMA superficie, respeitando o tipo de primitiva.
+##
+## POR QUE NAO E' vertices/3: quando a superficie e' INDEXADA, os vertices sao
+## reaproveitados e o numero de triangulos sai da lista de INDICES. E costura de
+## UV duplica vertice sem criar triangulo nenhum — foi por isso que Pyra
+## (22.561 vertices) e Brok (29.212) reprovavam num teto de 20.000 estando os
+## dois dentro do orcamento real, que sempre foi em TRIANGULO.
+static func _triangulos_da_superficie(malha: Mesh, s: int, arrays: Array, verts: int) -> int:
+	var prim: int = malha.surface_get_primitive_type(s)
+	var indices := 0
+	if arrays.size() > Mesh.ARRAY_INDEX and arrays[Mesh.ARRAY_INDEX] != null:
+		indices = (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size()
+	var n := indices if indices > 0 else verts
+	match prim:
+		Mesh.PRIMITIVE_TRIANGLES:
+			return n / 3
+		Mesh.PRIMITIVE_TRIANGLE_STRIP:
+			return maxi(n - 2, 0)
+		_:
+			return 0   # linha ou ponto nao e' superficie: nao conta orcamento
 
 
 func _accumulate_skeleton_report(n: Node, report: Dictionary) -> void:
