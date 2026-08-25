@@ -398,10 +398,10 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 		"contagem da queda do bau na faixa ('%s')" % aviso.faixa_ativa())
 	bus.bau_pousou.emit(Vector3(30, 0, -10))
 	_check(aviso.faixa_ativa() == Textos.BAU_POUSOU, "bau_pousou: da' pra abrir agora")
-	bus.bau_canalizando.emit(0.5)
+	bus.bau_canalizando.emit(hud.player, 0.5)
 	_check(aviso.faixa_ativa().begins_with(Textos.BAU_ABRINDO),
 		"canalizar mostra o progresso ('%s')" % aviso.faixa_ativa())
-	bus.bau_canalizando.emit(0.0)
+	bus.bau_canalizando.emit(null, 0.0)
 	_check(aviso.faixa_ativa() == Textos.BAU_POUSOU,
 		"cancelar a canalizacao (saiu do raio) volta para 'BAU NO CHAO'")
 	bus.bau_aberto.emit(true, PackedStringArray(["fire", "water"]))
@@ -430,7 +430,12 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 	_check(hud.arma_lbl.text.begins_with("Cajado"),
 		"equipar publica a arma do jogador na HUD ('%s')" % hud.arma_lbl.text)
 	var minha: String = hud.arma_lbl.text
-	bus.weapon_equipped.emit("manopla", "Manopla", "lendaria",
+	# O sinal agora DIZ de quem e'. Emitimos com um pawn que NAO e' o jogador:
+	# antes isto so' passava porque o arma_id era diferente, e um bot com a
+	# MESMA arma teria sequestrado o rotulo.
+	var pawn_bot := Node3D.new()
+	hud.add_child(pawn_bot)
+	bus.weapon_equipped.emit(pawn_bot, "manopla", "Manopla", "lendaria",
 			PackedStringArray(["fire", "earth"]))
 	_check(hud.arma_lbl.text == minha, "arma de BOT nao sequestra o rotulo do jogador")
 
@@ -501,7 +506,7 @@ func _teste_interacao(hud: CanvasLayer) -> void:
 	var bau_scr: GDScript = load("res://gameplay/BauCelestial.gd")
 	var botao_scr: GDScript = load("res://ui/AcaoButton.gd")
 	var cancelamentos := [0]
-	bus.bau_canalizando.connect(func(p: float) -> void:
+	bus.bau_canalizando.connect(func(_pawn: Node, p: float) -> void:
 		if p <= 0.0:
 			cancelamentos[0] += 1)
 
@@ -579,13 +584,13 @@ func _teste_interacao(hud: CanvasLayer) -> void:
 	# -------------------------- 5. CANCELAR E' ESTADO DE 1a CLASSE (cor+forma)
 	aviso.zerar()
 	bus.bau_pousou.emit(Vector3(4, 0, 4))
-	bus.bau_canalizando.emit(0.45)
+	bus.bau_canalizando.emit(null, 0.45)
 	_check(aviso._canal > 0.0, "canalizar o bau desenha o anel de progresso")
 	var rc: Rect2 = aviso.rect_canalizar()
 	_check(rc.position.y >= ST and rc.end.y <= cv.y - SB,
 		"anel de canalizacao dentro da area util (y %.0f, fim %.0f)"
 		% [rc.position.y, rc.end.y])
-	bus.bau_canalizando.emit(0.0)
+	bus.bau_canalizando.emit(null, 0.0)
 	_check(aviso._canal < 0.0 and aviso._cancelado > 0.0,
 		"interromper NAO some caladinho: fica a marca de cancelamento")
 	_check(aviso.COR_CANCELADO != hud._cor_lendaria() and aviso._canal < 0.0,
@@ -593,7 +598,7 @@ func _teste_interacao(hud: CanvasLayer) -> void:
 	aviso._process(float(aviso.CANCELADO_S) + 0.01)
 	_check(is_zero_approx(aviso._cancelado), "a marca apaga sozinha depois de %.1fs"
 		% float(aviso.CANCELADO_S))
-	bus.bau_canalizando.emit(0.9)
+	bus.bau_canalizando.emit(null, 0.9)
 	bus.bau_aberto.emit(true, PackedStringArray(["fire", "wind"]))
 	_check(aviso._canal < 0.0 and is_zero_approx(aviso._cancelado),
 		"terminar BEM fecha o anel sem marca de interrupcao")

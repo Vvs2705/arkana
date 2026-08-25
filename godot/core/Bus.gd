@@ -61,7 +61,12 @@ signal spell_cast(element: String)
 signal loot_prompt(nome: String, raridade: String, perto: bool)
 ## weapon_equipped: alguem trocou de arma. elementos traz 1 (varinha/cajado) ou
 ## os 2 FIXOS da manopla.
-signal weapon_equipped(arma_id: String, nome: String, raridade: String, elementos: PackedStringArray)
+## `pawn` vem PRIMEIRO de proposito: quem consome le' o dono antes de qualquer
+## outra coisa. Ate' 25/08/2026 este sinal nao dizia de quem era, e a HUD
+## adivinhava comparando o arma_id com o slot do jogador — um BOT equipando a
+## MESMA arma mudava o icone do jogador. Sinal ambiguo obriga cada consumidor a
+## adivinhar, e cada um adivinha diferente.
+signal weapon_equipped(pawn: Node, arma_id: String, nome: String, raridade: String, elementos: PackedStringArray)
 
 ## HABILIDADES DOS MAGOS (GDD §3 e §4 — raia GAMEPLAY/HABILIDADES). A HUD e o
 ## audio OBSERVAM; quem decide habilidade e' um lugar so' (gameplay/KitRunner).
@@ -99,7 +104,9 @@ signal bau_anunciado(pos: Vector3, segundos: float)
 signal bau_pousou(pos: Vector3)
 ## bau_canalizando: barra de progresso 0..1 do PLAYER abrindo. 0.0 = cancelou
 ## (saiu do raio). So' sai quando o player esta' canalizando — bot e' ruido.
-signal bau_canalizando(progresso: float)
+## `pawn` primeiro, mesma razao de weapon_equipped: sem ele o sinal so' podia
+## ser do player por convencao, e convencao nao e' contrato.
+signal bau_canalizando(pawn: Node, progresso: float)
 ## bau_aberto: acabou. `por_player` diz se a manopla foi para o jogador ou para
 ## um bot (kill feed: "a manopla caiu em outras maos"); `elementos` traz os 2
 ## FIXOS dela, para a HUD mostrar o par que o carrossel nao pode mais trocar.

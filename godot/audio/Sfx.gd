@@ -402,7 +402,7 @@ func _on_loot_prompt(_nome: String, _raridade: String, perto: bool) -> void:
 ## e ARMA o estalo dos dedos para os proximos disparos do player.
 ## ⚠️ `weapon_equipped` nao diz QUEM equipou (ver PEDIDOS): usamos a raridade,
 ## e o par de 2 elementos, como assinatura da manopla.
-func _on_weapon_equipped(_arma_id: String, _nome: String, raridade: String,
+func _on_weapon_equipped(_pawn: Node, _arma_id: String, _nome: String, raridade: String,
 		elementos: PackedStringArray) -> void:
 	if raridade == "lendaria" or elementos.size() >= 2:
 		_manopla = true
@@ -467,7 +467,7 @@ func _on_bau_pousou(_pos: Vector3) -> void:
 
 ## Chega a CADA frame de fisica enquanto o player canaliza (BauCelestial._process)
 ## — por isso NAO gera stream nova: so' mexe no pitch de um loop que ja' toca.
-func _on_bau_canalizando(progresso: float) -> void:
+func _on_bau_canalizando(_pawn: Node, progresso: float) -> void:
 	if progresso <= 0.0:
 		_parar_evento()
 		return

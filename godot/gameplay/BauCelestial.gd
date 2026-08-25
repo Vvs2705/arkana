@@ -61,6 +61,7 @@ var _gesto_acc := 0.0        # relogio do gesto repetido (ver _gestos)
 ## para a HUD — bot saindo de cima do bau nao pode acender "CANCELOU" na tela
 ## do jogador (o sinal bau_canalizando e' do PLAYER, ver core/Bus.gd).
 var _player_canalizou := false
+var _quem_canalizava: Node = null
 
 
 ## Agenda a queda da partida. DETERMINISTICO: mesmo seed = mesmo instante,
@@ -174,9 +175,11 @@ func _process(delta: float) -> void:
 		return
 	_progresso += delta
 	_gestos(delta, quem)
-	if _tem_player(quem):
+	var o_player := _o_player(quem)
+	if o_player != null:
 		_player_canalizou = true
-		Bus.bau_canalizando.emit(minf(_progresso / CANALIZAR_S, 1.0))
+		_quem_canalizava = o_player
+		Bus.bau_canalizando.emit(o_player, minf(_progresso / CANALIZAR_S, 1.0))
 	if _progresso >= CANALIZAR_S:
 		_abrir()
 
@@ -224,7 +227,11 @@ func _cancelar() -> void:
 	_progresso = 0.0
 	if _player_canalizou:
 		_player_canalizou = false
-		Bus.bau_canalizando.emit(0.0)
+		# Guardado no inicio da canalizacao: no cancelamento o pawn pode ja' ter
+		# saido da lista (foi derrubado, morreu ou andou), e o sinal continua
+		# precisando dizer de quem era.
+		Bus.bau_canalizando.emit(_quem_canalizava, 0.0)
+		_quem_canalizava = null
 
 
 ## Quem abre e' quem esta' MAIS PERTO no instante em que a barra enche — nao
@@ -267,11 +274,13 @@ func _saiu(body: Node3D) -> void:
 	set_process(false)
 
 
-func _tem_player(lista: Array[Node]) -> bool:
+## O player da lista, ou null. Devolve o NO' e nao um booleano porque o sinal
+## de canalizacao passou a carregar o dono (ver core/Bus.gd).
+func _o_player(lista: Array[Node]) -> Node:
 	for n in lista:
 		if is_instance_valid(n) and n.is_in_group("player"):
-			return true
-	return false
+			return n
+	return null
 
 
 func _mais_perto() -> Node:

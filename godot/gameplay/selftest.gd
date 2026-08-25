@@ -64,14 +64,14 @@ func _run() -> void:
 		_thits.append([el, pos, strong]))
 	_bus.player_killed_bot.connect(func(bot_name: String) -> void: _kills.append(bot_name))
 	_bus.dodge_performed.connect(func() -> void: _dodges += 1)
-	_bus.weapon_equipped.connect(func(id: String, nome: String, rar: String,
+	_bus.weapon_equipped.connect(func(_pawn: Node, id: String, nome: String, rar: String,
 			els: PackedStringArray) -> void: _armados.append([id, nome, rar, els]))
 	_bus.loot_prompt.connect(func(nome: String, rar: String, perto: bool) -> void:
 		_prompts.append([nome, rar, perto]))
 	_bus.bau_anunciado.connect(func(pos: Vector3, segs: float) -> void:
 		_bau_anuncios.append([pos, segs]))
 	_bus.bau_pousou.connect(func(pos: Vector3) -> void: _bau_pousos.append(pos))
-	_bus.bau_canalizando.connect(func(pr: float) -> void: _bau_prog.append(pr))
+	_bus.bau_canalizando.connect(func(_pawn: Node, pr: float) -> void: _bau_prog.append(pr))
 	_bus.bau_aberto.connect(func(por_player: bool, els: PackedStringArray) -> void:
 		_bau_abertos.append([por_player, els]))
 	_test_combat_damage()
@@ -88,6 +88,7 @@ func _run() -> void:
 	_test_armas()
 	_test_loot()
 	_test_bau()
+	_test_dono_dos_sinais()
 	_test_game_feel()
 	_test_restart()
 	_test_sinal_sem_zero()  # roda por ULTIMO: audita todos os eventos da sessao
@@ -112,6 +113,37 @@ func _check(cond: bool, name: String) -> void:
 	else:
 		fails += 1
 		printerr("  FALHA - " + name)
+
+
+## QUEM emitiu? `weapon_equipped` e `bau_canalizando` tinham consumidor mas nao
+## diziam de quem eram. A HUD contornava comparando o arma_id com o slot do
+## jogador: se um BOT equipasse a MESMA arma, o icone do jogador mudava. Sinal
+## ambiguo obriga cada consumidor a adivinhar, e cada um adivinha diferente.
+func _test_dono_dos_sinais() -> void:
+	print("[Bus: quem emitiu? arma e bau carregam o dono]")
+	var assinaturas := {}
+	for sig in _bus.get_signal_list():
+		var nomes: Array = []
+		for arg in sig["args"]:
+			nomes.append(String(arg["name"]))
+		assinaturas[String(sig["name"])] = nomes
+	for nome in ["weapon_equipped", "bau_canalizando"]:
+		var args: Array = assinaturas.get(nome, [])
+		_check(args.size() > 0 and String(args[0]) == "pawn",
+			"%s abre com `pawn`: o sinal diz de QUEM e' (%s)" % [nome, str(args)])
+
+	# O emissor real: o slot vive como filho do pawn, entao quem equipou e' o pai.
+	var armados: Array = []
+	_bus.weapon_equipped.connect(func(pawn: Node, id: String, _n: String, _r: String,
+			_e: PackedStringArray) -> void: armados.append([pawn, id]))
+	var dono := Node3D.new()
+	root.add_child(dono)
+	var slot: Node = load("res://gameplay/ArmaSlot.gd").new()
+	dono.add_child(slot)
+	slot.equipar("varinha")
+	_check(armados.size() == 1 and armados[0][0] == dono,
+		"weapon_equipped carrega o pawn que equipou, nao so' o id da arma")
+	dono.queue_free()
 
 
 func _dummy(hp0: float) -> Node:

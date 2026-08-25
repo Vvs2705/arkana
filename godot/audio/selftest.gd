@@ -138,7 +138,7 @@ func _r21(sfx: Node, bus: Node) -> void:
 	# --- armas arcanas (GDD §16.2) ---
 	_event(sfx, bus, "loot_prompt", ["Cajado", "raro", true], "loot_perto", "ui")
 	_event(sfx, bus, "weapon_equipped",
-		["cajado", "Cajado", "raro", PackedStringArray(["fire"])], "arma_equipar")
+		[null, "cajado", "Cajado", "raro", PackedStringArray(["fire"])], "arma_equipar")
 
 	# --- O ESTALO DA MANOPLA: so' sai depois que o player TEM a manopla ---
 	sfx._manopla = false
@@ -148,7 +148,7 @@ func _r21(sfx: Node, bus: Node) -> void:
 	_check(sfx.get_meta("last_key") == "shot_fire",
 		"sem manopla: disparo normal, sem estalo")
 	_event(sfx, bus, "weapon_equipped",
-		["manopla", "Manopla", "lendaria", PackedStringArray(["fire", "wind"])],
+		[null, "manopla", "Manopla", "lendaria", PackedStringArray(["fire", "wind"])],
 		"manopla_equipar")
 	_check(sfx._manopla, "equipar manopla ARMA o estalo dos dedos")
 	sfx._throttle.clear()
@@ -184,12 +184,12 @@ func _r21(sfx: Node, bus: Node) -> void:
 	_check(teve_gongo, "bau anunciado: gongo + assobio da queda no ar")
 	_event(sfx, bus, "bau_pousou", [Vector3(40, 0, 40)], "bau_pouso")
 	_check(not sfx._evento.playing, "pouso corta o assobio da queda")
-	_event(sfx, bus, "bau_canalizando", [0.5], "bau_canal", "evento")
+	_event(sfx, bus, "bau_canalizando", [null, 0.5], "bau_canal", "evento")
 	var pitch_meio: float = sfx._evento.pitch_scale
-	bus.emit_signal("bau_canalizando", 1.0)
+	bus.emit_signal("bau_canalizando", null, 1.0)
 	_check(sfx._evento.pitch_scale > pitch_meio,
 		"canalizacao: o zumbido SOBE com a barra (sem stream nova por frame)")
-	bus.emit_signal("bau_canalizando", 0.0)
+	bus.emit_signal("bau_canalizando", null, 0.0)
 	_check(not sfx._evento.playing, "cancelar a canalizacao corta o zumbido")
 	_event(sfx, bus, "bau_aberto", [true, PackedStringArray(["fire", "wind"])], "bau_aberto")
 
