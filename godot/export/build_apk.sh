@@ -88,5 +88,22 @@ done
 esperar_no_apk "assets/" "APK sem assets/ (pck do projeto)"
 esperar_no_apk "assets/characters/modelos/pyra[.]glb[.]import" "APK sem import da Pyra"
 esperar_no_apk "assets/[.]godot/imported/pyra[.]glb-.*[.]scn" "APK sem cena importada da Pyra"
+esperar_no_apk "assets/characters/modelos/brok[.]glb[.]import" "APK sem import do Brok"
+# O ATELIE 3D nunca pode entrar no pacote. Em 25/08 ele entrou e o APK foi de
+# 54 MB para 106 MB — malha crua, versao riggada e animacoes separadas que o
+# jogo NAO carrega. O filtro de export_presets barra characters/modelos/*/*;
+# este portao existe para o dia em que alguem mexer no filtro sem perceber.
+if unzip -l "$OUT" 2>/dev/null | grep -Eq "assets/characters/modelos/[^/]+/"; then
+	fail "APK levando o atelie 3D (characters/modelos/<slug>/) — confira exclude_filter"
+fi
+
+# Copia datada para o Diretor levar ao aparelho, DENTRO do projeto: nada de
+# Downloads nem Area de Trabalho (ordem dele, 25/08).
+TESTES="$(dirname "$OUT")/testes"
+mkdir -p "$TESTES"
+CARIMBO="$(date +%Y-%m-%d_%H%M)"
+cp "$OUT" "$TESTES/arkana-$CARIMBO.apk"
+
 echo "OK: $OUT ($SIZE)"
+echo "    copia para o celular: $TESTES/arkana-$CARIMBO.apk"
 unzip -l "$OUT" | grep -E "lib/|\.pck|assets/.*\.(pck|so)" | head -8 || true
