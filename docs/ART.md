@@ -24,6 +24,23 @@ chegaram ao projeto.
 ele veio**. Não reconstruir de memória, não reinterpretar, não "melhorar". A
 direção é decisão do Diretor; este arquivo só a registra.
 
+### Onde as 160 referencias vao morar — DECISAO DO DIRETOR, nao tomada
+
+Sao ~307 MB de materia-prima. Duas rotas, com o custo de cada uma:
+
+**Rota A — Git LFS.** Tudo versionado e verificavel por qualquer pessoa que
+clonar. Custa cota de LFS e trafego a cada clone. So' vale se a cota do
+repositorio comportar o volume e o crescimento futuro (mais 18 personagens
+modelados significam mais entregas).
+
+**Rota B — armazenamento externo duravel.** Em Git ficam apenas os manifestos,
+hashes, dimensoes e a localizacao. Nao consome cota, mas **exige que o
+armazenamento pertenca ao projeto** — link de conversa ou pasta pessoal nao
+serve, porque some junto com quem o criou.
+
+Enquanto nao houver decisao, os 160 PNGs seguem apenas em disco local, sem
+copia. Isso e' um risco real e esta' escrito aqui de proposito.
+
 **Enquanto isso não chega**, o que vale como evidência técnica é a auditoria
 abaixo — que descreve o lote ANTERIOR e continua útil para não repetir os mesmos
 erros de vista e de coerência. Ela **não** é a norma nova.
