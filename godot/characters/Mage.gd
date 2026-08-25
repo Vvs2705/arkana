@@ -37,14 +37,20 @@ const MODEL_DIR := "res://characters/modelos"
 const REQUIRED_ANIMS := ["idle", "run", "cast"]
 const ANIM_ALIASES := {
 	"idle": ["idle", "Idle", "IDLE", "Armature|Idle", "mixamo.com",
-		"standing_idle", "breathing_idle", "idle_01", "idle_loop"],
+		"standing_idle", "breathing_idle", "idle_01", "idle_loop",
+		# A biblioteca da Meshy numera as variantes (Idle_02, Idle_03...).
+		"idle_02", "idle_03"],
 	"run": ["run", "Run", "RUN", "Running", "running", "Armature|Run",
 		"Armature|Running", "Run Forward", "running_forward", "locomotion_run",
 		"sprint", "jog", "fast_run"],
 	"cast": ["cast", "Cast", "CAST", "Spellcast", "Spell Cast", "spell_cast",
 		"casting", "magic_cast", "Attack", "attack", "attack1",
 		"Standing 1H Magic Attack", "magic_attack", "shoot", "fireball",
-		"Armature|Cast", "Armature|Attack"],
+		"Armature|Cast", "Armature|Attack",
+		# Biblioteca da Meshy. "soell" NAO e' erro nosso: e' como o clipe
+		# "Mage Spell Cast" vem gravado dentro do .glb (conferido em 25/08 lendo
+		# o JSON do arquivo). Se a Meshy corrigir, o alias certo ja' esta' acima.
+		"mage_soell_cast", "mage_spell_cast"],
 }
 
 ## PRESETS DE MATERIAL — um shader so', quatro respostas de luz diferentes.

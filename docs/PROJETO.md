@@ -54,7 +54,16 @@ de primeira classe) nao sao estilo — sao cicatrizes de defeitos medidos.
 3. **Corrigir os angulos das vistas** da concept art: nao existe perfil de 90
    graus no lote, e o "3/4" e' a frontal repetida. Isso trava o multi-imagem
    da Meshy e independe da decisao de estilo.
-4. Modelo 3D dos outros 19 magos, quando a direcao estiver decidida.
+4. Modelo 3D dos magos restantes. **O caminho esta provado de ponta a ponta**
+   (25/08): concept -> Meshy multi-imagem -> remesh 15k -> rig -> animacoes ->
+   .glb -> jogo. Custo medido: **30 creditos** por personagem (remesh, rig e
+   animacao saem de graca no webapp; na API o remesh custa 5).
+5. **Corrigir o teto de vertices do `model_audit.gd`**: ele reprova em 20.000 e
+   **os dois modelos reais reprovam** (Pyra 22.561, Brok 29.212) mesmo estando
+   dentro do orcamento de 15k triangulos. Costura de UV multiplica vertice — o
+   teto foi escrito na metrica errada.
+6. **Texturas acima do orcamento**: o Brok trouxe duas de 2048 (13,6 MB no
+   pacote). TECH_ART pede 2K para hero, entao passa, mas duas e' desperdicio.
 5. Vozes (560 falas escritas, nenhuma gerada) e arte de UI (68 prompts prontos).
    **Bloqueante para publicar:** o APK ainda usa o icone padrao do Godot.
 
@@ -99,6 +108,7 @@ personagem → partida com bots → fim de partida. O APK de debug sai em
 | Menu, Configurações (GDD §12), seleção dos 20 magos | ✅ |
 | Áudio sintetizado (48 timbres, zero arquivo de áudio) | ✅ |
 | **Pyra em 3D** (15.492 tris, PBR, riggada, 3 animações) | ✅ |
+| **Brok em 3D** (15.424 tris, 1 malha, 1 material, 24 ossos, 5 animações) | ✅ |
 
 ### Verificação
 
@@ -241,6 +251,6 @@ recebe manutenção. Continua recuperável pelo histórico do Git.
 | **21/08** | **R20/R20.1** — elenco descolado do Apex com marcas mágicas próprias; Pyra em 3D pela Meshy; zona, habilidades, escudo, derrubado, armas arcanas, baú e HUD completa; área segura corrigida; estudo de dano |
 
 | 24/08 | Novo lote de concept art dos 20 magos (8 vistas cada) |
-| **25/08** | **Higienização**: -398 MB em duplicatas e material superseded; ateliê de arte fora do git; pipeline Meshy achatado em `docs/pipeline-arte/`; `meshy.py` consertado; auditoria visual dos 20 e da validade do pacote de pipeline |
+| **25/08** | **Brok em 3D pela Meshy** (multi-imagem + rig + 5 animações), APK de 106 MB → 54 MB ao excluir o ateliê da exportação; **higienização**: -398 MB em duplicatas e material superseded; ateliê de arte fora do git; pipeline Meshy achatado em `docs/pipeline-arte/`; `meshy.py` consertado; auditoria visual dos 20 e da validade do pacote de pipeline |
 
 Detalhe de cada mudança: `git log` e o [CHANGELOG](../CHANGELOG.md).
