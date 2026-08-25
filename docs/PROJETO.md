@@ -208,6 +208,50 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
 
 ---
 
+## 3.5 Decisão de sequência: FUNCIONALIDADE antes de ARTE DE CENÁRIO
+
+**Decidido pelo Diretor em 26/08/2026**, com estas palavras: *"depois de
+validarmos funcionalidades, seria interessante começar a desenvolver mais em 3D
+a ilha, árvores, mais ambientes, deixar mais bonito assim como estamos
+melhorando os personagens"*.
+
+**A ordem, portanto:** primeiro o jogo funciona (queda, interação, kits,
+Sintonia); só depois o cenário ganha modelagem 3D de verdade.
+
+**Por que isso não é adiar por preguiça** — os quatro custos foram levantados
+antes da decisão:
+
+1. **Desenhos por quadro.** As 158 árvores custam praticamente UM desenho hoje,
+   porque compartilham a mesma malha procedural via MultiMesh. Modelo importado
+   traz material próprio e quebra isso. É o risco número um no celular.
+2. **Tamanho do pacote.** A ilha é ZERO BINÁRIO — nenhum arquivo de malha ou
+   imagem. É por isso que o APK tem 54 MB. Sessenta assets com textura viram
+   fácil +100 MB. Em 25/08 um vazamento do ateliê já levou o APK de 54 para
+   106 MB numa tacada.
+3. **O fogo depende das árvores atuais.** `tree_count()/tree_pos()/
+   set_tree_burned()` são o que permite queimar a floresta e abrir caminho —
+   pilar do GDD §14. Trocar a árvore obriga a refazer essa fiação.
+4. **Coerência.** O elenco já tem três linguagens visuais (auditoria de 25/08).
+   Um cenário esculpido ao lado de terreno cel-shaded arrisca criar a quarta.
+
+**Quando chegar a hora, o plano é UMA FAMÍLIA POR VEZ, começando pelas
+RUÍNAS** — não pelas árvores. As ruínas dão o maior salto de "parece jogo
+publicado" por crédito e **não estão presas a sistema nenhum**: são cobertura e
+cenário, e se derem errado joga-se fora sem quebrar nada. Árvore é o oposto:
+maior impacto visual, mas é a peça que o fogo usa.
+
+**Antes de gastar crédito, olhar o Discover CC0** — o próprio pacote de
+pipeline manda (`docs/pipeline-arte/MESHY/01-DISCOVER_CURADORIA.md`) e já lista
+URLs de ruínas, muro de pedra e cristal arcano em CC0. Custo zero.
+
+**Meshy NÃO gera terreno.** Forma da ilha, alturas, biomas e cores são código
+procedural e continuam sendo. Meshy faz os OBJETOS que vestem o terreno.
+
+**O teste que decide, sempre:** uma família, dentro do jogo, no celular do
+Diretor, medindo desenhos por quadro e tamanho do pacote antes e depois.
+
+---
+
 ## 4. Decisões que precisam do Diretor
 
 1. **A tabela de fases da zona é PROPOSTA, não spec.** O GDD *pressupõe* a zona
