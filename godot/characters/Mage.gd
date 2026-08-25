@@ -194,6 +194,9 @@ func play_anim(nome: String) -> void:
 		_pending_anim = nome           # chamado antes de entrar na arvore
 		return
 	var anim := _anim_name(nome)
+	# O que foi PEDIDO, guardado antes de qualquer substituicao. E' por ele que
+	# se decide o gatilho do projetil — ver o `_cast_emit_pending` abaixo.
+	var pedido := nome
 	# Opcional ausente cai no substituto em silencio: o jogo nao pode ficar sem
 	# pose, e um warning por frame poluiria o console durante a queda inteira.
 	if not player.has_animation(anim) and ANIM_FALLBACK.has(nome):
@@ -202,7 +205,11 @@ func play_anim(nome: String) -> void:
 	if player.has_animation(anim):
 		player.play(anim, float(BLEND.get(nome, 0.15)))
 		if player == _external_player:
-			_cast_emit_pending = nome == "cast"
+			# PEDIDO, nunca o substituto. "pegar" cai em "cast" nos modelos que
+			# nao tem a opcional (Pyra e Brok): se olhassemos o nome final,
+			# APANHAR UM ITEM EMITIRIA cast_fired — ou seja, pegar viraria tiro
+			# no dia em que o disparo for pendurado nesse sinal.
+			_cast_emit_pending = pedido == "cast"
 			set_process(_cast_emit_pending or not _orbits.is_empty())
 	else:
 		push_warning("Mage: animacao desconhecida '%s'" % nome)

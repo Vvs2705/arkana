@@ -14,6 +14,41 @@
 
 ---
 
+## DIRETRIZ PERMANENTE DO DIRETOR (26/08/2026)
+
+*"O tamanho do APK não importa hoje. Para testar e validar isso é irrelevante,
+meu celular suporta. O importante é validar com o que é real, mais importante
+do que deixar o arquivo comprimido e sem qualidade. Com esse excesso de
+segurança e travas de lógica sem sentido... eu quero correr os riscos, fazer
+acontecer com qualidade e funcionalidade, claro com lógica, sem atropelar as
+coisas, mas sem esse medo excessivo."*
+
+**Como isso muda o trabalho, em concreto:**
+
+- **PARE de usar peso de arquivo como argumento** para recusar asset melhor,
+  textura maior ou modelo mais detalhado. Ele tem 20+ GB e o aparelho aguenta.
+- **Qualidade e funcionalidade reais valem mais que otimização precoce.**
+  Compressão, atlas e formato de loja entram quando as projeções fecharem.
+- **O que CONTINUA valendo**, e não é a mesma coisa: **quadros por segundo no
+  aparelho**. Pacote grande é irrelevante; jogo travando é o jogo não
+  funcionando. Se um asset derrubar o FPS, o problema é o FPS — diga isso com
+  MEDIÇÃO no aparelho, nunca com estimativa de disco.
+**O APARELHO DE TESTE, agora conhecido (26/08):** **Poco F4** — Snapdragon 870,
+GPU Adreno 650, tela 120 Hz. Nao e' aparelho de entrada: e' alto desempenho de
+2022 e roda jogo pesado. Ate' hoje o projeto mirava "aparelho intermediario"
+generico, o que era chute. **A regua de desenvolvimento pode ser bem mais
+generosa do que a que estava escrita** nos orcamentos de TECH_ART.
+Duas coisas seguem verdadeiras mesmo assim: o aparelho do Diretor NAO e' o
+aparelho do jogador final (isso volta a importar em G6, na loja), e **FPS se
+mede, nao se estima** — e nunca foi medido neste projeto, porque nenhum
+aparelho apareceu em `adb devices`.
+
+- **O que também continua valendo:** teste provado em vermelho, portão verde
+  antes de entregar, e nada de atropelar etapa. Ele pediu risco com lógica, não
+  ausência de método. *"sem atropelar as coisas"* são as palavras dele.
+
+---
+
 ## CONTINUAR DAQUI
 
 ### >>> COMECE POR AQUI (25/08, fim da noite — parado a pedido do Diretor)
@@ -224,10 +259,14 @@ antes da decisão:
 1. **Desenhos por quadro.** As 158 árvores custam praticamente UM desenho hoje,
    porque compartilham a mesma malha procedural via MultiMesh. Modelo importado
    traz material próprio e quebra isso. É o risco número um no celular.
-2. **Tamanho do pacote.** A ilha é ZERO BINÁRIO — nenhum arquivo de malha ou
-   imagem. É por isso que o APK tem 54 MB. Sessenta assets com textura viram
-   fácil +100 MB. Em 25/08 um vazamento do ateliê já levou o APK de 54 para
-   106 MB numa tacada.
+2. ~~**Tamanho do pacote.**~~ **ARGUMENTO DERRUBADO PELO DIRETOR em 26/08.**
+   Palavras dele: *"o tamanho do APK não importa hoje... o importante é validar
+   com o que é real... eu tenho mais de 20 GB disponíveis"*. **Não use peso de
+   pacote como motivo para recusar qualidade enquanto o jogo está em
+   desenvolvimento.** Compressão e formato de publicação viram tema quando as
+   projeções fecharem, não antes.
+   O fato técnico continua verdadeiro (a ilha é zero binário; foi por isso que
+   o APK ficou em 54 MB) — o que mudou é que ele **não decide nada agora**.
 3. **O fogo depende das árvores atuais.** `tree_count()/tree_pos()/
    set_tree_burned()` são o que permite queimar a floresta e abrir caminho —
    pilar do GDD §14. Trocar a árvore obriga a refazer essa fiação.

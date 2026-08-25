@@ -150,6 +150,13 @@ func _check_imported_model_contract() -> void:
 		"set_tint recolore material duplicado do externo")
 	var fired := []
 	m.cast_fired.connect(func(): fired.append(true))
+	# PEGAR NAO E TIRO. Modelo externo sem a opcional "pegar" cai no substituto
+	# "cast"; se o gatilho olhasse o nome FINAL em vez do PEDIDO, apanhar um
+	# item do chao emitiria cast_fired. Achado pela raia de interacao em 26/08.
+	m.play_anim("pegar")
+	player.seek(m.get_cast_fire_time() + 0.01, true)
+	m._process(0.01)
+	_check(fired.is_empty(), "play_anim('pegar') caindo em 'cast' NAO emite cast_fired")
 	m.play_anim("cast")
 	player.seek(m.get_cast_fire_time() + 0.01, true)
 	m._process(0.01)

@@ -85,6 +85,9 @@ const BAU_POUSOU := "BAÚ NO CHÃO"
 const BAU_ABRINDO := "ABRINDO..."
 const BAU_MANOPLA := "MANOPLA: %s + %s"
 const BAU_PERDIDO := "A MANOPLA CAIU EM OUTRAS MÃOS"
+## Canalizacao interrompida: o X vermelho ja' diz por cor+forma (GDD 10), mas
+## quem nao le simbolo precisa da palavra. Pedido da raia de interacao, 26/08.
+const BAU_CANCELADO := "CANALIZAÇÃO INTERROMPIDA"
 
 # ---------------------------------------------------------------- HUD de partida
 ## Rotulos curtos: eles vivem ao lado de barras finas e de botoes de 48dp, entao
@@ -132,6 +135,9 @@ const DERRUBADO_ALIADO := "ALIADO DERRUBADO"
 
 ## LOOT E ARMA ARCANA (GDD §16.2).
 const LOOT_PEGAR := "PEGAR"
+## O "peguei" em palavra. O pulso do rotulo da arma ja' confirma no olho; isto
+## atende quem precisa de texto e serve de base para leitor de tela depois.
+const LOOT_PEGOU := "PEGOU: %s"
 const ARMA_PAR := "%s + %s"
 
 ## ESTADOS DE KIT (Bus.kit_state). Nome QUE NAO ESTA AQUI nao vira badge — e' a
