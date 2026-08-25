@@ -107,13 +107,24 @@ estao em [docs/ROBLOX.md](docs/ROBLOX.md) e
 ## Como verificar
 
 Cada pasta tem seu proprio autoteste headless. O portao antes de qualquer
-entrega e' rodar todos e nenhum falhar:
+entrega e' rodar **todos** e nenhum falhar — e existe um comando so' para isso:
+
+```bash
+bash godot/tests/run_all.sh
+```
+
+Ele imprime `ARKANA: 12/12 selftests executados com sucesso.` no fim. Qualquer
+teste que falhe **encerra o script na hora**, sem imprimir essa linha. Use
+`GODOT_BIN=/caminho/para/godot` se o binario nao estiver no PATH.
+
+Os doze continuam disponiveis individualmente, que e' como se diagnostica uma
+falha depois que o runner apontou onde ela esta':
 
 ```bash
 godot --headless --path godot --script res://gameplay/selftest.gd
 ```
 
-Existem doze: `gameplay` (mais `selftest_kits`, `selftest_zona`,
+Sao eles: `gameplay` (mais `selftest_kits`, `selftest_zona`,
 `selftest_derrubado`), `gameplay/queda`, `ui`, `menu`, `characters`, `world`,
 `terrain`, `audio` e `juice`.
 
