@@ -107,5 +107,16 @@ void fragment() {
 	col = mix(col, mix(shallow_color.rgb, vec3(0.95, 0.99, 1.0), 0.6),
 			clamp(foam, 0.0, 1.0) * 0.6);
 	ALBEDO = col;
-	ALPHA = alpha;
+	// G5 — A BORDA FANTASMA. Diagnostico do render aereo: de 200 m aparecia um
+	// LOSANGO nitido desenhado na agua, e ele nao vinha do mar — vinha de o mar ser
+	// TRANSLUCIDO (alpha 0.88). Dentro do quadrado de SIZE metros existe terreno
+	// submerso por baixo da lamina e os 12% que passam mostram o fundo; fora dele
+	// nao existe malha nenhuma e os mesmos 12% mostram o ceu. O contorno do losango
+	// era, literalmente, a BORDA DA MALHA DO TERRENO vista atraves da agua.
+	// Ampliar o plano do mar ou o far da camera nao resolvia nada (foram testados):
+	// o problema nunca foi onde o mar acaba, e sim que da' pra ver atraves dele.
+	// `detail` ja' existe e ja' mede exatamente o que interessa (1 no pe' da camera,
+	// 0 alem de 160 m). Perto o mar continua translucido — e' o que mostra a areia
+	// molhada na beira; longe ele fecha e nao ha' o que vazar. Custo: 1 mix.
+	ALPHA = mix(1.0, alpha, detail);
 }

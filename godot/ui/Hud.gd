@@ -395,18 +395,26 @@ func _on_bau_pousou(pos: Vector3) -> void:
 	aviso.avisar(HudAviso.P_BAU, Textos.BAU_POUSOU, _cor_lendaria())
 
 
-## 0.0 = cancelou (saiu do raio). ponytail: a canalizacao e' um numero na faixa,
-## nao uma barra propria — sao 3s e o jogador esta' PARADO olhando o bau.
+## 0.0 = INTERROMPEU (saiu do raio, caiu, morreu). O numero continua na faixa
+## (o quanto falta), mas o ESTADO virou anel no meio de baixo: a faixa e' texto
+## e texto que troca nao le' como perda. Regra do projeto — cancelar e' estado
+## de 1a classe, e estado se le' em COR + FORMA (ver HudAviso.canalizar).
 func _on_bau_canalizando(progresso: float) -> void:
 	if progresso <= 0.0:
+		## INTERROMPEU. A faixa volta ao texto de "da' pra abrir", mas quem diz
+		## que o progresso MORREU e' o anel virando X (cor + forma): so' trocar
+		## a frase la' em cima lia como "nao aconteceu nada".
+		aviso.cancelar()
 		aviso.avisar(HudAviso.P_BAU, Textos.BAU_POUSOU, _cor_lendaria())
 		return
+	aviso.canalizar(progresso, _cor_lendaria())
 	aviso.avisar(HudAviso.P_BAU,
 			Textos.BAU_ABRINDO + Textos.HUD_SEP + "%d%%" % int(progresso * 100.0),
 			_cor_lendaria())
 
 
 func _on_bau_aberto(por_player: bool, elementos: PackedStringArray) -> void:
+	aviso.canalizar_fim()  # terminou: o anel some sem marca de interrupcao
 	aviso.bussola("bau", Vector3.ZERO, Color.WHITE, false)
 	_contagens.erase(HudAviso.P_BAU)
 	var txt := Textos.BAU_PERDIDO
@@ -425,11 +433,18 @@ func _el(id: String) -> String:
 
 # ---------- loot e arma arcana ----------
 
+## "TEM COISA AQUI, E E' ISTO": o botao PEGAR so' existe com loot ao alcance
+## (botao sem funcao na tela e' poluicao), e carrega as tres leituras do item —
+## NOME embaixo, COR e FORMA da raridade no contorno (GDD §10: cor sozinha nao
+## e' leitura). Raridade que a HUD nao conhece cai no disco branco de sempre.
 func _on_loot_prompt(nome: String, raridade: String, perto: bool) -> void:
 	pegar_btn.visible = perto
 	if perto:
+		var r: Dictionary = Arma.RARIDADES.get(raridade,
+				{"cor": Color.WHITE, "forma": ""})
 		pegar_btn.subtitulo = nome
-		pegar_btn.cor = Arma.RARIDADES.get(raridade, {"cor": Color.WHITE}).cor
+		pegar_btn.cor = r.cor
+		pegar_btn.forma = str(r.get("forma", ""))
 		pegar_btn.queue_redraw()
 
 
@@ -442,6 +457,11 @@ func _on_arma(arma_id: String, nome: String, raridade: String,
 			else nome + Textos.HUD_SEP + Textos.ARMA_PAR % [_el(elementos[0]), _el(elementos[1])]
 	arma_lbl.add_theme_color_override("font_color",
 			Arma.RARIDADES.get(raridade, {"cor": Color.WHITE}).cor)
+	## O "PEGUEI": o rotulo PISCA. Sem isso a unica confirmacao de que a troca
+	## aconteceu era um texto mudando num canto — no meio de uma briga ninguem
+	## ve'. O pulso dura menos que o gesto do mago, entao os dois se somam.
+	arma_lbl.modulate = Color(2.2, 2.2, 2.2)
+	create_tween().tween_property(arma_lbl, "modulate", Color.WHITE, 0.45)
 
 
 # ---------- derrubado (GDD §3.7/§3.8) ----------
@@ -589,7 +609,10 @@ func _layout(sl := Safe.left(), st := Safe.top(), sr := Safe.right(), sb := Safe
 
 	# PEGAR no rodape, centrado: e' a UNICA coisa da HUD no meio, e fica na
 	# faixa de baixo (longe do reticulo, que mora no meio da ALTURA).
-	var pb := Dp.px(56.0)
+	# 64dp = o mesmo alvo da fileira do polegar (bem acima dos 48dp de piso).
+	# Era 56dp; subiu junto com a leitura nova (contorno da raridade + nome),
+	# e porque interagir agora e' um ATO, nao um clique de inventario.
+	var pb := Dp.px(64.0)
 	pegar_btn.offset_left = -pb / 2.0
 	pegar_btn.offset_right = pb / 2.0
 	pegar_btn.offset_bottom = -(sb + Dp.px(40.0))
@@ -707,7 +730,7 @@ func _build_aviso() -> void:
 
 
 ## So' cria e liga os sinais — tamanho e margem sao do _layout (area segura).
-## Alvos de toque em dp: joystick 150, Fogo 88, acoes 64, PEGAR 56, slot 52.
+## Alvos de toque em dp: joystick 150, Fogo 88, acoes 64, PEGAR 64, slot 52.
 func _build_sticks() -> void:
 	joystick = VirtualJoystick.new()
 	joystick.anchor_top = 1.0

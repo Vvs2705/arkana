@@ -51,7 +51,27 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI (25/08, fim da noite — parado a pedido do Diretor)
+### >>> COMECE POR AQUI (26/08) — o Diretor precisa testar o APK
+
+O APK esta' em `godot/build/testes/`. **O que mudou e o que olhar:**
+
+1. **A partida agora comeca NO AR.** O castelo cruza o mapa, um toque salta,
+   o corpo cai (~9,5 s de ar, 183 m de alcance horizontal), plana e pousa.
+   **Nao ha' magia durante a queda** — ordem dele, e esta' testada.
+2. **A ilha quase triplicou** (180 -> 300 m) e ficou mais legivel DO ALTO, que
+   e' a vista nova que a queda criou. 7 POIs agora (era 4).
+3. **A patinacao acabou** — era animacao importada sem laco.
+4. **Pegar item e abrir bau viraram GESTO**, com a faisca saindo no quadro em
+   que a mao chega ao chao.
+
+**Pendencias conhecidas, ditas sem maquiagem:** os bots ainda nascem no chao
+(nao caem); nao ha' colisao no ar (nao da' para pousar em cima de arvore); quem
+mergulhar reto no mar pousa na agua, porque natacao nao existe; e o FPS nunca
+foi medido em aparelho nenhum.
+
+---
+
+### (25/08 — RESOLVIDO, mantido como historico)
 
 **O defeito da corrida esta' DIAGNOSTICADO e NAO corrigido.** Deixei parado de
 proposito; e' a primeira coisa da manha.
@@ -117,8 +137,15 @@ de primeira classe) nao sao estilo — sao cicatrizes de defeitos medidos.
 5. Contratar servidor e contas de loja quando chegar a hora (G5/G6) e responder o IARC.
 
 **A equipe faz, em ordem de valor:**
-0. **O laco das animacoes do modelo externo** — ver ">>> COMECE POR AQUI".
-   Pequeno, diagnosticado e bloqueia a sensacao de movimento do jogo inteiro.
+0. **[FEITO 26/08]** ~~O laco das animacoes do modelo externo~~ — corrigido,
+   com teste provado em vermelho.
+0.1. **Bots nao caem do castelo** — nascem no chao. Mexe em `Bot.gd`, que nao
+   era de nenhuma raia desta fase. E' o buraco mais visivel da queda hoje.
+0.2. **Sem colisao no ar durante a queda**: o pouso e' sempre no terreno, nunca
+   em cima de arvore ou telhado. Marcado com `ponytail:` em `Queda._solo()`.
+0.3. **Dano cancela a canalizacao do bau?** PERGUNTA ABERTA AO DIRETOR. Hoje
+   cancelam: sair do raio, cair derrubado e morrer. Dano NAO cancela. E'
+   balanceamento — nao decidido pela equipe de proposito.
 1. **Os 17 kits que faltam** — e' o maior buraco de jogabilidade (secao 3).
 2. **A Sintonia** — um dos dois pilares de identidade, sem uma linha em codigo.
 3. **Corrigir os angulos das vistas** da concept art: nao existe perfil de 90
@@ -378,6 +405,7 @@ recebe manutenção. Continua recuperável pelo histórico do Git.
 | **21/08** | **R20/R20.1** — elenco descolado do Apex com marcas mágicas próprias; Pyra em 3D pela Meshy; zona, habilidades, escudo, derrubado, armas arcanas, baú e HUD completa; área segura corrigida; estudo de dano |
 
 | 24/08 | Novo lote de concept art dos 20 magos (8 vistas cada) |
+| **26/08** | **A QUEDA**: castelo voador, salto, planeio e pouso · ilha 180 -> 300 m com 7 POIs e leitura aerea · gesto de pegar item e abrir bau · fim da patinacao · zona e terreno passam a ESCALAR com o mapa |
 | **25/08** | **Brok em 3D pela Meshy** (multi-imagem + rig + 5 animações), APK de 106 MB → 54 MB ao excluir o ateliê da exportação; **higienização**: -398 MB em duplicatas e material superseded; ateliê de arte fora do git; pipeline Meshy achatado em `docs/pipeline-arte/`; `meshy.py` consertado; auditoria visual dos 20 e da validade do pacote de pipeline |
 
 Detalhe de cada mudança: `git log` e o [CHANGELOG](../CHANGELOG.md).

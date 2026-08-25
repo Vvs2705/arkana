@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_shadow_budget()
 	_test_shadow_budget_defect_red()
 	_test_look()
+	_test_fog_defect_red()
 	_test_materials()
 	_test_shader_uniforms()
 	_test_terrain_ao()
@@ -46,6 +47,11 @@ func _run() -> void:
 	_test_material_blend()
 	_test_material_blend_defect_red()
 	_test_coastline()
+	_test_water_sheet()
+	_test_water_sheet_defect_red()
+	_test_aerial_read()
+	_test_aerial_read_defect_red()
+	_test_drop_budget()
 	_test_scatter_budget()
 	_test_gamma()
 	_test_spawns()
@@ -78,6 +84,27 @@ func _test_mobile_budget() -> void:
 	_check(not env.ssr_enabled, "SSR desligado (nao existe no mobile)")
 	_check(not env.sdfgi_enabled, "SDFGI desligado (nao existe no mobile)")
 	_check(not env.volumetric_fog_enabled, "nevoa volumetrica desligada (nao existe no mobile)")
+
+
+## Fracao de nevoa que uma superficie a `d` metros da camera recebe, com a formula
+## do modo DEPTH do Godot. Existe pra que a guarda cobre o EFEITO e nao o valor de
+## um botao — begin, end e curve podem ser recalibrados a vontade desde que o
+## resultado a 200 m continue deixando a ilha visivel.
+func _fog_em(d: float) -> float:
+	var t: float = clampf((d - env.fog_depth_begin)
+			/ maxf(env.fog_depth_end - env.fog_depth_begin, 0.001), 0.0, 1.0)
+	return clampf(pow(t, env.fog_depth_curve) * env.fog_density, 0.0, 1.0)
+
+
+## Anti-vacuidade: o ajuste que a ilha tinha ANTES da ampliacao (34/220/1.8) —
+## bom pra um mapa de 76 m de raio, fatal pra uma queda de 200 m.
+func _test_fog_defect_red() -> void:
+	print("[defeito: nevoa calibrada pro mapa pequeno]")
+	var t: float = clampf((200.0 - 34.0) / (220.0 - 34.0), 0.0, 1.0)
+	var velho: float = pow(t, 1.8)
+	_check(velho >= 0.20,
+			"o ajuste 34/220/1.8 comeria %0.0f%% do quadro aereo — BARRADO pela guarda acima"
+			% (velho * 100.0))
 
 
 func _test_shadow_budget() -> void:
@@ -123,6 +150,18 @@ func _test_look() -> void:
 	_check(env.fog_depth_begin >= 30.0,
 			"nevoa so' comeca a %0.0fm — o combate perto fica limpo" % env.fog_depth_begin)
 	_check(env.fog_depth_end >= 200.0, "nevoa fecha longe o bastante p/ engolir o mar")
+	# A NEVOA VISTA DA QUEDA (G5). Este e' o numero que decide se a fase nova existe:
+	# o jogador entra a ~200 m de altura e escolhe onde pousar, entao o chao esta' a
+	# ~200 m da camera. Com o ajuste herdado (fim aos 220 m) a conta dava 81% de
+	# nevoa e o render aereo saiu um BORRAO CARAMELO — nao ha' escolha possivel num
+	# quadro onde nao existe nada. A guarda cobra a conta, nao o botao: qualquer
+	# combinacao de begin/end/curve serve, desde que a 200 m ainda se enxergue.
+	_check(_fog_em(200.0) < 0.20,
+			"a %0.0fm (a altura da queda) a nevoa come so' %0.0f%% do quadro" % [200.0, _fog_em(200.0) * 100.0])
+	# E o mar continua tendo que morrer no ceu: e' o que a nevoa fazia antes e nao
+	# pode deixar de fazer. 600 m e' o dobro da ilha — se sobrar mar nitido ali, a
+	# borda do plano d'agua aparece no quadro (aconteceu, e foi corrigido no shader).
+	_check(_fog_em(600.0) > 0.95, "a 600m o mar aberto ja' virou ceu (%0.0f%%)" % (_fog_em(600.0) * 100.0))
 	_check(env.fog_height_density > 0.0, "camada baixa de nevoa (vale/mar respiram bruma)")
 	_check(env.glow_enabled, "glow ligado (vagalume e sol em HDR acendem)")
 	_check(env.background_mode == Environment.BG_SKY
@@ -190,15 +229,25 @@ func _test_shader_uniforms() -> void:
 ## Travessias escolhidas para cruzar cada fronteira que existe: praia, margem do
 ## lago, lama do alagado, piso das ruinas e chao de mata.
 func _material_seams() -> Array:
+	# As travessias saem dos PROPRIOS centros de POI: cravar coordenadas foi o que
+	# fez metade dos testes deste arquivo apontarem pro vazio quando o mapa cresceu.
+	var e: float = float(island.LAND_R) + 12.0
+	var lk: Vector2 = island.LAKE
+	var mh: Vector2 = island.MARSH
+	var rn: Vector2 = island.RUINS
+	var pk: Vector2 = island.PEAK
+	var du: Vector2 = island.DUNES
 	var linhas := [
-		[Vector2(-88, 18), Vector2(88, 18)],      # lago + as duas praias
-		[Vector2(-88, 36), Vector2(88, 36)],      # alagado
-		[Vector2(38, -88), Vector2(38, 88)],      # ruinas
-		[Vector2(-70, -70), Vector2(70, 70)],     # floresta e vale
+		[Vector2(-e, lk.y), Vector2(e, lk.y)],    # lago + as duas praias
+		[Vector2(-e, mh.y), Vector2(e, mh.y)],    # alagado
+		[Vector2(rn.x, -e), Vector2(rn.x, e)],    # ruinas
+		[Vector2(-e, -e), Vector2(e, e)],         # floresta e vale
+		[Vector2(pk.x, -e), Vector2(pk.x, e)],    # pico (POI novo do G5)
+		[Vector2(-e, du.y), Vector2(e, du.y)],    # dunas (POI novo do G5)
 	]
 	var pior_novo := 0.0
 	var pior_velho := 0.0
-	var pior_dentro := 0.0    # so' a area jogavel (r <= 68m)
+	var pior_dentro := 0.0    # so' a area jogavel
 	var onde := Vector2.ZERO
 	var onde_dentro := Vector2.ZERO
 	for l in linhas:
@@ -206,25 +255,36 @@ func _material_seams() -> Array:
 		var b: Vector2 = l[1]
 		var pn := Color(0, 0, 0)
 		var pv := Color(0, 0, 0)
-		var n := 120
+		var ph := 0.0
+		var n := 160
 		for i in n + 1:
 			var q: Vector2 = a.lerp(b, float(i) / n)
 			var h: float = island.height(q.x, q.y)
 			var ny: float = island._terrain_ny(q.x, q.y)
 			var cn: Color = island._vcolor(q.x, q.y, h, ny)
 			var cv: Color = _vcolor_g3(q, h, ny)
-			if i > 0:
+			# FILTRO DE PENHASCO (entrou no G5, e ele CORRIGE o teste, nao o afrouxa).
+			# Este teste existe pra pegar EMENDA DE MATERIAL — cor que salta sem o
+			# chao saltar. Onde o relevo despenca a cor TEM que acompanhar, e contar
+			# isso como emenda so' mede o penhasco. Ate' o G4 o unico penhasco da
+			# ilha ficava na borda, e o corte por raio dava conta; o G5 poe um
+			# penhasco NO MEIO do mapa (a escarpa da mesa) e o corte por raio passou
+			# a esconder o que interessa e a acusar o que nao e' defeito.
+			# Passo da amostra ~1,8m; 0,8m de cota nele e' ~24 graus. Acima disso e'
+			# escarpa. O MESMO filtro vale para as duas regras — comparacao justa.
+			if i > 0 and absf(h - ph) <= 0.8:
 				var dn := absf(cn.r - pn.r) + absf(cn.g - pn.g) + absf(cn.b - pn.b)
 				if dn > pior_novo:
 					pior_novo = dn
 					onde = q
-				if q.length() <= 68.0 and dn > pior_dentro:
+				if q.length() <= float(island.LAND_R) - 14.0 and dn > pior_dentro:
 					pior_dentro = dn
 					onde_dentro = q
 				pior_velho = maxf(pior_velho,
 						absf(cv.r - pv.r) + absf(cv.g - pv.g) + absf(cv.b - pv.b))
 			pn = cn
 			pv = cv
+			ph = h
 	return [pior_novo, pior_velho, onde, pior_dentro, onde_dentro]
 
 
@@ -252,11 +312,10 @@ func _test_material_blend() -> void:
 	_check(novo < velho * 0.7,
 			"pior fronteira caiu de %0.2f (escada de if) para %0.2f — rampa, nao degrau"
 			% [velho, novo])
-	# O que sobra do pior caso e' o penhasco onde a ilha DESPENCA no mar (r~76m):
-	# la' a cota muda mais de 1m entre dois vertices e a cor tem que acompanhar —
-	# isso e' relevo, nao emenda. Dentro da area jogavel (r<=68m), que e' onde o
-	# jogador olha o chao de perto, a exigencia e' bem mais dura.
-	# Regra, nao numero magico: dentro da area jogavel (r<=68m), que e' onde o
+	# O que sobra do pior caso e' a beira d'agua, onde a areia molhada encosta na
+	# grama dentro de uma faixa de cota estreita. Dentro da area jogavel, que e'
+	# onde o jogador olha o chao de perto, a exigencia e' bem mais dura.
+	# Regra, nao numero magico: dentro da area jogavel (r<=LAND_R-14), que e' onde o
 	# jogador olha o chao de perto, a pior emenda tem que ser MENOS DA METADE da
 	# que a escada de if produzia no mesmo terreno.
 	_check(dentro < velho * 0.5,
@@ -279,21 +338,198 @@ func _test_material_blend_defect_red() -> void:
 ## raio puro, a ilha vira um disco e a praia um anel de contorno perfeito (era o
 ## defeito mais visivel do mapa visto de cima). Medida: o raio em que h cruza
 ## zero, varrido em 48 angulos, precisa de amplitude de verdade.
+## A varredura mudou de SENTIDO no G5, e isso e' um conserto, nao um capricho: a
+## versao antiga andava DE DENTRO PRA FORA a partir de r=60 e parava na primeira
+## cota <= 0. Com o lago agora centrado a 81 m do meio, o raio de 60 m ja' nascia
+## dentro da cava do lago e a funcao devolvia "costa aos 60 m" — media agua doce
+## achando que media mar. Varrendo DE FORA PRA DENTRO, a primeira terra que se
+## encontra e' necessariamente a costa, e bacia interna nenhuma engana o teste.
 func _test_coastline() -> void:
 	print("[costa irregular]")
 	var lo := 999.0
 	var hi := 0.0
-	for k in 48:
-		var a := TAU * float(k) / 48.0
+	for k in 64:
+		var a := TAU * float(k) / 64.0
 		var d := Vector2(cos(a), sin(a))
-		var r := 60.0
-		while r < 110.0 and island.height(d.x * r, d.y * r) > 0.0:
-			r += 0.5
+		var r: float = island.LAND_R + 55.0
+		while r > 20.0 and island.height(d.x * r, d.y * r) <= 0.0:
+			r -= 0.5
 		lo = minf(lo, r)
 		hi = maxf(hi, r)
-	_check(hi - lo > 8.0,
+	# 8 m bastava numa ilha de 76 m de raio; em 132 m a mesma exigencia relativa
+	# pede ~14 m. O que se cobra e' o mesmo: costa nao pode ser circunferencia.
+	_check(hi - lo > 14.0,
 			"a linha d'agua varia %0.1fm entre a enseada e a ponta (disco perfeito = 0)"
 			% (hi - lo))
+
+
+# --------------------------------------------- G5: a ilha vista LA' DE CIMA
+
+## LAMINA D'AGUA. A ilha e' desenhada por uma funcao de relevo e a agua por um
+## DISCO plano posto por cima; sao duas coisas independentes, e quando o mapa
+## cresceu elas se desencontraram na primeira tentativa. O sintoma e' o pior que
+## existe num POI: um BURACO no meio do lago, com o fundo da cava seco e a' mostra,
+## porque o disco acabava antes da margem.
+## A guarda mede as duas e cobra a relacao certa: o raio em que a cota cruza a
+## lamina tem que caber DENTRO do disco. O raio do disco e' LIDO DA MALHA (o menor
+## vertice do anel externo), nao de um numero repetido aqui — repetir o numero e'
+## justamente como as duas coisas se desencontram.
+## Errar pra MAIS e' de graca e por isso nao e' cobrado: onde a margem ja' subiu,
+## quem cobre o disco e' o terreno, e o plano d'agua fica enterrado.
+func _water_gap(nm: String, centro: Vector2, superficie: float) -> Array:
+	var mi := island.get_node_or_null("Generated/" + nm) as MeshInstance3D
+	if mi == null:
+		return [-1.0, 0.0]
+	var arr: Array = (mi.mesh as ArrayMesh).surface_get_arrays(0)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var cols: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+	var disco := INF
+	for i in verts.size():
+		# COLOR.r == 1.0 marca o anel EXTERNO do disco (gravado pelo _disc_mesh);
+		# o MENOR raio desse anel e' o pior caso, porque o disco e' deformado.
+		if cols[i].r > 0.999:
+			disco = minf(disco, Vector2(verts[i].x, verts[i].z).length())
+	var submerso := 0.0
+	for k in 96:
+		var a := TAU * float(k) / 96.0
+		var d := Vector2(cos(a), sin(a))
+		var r := 0.5
+		while r < 70.0 and island.height(centro.x + d.x * r, centro.y + d.y * r) < superficie:
+			r += 0.25
+		submerso = maxf(submerso, r)
+	return [disco, submerso]
+
+
+func _test_water_sheet() -> void:
+	print("[lamina d'agua cobre a cava]")
+	for job in [["LakeWater", island.LAKE, 0.6], ["MarshWater", island.MARSH, 0.55]]:
+		var m := _water_gap(job[0], job[1], job[2])
+		var disco: float = m[0]
+		var submerso: float = m[1]
+		_check(disco > 0.0, "%s existe na cena" % job[0])
+		_check(disco >= submerso,
+				"%s: disco de %0.1fm cobre os %0.1fm de cava submersa (sobra %0.1fm)"
+				% [job[0], disco, submerso, disco - submerso])
+
+
+## Anti-vacuidade: o par de discos do G4 (18 m no lago, 15 m no alagado) foi
+## herdado sem ser remedido quando os POIs cresceram. Com os raios de HOJE aquele
+## disco deixaria a cava descoberta — e e' isso que a guarda acima pega.
+func _test_water_sheet_defect_red() -> void:
+	print("[defeito: disco d'agua herdado do mapa pequeno]")
+	for job in [["LakeWater", island.LAKE, 0.6, 18.0], ["MarshWater", island.MARSH, 0.55, 15.0]]:
+		var m := _water_gap(job[0], job[1], job[2])
+		var submerso: float = m[1]
+		var herdado: float = job[3]
+		_check(herdado < submerso,
+				"%s com os %0.0fm do G4 deixaria %0.1fm de cava seca — BARRADO pela guarda acima"
+				% [job[0], herdado, submerso - herdado])
+
+
+## LEITURA DO ALTO — a exigencia NOVA da fase. Caindo de 200 m o jogador escolhe
+## onde pousar, e daquela altura nao existe detalhe: nao ha' sombra projetada (o
+## sol so' desenha ate' 60 m), nao ha' grama (some por celula alem de 80 m) e nao
+## ha' silhueta de objeto pequeno. O que chega no olho e' a COR MEDIA de cada
+## pedaco de chao — e cor media e' exatamente o que esta' gravado na cor de
+## vertice da malha. Entao o teste le' a propria malha e cobra que cada POI seja
+## uma MANCHA propria: distinta da campina aberta E distinta dos outros POIs.
+## Limiar 0.10 na soma dos canais (~3% por canal em LINEAR): abaixo disso duas
+## areas viram a mesma mancha a 200 m, por mais diferentes que os hex parecam.
+func _poi_tint(centro: Vector2, raio: float) -> Color:
+	var mi := island.get_node_or_null("Generated/Terrain") as MeshInstance3D
+	var arr: Array = (mi.mesh as ArrayMesh).surface_get_arrays(0)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var cols: PackedColorArray = arr[Mesh.ARRAY_COLOR]
+	var acc := Color(0, 0, 0)
+	var n := 0
+	for i in verts.size():
+		if Vector2(verts[i].x, verts[i].z).distance_to(centro) <= raio:
+			acc += cols[i]
+			n += 1
+	if n == 0:
+		return Color(0, 0, 0)
+	return Color(acc.r / n, acc.g / n, acc.b / n)
+
+
+func _dist(a: Color, b: Color) -> float:
+	return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b)
+
+
+func _aerial_tints() -> Dictionary:
+	return {
+		"campina": _poi_tint(Vector2(0, 0), 26.0),
+		"floresta": _poi_tint(island.FOREST, float(island.FOREST_R) * 0.6),
+		"ruinas": _poi_tint(island.RUINS, float(island.RUINS_R) * 0.6),
+		"alagado": _poi_tint(island.MARSH, float(island.MARSH_R) * 0.5),
+		"dunas": _poi_tint(island.DUNES, float(island.DUNES_R) * 0.5),
+		"pico": _poi_tint(island.PEAK, float(island.PEAK_TOP)),
+	}
+
+
+func _test_aerial_read() -> void:
+	print("[leitura do alto: cada POI e' uma mancha propria]")
+	var t := _aerial_tints()
+	var nomes: Array = t.keys()
+	var pior := 9.0
+	var par := ""
+	for i in nomes.size():
+		for j in range(i + 1, nomes.size()):
+			var d := _dist(t[nomes[i]], t[nomes[j]])
+			if d < pior:
+				pior = d
+				par = "%s/%s" % [nomes[i], nomes[j]]
+	_check(pior > 0.10,
+			"o par mais parecido do mapa (%s) ainda difere %0.3f na cor gravada" % [par, pior])
+	# E o pico tem que ser tambem FORMA, nao so' cor (GDD §10: cor + forma). A mesa
+	# e' o unico relevo com altura de landmark; achatou, sumiu do quadro aereo.
+	var alto: float = island.height(island.PEAK.x, island.PEAK.y)
+	var chao: float = island.height(0, 0)
+	_check(alto - chao > 20.0,
+			"o pico se ergue %0.1fm acima do vale — silhueta, nao so' tinta" % (alto - chao))
+
+
+## Anti-vacuidade: a ilha do G4 tinha 4 POIs e dois deles se distinguiam so' pelo
+## que ha' EM CIMA do chao (copas, pedras) — coisas que a 200 m nao se resolvem.
+## Aqui as duas guardas acima recebem os casos degenerados: um POI sem cor propria
+## (cor da campina contra ela mesma) e um POI sem altura (colina de 8 m no lugar
+## da mesa). As duas tem que reprovar.
+func _test_aerial_read_defect_red() -> void:
+	print("[defeito: POI que so' se distingue de perto]")
+	var t := _aerial_tints()
+	var campina: Color = t["campina"]
+	_check(_dist(campina, campina) <= 0.10,
+			"POI pintado com o verde da campina daria diferenca 0.000 — BARRADO pela guarda acima")
+	var chao: float = island.height(0, 0)
+	_check(not ((chao + 8.0) - chao > 20.0),
+			"uma colina de 8m no lugar da mesa seria BARRADA pela guarda de silhueta")
+
+
+## ORCAMENTO DA QUEDA. No chao a grama some sozinha: o grass.gdshader achata a
+## lamina aos 56 m. So' que achatar NAO deixa de custar — o vertex shader roda
+## igual para toda instancia que caia no frustum, e do alto da queda o frustum
+## pega a ILHA INTEIRA de uma vez, ou seja, os 30.000 tufos. Por isso a grama sai
+## fatiada em celulas com visibility_range: alem do alcance a celula inteira e'
+## descartada pela engine, ANTES do vertex shader. Sem isso a ampliacao nao paga.
+func _test_drop_budget() -> void:
+	print("[orcamento da queda: grama cortada por celula]")
+	var gen := island.get_node_or_null("Generated")
+	var celulas := 0
+	var sem_corte := 0
+	var alcance := 0.0
+	for c in gen.get_children():
+		if c is MultiMeshInstance3D and String(c.name).begins_with("Grass"):
+			celulas += 1
+			var v: float = (c as MultiMeshInstance3D).visibility_range_end
+			alcance = maxf(alcance, v)
+			if v <= 0.0:
+				sem_corte += 1
+	_check(celulas > 0 and sem_corte == 0,
+			"as %d celulas de grama tem corte por distancia (%d sem corte)" % [celulas, sem_corte])
+	# O corte tem que ser MAIOR que o fade do shader (56 m) — senao apaga tufo que
+	# ainda esta' em pe' — e bem menor que a altura da queda, senao nao corta nada.
+	_check(alcance > 56.0 and alcance < 150.0,
+			"corte em %0.0fm: depois do fade do shader (56m) e muito antes dos 200m da queda"
+			% alcance)
 
 
 ## Densidade so' e' ganho se ela vier COM culling. A grama tem que estar fatiada
@@ -334,10 +570,11 @@ func _test_terrain_ao() -> void:
 	var lo := 2.0
 	var hi := 0.0
 	var darkest := Vector2.ZERO
-	for iz in range(0, 101, 4):
-		for ix in range(0, 101, 4):
-			var x := (float(ix) / 100.0 - 0.5) * 180.0
-			var z := (float(iz) / 100.0 - 0.5) * 180.0
+	var n1: int = int(island.QUADS) + 1
+	for iz in range(0, n1, 5):
+		for ix in range(0, n1, 5):
+			var x: float = (float(ix) / float(island.QUADS) - 0.5) * float(island.SIZE)
+			var z: float = (float(iz) / float(island.QUADS) - 0.5) * float(island.SIZE)
 			var h: float = island.height(x, z)
 			var ny: float = island._terrain_ny(x, z)
 			var ao: float = island._terrain_ao(x, z, h, ny)
@@ -411,7 +648,7 @@ func _test_spawns() -> void:
 			var m := c as Marker3D
 			if m.position.y < island.height(m.position.x, m.position.z):
 				acima = false
-	_check(n >= 8, "ilha publica %d spawns no grupo 'spawn'" % n)
+	_check(n >= 12, "ilha publica %d spawns no grupo 'spawn'" % n)
 	_check(acima, "todo spawn foi grudado ACIMA do terreno (ninguem nasce dentro do chao)")
 
 

@@ -15,6 +15,13 @@ extends Node3D
 ## passa a pendurar la' e esta constante morre.
 const MAO_OFFSET := Vector3(0.34, 1.16, 0.22)
 
+## O GESTO DE PEGAR. Duracao da anim "pegar" do mago e o instante em que a mao
+## ALCANCA o objeto (characters/Mage.gd, _anim_pegar). Sao numeros do MUNDO
+## (segundos de animacao), nao do dedo — por isso nao vivem em dp.
+const GESTO_S := 0.65
+const GESTO_CONTATO_S := 0.24
+const META_GESTO := "gesto_pegar_inicio"
+
 var arma_id := "varinha"
 var par: PackedStringArray = PackedStringArray()  # so' a manopla usa
 ## Pega sozinho quando o loot e' de tier ESTRITAMENTE melhor. E' o que faz o
@@ -119,6 +126,65 @@ func pegar() -> bool:
 	if melhor == null:
 		return false
 	return bool(melhor.pegar(self))
+
+
+# ---------------------------------------------------------------- o gesto
+
+## O ATO DE PEGAR (pedido do Diretor: "gesto de pegar o item, abrir o bau").
+## Um lugar so' para os dois atos — item do chao (Loot.pegar) e canalizacao do
+## Bau Celestial — porque e' o MESMO movimento: agacha, estende o braco, volta.
+## A animacao mora no visual do mago; aqui esta' a UNICA chamada dela no jogo.
+##
+## POR QUE NAO `pawn.anim("pegar")`, que seria o caminho obvio: o Player
+## reescreve a animacao TODO frame (`anim(locomotion_anim())` no fim do
+## _physics_process) e Pawn.anim() so' repassa quando o NOME muda. Pedindo por
+## la', o gesto seria apagado no frame seguinte — duraria 16ms. Tocando direto
+## no visual, o Pawn continua achando que esta' em "idle"/"run" e nao repete a
+## chamada: o gesto roda inteiro. No fim devolvemos o corpo para a pose de
+## locomocao, senao o mago congela agachado (a anim e' de disparo unico).
+##
+## Devolve false quando o pawn nao tem visual com animacao (fallback
+## procedural, pawn de teste): fiacao defensiva, o ato acontece do mesmo jeito.
+static func gesto(pawn: Node) -> bool:
+	var vis := _visual_animado(pawn)
+	if vis == null:
+		return false
+	## Carimbo do gesto MAIS NOVO. Sem ele o fim de um gesto apagaria o
+	## seguinte — e' o caso do bau, que repete o movimento a cada GESTO_S.
+	var inicio := Time.get_ticks_msec()
+	pawn.set_meta(META_GESTO, inicio)
+	vis.call("play_anim", "pegar")
+	var tree := vis.get_tree()
+	if tree == null:
+		return true  # fora da arvore nao ha' relogio; a pose volta no proximo anim()
+	tree.create_timer(GESTO_S).timeout.connect(func() -> void: _voltar(pawn, inicio))
+	return true
+
+
+## Devolve o corpo para a pose que o gameplay ja' acha que esta' tocando.
+static func _voltar(pawn: Node, inicio: int) -> void:
+	var vis := _visual_animado(pawn)
+	if vis == null:
+		return
+	if int(pawn.get_meta(META_GESTO, 0)) != inicio:
+		return  # um gesto mais novo comecou: quem manda e' ele
+	var nome := "idle"
+	if pawn.has_method("locomotion_anim"):
+		nome = str(pawn.call("locomotion_anim"))
+	vis.call("play_anim", nome)
+
+
+## O visual do pawn, se ele existir e souber animar. Duck-typing de proposito:
+## este arquivo NAO conhece Pawn nem Mage — acopla por fora, como o resto do
+## slot (e e' o que deixa bot, player e pawn de teste passarem pelo mesmo lugar).
+static func _visual_animado(pawn: Node) -> Node:
+	if pawn == null or not is_instance_valid(pawn):
+		return null
+	var v: Variant = pawn.get("visual")
+	if not (v is Node) or not is_instance_valid(v as Node) \
+			or not (v as Node).has_method("play_anim"):
+		return null
+	return v as Node
 
 
 # ---------------------------------------------------------------- visual

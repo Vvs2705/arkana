@@ -167,17 +167,40 @@ func _prompt(body: Node, dentro: bool) -> void:
 ## TROCA (nao consome): a arma velha fica no chao no lugar desta. E' o padrao
 ## de BR — trocar tem custo de decisao, e o mapa nao esvazia sozinho.
 ## Devolve false se ja' e' a mesma arma (nada acontece, sem sinal duplicado).
+##
+## O ATO (R22): esta e' a porta UNICA do "pegar" — botao da HUD, auto-upgrade e
+## Bau Celestial passam todos por aqui, entao e' aqui que o gesto nasce. O
+## ESTADO nao espera animacao (dedo que aperta tem que responder no mesmo
+## frame); quem se sincroniza com a mao e' o EFEITO: a faisca sai em
+## GESTO_CONTATO_S, o instante em que o braco do mago alcanca o chao.
 func pegar(slot: ArmaSlot) -> bool:
 	if slot == null or not is_instance_valid(slot) or slot.arma_id == arma_id:
 		return false
 	var velha := slot.arma_id
 	var velho_par := slot.par
+	var cor := Arma.cor(arma_id)  # cor do que esta' sendo PEGO (o swap vem abaixo)
 	slot.equipar(arma_id, par)
 	arma_id = velha
 	par = velho_par
 	_montar()
 	_prompt(slot.get_parent(), false)  # o prompt some: ja' pegou
+	ArmaSlot.gesto(slot.get_parent())
+	_faisca(cor)
 	return true
+
+
+## O "peguei" no MUNDO (o da tela e' da HUD): um estouro curto na cor da
+## raridade, no tempo do contato da mao. Adiado por SceneTreeTimer porque o
+## relogio da engine e' o unico que nao custa um _process neste no'.
+func _faisca(cor: Color) -> void:
+	var pai := get_parent()
+	var pos := global_position + Vector3(0, ALTURA, 0)
+	var tree := get_tree()
+	if tree == null:
+		Projectile.burst(pai, pos, cor, 14)  # sem arvore, sem relogio: sai agora
+		return
+	tree.create_timer(ArmaSlot.GESTO_CONTATO_S).timeout.connect(
+			func() -> void: Projectile.burst(pai, pos, cor, 14))
 
 
 # ---------------------------------------------------------------- distribuicao

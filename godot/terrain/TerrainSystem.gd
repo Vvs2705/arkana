@@ -31,8 +31,14 @@ const R_SPLASH_STRONG := 2.5
 # cotas/raios dos discos d'agua — espelham world/Island.gd (_build_water)
 const LAKE_SURFACE_Y := 0.6
 const MARSH_SURFACE_Y := 0.55
+## Fallback apenas: os valores REAIS sao lidos da ilha em _build_grid
+## (Island.LAKE_DISC_R / MARSH_DISC_R / LAND_R). Ficam aqui para o sistema rodar
+## num teste sem mundo. Em 26/08 estes numeros eram os UNICOS donos da verdade e
+## envelheceram calados quando a ilha cresceu: o lago virou 29 m e o fogo
+## continuou achando que a agua acabava aos 18.
 const LAKE_DISC_R := 18.0
 const MARSH_DISC_R := 15.0
+const LAND_R_PADRAO := 76.0
 
 enum { M_OUT, M_GROUND, M_FUEL, M_LAKE, M_MARSH }  # material: escrito 1x no build
 enum { S_NORMAL, S_BURNING, S_CHARRED, S_FROZEN, S_ZAP, S_WALL }  # a magia mexe aqui
@@ -168,6 +174,11 @@ func _build_grid() -> void:
 	var marsh: Vector2 = _island.MARSH
 	var forest: Vector2 = _island.FOREST
 	var forest_r: float = _island.FOREST_R
+	# Os raios saem da ILHA que foi entregue, nunca das constantes locais: e' o
+	# que impede o terreno de envelhecer quando o mapa muda de tamanho.
+	var lake_r: float = float(_island.LAKE_DISC_R) if "LAKE_DISC_R" in _island else LAKE_DISC_R
+	var marsh_r: float = float(_island.MARSH_DISC_R) if "MARSH_DISC_R" in _island else MARSH_DISC_R
+	var land_r: float = float(_island.LAND_R) if "LAND_R" in _island else LAND_R_PADRAO
 	for cz in _n:
 		for cx in _n:
 			var idx := cz * _n + cx
@@ -176,11 +187,11 @@ func _build_grid() -> void:
 			var p := Vector2(x, z)
 			var h: float = _island.height(x, z)
 			var m := M_OUT
-			if p.distance_to(lake) < LAKE_DISC_R and h < LAKE_SURFACE_Y - 0.1:
+			if p.distance_to(lake) < lake_r and h < LAKE_SURFACE_Y - 0.1:
 				m = M_LAKE
-			elif p.distance_to(marsh) < MARSH_DISC_R and h < MARSH_SURFACE_Y - 0.1:
+			elif p.distance_to(marsh) < marsh_r and h < MARSH_SURFACE_Y - 0.1:
 				m = M_MARSH
-			elif h > 0.9 and p.length() < 76.0:
+			elif h > 0.9 and p.length() < land_r:
 				# a FLORESTA inteira e' combustivel (arvores + sub-bosque):
 				# a mancha CONTIGUA e' o que faz o ORCAMENTO ser a lei que
 				# regula o incendio (celulas so-arvore seriam ilhas soltas)

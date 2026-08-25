@@ -17,6 +17,11 @@ var rotulo := ""
 ## Segunda linha, menor: o NOME da habilidade do mago (menu/Elenco.gd).
 var subtitulo := ""
 var cor := Color(0.25, 0.85, 0.95)
+## FORMA da borda ("circulo" | "losango" | "triangulo" — Arma.RARIDADES).
+## Vazio/desconhecida = o disco de sempre. E' a lei do GDD §10 dentro do botao:
+## o PEGAR ja' mudava de COR por raridade, e cor sozinha nao e' leitura — quem
+## nao distingue cor precisa ver que o contorno virou losango/triangulo.
+var forma := ""
 ## 0..1 (0 = pronto). Callable porque o dono do numero e' o gameplay e ele troca
 ## de instancia a cada partida — is_valid() cobre o player velho.
 var cd_frac := Callable()
@@ -71,7 +76,14 @@ func _draw() -> void:
 	draw_circle(c + Vector2(Dp.px(1.5), Dp.px(2.5)), r, Color(0, 0, 0, 0.20))
 	var base := cor if ativo else Color(0.55, 0.55, 0.58)
 	draw_circle(c, r, Color(base, 0.36 if pronto else 0.18))
-	draw_arc(c, r, 0, TAU, 40, Color(1, 1, 1, 0.56 if ativo else 0.28), Dp.px(1.6), true)
+	## O disco (alvo do dedo) continua REDONDO sempre; quem muda e' o contorno.
+	## Mexer no alvo por raridade encolheria a area de toque do triangulo.
+	var borda := Color(1, 1, 1, 0.56 if ativo else 0.28)
+	var lados := contorno_lados(forma)
+	if lados == 0:
+		draw_arc(c, r, 0, TAU, 40, borda, Dp.px(1.6), true)
+	else:
+		draw_polyline(contorno(c, r, lados), borda, Dp.px(2.0), true)
 	if frac > 0.0:
 		draw_arc(c, r * 0.62, -PI / 2.0, -PI / 2.0 + TAU * frac, 32,
 				Color(0, 0, 0, 0.55), Dp.px(10.0), true)
@@ -92,3 +104,26 @@ func _draw() -> void:
 		draw_string(font, Vector2(-Dp.px(8.0), size.y + sfs * 1.1), subtitulo,
 				HORIZONTAL_ALIGNMENT_CENTER, size.x + Dp.px(16.0), sfs,
 				Color(1, 1, 1, 0.62 if ativo else 0.35))
+
+
+## Quantos lados a forma da raridade tem (0 = circulo, o desenho padrao).
+## Publica porque o selftest cobra daqui: assim nao existe uma versao "de
+## teste" da regra divergente da desenhada.
+static func contorno_lados(forma_: String) -> int:
+	match forma_:
+		"triangulo":
+			return 3
+		"losango":
+			return 4
+		_:
+			return 0
+
+
+## Poligono fechado inscrito no raio do botao, com um VERTICE PARA CIMA (e' o
+## que faz o losango parecer losango e nao um quadrado).
+static func contorno(centro: Vector2, raio: float, lados: int) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in lados + 1:
+		var a := -PI / 2.0 + TAU * float(i % lados) / float(lados)
+		pts.append(centro + Vector2(cos(a), sin(a)) * raio)
+	return pts

@@ -33,10 +33,25 @@ extends Node3D
 ## Seed proprio (nao o do Loot): mexer no loot nao pode mudar os circulos.
 const SEED_ZONA := 2707
 
-## Raio de partida = meia-ilha (Island.SIZE / 2). Garante que NINGUEM nasce
-## fora da zona, qualquer que seja o spawn. KNOB: baixar aperta a queda desde o
-## primeiro segundo; subir faz a fase 1 nao significar nada.
+## Raio de partida = MEIA-ILHA. Garante que ninguem nasce fora da zona,
+## qualquer que seja o spawn.
+##
+## OS RAIOS DESTE ARQUIVO ESCALAM COM O MAPA. Eles foram calibrados contra uma
+## ilha de ILHA_REF metros de lado; quando a ilha muda de tamanho, `plano()` le'
+## o lado real e multiplica tudo. Sem isso, em 26/08 a ilha passou de 180 para
+## 300 m e o raio inicial de 90 (que era meia-ilha) virou menos de um terco:
+## 6 dos 14 pontos de nascimento ficaram FORA do primeiro circulo e tomavam
+## dano no segundo zero. O numero cravado nao acusou nada — o comentario ao
+## lado dele ja' dizia "meia-ilha" e mesmo assim envelheceu calado.
+##
+## KNOB: baixar aperta a queda desde o primeiro segundo; subir faz a fase 1 nao
+## significar nada.
 const RAIO_INICIAL := 90.0
+
+## A ilha contra a qual RAIO_INICIAL e a tabela FASES foram escritos.
+## NAO e' o tamanho atual do mapa — e' a regua de calibragem. Mudar este numero
+## reinterpreta todos os raios abaixo; para mudar o MAPA, mexa em Island.SIZE.
+const ILHA_REF := 180.0
 
 ## AS 5 FASES. `espera` = zona parada com o proximo circulo ja' visivel;
 ## `fecha` = parede andando; `raio` = onde ela para; `dps` = dano por segundo
@@ -109,6 +124,20 @@ var _player_fora := false       # borda: so' emite zona_estado quando MUDA
 ## Cria a zona da partida. DETERMINISTICO: mesmo seed = mesma sequencia de
 ## centros e raios. `island` so' precisa responder height(x, z) — serve para
 ## nao plantar o circulo final no meio do lago; sem ela tudo funciona igual.
+## Quantas vezes o mapa atual e' maior que a regua de calibragem (ILHA_REF).
+## Le' o lado da ilha que foi ENTREGUE, e nao um preload de Island.gd: em 26/08
+## a ilha ficou com erro de sintaxe salvo em disco por um tempo, e um preload
+## teria derrubado a Zona junto. Sem ilha, devolve 1.0 e nada muda — e' o que
+## mantem o selftest da zona rodando sem mundo.
+static func escala_do_mapa(island: Node) -> float:
+	if island == null or not ("SIZE" in island):
+		return 1.0
+	var lado := float(island.SIZE)
+	if lado <= 0.0:
+		return 1.0
+	return lado / ILHA_REF
+
+
 static func criar(parent: Node3D, island: Node, p_seed := SEED_ZONA) -> Zona:
 	var z := Zona.new()
 	z.name = "Zona"
@@ -122,14 +151,24 @@ static func criar(parent: Node3D, island: Node, p_seed := SEED_ZONA) -> Zona:
 ## Lei do circulo: o novo esta' SEMPRE contido no anterior — dist(c1,c0) + r1
 ## <= r0. Sem isso existiria ponto seguro AGORA que fica fora depois de andar,
 ## e o jogador nao teria como planejar rotacao.
+## Raio com que a tempestade abre. Deriva do plano, que ja' nasce escalado.
+func _raio_de_abertura() -> float:
+	if _plano.is_empty():
+		return RAIO_INICIAL
+	# O primeiro circulo e' o DESTINO da fase 1; a abertura e' maior que ele na
+	# mesma proporcao em que RAIO_INICIAL e' maior que FASES[0].raio.
+	return float(_plano[0].raio) * (RAIO_INICIAL / float(FASES[0].raio))
+
+
 static func plano(island: Node, p_seed := SEED_ZONA) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = p_seed
+	var esc := escala_do_mapa(island)
 	var c := Vector3.ZERO
-	var r := RAIO_INICIAL
+	var r := RAIO_INICIAL * esc
 	var out: Array = []
 	for f in FASES:
-		var novo_r := float(f.raio)
+		var novo_r := float(f.raio) * esc
 		var folga: float = maxf(r - novo_r, 0.0) * DESLOCAMENTO
 		c = _sortear_centro(island, rng, c, folga)
 		r = novo_r
@@ -162,7 +201,10 @@ func _ready() -> void:
 	if _plano.is_empty():
 		_plano = plano(null)
 	_montar_visual()
-	raio = RAIO_INICIAL            # dispara o setter: parede na escala certa
+	# O raio de abertura sai da MESMA conta que gerou o plano (ja' escalado pelo
+	# mapa). Ler a constante crua aqui era o que deixava a parede nascer com o
+	# tamanho da ilha antiga mesmo com o plano correto.
+	raio = _raio_de_abertura()     # dispara o setter: parede na escala certa
 	_timer = Timer.new()
 	_timer.one_shot = true
 	_timer.timeout.connect(_no_tempo)

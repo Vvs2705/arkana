@@ -57,6 +57,55 @@ func _run() -> void:
 	quit(0 if fails == 0 else 1)
 
 
+## A ZONA ESCALA COM O MAPA — e NINGUEM nasce fora dela.
+##
+## Este bloco existe por um defeito medido em 26/08: a ilha passou de 180 para
+## 300 m e RAIO_INICIAL continuou 90, ou seja, menos de um terco do mapa. Seis
+## dos catorze pontos de nascimento ficaram FORA do primeiro circulo e tomavam
+## dano de tempestade no segundo zero da partida.
+##
+## O teste velho ("r >= 90") passou verde o tempo todo, porque cobrava um numero
+## e nao uma RELACAO. Aqui a conta e' contra o mapa de verdade: se a ilha
+## crescer de novo e a zona nao acompanhar, isto fica vermelho.
+func _test_escala_do_mapa() -> void:
+	print("[A zona acompanha o tamanho do mapa]")
+	var cena := "res://world/Island.tscn"
+	if not ResourceLoader.exists(cena):
+		_check(false, "Island.tscn existe para medir a escala")
+		return
+	var ilha: Node3D = (load(cena) as PackedScene).instantiate()
+	root.add_child(ilha)
+
+	var lado := float(ilha.SIZE)
+	var esc: float = _zona.escala_do_mapa(ilha)
+	_check(is_equal_approx(esc, lado / float(_zona.ILHA_REF)),
+		"escala sai do lado REAL da ilha (%.0fm / regua %.0fm = %.2fx)"
+		% [lado, float(_zona.ILHA_REF), esc])
+	_check(_zona.escala_do_mapa(null) == 1.0,
+		"sem ilha, escala 1.0 — a zona roda sozinha em teste")
+
+	var plano: Array = _zona.plano(ilha)
+	var abertura: float = float(plano[0].raio) 		* (float(_zona.RAIO_INICIAL) / float(_zona.FASES[0].raio))
+	_check(abertura >= lado * 0.5 * 0.98,
+		"a abertura cobre meia-ilha DE VERDADE: %.0fm para um mapa de %.0fm"
+		% [abertura, lado])
+
+	# o que o defeito realmente causava: gente nascendo na tempestade
+	var fora := 0
+	var total := 0
+	for n in get_nodes_in_group("spawn"):
+		if not (n is Node3D):
+			continue
+		total += 1
+		var p: Vector3 = (n as Node3D).global_position
+		if Vector2(p.x - plano[0].centro.x, p.z - plano[0].centro.z).length() > abertura:
+			fora += 1
+	_check(total > 0, "ha' pontos de nascimento para conferir (%d)" % total)
+	_check(fora == 0,
+		"NENHUM nascimento cai fora do primeiro circulo (%d de %d fora)" % [fora, total])
+	ilha.queue_free()
+
+
 func _check(cond: bool, name: String) -> void:
 	if cond:
 		print("  ok    - " + name)
@@ -80,7 +129,10 @@ func _test_desenho() -> void:
 
 	# raios: sempre menores, e o inicial cobre a ilha inteira (ninguem nasce fora)
 	var r: float = float(_zona.RAIO_INICIAL)
-	_check(r >= 90.0, "raio inicial cobre meia-ilha (Island.SIZE/2 = 90m): %.0fm" % r)
+	_check(r >= 90.0, "raio inicial de referencia cobre meia-ilha-REGUA: %.0fm" % r)
+	_test_escala_do_mapa()
+
+	r = float(_zona.RAIO_INICIAL)
 	var ok_raio := true
 	var ok_dps := true
 	var dps := 0.0

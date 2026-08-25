@@ -13,6 +13,9 @@
 extends Node3D
 
 const ISLAND_SCENE := "res://world/Island.tscn"
+## A QUEDA — a abertura de battle royale. Carregada por CAMINHO e nao por
+## preload: se a raia da queda nao existir, a partida abre no chao como antes.
+const QUEDA_SCRIPT := "res://gameplay/queda/Queda.gd"
 const PLAYER_MAGE := "01-pyra"
 # Magos ja' cadastrados em characters/mage_identity.gd (o script nao tem
 # class_name; carrega igual ao Mage.gd). Cresce sozinho conforme a raia
@@ -106,6 +109,21 @@ func _build_match() -> void:
 	## restart) e e' DETERMINISTICA pelo proprio seed — mesma sequencia de
 	## circulos toda partida, como manda o contrato do projeto.
 	zona = Zona.criar(arena, island)
+	## A QUEDA DO CASTELO — a partida comeca no ar, nao no chao. O castelo cruza
+	## o mapa, o jogador salta quando quiser, cai, plana e pousa. Ordem do
+	## Diretor: durante a queda o mago NAO tem poder nenhum, so' o corpo.
+	##
+	## Vem DEPOIS de tudo (loot, bau, zona) de proposito: quando o jogador pousa,
+	## o mundo ja' esta' montado e ele cai num mapa vivo, nao num vazio que se
+	## preenche embaixo dele. Nasce sob a Arena, entao o restart limpa junto.
+	##
+	## Fiacao defensiva: sem o arquivo, nada acontece e a partida abre no chao.
+	## Os BOTS continuam nascendo no chao — faze-los cair e' raia de IA e mexeria
+	## em Bot.gd; esta' registrado como pendencia, nao como esquecimento.
+	if ResourceLoader.exists(QUEDA_SCRIPT):
+		var qs: GDScript = load(QUEDA_SCRIPT)
+		if qs != null:
+			qs.iniciar(arena, island, player)
 	hud.bind_player(player)
 	hud.hide_end()
 	hud.update_match(time_left, bots_alive)

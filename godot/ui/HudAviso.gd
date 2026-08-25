@@ -29,6 +29,14 @@ const P_BAU := 3          # oportunidade, nao ameaca — e' o primeiro a sumir
 ## no jogo mas nao na tela (ver relatorio da raia UI).
 const MAX_BADGES := 4
 
+## CANCELAR E' ESTADO DE 1a CLASSE (regra do projeto, docs/ARQUITETURA.md):
+## quando a canalizacao do bau quebra, o anel NAO pode sumir caladinho — some
+## quem terminou, quem foi INTERROMPIDO vira marca. E a marca muda COR **E
+## FORMA** (ambar em anel -> vermelho em X), porque cor sozinha nao e' leitura
+## (GDD §10, daltonismo).
+const CANCELADO_S := 0.9
+const COR_CANCELADO := Color(1.0, 0.36, 0.30)
+
 var safe := Vector4.ZERO  # l, t, r, b em px de canvas — vem do Hud._layout
 var player: Node = null   # Node3D com cam_yaw; duck-typed de proposito
 
@@ -39,6 +47,9 @@ var _vinheta_cor := Color(0.9, 0.15, 0.15)
 var _vinheta_ultima := -99.0
 var _badges: Array[String] = []
 var _bussola := {}        # chave -> {pos: Vector3, cor: Color}
+var _canal := -1.0        # 0..1 canalizando o bau; < 0 = nada na tela
+var _canal_cor := Color.WHITE
+var _cancelado := 0.0     # segundos que faltam do X de cancelamento
 var _caido := false
 var _resgatando := false
 var _esvaecimento := 0.0
@@ -110,6 +121,31 @@ func bussola(chave: String, pos: Vector3, cor: Color, ligado := true) -> void:
 	queue_redraw()
 
 
+## ANEL DE CANALIZACAO (abrir o Bau Celestial). Progresso 0..1. Chamado pela
+## BORDA do gameplay, nao por frame — o anel guarda o ultimo valor.
+func canalizar(prog: float, cor: Color) -> void:
+	_canal = clampf(prog, 0.0, 1.0)
+	_canal_cor = cor
+	_cancelado = 0.0
+	queue_redraw()
+
+
+## Acabou BEM (o bau abriu): o anel some sem marca. So' interrupcao vira X.
+func canalizar_fim() -> void:
+	_canal = -1.0
+	_cancelado = 0.0
+	queue_redraw()
+
+
+## INTERROMPEU (saiu do raio, caiu, morreu). Ver CANCELADO_S la' em cima.
+func cancelar() -> void:
+	if _canal < 0.0:
+		return  # nao havia canalizacao: nao existe cancelamento do nada
+	_canal = -1.0
+	_cancelado = CANCELADO_S
+	queue_redraw()
+
+
 func derrubar(caido: bool) -> void:
 	_caido = caido
 	if not caido:
@@ -137,6 +173,8 @@ func zerar() -> void:
 	_badges.clear()
 	_vinheta = 0.0
 	_vinheta_ultima = -99.0
+	_canal = -1.0
+	_cancelado = 0.0
 	_caido = false
 	_resgatando = false
 	queue_redraw()
@@ -148,6 +186,9 @@ func _process(delta: float) -> void:
 	var mexeu := false
 	if _vinheta > 0.0:
 		_vinheta = maxf(_vinheta - delta * 2.2, 0.0)
+		mexeu = true
+	if _cancelado > 0.0:
+		_cancelado = maxf(_cancelado - delta, 0.0)
 		mexeu = true
 	var agora := _agora()
 	for prio: int in _faixa.keys():
@@ -197,6 +238,16 @@ func rect_badges() -> Rect2:
 			maxf(t.x * 0.5 - safe.x, 1.0), Dp.px(20.0))
 
 
+## O anel de canalizacao mora na coluna central, logo acima do botao PEGAR.
+## Aqui a regra "nada no meio da tela" cai de proposito, pela MESMA razao do
+## painel de DERRUBADO: quem canaliza esta' PARADO, nao esta' mirando — e o
+## unico numero que importa nesses 3 segundos e' esse.
+func rect_canalizar() -> Rect2:
+	var t := _tela()
+	var d := Dp.px(52.0)
+	return Rect2((t.x - d) / 2.0, t.y - safe.w - Dp.px(196.0), d, d)
+
+
 func rect_derrubado() -> Rect2:
 	var t := _tela()
 	var w := Dp.px(240.0)
@@ -213,6 +264,9 @@ func _draw() -> void:
 	_draw_bussola()
 	_draw_faixa()
 	_draw_badges()
+	# No chao o painel de DERRUBADO ocupa este lugar (e quem caiu nao canaliza).
+	if not _caido and (_canal >= 0.0 or _cancelado > 0.0):
+		_draw_canalizar()
 	if _caido or _resgatando:
 		_draw_derrubado()
 
@@ -312,6 +366,26 @@ func _draw_badges() -> void:
 		draw_string(font, Vector2(x + Dp.px(6.0), r.position.y + r.size.y * 0.75), txt,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.92, 0.96, 1.0, 0.95))
 		x = chip.end.x + Dp.px(6.0)
+
+
+## Canalizando: anel que enche na cor da raridade. Interrompido: X vermelho
+## esmaecendo. Duas coisas mudam de uma vez — a COR e a FORMA — para que a
+## interrupcao seja legivel sem depender de enxergar cor (GDD §10).
+func _draw_canalizar() -> void:
+	var r := rect_canalizar()
+	var c := r.get_center()
+	var raio := r.size.x / 2.0
+	var grosso := Dp.px(4.0)
+	if _canal >= 0.0:
+		draw_arc(c, raio, 0, TAU, 32, Color(0, 0, 0, 0.45), grosso, true)
+		draw_arc(c, raio, -PI / 2.0, -PI / 2.0 + TAU * _canal, 32, _canal_cor,
+				grosso, true)
+		return
+	var a := clampf(_cancelado / CANCELADO_S, 0.0, 1.0)
+	draw_arc(c, raio, 0, TAU, 32, Color(COR_CANCELADO, 0.30 * a), grosso, true)
+	var d := raio * 0.62
+	draw_line(c + Vector2(-d, -d), c + Vector2(d, d), Color(COR_CANCELADO, a), grosso, true)
+	draw_line(c + Vector2(-d, d), c + Vector2(d, -d), Color(COR_CANCELADO, a), grosso, true)
 
 
 ## Painel de DERRUBADO. Barra de ESVAECIMENTO (o tempo que resta) e ANEL de

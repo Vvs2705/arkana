@@ -8,19 +8,97 @@
 ## Distancias do MUNDO em METROS (regra da ponte: dp e' so' do dedo).
 extends Node3D
 
-const SIZE := 180.0          # m, lado do terreno (101x101 verts = 20k tris)
-const QUADS := 100
+## AMPLIACAO (G5). SIZE saiu de 180 para 300 m. O motivo nao e' estetico: a
+## partir desta fase o jogador ENTRA CAINDO de ~200 m, e uma ilha de 76 m de raio
+## de terra nao tem rota de queda nem espaco para a zona fechar em 5 fases — o
+## primeiro circulo ja' nasceria em cima do ultimo.
+## A CONTA que autorizou o numero — MEDIDA com world/_shot.gd, nao chutada:
+##   antes  SIZE 180 | 101x101 verts | 20.000 tris de chao | 87.420 no mundo
+##          49 nos desenhaveis | PIOR quadro 53 draw calls / 133k prims | 399 ms
+##   depois SIZE 300 | 133x133 verts | 34.848 tris de chao | 220.986 no mundo
+##          85 nos desenhaveis | PIOR quadro 30 draw calls / 159k prims | 621 ms
+##   ou seja: 2,9x de area jogavel por 1,7x de triangulo de chao, e o pior quadro
+##   ficou com 57% dos draw calls de antes (a regua herdada era "nao pode DOBRAR").
+## Os draw calls CAIRAM porque a grama passou a ser cortada por celula pela propria
+## engine (visibility_range_end = 80 m), coisa que a versao de 180 m nao fazia: o
+## fade do grass.gdshader achatava a lamina aos 56 m mas continuava pagando o
+## vertex shader dela. E porque POI novo aqui e' RELEVO, nao objeto — pico, dunas
+## e enseada saem de uma conta a mais dentro de height() e custam ZERO draw call.
+## O que subiu foi o TEMPO DE GERACAO (399 -> 621 ms, uma vez por partida, atras
+## da tela de carga). ponytail: da' pra cortar ~90% disso guardando o campo de
+## altura numa grade e tirando normal e AO dela em vez de chamar height() 13x por
+## vertice — mas ai' _terrain_ao/_terrain_ny deixam de ser a unica fonte da verdade
+## e o selftest perde o pe'. So' vale a pena se o aparelho reclamar do load.
+##
+## AVISO PARA AS OUTRAS RAIAS (o SIZE e' contrato, e ele MUDOU):
+##  * gameplay/Zona.gd — RAIO_INICIAL esta' cravado em 90.0 com o comentario
+##    "meia-ilha (Island.SIZE / 2)". Com SIZE 300 meia-ilha e' 150: do jeito que
+##    esta', 6 dos 14 spawns nascem FORA do primeiro circulo e tomam dano no
+##    segundo zero. A tabela de FASES (62/42/...) precisa da mesma escala (x1,67).
+##  * terrain/TerrainSystem.gd — tem `p.length() < 76.0` cravado no _build_grid
+##    (era o raio de terra da ilha antiga, hoje e' 132) e espelha os raios dos
+##    discos d'agua em LAKE_DISC_R/MARSH_DISC_R 18/15, que aqui viraram 29/22.
+##    Nada quebra: o fogo simplesmente nao pega fora dos 76 m e o gelo nao
+##    reconhece a borda nova do lago.
+## QUADS 132 = quad de 2,27 m (era 1,8 m). Continua bem acima do Nyquist da
+## ondulacao curta do relevo (~12 m), que e' o detalhe mais fino que a malha
+## precisa carregar; abaixo disso quem desenha e' a grama e a cor de vertice.
+const SIZE := 300.0          # m, lado do terreno (133x133 verts = 34.8k tris)
+const QUADS := 132
 const SEA_Y := 0.0
+## Raio de TERRA FIRME (a linha d'agua fica por volta disto, irregular). Tudo que
+## e' espalhado le' daqui em vez de repetir 62/70/72/74/76 cravados pelo arquivo —
+## foi o que fez a ampliacao caber num diff em vez de numa cacada.
+const LAND_R := 132.0
 
 # POIs (GDD §14 reinterpretados) — centros XZ locais
-const LAKE := Vector2(45, 18)
-const LAKE_R := 17.0
-const MARSH := Vector2(-42, 36)      # baixada/alagado
-const MARSH_R := 16.0
-const FOREST := Vector2(-36, -40)
-const FOREST_R := 26.0
-const RUINS := Vector2(38, -44)      # plato elevado
-const RUINS_R := 14.0
+const LAKE := Vector2(75, 30)
+const LAKE_R := 24.0
+const MARSH := Vector2(-70, 60)      # baixada/alagado
+const MARSH_R := 22.0
+
+## RAIO DA LAMINA D'AGUA — maior que o raio da CAVA (LAKE_R/MARSH_R) porque a
+## agua tem que passar da beira e cobrir a areia molhada. Virou constante em
+## 26/08 porque o terreno reativo precisa saber onde e' agua para congelar e
+## conduzir raio, e ate' entao os dois arquivos guardavam o numero separado —
+## a ilha cresceu, o disco cresceu junto, e o terreno continuou achando que o
+## lago tinha 18 m. Fonte unica: quem desenha a agua e' quem diz onde ela esta'.
+const LAKE_DISC_R := 29.0
+const MARSH_DISC_R := 22.0
+const FOREST := Vector2(-60, -66)
+const FOREST_R := 40.0
+const RUINS := Vector2(63, -73)      # plato elevado
+const RUINS_R := 20.0
+
+## POIs NOVOS DO G5. Os tres sao RELEVO puro (uma conta a mais dentro de height()
+## e um lerp a mais dentro de _vcolor): nao acrescentam um unico draw call, e sao
+## justamente os que se leem melhor de 200 m — porque de 200 m nao existe detalhe,
+## so' existe SILHUETA e COR (GDD §10: cor + forma, nunca so' cor).
+##  * PICO   — mesa de 18 m sobre um sope de ~10 m (topo medido: 28 m). A unica coisa do mapa com altura de verdade: de cima
+##             e' a mancha clara com sombra propria, do chao e' a referencia que
+##             diz onde voce esta'. E' tambem onde o castelo voador vai ancorar.
+##             Escarpa de um lado so' (ver `ramp` em height()): sobe por uma
+##             encosta MEDIDA em 39 graus e e' penhasco no resto — alto defensavel com
+##             UMA rota a pe', que e' o que faz um POI de topo valer a queda.
+##  * DUNAS  — areal costeiro com cristas de vento. De cima e' o unico bege grande
+##             num mapa verde; do chao e' o campo ABERTO (todo BR precisa de um).
+##  * ENSEADA— fiorde: o mar entra 60 m ilha adentro. Nao e' lugar de pousar, e'
+##             o que quebra a SILHUETA da ilha — de 200 m uma mordida azul na
+##             borda vale mais que qualquer objeto que se pudesse plantar la'.
+const PEAK := Vector2(12, 84)
+const PEAK_R := 40.0                 # onde a encosta comeca
+const PEAK_TOP := 14.0               # raio do topo chato
+const PEAK_H := 18.0
+## Para ONDE aponta a encosta subivel, em radianos. 4,6 rad aponta o setor manso
+## para o MIOLO da ilha. Foi medido e corrigido: com o valor anterior (2,2 rad) a
+## unica rampa a pe' apontava para o MAR — o pico tinha rota de subida e a rota
+## nascia dentro d'agua. O resto do morro e' penhasco, de proposito.
+const PEAK_FACE := 4.6
+const DUNES := Vector2(10, -98)
+const DUNES_R := 32.0
+const BAY_A := Vector2(-142, 30)     # boca (no mar)
+const BAY_B := Vector2(-84, -4)      # fundo (ilha adentro)
+const BAY_W := 16.0
 
 # Paleta GDD §10 — saturada, "clima com COR, nunca falta de luz"
 const COL_GRASS := Color("58bd6d")
@@ -42,6 +120,12 @@ const COL_GRASS_DEEP := Color("2f8a55")  # verde fundo das dobras
 const COL_FOREST_FLOOR := Color("5f7742") # serrapilheira sob a copa
 const COL_MOSS := Color("74a06a")        # musgo nas ruinas
 const COL_PEBBLE := Color("8d8a84")
+# G5 — as duas cores que faltavam pra ilha ter mais de um bioma VISTA DE CIMA.
+# Escolhidas pelo que fazem no quadro aereo, nao pelo que sao de perto: uma puxa
+# pro claro-frio (o topo do pico salta do verde), outra pro quente-claro (o areal
+# e' a maior mancha nao-verde do mapa depois do lago).
+const COL_PEAK := Color("dfe3ee")        # cume batido de vento, cinza-azulado
+const COL_DUNE := Color("e8d6a4")        # areia seca de duna (mais palida que a praia)
 
 # Icosaedro (winding CW = frente no Godot; lista classica CCW ja invertida)
 const ICO_V: Array[Vector3] = [
@@ -171,17 +255,24 @@ func height(x: float, z: float) -> float:
 	# em mais nada: e' o mesmo custo (uma amostra de ruido) e a silhueta do mapa
 	# deixa de ser um circulo. So' o RAIO DA COSTA usa isto; o vale central
 	# continua no raio real (a arena precisa ser previsivel).
-	var redge := r * (1.0 + 0.11 * _noise.get_noise_2d(x * 2.2 + 700.0, z * 2.2 - 300.0))
-	var fall := 1.0 - smoothstep(52.0, 82.0, redge)
+	# G5: a mesma ideia, so' que a ONDA da costa ficou mais longa (x*1.2 em vez de
+	# x*2.2 = enseada de ~42 m em vez de crespo de 23 m). Numa ilha de 132 m de
+	# raio o crespo curto desaparece de 200 m; o que se le' de cima e' baia grande.
+	var redge := r * (1.0 + 0.13 * _noise.get_noise_2d(x * 1.2 + 700.0, z * 1.2 - 300.0))
+	var fall := 1.0 - smoothstep(87.0, 137.0, redge)
 	var n := _noise.get_noise_2d(x, z) * 0.5 + 0.5
-	var h := fall * (1.8 + 7.2 * n)               # colinas
+	# Amplitude das colinas subiu de 7,2 m para 10,5 m. Motivo AEREO: de 200 m nao
+	# ha' sombra projetada (o sol so' desenha ate' 60 m), entao o unico relevo que
+	# se le' la' de cima e' o que o proprio N.L do toon consegue bandear — e com
+	# 7,2 m sobre 50 m de onda a encosta era rasa demais pra virar banda.
+	var h := fall * (1.8 + 10.5 * n)              # colinas
 	# ONDULACAO CURTA (G4). A unica oitava do relevo tinha 50m de comprimento de
 	# onda: entre uma colina e outra o chao era um plano liso, e plano liso e' o
 	# que faz o terreno parecer maquete por baixo de qualquer grama. Esta oitava
 	# tem ~12m e +-0,5m — visivel a pe', mansa o bastante pra ninguem tropecar, e
 	# bem acima do Nyquist da malha (quad de 1,8m). Morre na praia junto com `fall`.
 	h += fall * _noise.get_noise_2d(x * 4.0 + 300.0, z * 4.0 - 120.0) * 0.5
-	var valley := 1.0 - smoothstep(4.0, 30.0, r)  # vale central
+	var valley := 1.0 - smoothstep(7.0, 50.0, r)  # vale central
 	h -= 2.8 * valley
 	if valley > 0.0:
 		h = maxf(h, 1.05)                         # vale nunca afunda no mar
@@ -191,12 +282,65 @@ func height(x: float, z: float) -> float:
 	# seja. Alargando a cava (5,9m a 31m) a queda cai pela metade, a areia ganha
 	# largura e o lago passa a ter beira que da' pra pisar — que e' o que o §14 quer
 	# quando a agua congela e vira rota.
-	h = lerpf(h, -2.4, 1.0 - smoothstep(LAKE_R * 0.3, LAKE_R + 16.0, p.distance_to(LAKE)))
+	h = lerpf(h, -2.4, 1.0 - smoothstep(LAKE_R * 0.3, LAKE_R + 20.0, p.distance_to(LAKE)))
 	var dm := p.distance_to(MARSH)
-	h = lerpf(h, 0.45, 0.92 * (1.0 - smoothstep(MARSH_R * 0.6, MARSH_R + 12.0, dm)))
-	h -= 0.5 * (1.0 - smoothstep(4.0, 10.0, dm))  # poca central do alagado
-	h = lerpf(h, 6.4, 1.0 - smoothstep(RUINS_R * 0.6, RUINS_R + 11.0, p.distance_to(RUINS)))
-	h -= 3.2 * smoothstep(70.0, 90.0, redge)      # borda mergulha no mar
+	h = lerpf(h, 0.35, 1.0 - smoothstep(MARSH_R * 0.55, MARSH_R + 26.0, dm))
+	h -= 0.5 * (1.0 - smoothstep(5.0, 13.0, dm))  # poca central do alagado
+	# Plato das ruinas subiu de 6,4 m para 9,0 m: numa ilha cujas colinas agora vao
+	# a ~12 m, um degrau de 6,4 m deixaria de ser degrau.
+	h = lerpf(h, 9.0, 1.0 - smoothstep(RUINS_R * 0.6, RUINS_R + 14.0, p.distance_to(RUINS)))
+
+	# --- PICO: mesa com UMA encosta subivel -------------------------------------
+	# `ramp` estica o raio da mesa num setor de ~120 graus (o cos so' conta onde e'
+	# positivo). No setor esticado os 22 m de subida se espalham por ~45 m de chao
+	# = ~36 graus, abaixo do floor_max_angle padrao (45) -> da' pra subir a pe'.
+	# Fora dele a mesma subida cabe em 26 m = ~52 graus = penhasco. Isso e' desenho
+	# de nivel, nao decoracao: um alto so' vale a queda se tiver rota E defesa.
+	# GUARDA DE CUSTO, nao de logica: `ramp` chega no maximo a 1,9, entao acima de
+	# PEAK_R*1.9 o smoothstep ja' vale 0 e a conta inteira e' descartada. height()
+	# roda ~230.000 vezes so' no chao — pagar um atan2 e uma amostra de ruido em
+	# TODO ponto da ilha por causa de um morro que ocupa 6% dela seria desperdicio
+	# puro. O resultado e' identico ao de calcular sempre (o corte e' onde o peso
+	# ja' era zero), so' que a ilha inteira nao paga o pedaco do pico.
+	var dpk := p.distance_to(PEAK)
+	if dpk < PEAK_R * 1.9:
+		var ramp := 1.0 + 0.9 * maxf(0.0, cos((p - PEAK).angle() - PEAK_FACE))
+		var wpk := smoothstep(PEAK_R * ramp, PEAK_TOP * ramp, dpk)
+	# CRISTA. O primeiro render do pico entregou o defeito: sem esta linha ele saia
+	# uma cupula LISA e monocromatica — de perto uma bolha de plastico, de cima uma
+	# mancha sem forma. O ruido de 25 m de onda quebra a encosta em costela e
+	# rampa, e e' isso que faz o toon achar banda e o AO achar dobra.
+	# `crag` anda ao contrario de `ramp`: no setor da subida a crista quase some.
+	# Escarpa quebrada nao se escala — e o unico caminho a pe' tem que continuar
+	# sendo caminho (medido: com a crista cheia a rampa passava dos 45 graus do
+	# floor_max_angle padrao e o pico virava inalcancavel a pe').
+		var crag := 1.9 - 0.9 * ramp
+		h += wpk * (PEAK_H + crag * _noise.get_noise_2d(x * 2.0 - 400.0, z * 2.0 + 260.0) * 3.2)
+
+	# --- DUNAS: areal costeiro com crista de vento ------------------------------
+	# A cota vira quase plana (2,2 m) e por cima entra uma onda DIRECIONAL de ~14 m
+	# — duna nao e' ruido isotropico, e' listra transversal ao vento. E' o que da'
+	# FORMA ao POI; sem ela o areal seria so' uma mancha bege (GDD §10 proibe).
+	var wdu := 1.0 - smoothstep(DUNES_R * 0.45, DUNES_R + 18.0, p.distance_to(DUNES))
+	if wdu > 0.0:
+		# A fase da senoide e' EMPURRADA por um ruido longo: sem isso as cristas
+		# saem paralelas e do chao o areal le' como veludo cotele, nao como duna.
+		var warp := _noise.get_noise_2d(x * 0.8 + 150.0, z * 0.8 - 80.0) * 2.6
+		var crest := sin((x * 0.62 + z * 0.78) * 0.45 + warp) * 1.25 					+ _noise.get_noise_2d(x * 3.0 - 900.0, z * 3.0 + 400.0) * 1.1
+		h = lerpf(h, 2.4 + crest, wdu * 0.9)
+
+	# --- ENSEADA: o mar entra ilha adentro --------------------------------------
+	# Custo de geometria: ZERO. A cota desce abaixo do nivel do mar e o PLANO DO MAR
+	# que ja' existe preenche o vao sozinho. De 200 m o resultado e' uma mordida
+	# azul na borda — silhueta, que e' a unica coisa que se le' daquela altura.
+	# Mesma guarda barata: uma distancia ate' o MEIO do fiorde decide se vale a pena
+	# chamar a rotina de segmento. 66 m = meio comprimento (34) + o alcance da rampa
+	# (31); fora disso o peso e' zero por construcao.
+	if p.distance_to((BAY_A + BAY_B) * 0.5) < 66.0:
+		var db := p.distance_to(Geometry2D.get_closest_point_to_segment(p, BAY_A, BAY_B))
+		h = lerpf(h, -3.0, 1.0 - smoothstep(BAY_W * 0.35, BAY_W + 15.0, db))
+
+	h -= 3.2 * smoothstep(118.0, 150.0, redge)    # borda mergulha no mar
 	return h
 
 
@@ -214,12 +358,18 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# faixa 0,25-0,75 depois do *0.5+0.5. A primeira versao usava smoothstep(0.54,
 	# 0.95) e portanto NUNCA disparava — o chao continuou de um verde so'. As
 	# rampas abaixo vivem dentro da faixa REAL do ruido.
-	# Escalas: `big` sai em ~33m (mancha de regiao) e `fine` em ~6m (granulado).
+	# Escalas: `big` sai em ~33m (mancha de regiao) e `fine` em ~9m (granulado).
 	var big := _noise.get_noise_2d(x * 1.5, z * 1.5) * 0.5 + 0.5
-	var fine := _noise.get_noise_2d(x * 8.0 + 90.0, z * 8.0 - 40.0) * 0.5 + 0.5
+	# G5: `fine` foi de x*8 (onda de 6,2 m) para x*5,5 (onda de 9,1 m). Nao e' gosto,
+	# e' AMOSTRAGEM: o quad do chao passou de 1,8 m para 2,27 m, e 6,2 m de onda em
+	# quad de 2,27 m da' 2,7 amostras por periodo — abaixo do Nyquist. O granulado
+	# parava de ser granulado e virava CHIADO por vertice, que o selftest de emenda
+	# de material pegou como salto de cor entre vizinhos. Com 9,1 m sao 4 amostras
+	# por periodo e o mesmo desenho volta a ser lido como mancha.
+	var fine := _noise.get_noise_2d(x * 5.5 + 90.0, z * 5.5 - 40.0) * 0.5 + 0.5
 
 	# 1) campina: verde por altitude + faixa seca no alto/exposto + fundo escuro
-	var c := COL_GRASS_HI.lerp(COL_GRASS, clampf((h - 1.0) / 7.0, 0.0, 1.0))
+	var c := COL_GRASS_HI.lerp(COL_GRASS, clampf((h - 1.0) / 10.5, 0.0, 1.0))
 	c = c.lerp(COL_GRASS_DRY, smoothstep(0.50, 0.72, big) * 0.7)
 	c = c.lerp(COL_GRASS_DEEP, smoothstep(0.50, 0.28, big) * 0.6)
 	c = c.lerp(c.darkened(0.14), fine * 0.5)
@@ -231,20 +381,39 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 
 	# 3) POI ruinas: piso de pedra FRIO tomado por musgo. A "luz propria" do POI
 	#    nao precisa de uma luz — precisa de um chao com outro matiz.
-	var wr := 1.0 - smoothstep(RUINS_R * 0.75, RUINS_R + 4.0, p.distance_to(RUINS))
-	c = c.lerp(COL_ROCK.lerp(COL_MOSS, 0.1 + 0.45 * fine), wr * 0.92)
+	# G5: a rampa foi aberta (0.85R -> R+6) e o musgo puxado pra tras. Com o plato
+	# em 20 m de raio o piso antigo perdia forca cedo demais e a metade de fora do
+	# POI voltava a ser campina — ou seja, de 200 m as ruinas eram um circulo VERDE
+	# no meio de um mapa verde. Piso de pedra e' o que anuncia o POI la' de cima.
+	var wr := 1.0 - smoothstep(RUINS_R * 0.85, RUINS_R + 6.0, p.distance_to(RUINS))
+	c = c.lerp(COL_ROCK.lerp(COL_MOSS, 0.05 + 0.32 * fine), wr * 0.95)
 
 	# 4) POI alagado: lama entrando em rampa larga e SO' na cota baixa
 	# Mesmo raciocinio da praia: das duas rampas que fecham a lama, a de COTA era a
 	# estreita (1,4m). Na beira do brejo o terreno sobe rapido e a lama inteira
 	# aparecia em dois vertices. Alargada para 2,8m de cota, a borda vira faixa.
-	var wm := (1.0 - smoothstep(MARSH_R * 0.2, MARSH_R + 10.0, p.distance_to(MARSH))) 			* smoothstep(3.0, 0.2, h)
+	var wm := (1.0 - smoothstep(MARSH_R * 0.2, MARSH_R + 13.0, p.distance_to(MARSH))) 			* smoothstep(5.6, 0.2, h)
 	var wmud := minf(wm * 1.5, 1.0)
 	c = c.lerp(COL_MUD.darkened(0.2), wmud)
 
+	# 4b) POI dunas: areal palido. Entra DEPOIS da lama e ANTES da rocha porque
+	#     duna e' cota baixa e o teste de rocha por inclinacao pegaria a crista.
+	#     O `fine` mistura um capim ralo por cima: areal 100% liso le' como um
+	#     buraco na paleta quando visto do chao.
+	var wdu := 1.0 - smoothstep(DUNES_R * 0.5, DUNES_R + 14.0, p.distance_to(DUNES))
+	c = c.lerp(COL_DUNE.lerp(COL_GRASS_DRY, 0.14 + 0.3 * fine), wdu * 0.92)
+
 	# 5) rocha por INCLINACAO e por altitude, as duas em rampa
-	var wrk := maxf(smoothstep(0.74, 0.60, ny), smoothstep(6.4, 8.4, h))
+	# O corte de altitude subiu de 6,4-8,4 m para 11-15 m: com colinas de 12 m e
+	# plato de ruina em 9 m, o corte antigo pintaria de cinza METADE da ilha.
+	var wrk := maxf(smoothstep(0.74, 0.60, ny), smoothstep(12.5, 17.0, h))
 	c = c.lerp(COL_ROCK, wrk * 0.9)
+	# 5b) CUME do pico: acima de ~19 m so' existe o pico, e ele fica claro-frio.
+	#     E' a mancha que o jogador acha primeiro quando olha o mapa la' de cima.
+	# 20,5-27 m: a faixa acompanha o topo da mesa (28 m). Comecando cedo demais o pico fica
+	# branco e virava uma bolha sem relevo. Agora a encosta e' ROCHA (regra 5, que
+	# ja' pinta tudo acima de 17 m) e so' o cume batido de vento clareia.
+	c = c.lerp(COL_PEAK, smoothstep(20.5, 27.0, h) * 0.9)
 
 	# 6) areia da praia, tambem em rampa; o alagado nao vira praia
 	# Rampa LARGA (2,4m -> 0,5m de cota) E com o limiar puxado por ruido: sem o
@@ -255,7 +424,7 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# tambem e' cota baixa, levava ~38% de areia por cima da lama e o resultado era
 	# um anel BEGE: o POI perdia a cara de brejo e virava outra praia. Ao quadrado,
 	# lama e praia param de disputar o mesmo pixel.
-	var beach := 3.2 + 1.0 * (_noise.get_noise_2d(x * 2.6 - 55.0, z * 2.6 + 210.0))
+	var beach := 4.6 + 1.4 * (_noise.get_noise_2d(x * 2.6 - 55.0, z * 2.6 + 210.0))
 	var dry := (1.0 - wmud) * (1.0 - wmud)
 	# DOIS degraus de praia, nao um. Grama e areia sao as duas cores mais distantes
 	# da paleta: com uma rampa so', por mais macia que seja, ela precisa vencer toda
@@ -265,10 +434,10 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# [transicao de material] do selftest, que compara com a regra do G3.
 	var meio := COL_SAND.lerp(c, 0.45)
 	c = c.lerp(meio, smoothstep(beach, 0.9, h) * dry)
-	c = c.lerp(COL_SAND, smoothstep(1.7, 0.15, h) * dry)
+	c = c.lerp(COL_SAND, smoothstep(2.5, 0.15, h) * dry)
 	# 7) faixa MOLHADA na linha d'agua: areia perto do nivel do mar escurece. E' o
 	#    detalhe que separa "praia desenhada" de "praia molhada" e custa um lerp.
-	return c.lerp(c.darkened(0.28), smoothstep(1.15, 0.0, h))
+	return c.lerp(c.darkened(0.28), smoothstep(1.7, 0.0, h))
 
 
 ## AO DE VERTICE (G3) — o substituto barato do SSAO, que NAO existe no renderer
@@ -286,7 +455,10 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 ## 0,73 aqui); a faixa "de manual" 0,3-0,9 nao encostaria em nada.
 func _terrain_ao(x: float, z: float, h: float, ny: float) -> float:
 	var e := 2.5
-	var w := 9.0
+	# G5: a escala larga foi de 9 m para 16 m. Ela existe pra pegar a BACIA, e as
+	# bacias da ilha nova (cava do lago, areal, fiorde, sope da mesa) tem o dobro
+	# do tamanho das antigas: com 9 m ela media a encosta, nao a bacia.
+	var w := 16.0
 	var near := (height(x - e, z) + height(x + e, z) + height(x, z - e) + height(x, z + e)) * 0.25 - h
 	var wide := (height(x - w, z) + height(x + w, z) + height(x, z - w) + height(x, z + w)) * 0.25 - h
 	var cavity := clampf(1.0 - maxf(near, 0.0) * 0.45 - maxf(wide, 0.0) * 0.07, 0.66, 1.0)
@@ -363,14 +535,26 @@ func _water_mat(shallow: Color, deep: Color, wave: float, edge: float,
 
 func _build_water(parent: Node3D) -> void:
 	var sea := PlaneMesh.new()
-	sea.size = Vector2(520, 520)
+	# 520 m bastava pra uma ilha de 76 m de raio; com 132 m a borda do plano
+	# aparecia no quadro aereo: a 450 m a nevoa ainda deixava 9% de mar passar e o
+	# render mostrou o LOSANGO do plano desenhado na agua. 2200 m poe a borda a
+	# 1.100 m, muito alem dos 520 m em que a nevoa fecha 100%. Custo: os MESMOS
+	# 3.200 tris e o MESMO 1 draw call — plano maior nao e' plano mais caro.
+	sea.size = Vector2(2200, 2200)
 	sea.subdivide_width = 40
 	sea.subdivide_depth = 40
 	sea.material = _water_sea
 	_add_mesh(parent, sea, Transform3D(Basis.IDENTITY, Vector3(0, SEA_Y, 0)), "Sea", false)
-	_add_mesh(parent, _disc_mesh(18.0, _water_lake, 0.08),
+	# RAIOS MEDIDOS, nao escolhidos: um script de sondagem varreu 72 angulos e achou
+	# onde a cota cruza a lamina d'agua — lago entre 19,0 e 25,8 m do centro, brejo
+	# entre 14,5 e 16,5 m. O disco tem que ser >= o MAIOR desses, nunca o menor:
+	# faltar disco deixa um BURACO com o fundo seco a' mostra no meio da agua;
+	# sobrar disco nao aparece, porque onde a margem ja' subiu e' o TERRENO que
+	# cobre o disco (o plano d'agua fica enterrado). Errar pra mais e' de graca.
+	# Este e' o par que o selftest [lamina d'agua] guarda.
+	_add_mesh(parent, _disc_mesh(LAKE_DISC_R, _water_lake, 0.08),
 			Transform3D(Basis.IDENTITY, Vector3(LAKE.x, 0.6, LAKE.y)), "LakeWater", false)
-	_add_mesh(parent, _disc_mesh(15.0, _water_marsh, 0.12),
+	_add_mesh(parent, _disc_mesh(MARSH_DISC_R, _water_marsh, 0.12),
 			Transform3D(Basis.IDENTITY, Vector3(MARSH.x, 0.55, MARSH.y)), "MarshWater", false)
 
 
@@ -431,8 +615,15 @@ func _build_forest(parent: Node3D) -> void:
 	rng.seed = 21
 	var xf: Array[Transform3D] = []
 	var tries := 0
-	# ponytail: rejeicao O(n^2) — n=94, roda uma vez no load, irrelevante
-	while xf.size() < 58 and tries < 1600:
+	# ponytail: rejeicao O(n^2) — n=176, roda uma vez no load, irrelevante
+	# 58 -> 150 arvores. NAO e' enfeite: no render aereo do baseline a mata lia
+	# como CHUVISCO de arvores, nao como mancha — 58 copas de ~2 m de raio sobre
+	# 2.100 m2 cobriam 31% do chao, e 31% de cobertura visto de 200 m e' grama com
+	# pontinhos. Com 150 copas sobre os 5.000 m2 do raio novo a cobertura vai a
+	# ~45% e a floresta vira MASSA VERDE-ESCURA, que e' como ela tem que se anunciar
+	# pra quem esta' escolhendo onde pousar. Custo: mesmo 1 draw call (MultiMesh),
+	# +4.600 tris, +92 CylinderShape no mesmo StaticBody.
+	while xf.size() < 150 and tries < 4200:
 		tries += 1
 		var p := FOREST + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * FOREST_R
 		if p.distance_to(FOREST) > FOREST_R:
@@ -442,7 +633,7 @@ func _build_forest(parent: Node3D) -> void:
 			continue
 		var ok := true
 		for t in xf:
-			if Vector2(t.origin.x, t.origin.z).distance_to(p) < 4.8:
+			if Vector2(t.origin.x, t.origin.z).distance_to(p) < 4.4:
 				ok = false
 				break
 		if ok:
@@ -450,15 +641,15 @@ func _build_forest(parent: Node3D) -> void:
 	# arvores avulsas fora da mata fechada
 	tries = 0
 	var extra := 0
-	while extra < 10 and tries < 900:
+	while extra < 26 and tries < 2600:
 		tries += 1
-		var p := Vector2(rng.randf_range(-62, 62), rng.randf_range(-62, 62))
-		if p.length() > 62 or p.distance_to(FOREST) < FOREST_R \
+		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
+		if p.length() > LAND_R * 0.84 or p.distance_to(FOREST) < FOREST_R \
 				or p.distance_to(LAKE) < LAKE_R + 6 or p.distance_to(MARSH) < MARSH_R + 4 \
-				or p.distance_to(RUINS) < RUINS_R + 4:
+				or p.distance_to(RUINS) < RUINS_R + 4 or p.distance_to(DUNES) < DUNES_R + 6:
 			continue
 		var h := height(p.x, p.y)
-		if h < 1.2 or h > 7.0:
+		if h < 1.2 or h > 9.5:
 			continue
 		xf.append(_tree_xform(rng, p, h))
 		extra += 1
@@ -526,31 +717,35 @@ func _build_ruins(parent: Node3D) -> void:
 	var body := StaticBody3D.new()
 	body.name = "RuinColliders"
 
-	# circulo de 8 colunas quebradas + 1 caida
-	for i in 8:
-		var ang := TAU * i / 8.0
-		var p := Vector2(RUINS.x + cos(ang) * 8.0, RUINS.y + sin(ang) * 8.0)
+	# 12 colunas num circulo de 13 m (eram 8 num de 8 m). O render entregou o
+	# defeito da ampliacao: o plato foi de 14 para 20 m de raio e a construcao NAO
+	# foi junto — de dentro do circulo o jogador via um campo verde com meia duzia
+	# de pedras perdidas no meio, e de 200 m as ruinas sumiam. Um POI se le' pela
+	# proporcao que ocupa do proprio terreno, nao pelo numero de pecas.
+	for i in 12:
+		var ang := TAU * i / 12.0
+		var p := Vector2(RUINS.x + cos(ang) * 13.0, RUINS.y + sin(ang) * 13.0)
 		var h := height(p.x, p.y)
 		if i == 2:
 			# coluna caida, deitada apontando pra fora do circulo
 			var bf := Basis.from_euler(Vector3(0, -ang, PI * 0.47))
-			cols.append(Transform3D(bf, Vector3(p.x + cos(ang) * 1.5, h + 0.6, p.y + sin(ang) * 1.5)))
+			cols.append(Transform3D(bf, Vector3(p.x + cos(ang) * 2.1, h + 0.8, p.y + sin(ang) * 2.1)))
 			continue
 		var sy := rng.randf_range(0.35, 1.05)
 		var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(1, sy, 1))
 		cols.append(Transform3D(b, Vector3(p.x, h, p.y)))
 		var cs := CollisionShape3D.new()
 		var cshape := CylinderShape3D.new()
-		cshape.radius = 0.62
-		cshape.height = 3.0 * sy
+		cshape.radius = 0.78
+		cshape.height = 4.2 * sy
 		cs.shape = cshape
-		cs.position = Vector3(p.x, h + 1.5 * sy, p.y)
+		cs.position = Vector3(p.x, h + 2.1 * sy, p.y)
 		body.add_child(cs)
 
 	# 2 muros quebrados de blocos, com lacunas e camadas caidas
 	var walls := [
-		{"start": Vector2(RUINS.x - 8.0, RUINS.y - 11.0), "dir": Vector2(1, 0.18).normalized(), "n": 7},
-		{"start": Vector2(RUINS.x + 10.5, RUINS.y - 4.0), "dir": Vector2(0.25, 1).normalized(), "n": 6},
+		{"start": Vector2(RUINS.x - 12.0, RUINS.y - 16.0), "dir": Vector2(1, 0.18).normalized(), "n": 10},
+		{"start": Vector2(RUINS.x + 15.0, RUINS.y - 6.0), "dir": Vector2(0.25, 1).normalized(), "n": 9},
 	]
 	var blk_shape := BoxShape3D.new()
 	blk_shape.size = Vector3(2.2, 0.9, 1.0)
@@ -558,9 +753,9 @@ func _build_ruins(parent: Node3D) -> void:
 		var dirv: Vector2 = w["dir"]
 		var yaw := -atan2(dirv.y, dirv.x)
 		for j in w["n"]:
-			if j == 3:
+			if j == 3 or j == 7:
 				continue  # lacuna — muro QUEBRADO
-			var p: Vector2 = w["start"] + dirv * (j * 2.3)
+			var p: Vector2 = w["start"] + dirv * (j * 2.6)
 			var h := height(p.x, p.y)
 			var layers := 2 if (j == 0 or j == int(w["n"]) - 1) else 1
 			for l in layers:
@@ -577,7 +772,7 @@ func _build_ruins(parent: Node3D) -> void:
 	blks.append(Transform3D(Basis(Vector3.UP, 1.1).scaled(Vector3(0.7, 1, 0.7)),
 			Vector3(RUINS.x + 0.3, hc + 1.35, RUINS.y - 0.2)))
 	cols.append(Transform3D(Basis.IDENTITY.scaled(Vector3(1, 0.28, 1)),
-			Vector3(RUINS.x - 2.6, hc, RUINS.y + 2.2)))
+			Vector3(RUINS.x - 3.4, hc, RUINS.y + 3.0)))
 
 	# desgaste por peca: pedra que envelheceu junto nunca envelhece IGUAL
 	var ccol := PackedColorArray()
@@ -596,15 +791,17 @@ func _build_ruins(parent: Node3D) -> void:
 func _column_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_frustum(st, Vector3.ZERO, 0.58, 0.5, 3.0, 6, COL_STONE)
+	# 4,2 m (era 3,0): a coluna e' a UNICA silhueta vertical construida do mapa e
+	# precisa competir com arvore de 5,5 m e com uma mesa de 32 m.
+	_frustum(st, Vector3.ZERO, 0.72, 0.6, 4.2, 6, COL_STONE)
 	# tampa do topo
 	st.set_color(_lin(COL_STONE))
 	for i in 6:
 		var a0 := TAU * i / 6.0
 		var a1 := TAU * (i + 1) / 6.0
-		st.add_vertex(Vector3(0, 3.0, 0))
-		st.add_vertex(Vector3(cos(a0) * 0.5, 3.0, sin(a0) * 0.5))
-		st.add_vertex(Vector3(cos(a1) * 0.5, 3.0, sin(a1) * 0.5))
+		st.add_vertex(Vector3(0, 4.2, 0))
+		st.add_vertex(Vector3(cos(a0) * 0.6, 4.2, sin(a0) * 0.6))
+		st.add_vertex(Vector3(cos(a1) * 0.6, 4.2, sin(a1) * 0.6))
 	st.generate_normals()
 	var m := st.commit()
 	m.surface_set_material(0, _toon_stone)
@@ -629,7 +826,7 @@ func _build_marsh(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 80 and tries < 1600:
+	while xf.size() < 150 and tries < 3600:
 		tries += 1
 		var p := MARSH + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * (MARSH_R - 1.0)
 		if p.distance_to(MARSH) > MARSH_R - 1.0:
@@ -690,13 +887,17 @@ func _build_rocks(parent: Node3D) -> void:
 	var body := StaticBody3D.new()
 	body.name = "RockColliders"
 	var tries := 0
-	while xf.size() < 26 and tries < 1200:
+	while xf.size() < 58 and tries < 3200:
 		tries += 1
-		var p := Vector2(rng.randf_range(-70, 70), rng.randf_range(-70, 70))
-		if p.length() > 72 or p.distance_to(LAKE) < LAKE_R + 3 or p.distance_to(MARSH) < MARSH_R:
+		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
+		if p.length() > LAND_R - 4.0 or p.distance_to(LAKE) < LAKE_R + 3 or p.distance_to(MARSH) < MARSH_R:
 			continue
 		var h := height(p.x, p.y)
-		var hill := h > 4.5
+		# `hill` subiu de 4,5 m para 7 m junto com as colinas — e por tabela pega a
+		# MESA: acima de 7 m so' existe encosta alta e o topo do pico, e um cume com
+		# pedregulho tem silhueta recortada (de 200 m e' o que separa monte de bolha
+		# de terreno). Reaproveita o mesmo MultiMesh: zero draw call novo.
+		var hill := h > 7.0
 		var beach := h > 0.25 and h < 1.0
 		if not (hill or beach):
 			continue
@@ -749,9 +950,19 @@ func _terrain_ny(x: float, z: float) -> float:
 
 ## Onde tufo/moita/pedrinha pode nascer: campina aberta, fora d'agua e fora de
 ## ladeira. Uma funcao so' porque tres scatters diferentes fazem a MESMA pergunta.
-func _open_ground(p: Vector2, hmin := 1.05, hmax := 7.3, nymin := 0.66) -> float:
-	if p.length() > 74.0 or p.distance_to(LAKE) < LAKE_R + 2.0 \
+func _open_ground(p: Vector2, hmin := 1.05, hmax := 12.5, nymin := 0.66) -> float:
+	if p.length() > LAND_R - 6.0 or p.distance_to(LAKE) < LAKE_R + 2.0 \
 			or p.distance_to(MARSH) < MARSH_R:
+		return -1.0
+	# O areal e' o campo ABERTO do mapa: capim e moita nele destruiriam o unico POI
+	# que se le' de cima por ser LISO e claro.
+	if p.distance_to(DUNES) < DUNES_R * 0.85:
+		return -1.0
+	# Mesmo motivo no MIOLO das ruinas: o _vcolor pinta ali um piso de pedra com
+	# musgo, e no render de calibragem a grama cobria o piso inteiro — o POI ficou
+	# sendo 'campina com pedras'. Capim continua permitido na BORDA (ruina tomada
+	# pelo mato e' a imagem certa); o que nao pode e' ele comer o chao de pedra.
+	if p.distance_to(RUINS) < RUINS_R * 0.8:
 		return -1.0
 	var h := height(p.x, p.y)
 	if h < hmin or h > hmax or _terrain_ny(p.x, p.y) < nymin:
@@ -779,15 +990,15 @@ func _build_grass(parent: Node3D) -> void:
 	rng.seed = 61
 	var seeds: Array[Vector2] = []
 	var tries := 0
-	while seeds.size() < 430 and tries < 6000:
+	while seeds.size() < 1180 and tries < 16000:
 		tries += 1
-		var sp := Vector2(rng.randf_range(-72, 72), rng.randf_range(-72, 72))
+		var sp := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		if _open_ground(sp) >= 0.0:
 			seeds.append(sp)
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	tries = 0
-	while xf.size() < 11000 and tries < 60000:
+	while xf.size() < 30000 and tries < 150000:
 		tries += 1
 		var p: Vector2
 		if not seeds.is_empty() and rng.randf() < 0.88:
@@ -799,7 +1010,7 @@ func _build_grass(parent: Node3D) -> void:
 			var r := sqrt(rng.randf()) * rng.randf_range(1.2, 3.0)
 			p = seeds[rng.randi_range(0, seeds.size() - 1)] + Vector2(cos(a), sin(a)) * r
 		else:
-			p = Vector2(rng.randf_range(-74, 74), rng.randf_range(-74, 74))
+			p = Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		var h := _open_ground(p)
 		if h < 0.0:
 			continue
@@ -809,7 +1020,10 @@ func _build_grass(parent: Node3D) -> void:
 		xf.append(Transform3D(b, Vector3(p.x, h - 0.06, p.y)))
 		var v := rng.randf_range(-0.14, 0.14)
 		cols.append(Color(1.0 + v * 0.9, 1.0 + v, 1.0 + v * 0.5))
-	_multimesh_grid(parent, _grass_mesh(), xf, cols, "Grass", 6)
+	# 10x10 celulas (era 6x6): a celula continua com ~30 m, que e' o tamanho que
+	# faz o frustum de uma camera de 3a pessoa pegar 6-9 delas. Fatiar mais fino
+	# nao adianta (mais nos, mesmo pixel); mais grosso perde o culling.
+	_multimesh_grid(parent, _grass_mesh(), xf, cols, "Grass", 10, 80.0)
 
 
 ## Tufo de 3 LAMINAS finas e tortas (era 2 quads largos cruzados — geometria de
@@ -862,13 +1076,13 @@ func _build_pebbles(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 190 and tries < 5000:
+	while xf.size() < 380 and tries < 11000:
 		tries += 1
-		var p := Vector2(rng.randf_range(-76, 76), rng.randf_range(-76, 76))
-		if p.length() > 76.0 or p.distance_to(LAKE) < LAKE_R - 1.0:
+		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
+		if p.length() > LAND_R or p.distance_to(LAKE) < LAKE_R - 1.0:
 			continue
 		var h := height(p.x, p.y)
-		if h < 0.15 or h > 8.2:
+		if h < 0.15 or h > 13.0:
 			continue
 		var sc := rng.randf_range(0.09, 0.26)
 		var b := Basis.from_euler(Vector3(rng.randf_range(-0.4, 0.4),
@@ -902,15 +1116,15 @@ func _build_bushes(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 130 and tries < 4000:
+	while xf.size() < 260 and tries < 9000:
 		tries += 1
 		var p: Vector2
 		if rng.randf() < 0.72:
 			var a := rng.randf_range(0.0, TAU)
-			p = FOREST + Vector2(cos(a), sin(a)) * (sqrt(rng.randf()) * (FOREST_R + 7.0))
+			p = FOREST + Vector2(cos(a), sin(a)) * (sqrt(rng.randf()) * (FOREST_R + 9.0))
 		else:
-			p = Vector2(rng.randf_range(-70, 70), rng.randf_range(-70, 70))
-		var h := _open_ground(p, 1.15, 7.4, 0.7)
+			p = Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
+		var h := _open_ground(p, 1.15, 12.0, 0.7)
 		if h < 0.0:
 			continue
 		var sc := rng.randf_range(0.62, 1.35)
@@ -945,10 +1159,12 @@ func _build_stacks(parent: Node3D) -> void:
 	rng.seed = 111
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
-	for i in 18:
-		var a := TAU * float(i) / 18.0 + rng.randf_range(-0.14, 0.14)
-		var r := rng.randf_range(92.0, 140.0)
-		var sc := rng.randf_range(3.2, 9.5)
+	for i in 22:
+		var a := TAU * float(i) / 22.0 + rng.randf_range(-0.12, 0.12)
+		# O anel acompanhou a ilha (era 92-140 m, quando a terra ia ate' 76). Fica
+		# fora do alcance da sombra e dentro da nevoa: e' cenario de fundo, nao rota.
+		var r := rng.randf_range(LAND_R + 26.0, LAND_R + 100.0)
+		var sc := rng.randf_range(4.0, 12.0)
 		var b := Basis(Vector3.UP, rng.randf_range(0.0, TAU)) \
 				.scaled(Vector3(sc, sc * rng.randf_range(0.8, 1.9), sc))
 		xf.append(Transform3D(b, Vector3(cos(a) * r, rng.randf_range(-2.6, -0.6), sin(a) * r)))
@@ -965,15 +1181,16 @@ func _build_flowers(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 240 and tries < 4000:
+	while xf.size() < 480 and tries < 9000:
 		tries += 1
-		var p := Vector2(rng.randf_range(-72, 72), rng.randf_range(-72, 72))
+		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		var near_poi: bool = p.distance_to(LAKE) < LAKE_R + 9 \
 				or p.distance_to(FOREST) < FOREST_R or p.distance_to(RUINS) < RUINS_R + 6
-		if not near_poi or p.distance_to(LAKE) < LAKE_R + 1 or p.distance_to(MARSH) < MARSH_R:
+		if not near_poi or p.distance_to(LAKE) < LAKE_R + 1 \
+				or p.distance_to(MARSH) < MARSH_R or p.distance_to(RUINS) < RUINS_R * 0.8:
 			continue
 		var h := height(p.x, p.y)
-		if h < 1.05 or h > 7.2 or _terrain_ny(p.x, p.y) < 0.7:
+		if h < 1.05 or h > 11.0 or _terrain_ny(p.x, p.y) < 0.7:
 			continue
 		var s := rng.randf_range(0.8, 1.2)
 		xf.append(Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(s, s, s)),
@@ -1016,7 +1233,7 @@ func _build_fireflies(parent: Node3D) -> void:
 	# na zoologia de drivers Android; 1 draw call
 	var p := CPUParticles3D.new()
 	p.name = "Fireflies"
-	p.amount = 24
+	p.amount = 40
 	p.lifetime = 8.0
 	p.preprocess = 8.0
 	p.randomness = 0.5
@@ -1068,7 +1285,7 @@ func _build_motes(parent: Node3D) -> void:
 	p.preprocess = 11.0
 	p.randomness = 0.6
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(26.0, 3.0, 26.0)
+	p.emission_box_extents = Vector3(44.0, 3.0, 44.0)
 	p.spread = 60.0
 	p.gravity = Vector3(0.05, 0.09, 0.0)     # sobem no ar quente do entardecer
 	p.initial_velocity_min = 0.1
@@ -1121,8 +1338,15 @@ func _add_mesh(parent: Node3D, mesh: Mesh, t: Transform3D, nm: String, shadows :
 ## cobre a ilha inteira NUNCA e' cortado pelo frustum — a GPU paga o vertex shader
 ## de TODA instancia, inclusive as que estao atras da camera. Fatiar o mesmo
 ## conjunto em celulas devolve o culling. Nao muda um pixel; muda o custo.
+## G5 — `vis_end`: alem dessa distancia a CELULA INTEIRA some, feito pela engine
+## (visibility_range_end), sem uma linha de GDScript por frame. Foi o que tornou
+## a ampliacao pagavel: o grass.gdshader ja' achatava a lamina aos 56 m, mas o
+## vertex shader continuava rodando pra TODA instancia que caisse no frustum — e
+## do alto da queda o frustum pega a ilha inteira, ou seja, os 30.000 tufos de uma
+## vez. Com o corte por celula, a vista aerea nao desenha um unico tufo (todos
+## alem de 58 m) e a vista de chao nao muda um pixel (a lamina la' ja' era zero).
 func _multimesh_grid(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D],
-		colors: PackedColorArray, nm: String, cells: int) -> void:
+		colors: PackedColorArray, nm: String, cells: int, vis_end := 0.0) -> void:
 	var half := SIZE * 0.5
 	var bx: Array[Array] = []
 	var bc: Array[PackedColorArray] = []
@@ -1141,11 +1365,11 @@ func _multimesh_grid(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D],
 			continue
 		var tf: Array[Transform3D] = []
 		tf.assign(bx[k])
-		_multimesh(parent, mesh, tf, "%s%02d" % [nm, k], false, bc[k])
+		_multimesh(parent, mesh, tf, "%s%02d" % [nm, k], false, bc[k], vis_end)
 
 
 func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: String,
-		shadows := true, colors := PackedColorArray()) -> MultiMeshInstance3D:
+		shadows := true, colors := PackedColorArray(), vis_end := 0.0) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = colors.size() > 0
@@ -1160,6 +1384,9 @@ func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: Stri
 	mmi.multimesh = mm
 	if not shadows:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if vis_end > 0.0:
+		mmi.visibility_range_end = vis_end
+		mmi.visibility_range_end_margin = vis_end * 0.10
 	parent.add_child(mmi)
 	return mmi
 

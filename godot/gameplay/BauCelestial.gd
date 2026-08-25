@@ -56,6 +56,11 @@ var _pivo: Node3D            # so' o bau: e' isto que desce do ceu
 var _feixe: Node3D           # o telegrafo: feixe + marcador no chao
 var _dentro: Array[Node] = []
 var _progresso := 0.0
+var _gesto_acc := 0.0        # relogio do gesto repetido (ver _gestos)
+## O player chegou a canalizar nesta rodada? So' com isso o cancelamento vai
+## para a HUD — bot saindo de cima do bau nao pode acender "CANCELOU" na tela
+## do jogador (o sinal bau_canalizando e' do PLAYER, ver core/Bus.gd).
+var _player_canalizou := false
 
 
 ## Agenda a queda da partida. DETERMINISTICO: mesmo seed = mesmo instante,
@@ -158,15 +163,68 @@ func _pousar() -> void:
 	_chamar_bots()
 
 
-## 3. ABRIR — canalizacao. So' anda com alguem DENTRO do raio; sair zera.
+## 3. ABRIR — canalizacao. So' anda com alguem DENTRO do raio E DE PE'; sair,
+## cair ou morrer zera.
 func _process(delta: float) -> void:
 	if fase != POUSADO:
 		return
+	var quem := _ativos()
+	if quem.is_empty():
+		_cancelar()  # derrubado/morto em cima do bau NAO abre bau
+		return
 	_progresso += delta
-	if _tem_player():
+	_gestos(delta, quem)
+	if _tem_player(quem):
+		_player_canalizou = true
 		Bus.bau_canalizando.emit(minf(_progresso / CANALIZAR_S, 1.0))
 	if _progresso >= CANALIZAR_S:
 		_abrir()
+
+
+## O GESTO DE ABRIR, repetido enquanto a canalizacao dura. CANALIZAR_S sao 3
+## segundos: com um unico disparo de 0,65s o mago passaria 2,35s parado em
+## idle, e parado nao le' como "estou abrindo o bau" — le' como travamento.
+## Repetido, o corpo insiste no bau, que e' exatamente a leitura que o evento
+## quer (quem esta' abrindo esta' OCUPADO, e por isso e' alvo).
+func _gestos(delta: float, quem: Array[Node]) -> void:
+	_gesto_acc -= delta
+	if _gesto_acc > 0.0:
+		return
+	_gesto_acc = ArmaSlot.GESTO_S
+	for n in quem:
+		ArmaSlot.gesto(n)
+
+
+## Quem, entre os que estao em cima do bau, PODE canalizar agora. Derrubado e
+## morto nao abrem bau: abrir e' um ato, e quem esta' no chao nao age (a mesma
+## regra que Player._try_fire aplica ao ataque). E' o que transforma "levou
+## dano e caiu" em cancelamento de verdade, em vez de um bau que abre sozinho
+## por cima de um corpo.
+func _ativos() -> Array[Node]:
+	var out: Array[Node] = []
+	for n in _dentro:
+		if not is_instance_valid(n):
+			continue
+		var hp: Variant = n.get("hp")
+		if hp != null and float(hp) <= 0.0:
+			continue
+		if not Derrubado.pode_agir(n):
+			continue
+		out.append(n)
+	return out
+
+
+## CANCELAR E' ESTADO DE 1a CLASSE (regra do projeto): a canalizacao volta do
+## ZERO e a HUD e' avisada na BORDA, uma vez — nunca por frame (este metodo e'
+## chamado a cada frame enquanto um caido segue em cima do bau).
+func _cancelar() -> void:
+	_gesto_acc = 0.0
+	if _progresso <= 0.0 and not _player_canalizou:
+		return
+	_progresso = 0.0
+	if _player_canalizou:
+		_player_canalizou = false
+		Bus.bau_canalizando.emit(0.0)
 
 
 ## Quem abre e' quem esta' MAIS PERTO no instante em que a barra enche — nao
@@ -205,14 +263,12 @@ func _saiu(body: Node3D) -> void:
 		return
 	## CANCELOU: sair do raio zera a canalizacao. Nao e' punicao gratuita —
 	## e' o que transforma "chegar no bau" em "SEGURAR o bau", que e' a briga.
-	_progresso = 0.0
+	_cancelar()
 	set_process(false)
-	if fase == POUSADO:
-		Bus.bau_canalizando.emit(0.0)
 
 
-func _tem_player() -> bool:
-	for n in _dentro:
+func _tem_player(lista: Array[Node]) -> bool:
+	for n in lista:
 		if is_instance_valid(n) and n.is_in_group("player"):
 			return true
 	return false
@@ -221,12 +277,7 @@ func _tem_player() -> bool:
 func _mais_perto() -> Node:
 	var melhor: Node = null
 	var d2 := INF
-	for n in _dentro:
-		if not is_instance_valid(n):
-			continue
-		var hp: Variant = n.get("hp")   # pawn sempre tem; guarda p/ nao-pawn
-		if hp != null and float(hp) <= 0.0:
-			continue
+	for n in _ativos():  # caido/morto nao leva a manopla nem estando em cima
 		var dd: float = global_position.distance_squared_to((n as Node3D).global_position)
 		if dd < d2:
 			d2 = dd

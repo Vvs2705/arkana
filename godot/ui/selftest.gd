@@ -3,6 +3,11 @@
 ## Prova: a HUD monta; NENHUM elemento de borda ignora o notch/barra de gestos;
 ## refazer o layout nao acumula deriva; a HUD reage a rotacao/resize; os alvos
 ## de toque tem >= 48dp; e a base do viewport continua com cara de celular.
+## R22 (A INTERACAO): pegar item e abrir bau DISPARAM o gesto do mago e ele
+## sobrevive ao frame seguinte do Player; o botao PEGAR le' a raridade em COR
+## **+ FORMA** e some quando nao ha' o que pegar; e o cancelamento da
+## canalizacao do bau e' visivel (anel ambar -> X vermelho), inclusive quando
+## quem canaliza cai no meio.
 ##
 ## POR QUE MARGEM INJETADA: headless (e desktop) nao tem notch — Safe.* devolve
 ## zero e um teste sem inset passaria mesmo com a HUD colada na borda. Entao o
@@ -118,6 +123,7 @@ func _run() -> void:
 	_teste_config_hud(hud)
 	_teste_config_player()
 	_teste_sistemas(hud)
+	_teste_interacao(hud)
 
 	# --- base do viewport: com aspect "expand" o canvas CRESCE no eixo que
 	# sobra, e Safe.gd/Dp.gd convertem dividindo por esta base. Base 16:9 num
@@ -476,6 +482,185 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 		% int(balance.FEEDBACK.arc_max))
 
 	outro.queue_free()
+
+
+# --- A INTERACAO: o gesto, a leitura e o cancelamento -----------------------
+## O DEFEITO QUE CRIOU ESTA BATERIA (pedido do Diretor, 26/08): pegar item e
+## abrir bau FUNCIONAVAM e nao APARECIAM. Nao havia gesto nenhum no mago (a
+## arma trocava de mao como num inventario), a raridade do que estava no chao
+## so' existia como COR, e quando a canalizacao do bau quebrava a tela apenas
+## voltava a frase anterior — o jogador nao tinha como saber que perdeu os 2
+## segundos que ja' tinha investido.
+##
+## Cada bloco aqui cobra EFEITO, nao presenca de no'.
+func _teste_interacao(hud: CanvasLayer) -> void:
+	var bus: Node = root.get_node_or_null("Bus")
+	var aviso: Control = hud.aviso
+	var slot_scr: GDScript = load("res://gameplay/ArmaSlot.gd")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var bau_scr: GDScript = load("res://gameplay/BauCelestial.gd")
+	var botao_scr: GDScript = load("res://ui/AcaoButton.gd")
+	var cancelamentos := [0]
+	bus.bau_canalizando.connect(func(p: float) -> void:
+		if p <= 0.0:
+			cancelamentos[0] += 1)
+
+	# ----------------------------------------------- 1. O GESTO DE PEGAR
+	_check(jogador.visual != null and jogador.visual.has_method("play_anim"),
+		"o pawn expoe um visual que sabe animar (contrato de characters/)")
+	var pegar_anim := _anim_esperada(jogador, "pegar")
+	jogador.anim("idle")
+	_check(slot_scr.gesto(jogador), "ArmaSlot.gesto dispara o ato no visual do mago")
+	_check(_anim_atual(jogador) == pegar_anim,
+		"o mago ENTRA no gesto de pegar ('%s')" % _anim_atual(jogador))
+	_check(str(jogador._cur_anim) == "idle",
+		"o gesto nao passa por Pawn.anim (que e' quem o Player reescreve)")
+	## O DEFEITO DE VERDADE: o Player refaz a animacao TODO frame. Um gesto
+	## pedido pelo caminho do Pawn dura 16ms e ninguem ve'.
+	jogador.anim(jogador.locomotion_anim())
+	_check(_anim_atual(jogador) == pegar_anim,
+		"e SOBREVIVE ao frame seguinte do Player (o gesto roda inteiro)")
+	var cru := Node3D.new()
+	root.add_child(cru)
+	_check(not slot_scr.gesto(cru),
+		"pawn sem visual: o gesto nao acontece e nada quebra (fiacao defensiva)")
+
+	# --------------------------------- 2. PEGAR ITEM pelo caminho REAL do jogo
+	var slot: Node = slot_scr.de(jogador)
+	_check(slot != null, "o jogador tem slot de arma para o teste do ato")
+	var chao: Node = loot_scr.criar("varinha" if str(slot.arma_id) != "varinha" else "cajado")
+	root.add_child(chao)
+	jogador.anim("idle")
+	_check(bool(chao.pegar(slot)), "Loot.pegar troca a arma (o caminho de sempre)")
+	_check(_anim_atual(jogador) == pegar_anim,
+		"e agora DISPARA o gesto junto — era troca instantanea, sem ato")
+	_check(float(slot_scr.GESTO_CONTATO_S) > 0.0
+			and float(slot_scr.GESTO_CONTATO_S) < float(slot_scr.GESTO_S),
+		"o efeito sai no CONTATO (%.2fs), dentro do gesto (%.2fs)"
+		% [float(slot_scr.GESTO_CONTATO_S), float(slot_scr.GESTO_S)])
+
+	# ------------------------------- 3. LEITURA DO QUE ESTA NO CHAO: cor+FORMA
+	bus.loot_prompt.emit("Cajado", "raro", true)
+	_check(hud.pegar_btn.visible and hud.pegar_btn.subtitulo == "Cajado",
+		"loot ao alcance mostra o PEGAR com o NOME do item")
+	_check(botao_scr.contorno_lados(hud.pegar_btn.forma) == 4,
+		"raro desenha o contorno em LOSANGO (4 lados), nao so' em azul")
+	var cor_raro: Color = hud.pegar_btn.cor
+	bus.loot_prompt.emit("Manopla", "lendaria", true)
+	_check(hud.pegar_btn.cor != cor_raro
+			and botao_scr.contorno_lados(hud.pegar_btn.forma) == 3,
+		"lendaria muda COR **E** FORMA (triangulo) — GDD §10, daltonismo")
+	bus.loot_prompt.emit("Coisa", "raridade_que_nao_existe", true)
+	_check(hud.pegar_btn.visible and botao_scr.contorno_lados(hud.pegar_btn.forma) == 0,
+		"raridade desconhecida cai no disco redondo, sem quebrar o prompt")
+
+	# ------------------------------------------------- 4. O BOTAO NO DEDO
+	hud._layout(SL, ST, SR, SB)
+	var cv: Vector2 = Safe.canvas()
+	var r_pegar := _rect_de(hud.pegar_btn, cv)
+	_check(minf(r_pegar.size.x, r_pegar.size.y) / Dp.px(1.0) >= 48.0,
+		"alvo do PEGAR = %.0fdp (piso duro do projeto: 48dp)"
+		% (minf(r_pegar.size.x, r_pegar.size.y) / Dp.px(1.0)))
+	for par: Array in [["joystick", hud.joystick], ["Fogo", hud.fire_btn],
+			["Esquiva", hud.dodge_btn], ["Tatica", hud.tatica_btn],
+			["Suprema", hud.suprema_btn], ["carrossel", hud.carousel]]:
+		_check(not r_pegar.intersects(_rect_de(par[1], cv)),
+			"PEGAR nao briga com %s (dois alvos de toque no mesmo pixel)" % par[0])
+	## O GESTO DE MIRA: arrastar o dedo gira a camera em qualquer lugar da
+	## direita da tela — MENOS em cima de um botao visivel.
+	bus.loot_prompt.emit("Cajado", "raro", true)
+	_check(not hud._in_look_zone(hud.pegar_btn.get_global_rect().get_center()),
+		"com loot ao alcance, o PEGAR nao entrega o toque para a mira")
+	bus.loot_prompt.emit("Cajado", "raro", false)
+	_check(not hud.pegar_btn.visible
+			and hud._in_look_zone(r_pegar.get_center()),
+		"sem loot o botao SOME e o pixel volta a ser da mira (HUD sem poluicao)")
+
+	# -------------------------- 5. CANCELAR E' ESTADO DE 1a CLASSE (cor+forma)
+	aviso.zerar()
+	bus.bau_pousou.emit(Vector3(4, 0, 4))
+	bus.bau_canalizando.emit(0.45)
+	_check(aviso._canal > 0.0, "canalizar o bau desenha o anel de progresso")
+	var rc: Rect2 = aviso.rect_canalizar()
+	_check(rc.position.y >= ST and rc.end.y <= cv.y - SB,
+		"anel de canalizacao dentro da area util (y %.0f, fim %.0f)"
+		% [rc.position.y, rc.end.y])
+	bus.bau_canalizando.emit(0.0)
+	_check(aviso._canal < 0.0 and aviso._cancelado > 0.0,
+		"interromper NAO some caladinho: fica a marca de cancelamento")
+	_check(aviso.COR_CANCELADO != hud._cor_lendaria() and aviso._canal < 0.0,
+		"e a marca muda de COR (vermelho) **E** de FORMA (anel -> X)")
+	aviso._process(float(aviso.CANCELADO_S) + 0.01)
+	_check(is_zero_approx(aviso._cancelado), "a marca apaga sozinha depois de %.1fs"
+		% float(aviso.CANCELADO_S))
+	bus.bau_canalizando.emit(0.9)
+	bus.bau_aberto.emit(true, PackedStringArray(["fire", "wind"]))
+	_check(aviso._canal < 0.0 and is_zero_approx(aviso._cancelado),
+		"terminar BEM fecha o anel sem marca de interrupcao")
+
+	# ------------------- 6. QUEM CAI NO MEIO DA CANALIZACAO PERDE O BAU
+	var mapa := Node3D.new()
+	root.add_child(mapa)
+	var bau: Node3D = bau_scr.agendar(mapa, null)
+	bau._timer.timeout.emit()  # ESPERANDO -> CAINDO
+	bau._timer.timeout.emit()  # CAINDO -> POUSADO
+	jogador.global_position = bau.global_position
+	bau._entrou(jogador)
+	jogador.anim("idle")
+	cancelamentos[0] = 0
+	bau._process(0.5)
+	_check(_anim_atual(jogador) == pegar_anim,
+		"abrir o bau tambem e' um ATO: o mago repete o gesto enquanto canaliza")
+	_check(aviso._canal > 0.0, "e o anel da HUD enche com o progresso")
+	jogador.anim("idle")
+	bau._process(float(slot_scr.GESTO_S) + 0.01)
+	_check(_anim_atual(jogador) == pegar_anim,
+		"o gesto se repete durante os %.0fs de canalizacao (parado leria como travamento)"
+		% float(bau_scr.CANALIZAR_S))
+	var hp_antes: float = jogador.hp
+	jogador.hp = 0.0  # caiu no meio (o mesmo filtro pega derrubado)
+	bau._process(0.1)
+	_check(is_zero_approx(float(bau._progresso)),
+		"quem cai no meio da canalizacao PERDE o progresso do bau")
+	_check(aviso._canal < 0.0 and aviso._cancelado > 0.0,
+		"e a tela mostra o cancelamento (era bau abrindo sozinho sobre um corpo)")
+	bau._process(0.1)
+	bau._process(0.1)
+	_check(cancelamentos[0] == 1,
+		"o cancelamento sai UMA vez, na borda — nunca por frame (contrato do Bus)")
+	jogador.hp = hp_antes
+
+	cru.queue_free()
+	chao.queue_free()
+	bau.queue_free()
+	mapa.queue_free()
+
+
+## Nome REAL da animacao no AnimationPlayer ativo. O Mage resolve apelidos de
+## modelo externo e cai no substituto quando a opcional nao existe (Pyra e Brok
+## so' tem idle/run/cast) — o teste segue esse mesmo contrato em vez de supor
+## que o nome no disco e' o nome do jogo.
+func _anim_esperada(pawn: Node, nome: String) -> String:
+	var v: Node = pawn.visual
+	if not bool(v.call("has_anim", nome)):
+		nome = "cast"  # ANIM_FALLBACK do Mage
+	return str(v.call("_anim_name", nome))
+
+
+func _anim_atual(pawn: Node) -> String:
+	var ap: AnimationPlayer = pawn.visual.call("_active_player")
+	return "" if ap == null else ap.current_animation
+
+
+## Retangulo de um Control ancorado, sem depender do passo de layout do frame:
+## os controles da HUD usam ancoras diferentes (o PEGAR e' o unico centrado) e
+## comparar offsets crus entre eles daria falso negativo.
+func _rect_de(c: Control, cv: Vector2) -> Rect2:
+	var p := Vector2(c.anchor_left * cv.x + c.offset_left,
+			c.anchor_top * cv.y + c.offset_top)
+	var e := Vector2(c.anchor_right * cv.x + c.offset_right,
+			c.anchor_bottom * cv.y + c.offset_bottom)
+	return Rect2(p, e - p)
 
 
 func _toque(pos: Vector2, pressed: bool) -> InputEventScreenTouch:

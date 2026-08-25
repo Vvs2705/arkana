@@ -62,9 +62,21 @@ fog_aerial_perspective = 0.4
 fog_sky_affect = 0.6
 fog_height = 6.0
 fog_height_density = 0.02
-fog_depth_curve = 1.8
-fog_depth_begin = 34.0
-fog_depth_end = 220.0
+; G5 — O DEFEITO MAIS CARO DA VISTA AEREA, e ele so' apareceu quando a tomada de
+; 200 m foi renderizada e OLHADA: com fim aos 220 m, o chao visto da altura da
+; queda estava a 200 m da camera e portanto 81% engolido pela nevoa. O quadro
+; drop200 do baseline e' um BORRAO CARAMELO uniforme — nao da' pra escolher onde
+; pousar num quadro onde nao existe nada. E a fase nova comeca exatamente ai'.
+; Numeros novos, com a conta: t = ((d - begin)/(end - begin))^curve.
+;   d=200 m (o chao, visto la' de cima) -> 8% de nevoa: le' com ar, nao apagado.
+;   d=280 m (a costa oposta, visto do chao) -> 20%: perspectiva aerea de verdade.
+;   d>520 m (o mar aberto) -> 100%: o mar continua morrendo no ceu, que era o
+;   motivo do 220 original.
+; O comeco subiu de 34 para 55 m porque o mapa dobrou: 34 m era "longe" numa ilha
+; de 76 m de raio e e' "do outro lado da clareira" numa de 132.
+fog_depth_curve = 2.2
+fog_depth_begin = 55.0
+fog_depth_end = 520.0
 
 [node name="Island" type="Node3D"]
 script = ExtResource("1_island")
@@ -91,32 +103,50 @@ directional_shadow_fade_start = 0.85
 [node name="Env" type="WorldEnvironment" parent="."]
 environment = SubResource("Env")
 
+; SPAWNS — 14 marcadores, 2 por POI (o Main.gd coleta o grupo "spawn"). Com a
+; ilha em 300 m eles deixaram de ser "espalhados": cada par fica na BOCA de um
+; POI, nunca dentro d'agua e nunca no meio da mata fechada. O y aqui e' chute —
+; _snap_spawns() gruda todo mundo em height()+0.3 no boot.
 [node name="SpawnForestA" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(-36, 4, -40)
+position = Vector3(-48, 4, -54)
 
 [node name="SpawnForestB" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(-22, 4, -30)
+position = Vector3(-74, 4, -80)
 
 [node name="SpawnLakeA" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(45, 4, 42)
+position = Vector3(43, 4, 30)
 
 [node name="SpawnLakeB" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(22, 4, 10)
+position = Vector3(75, 4, 62)
 
 [node name="SpawnRuinsA" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(30, 7, -36)
+position = Vector3(63, 10, -73)
 
 [node name="SpawnRuinsB" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(46, 7, -52)
+position = Vector3(54, 10, -62)
 
 [node name="SpawnMarshA" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(-33, 1, 27)
+position = Vector3(-52, 2, 48)
 
 [node name="SpawnMarshB" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(-52, 1, 44)
+position = Vector3(-86, 2, 76)
+
+; PICO: os dois em cima da mesa. E' o unico spawn de terreno ALTO do mapa —
+; quem nasce ali comeca com visao e com a unica encosta subivel nas costas.
+[node name="SpawnPeakA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(12, 32, 84)
+
+[node name="SpawnPeakB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(20, 32, 90)
+
+[node name="SpawnDunesA" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(10, 3, -98)
+
+[node name="SpawnDunesB" type="Marker3D" parent="." groups=["spawn"]]
+position = Vector3(-10, 3, -88)
 
 [node name="SpawnValleyA" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(0, 2, 5)
+position = Vector3(0, 2, 12)
 
 [node name="SpawnValleyB" type="Marker3D" parent="." groups=["spawn"]]
-position = Vector3(-6, 2, -10)
+position = Vector3(-14, 2, -18)
