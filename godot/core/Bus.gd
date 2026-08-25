@@ -127,6 +127,20 @@ signal status_aplicado(alvo: Node, nome: String)
 ## zona_avisou: a zona esta' PARADA e o PROXIMO circulo ja' e' publico. `centro`
 ## e `raio` sao os do circulo NOVO, `segundos` e' quanto falta ate' a parede
 ## comecar a andar (contagem regressiva "A tempestade avanca em X").
+## ---------------------------------------------------------------- A QUEDA
+## O inicio de partida de battle royale: o castelo voador cruza o mapa, o
+## jogador salta, cai, plana e pousa. Ordem do Diretor (26/08): durante a queda
+## o mago NAO tem poder nenhum alem do que nasce com ele — nada de magia no ar.
+##
+## fase: "no_castelo" | "caindo" | "planando" | "pousou"
+signal queda_fase(fase: String)
+## Altura acima do solo, em metros, durante a queda. Para a HUD desenhar o
+## altimetro. Quem manda e' a raia da queda; UI e audio so' observam.
+signal queda_altura(metros: float, velocidade: float)
+## Rota do castelo pelo mapa, publicada uma vez no comeco da partida, para a
+## HUD/minimapa poder desenhar a linha por onde da' para saltar.
+signal castelo_rota(inicio: Vector3, fim: Vector3, duracao: float)
+
 signal zona_avisou(fase: int, centro: Vector3, raio: float, segundos: float)
 ## zona_fechando: a parede COMECOU a andar, e leva `duracao` segundos ate' o
 ## `raio` novo. O anel do proximo circulo apaga aqui.

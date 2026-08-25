@@ -36,6 +36,17 @@ const IDS := preload("res://characters/mage_identity.gd")
 const MODEL_DIR := "res://characters/modelos"
 const REQUIRED_ANIMS := ["idle", "run", "cast"]
 
+## ANIMACOES OPCIONAIS. NAO entram em REQUIRED_ANIMS de proposito: um modelo
+## externo que nao as tenha continua valendo. Se entrassem como obrigatorias,
+## Pyra e Brok — que so' tem idle/run/cast — cairiam no mago procedural, ou
+## seja, uma feature nova apagaria os modelos que ja' funcionam.
+## Quem chama pergunta antes com has_anim(); play_anim() cai no substituto
+## abaixo em vez de reclamar no console.
+const OPTIONAL_ANIMS := ["cair", "planar", "pegar"]
+
+## Para onde cada opcional cai quando o modelo nao a tem. Nunca fica sem pose.
+const ANIM_FALLBACK := {"cair": "idle", "planar": "idle", "pegar": "cast"}
+
 ## MEIA-VOLTA OBRIGATORIA NO MODELO EXTERNO — nao e' gosto, e' conversao de
 ## convencao. glTF (e a Meshy, que exporta glTF) posiciona o personagem olhando
 ## para +Z. O Godot anda para -Z: o Pawn calcula o passo com
@@ -50,6 +61,16 @@ const REQUIRED_ANIMS := ["idle", "run", "cast"]
 ## e' o ESQUERDO na ficha — saia' a direita do quadro, prova de que o que se via
 ## era a frente. A Pyra carregava o defeito desde 21/08 sem ninguem notar.
 const MODEL_YAW := PI
+
+## QUAIS ANIMACOES DO MODEL EXTERNO REPETEM EM LACO.
+## O importador glTF do Godot traz TODA animacao com LOOP_NONE. Sem esta
+## tabela, "run" toca uma vez — uns tres passos —, congela no ultimo quadro e o
+## corpo segue deslizando: e' a PATINACAO que o Diretor relatou em 25/08 depois
+## de ja' termos consertado a orientacao ("da' apenas os tres primeiros passos e
+## depois patina").
+## "cast" fica de FORA de proposito: e' disparo unico, e o `cast_fired` depende
+## de ela terminar. Em laco, o tiro sairia repetido.
+const ANIMS_EM_LACO := ["idle", "run", "cair", "planar"]
 const ANIM_ALIASES := {
 	"idle": ["idle", "Idle", "IDLE", "Armature|Idle", "mixamo.com",
 		"standing_idle", "breathing_idle", "idle_01", "idle_loop",
@@ -66,6 +87,12 @@ const ANIM_ALIASES := {
 		# "Mage Spell Cast" vem gravado dentro do .glb (conferido em 25/08 lendo
 		# o JSON do arquivo). Se a Meshy corrigir, o alias certo ja' esta' acima.
 		"mage_soell_cast", "mage_spell_cast"],
+	"cair": ["cair", "fall", "Fall", "falling", "Falling", "freefall",
+		"free_fall", "skydive", "Skydiving", "air", "jump_loop"],
+	"planar": ["planar", "glide", "Glide", "gliding", "Gliding", "parachute",
+		"wingsuit", "hover", "Hovering", "flying", "Flying"],
+	"pegar": ["pegar", "pickup", "Pickup", "pick_up", "Picking Up", "grab",
+		"Grab", "interact", "Interacting", "loot", "crouch_pickup"],
 }
 
 ## PRESETS DE MATERIAL — um shader so', quatro respostas de luz diferentes.
@@ -152,12 +179,26 @@ func _process(delta: float) -> void:
 
 # -------------------------------------------------------------------- contrato
 
+## O mago tem esta animacao? Quem for usar uma OPTIONAL_ANIMS pergunta antes,
+## para poder mudar o comportamento (ex.: nao prometer plan(e)io que nao existe).
+func has_anim(nome: String) -> bool:
+	var player := _active_player()
+	if player == null:
+		return false
+	return player.has_animation(_anim_name(nome))
+
+
 func play_anim(nome: String) -> void:
 	var player := _active_player()
 	if player == null:
 		_pending_anim = nome           # chamado antes de entrar na arvore
 		return
 	var anim := _anim_name(nome)
+	# Opcional ausente cai no substituto em silencio: o jogo nao pode ficar sem
+	# pose, e um warning por frame poluiria o console durante a queda inteira.
+	if not player.has_animation(anim) and ANIM_FALLBACK.has(nome):
+		nome = ANIM_FALLBACK[nome]
+		anim = _anim_name(nome)
 	if player.has_animation(anim):
 		player.play(anim, float(BLEND.get(nome, 0.15)))
 		if player == _external_player:
@@ -219,6 +260,13 @@ func get_mage_sheet() -> Dictionary:
 ## Fonte visual atual: "procedural" ou "external:<res://...glb>".
 func get_model_source() -> String:
 	return _model_source
+
+
+## O AnimationPlayer do .glb importado, ou null se o mago esta' no procedural.
+## Existe para FERRAMENTA e TESTE (o no' fica aninhado em profundidade que varia
+## conforme o exportador); o jogo fala com o Mage por play_anim().
+func get_animation_player_externo() -> AnimationPlayer:
+	return _external_player
 
 
 func get_model_report() -> Dictionary:
@@ -360,6 +408,9 @@ func _build() -> void:
 	lib.add_animation("idle", _anim_idle())
 	lib.add_animation("run", _anim_run())
 	lib.add_animation("cast", _anim_cast())
+	lib.add_animation("cair", _anim_cair())
+	lib.add_animation("planar", _anim_planar())
+	lib.add_animation("pegar", _anim_pegar())
 	_player.add_animation_library("", lib)
 	_anim_map = {"idle": "idle", "run": "run", "cast": "cast"}
 	_model_report = _make_model_report(self, _player, _model_source)
@@ -398,6 +449,7 @@ func _build_imported_model() -> bool:
 		push_warning("Mage: modelo '%s' tem cast curto demais; usando procedural" % path)
 		inst.free()
 		return false
+	_aplica_laco(player, aliases)
 	inst.name = "ExternalModel"
 	(inst as Node3D).rotation.y = MODEL_YAW   # ver MODEL_YAW: +Z do glTF -> -Z do Godot
 	add_child(inst)
@@ -412,6 +464,18 @@ func _build_imported_model() -> bool:
 
 func _anim_name(contract_name: String) -> String:
 	return _anim_map.get(contract_name, contract_name)
+
+
+## Liga o laco nas animacoes continuas do modelo externo. Ver ANIMS_EM_LACO.
+## A Animation vem do .glb IMPORTADO e e' compartilhada pelo cache de cenas —
+## por isso marcamos uma vez, na montagem, e nao a cada play().
+static func _aplica_laco(player: AnimationPlayer, aliases: Dictionary) -> void:
+	for contrato in ANIMS_EM_LACO:
+		if not aliases.has(contrato):
+			continue
+		var anim := player.get_animation(aliases[contrato])
+		if anim != null:
+			anim.loop_mode = Animation.LOOP_LINEAR
 
 
 static func _resolve_animation_aliases(player: AnimationPlayer) -> Dictionary:
@@ -779,6 +843,91 @@ func _robe_scale(k: float) -> Vector3:
 ##   ANTECIPACAO (0.0-0.10)     o corpo recua e o capuz puxa para tras
 ##   DISPARO     (0.22)         a mao abre — e' aqui que sai o projetil (cast_fired)
 ##   FOLLOW-THROUGH (0.32-0.55) o manto ULTRAPASSA e volta; o braco assenta depois
+## QUEDA LIVRE. Sem paraquedas e sem magia (ordem do Diretor): o corpo cai de
+## barriga para baixo, bracos abertos e joelhos dobrados, com a instabilidade de
+## quem NAO controla o ar. O manto e' o que mais denuncia a velocidade — ele
+## sobe e treme, em vez de acompanhar o corpo.
+func _anim_cair() -> Animation:
+	var a := _new_anim(1.1, true)
+	_tr(a, "Rig:rotation", [                                   # inclinado p/ frente, oscilando
+		[0.0, Vector3(-0.85, 0, 0.10)], [0.55, Vector3(-0.92, 0, -0.10)],
+		[1.1, Vector3(-0.85, 0, 0.10)]])
+	_tr(a, "Rig:position", [
+		[0.0, Vector3(0, 0.04, 0)], [0.55, Vector3(0, -0.02, 0)], [1.1, Vector3(0, 0.04, 0)]])
+	_tr(a, _P + "ArmL:rotation", [                             # bracos abertos e tremendo
+		[0.0, Vector3(-0.5, 0, -1.25)], [0.35, Vector3(-0.35, 0, -1.45)],
+		[0.75, Vector3(-0.55, 0, -1.30)], [1.1, Vector3(-0.5, 0, -1.25)]])
+	_tr(a, _P + "ArmR:rotation", [
+		[0.0, Vector3(-0.5, 0, 1.25)], [0.35, Vector3(-0.55, 0, 1.30)],
+		[0.75, Vector3(-0.35, 0, 1.45)], [1.1, Vector3(-0.5, 0, 1.25)]])
+	_tr(a, _P + "Head:rotation", [                             # olhando para o chao que vem
+		[0.0, Vector3(0.45, -0.05, 0)], [0.55, Vector3(0.5, 0.05, 0)],
+		[1.1, Vector3(0.45, -0.05, 0)]])
+	# manto SOBE: o ar empurra de baixo. E' o sinal mais legivel de velocidade.
+	_tr(a, "Rig/Hips/Robe:rotation", [
+		[0.0, Vector3(0.62, 0, -0.06)], [0.28, Vector3(0.70, 0, 0.05)],
+		[0.62, Vector3(0.58, 0, -0.05)], [1.1, Vector3(0.62, 0, -0.06)]])
+	_tr(a, "Rig/Hips/Robe:scale", [[0.0, _robe_scale(1.0)]])
+	_tr(a, _P + "ArmR/HandR:scale", [[0.0, Vector3.ONE]])
+	_tr(a, _P + "ArmL/HandL:scale", [[0.0, Vector3.ONE]])
+	return a
+
+
+## PLANEIO. O oposto da queda livre: o corpo ACHA o eixo. Menos amplitude, mais
+## alinhamento — bracos firmes e abertos, cabeca no horizonte, manto esticado
+## para tras como asa. O jogador tem que LER pelo corpo que ganhou controle,
+## sem depender de icone na tela.
+func _anim_planar() -> Animation:
+	var a := _new_anim(2.0, true)
+	_tr(a, "Rig:rotation", [
+		[0.0, Vector3(-1.05, 0, 0.035)], [1.0, Vector3(-1.09, 0, -0.035)],
+		[2.0, Vector3(-1.05, 0, 0.035)]])
+	_tr(a, "Rig:position", [
+		[0.0, Vector3(0, 0.02, 0)], [1.0, Vector3(0, 0.05, 0)], [2.0, Vector3(0, 0.02, 0)]])
+	_tr(a, _P + "ArmL:rotation", [                             # firmes: controle
+		[0.0, Vector3(-0.18, 0, -1.48)], [1.0, Vector3(-0.22, 0, -1.52)],
+		[2.0, Vector3(-0.18, 0, -1.48)]])
+	_tr(a, _P + "ArmR:rotation", [
+		[0.0, Vector3(-0.18, 0, 1.48)], [1.0, Vector3(-0.22, 0, 1.52)],
+		[2.0, Vector3(-0.18, 0, 1.48)]])
+	_tr(a, _P + "Head:rotation", [[0.0, Vector3(0.22, 0, 0)]])  # horizonte, nao o chao
+	_tr(a, "Rig/Hips/Robe:rotation", [                          # esticado, quase sem tremer
+		[0.0, Vector3(0.80, 0, -0.02)], [1.0, Vector3(0.84, 0, 0.02)],
+		[2.0, Vector3(0.80, 0, -0.02)]])
+	_tr(a, "Rig/Hips/Robe:scale", [[0.0, _robe_scale(1.0)]])
+	_tr(a, _P + "ArmR/HandR:scale", [[0.0, Vector3.ONE]])
+	_tr(a, _P + "ArmL/HandL:scale", [[0.0, Vector3.ONE]])
+	return a
+
+
+## PEGAR / ABRIR. Disparo unico, curto de proposito: o dedo aperta e o gesto
+## precisa terminar antes do proximo toque. Agacha, estende o braco direito e
+## volta. Serve tanto para item no chao quanto para canalizar o bau.
+func _anim_pegar() -> Animation:
+	var a := _new_anim(0.65, false)
+	_tr(a, "Rig:position", [                                   # agacha e volta
+		[0.0, Vector3.ZERO], [0.22, Vector3(0, -0.16, 0)],
+		[0.42, Vector3(0, -0.14, 0)], [0.65, Vector3.ZERO]])
+	_tr(a, "Rig:rotation", [
+		[0.0, Vector3.ZERO], [0.22, Vector3(0.22, 0, 0)],
+		[0.42, Vector3(0.20, 0, 0)], [0.65, Vector3.ZERO]])
+	_tr(a, _P + "ArmR:rotation", [                             # o braco que pega
+		[0.0, Vector3(0.04, 0, 0.14)], [0.24, Vector3(0.95, 0, 0.30)],
+		[0.44, Vector3(0.80, 0, 0.22)], [0.65, Vector3(0.04, 0, 0.14)]])
+	_tr(a, _P + "ArmL:rotation", [                             # o outro equilibra
+		[0.0, Vector3(0.04, 0, -0.14)], [0.24, Vector3(-0.25, 0, -0.30)],
+		[0.65, Vector3(0.04, 0, -0.14)]])
+	_tr(a, _P + "Head:rotation", [                             # olha para o que pega
+		[0.0, Vector3.ZERO], [0.24, Vector3(0.42, 0, 0)], [0.65, Vector3.ZERO]])
+	_tr(a, "Rig/Hips/Robe:rotation", [
+		[0.0, Vector3(0.006, 0, 0)], [0.26, Vector3(-0.10, 0, 0)],
+		[0.65, Vector3(0.006, 0, 0)]])
+	_tr(a, "Rig/Hips/Robe:scale", [[0.0, _robe_scale(1.0)]])
+	_tr(a, _P + "ArmR/HandR:scale", [[0.0, Vector3.ONE]])
+	_tr(a, _P + "ArmL/HandL:scale", [[0.0, Vector3.ONE]])
+	return a
+
+
 func _anim_cast() -> Animation:
 	var a := _new_anim(0.55, false)
 	_tr(a, _P + "ArmR:rotation", [

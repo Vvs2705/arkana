@@ -198,6 +198,21 @@ func _check_real_pyra_glb() -> void:
 	# O modelo do glTF olha para +Z; o jogo anda para -Z. Sem a meia-volta o
 	# personagem corre de costas e patina — foi o que o Diretor viu no aparelho
 	# em 25/08. Este teste fica VERMELHO se alguem tirar a correcao do Mage.gd.
+	# LACO: o importador glTF traz tudo com LOOP_NONE. Sem o conserto, "run"
+	# toca uns tres passos, congela e o corpo desliza — a patinacao relatada
+	# pelo Diretor em 25/08. "cast" NAO pode repetir: e' disparo unico e o
+	# cast_fired depende do fim dela. Este teste fica VERMELHO se o laco sumir.
+	var ap: AnimationPlayer = m.get_animation_player_externo()
+	if ap != null:
+		var nomes: Dictionary = report["animations"]
+		for contrato in ["idle", "run"]:
+			var a := ap.get_animation(nomes[contrato])
+			_check(a != null and a.loop_mode == Animation.LOOP_LINEAR,
+				"anim externa '%s' repete em laco" % contrato)
+		var ac := ap.get_animation(nomes["cast"])
+		_check(ac != null and ac.loop_mode != Animation.LOOP_LINEAR,
+			"anim externa 'cast' NAO repete (e' disparo unico)")
+
 	var externo := m.get_node_or_null("ExternalModel")
 	_check(externo != null, "modelo externo entra como no' 'ExternalModel'")
 	if externo != null:
