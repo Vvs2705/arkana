@@ -38,6 +38,8 @@ func _run() -> void:
 	_test_mobile_budget()
 	_test_shadow_budget()
 	_test_shadow_budget_defect_red()
+	_test_sombra_na_queda()
+	_test_sombra_na_queda_defect_red()
 	_test_look()
 	_test_fog_defect_red()
 	_test_materials()
@@ -112,10 +114,72 @@ func _test_shadow_budget() -> void:
 	_check(sun.shadow_enabled, "sol projeta sombra")
 	_check(sun.directional_shadow_mode == DirectionalLight3D.SHADOW_ORTHOGONAL,
 			"1 split ortogonal (PSSM redesenharia os casters 2-4x por frame)")
+	# O teto de 80m vale para o JOGO A PE'. Desde 26/08 o alcance sobe durante a
+	# queda (world/Sol.gd) — e o que esta' sendo cobrado aqui e' o REPOUSO, que e'
+	# onde o mago passa a partida e onde o texel fino importa.
 	_check(sun.directional_shadow_max_distance <= 80.0,
-			"alcance de sombra <= 80m (%0.0f) — o resto e' nevoa" % sun.directional_shadow_max_distance)
+			"alcance EM REPOUSO <= 80m (%0.0f) — o resto e' nevoa" % sun.directional_shadow_max_distance)
 	_check(sun.directional_shadow_fade_start < 1.0,
 			"sombra some em rampa, nao numa linha reta cortando a ilha")
+
+
+## A SOMBRA DURANTE A QUEDA (26/08). Defeito fotografado: com alcance fixo em
+## 60 m, a ilha vista do castelo a 200 m nao projetava UMA sombra — a mata e o
+## pico liam como mancha chapada justo na fase que abre a partida. O alcance
+## agora segue a altura (world/Sol.gd) e volta a 60 m no pouso.
+## A regra e' funcao PURA de proposito: da' para prova-la sem partida e sem Bus.
+func _test_sombra_na_queda() -> void:
+	print("[sombra acompanha a queda]")
+	var sol_script: GDScript = load("res://world/Sol.gd")
+	_check(sun.get_script() == sol_script, "o Sun da ilha carrega world/Sol.gd")
+	_check(is_equal_approx(sun.directional_shadow_max_distance, sol_script.PERTO),
+			"boota em repouso (%0.0fm)" % sol_script.PERTO)
+	# no chao e em altura invalida, fecha
+	for m in [0.0, -3.0, NAN]:
+		_check(is_equal_approx(sol_script.alcance_para(m), sol_script.PERTO),
+				"altura %s -> alcance de repouso (NaN e negativo barrados)" % m)
+	# subindo, abre — e nunca passa do teto
+	_check(sol_script.alcance_para(50.0) > sol_script.PERTO,
+			"a 50m de altura o alcance ja' passou dos 60m de repouso")
+	_check(sol_script.alcance_para(200.0) >= 300.0,
+			"a 200m (altura do castelo) o alcance cobre a ilha de 300m")
+	_check(is_equal_approx(sol_script.alcance_para(9999.0), sol_script.LONGE),
+			"o alcance tem teto (%0.0fm) — nao cresce sem fim" % sol_script.LONGE)
+	# monotonica: mais alto nunca da' menos sombra
+	var anterior := 0.0
+	for m in [0.0, 25.0, 60.0, 120.0, 200.0, 400.0]:
+		var a: float = sol_script.alcance_para(m)
+		_check(a >= anterior, "alcance nao diminui ao subir (%0.0fm -> %0.0fm)" % [m, a])
+		anterior = a
+
+	# PONTA A PONTA. Sem isto, apagar a linha que conecta o Bus deixaria todos os
+	# checks acima VERDES com a sombra morta no jogo — a regra existiria e nunca
+	# seria chamada. Aqui o sinal e' emitido de verdade e o sol tem que responder.
+	var bus: Node = root.get_node_or_null("Bus")
+	_check(bus != null, "autoload Bus presente (o sol escuta a queda por ele)")
+	if bus == null:
+		return
+	bus.queda_altura.emit(200.0, 40.0)
+	_check(sun.directional_shadow_max_distance > sol_script.PERTO,
+			"Bus.queda_altura(200m) ABRE o alcance de verdade (%0.0fm)"
+			% sun.directional_shadow_max_distance)
+	bus.queda_fase.emit("pousou")
+	_check(is_equal_approx(sun.directional_shadow_max_distance, sol_script.PERTO),
+			"Bus.queda_fase(pousou) FECHA de volta em %0.0fm" % sol_script.PERTO)
+
+
+## O defeito que este conserto apaga, refeito na mao: alcance CRAVADO em 60 m.
+## Com ele, a ilha inteira vista do castelo fica fora da sombra.
+func _test_sombra_na_queda_defect_red() -> void:
+	print("[defeito: alcance cravado durante a queda]")
+	var fixo := 60.0
+	var altura_do_castelo := 200.0
+	_check(fixo < altura_do_castelo,
+			"com alcance fixo em %0.0fm, a %0.0fm de altura NADA na ilha teria sombra"
+			% [fixo, altura_do_castelo])
+	var sol_script: GDScript = load("res://world/Sol.gd")
+	_check(sol_script.alcance_para(altura_do_castelo) > fixo,
+			"a regra nova cobre onde o alcance fixo nao chegava")
 
 
 ## Defeito medido: a config "de PC" (4 splits, 300m) roda no editor e mata o
