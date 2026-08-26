@@ -10,7 +10,9 @@
 # lavada, membro deformado pelo rig. Isso so' aparece quando o quadro e' OLHADO.
 #
 # Salva PNGs em user://shots_mago: um por angulo em repouso, mais um por
-# animacao obrigatoria (idle/run/cast) na pose media dela.
+# animacao do CONTRATO que o mago realmente tenha (as opcionais sao puladas
+# quando o modelo nao traz o clipe — foto de fallback nomeada como a animacao
+# de verdade seria uma mentira arquivada em PNG).
 extends Node3D
 
 const ANGULOS := [
@@ -104,11 +106,25 @@ func _ready() -> void:
 	var rad34 := deg_to_rad(35.0)
 	cam.position = Vector3(sin(rad34) * raio, alt * 0.75, -cos(rad34) * raio)
 	cam.look_at(alvo, Vector3.UP)
-	for nome in ["idle", "run", "cast"]:
-		if mago.has_method("play_anim"):
-			mago.play_anim(nome)
-			for i in 14:
-				await get_tree().process_frame
+	# TODAS as do contrato, nao so' as tres obrigatorias. A lista estava cravada
+	# em idle/run/cast e por isso a ferramenta nunca mostrou `cair`, `planar`,
+	# `pegar` nem `derrubado` — animacoes escritas a mao, em quadros-chave, que
+	# NINGUEM tinha olhado renderizadas. Calibrar no escuro nao funciona: e' a
+	# mesma licao que world/_shot.gd carrega no cabecalho.
+	# As opcionais so' entram se o mago TIVER o clipe (has_anim), senao a foto
+	# seria do fallback com o nome da animacao que nao existe — uma mentira
+	# arquivada em PNG.
+	var mage_scr: GDScript = load("res://characters/Mage.gd")
+	var lista: Array = ["idle", "run", "cast"] + Array(mage_scr.OPTIONAL_ANIMS)
+	for nome in lista:
+		if not mago.has_method("play_anim"):
+			continue
+		if nome in mage_scr.OPTIONAL_ANIMS and mago.has_method("has_anim") 				and not mago.has_anim(nome):
+			print("pula anim %s — este mago nao tem o clipe" % nome)
+			continue
+		mago.play_anim(nome)
+		for i in 14:
+			await get_tree().process_frame
 		await _renderiza("%s/%s_anim_%s.png" % [dir, _slug, nome])
 		print("shot anim ", nome)
 
@@ -128,23 +144,62 @@ func _renderiza(caminho: String) -> void:
 ## NAO tem fallback silencioso: um numero plausivel inventado no lugar de uma
 ## medicao que falhou e' pior que erro nenhum — foi assim que 1.70 apareceu para
 ## a Pyra E para o Brok, escondendo que um deles podia estar na escala errada.
+## Altura do personagem MONTADO, em metros.
+##
+## Media a MAIOR MALHA ISOLADA ate' 26/08, e isso so' funciona quando o corpo e'
+## uma malha so'. No mago PROCEDURAL o corpo tem 18 primitivas, a maior delas e'
+## o manto, e a ferramenta respondia 1,02 m para um mago de 1,83 m — o
+## enquadramento saia perto demais e CORTAVA A CABECA nas fotos de animacao.
+## Descoberto tentando julgar a pose de `derrubado`: eu nao conseguia dizer se o
+## mago estava caido ou de pe' porque a propria referencia estava errada.
+##
+## SAO DOIS CASOS, e nao ha' formula unica — tentei uma e ela quebrou o outro:
+##
+##   MALHA SKINADA (todo modelo da Meshy): quem desenha e' o ESQUELETO. O
+##   `global_transform` do MeshInstance3D nao participa do desenho e nao
+##   significa nada — medido em 26/08, multiplicar a caixa por ele devolveu
+##   0,018 m para a Pyra, que renderiza em 1,78. Aqui vale a caixa do RECURSO,
+##   crua: o rig da Meshy ja' assa a altura da ficha nela (Brok deu 1,40, que e'
+##   exatamente a ficha dele, conferido no olho com uma regua de 1 m).
+##
+##   MALHA COMUM (mago procedural): a caixa do recurso e' so' daquela peca. Aqui
+##   vale a UNIAO das caixas levadas para o espaco do personagem.
+##
+## `basis.get_scale()` continua PROIBIDO nos dois casos: num .glb da Meshy ele
+## devolveu (0.01, 0.01, 0.01) para um modelo do tamanho certo — base espelhada
+## do glTF faz a decomposicao mentir. Nada aqui decompoe base nenhuma.
 func _altura_visivel(no: Node) -> float:
 	var malhas := _malhas(no)
-	var topo := 0.0
+	var raiz := no as Node3D
+	var topo_skin := 0.0
+	var caixa := AABB()
+	var tem_comum := false
+	var n_skin := 0
 	for m in malhas:
-		# A altura sai da caixa do RECURSO Mesh, em pose de repouso, SEM passar
-		# pelo transform do no. Motivo medido em 25/08: num .glb da Meshy o
-		# global_transform.basis.get_scale() devolveu (0.01, 0.01, 0.01) para um
-		# modelo que renderiza no tamanho certo — base espelhada do glTF faz
-		# get_scale() mentir. A caixa do recurso deu 1,4 para o Brok, que e'
-		# exatamente a altura da ficha dele. Conferido no olho com uma regua de
-		# 1 m ao lado.
-		if m.mesh != null:
-			topo = maxf(topo, m.mesh.get_aabb().size.y)
-	print("  malhas medidas: %d  topo: %.3f m" % [malhas.size(), topo])
+		if m.mesh == null:
+			continue
+		if _e_skinada(m):
+			n_skin += 1
+			topo_skin = maxf(topo_skin, m.mesh.get_aabb().size.y)
+			continue
+		var local: AABB = m.get_aabb()
+		if raiz != null:
+			local = (raiz.global_transform.affine_inverse() * m.global_transform) * local
+		caixa = local if not tem_comum else caixa.merge(local)
+		tem_comum = true
+	var topo := maxf(topo_skin, caixa.size.y if tem_comum else 0.0)
+	print("  malhas medidas: %d (%d skinadas)  topo: %.3f m" % [malhas.size(), n_skin, topo])
 	if topo <= 0.05:
 		push_warning("_shot_mago: nao consegui medir a altura (%d malhas)" % malhas.size())
 	return topo
+
+
+## Skinada = desenhada pelo esqueleto. Duas perguntas porque o glTF pode trazer
+## so' uma das duas: o recurso de skin, ou o caminho para o Skeleton3D.
+func _e_skinada(m: MeshInstance3D) -> bool:
+	if m.skin != null:
+		return true
+	return m.skeleton != NodePath() and m.get_node_or_null(m.skeleton) is Skeleton3D
 
 
 func _malhas(no: Node) -> Array:

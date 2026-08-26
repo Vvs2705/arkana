@@ -51,7 +51,55 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 26/08/2026
+### >>> COMECE POR AQUI — 26/08/2026 (noite)
+
+**ACHADO QUE MUDA PRIORIDADE — leia antes de planejar arte 3D.**
+
+Lendo o JSON dos `.glb` direto: **a Pyra tem TRÊS animações** (idle, run, cast) e
+**o Brok tem CINCO** (Idle_02, Run_02, Running, Walking, mage_soell_cast).
+**Nenhum dos dois tem `cair`, `planar` nem `pegar`.** Nos modelos 3D reais essas
+animações caem no fallback: `pegar` vira `cast`, `cair` vira `idle`.
+
+Consequência: **os dois personagens "prontos" em 3D são os mais pobres em
+animação do elenco.** O gesto de agachar e a queda que o Diretor elogiou em
+26/08 são do **mago procedural**, que 18 dos 20 personagens rodam. Cada modelo
+novo da Meshy, do jeito que o pipeline está hoje, *piora* a expressividade em
+troca de melhorar a malha.
+
+**O que fazer com isso:** baixar os clipes que faltam da biblioteca de animação
+da Meshy (grátis no webapp, segundo `docs/MESHY.md`) e reexportar. Os aliases de
+`cair`/`planar`/`pegar`/`derrubado` já estão escritos em `Mage.gd` — no dia em
+que o clipe chegar com qualquer nome conhecido, ele é adotado sozinho.
+
+**O estado DERRUBADO agora tem corpo.** Antes o caído usava a animação de
+locomoção: rasteja devagar, cai no lado "idle" da histerese, e ficava **de pé e
+parado** no meio da partida. O aliado só descobria quem dava para reerguer pela
+HUD. Agora: corpo no chão, apoiado num braço, e a cabeça sobe uma vez por volta
+— o beat que diz "ainda dá tempo".
+- **Onde a decisão mora:** `Pawn.locomotion_anim()`. Player e Bot reescrevem a
+  animação todo frame; pedido feito de fora seria apagado no frame seguinte.
+  `ArmaSlot.gesto` resolve isso para gesto **transitório** (volta por relógio);
+  derrubado é **sustentado** e não tem quando voltar — estado sustentado se
+  resolve na fonte da decisão, não driblando ela.
+
+**Dois defeitos nas FERRAMENTAS, achados por usá-las:**
+1. `_shot_mago.gd` fotografava só idle/run/cast. As animações escritas à mão
+   (`cair`, `planar`, `pegar`) **nunca tinham sido olhadas renderizadas**.
+2. A altura do personagem era a **maior malha isolada** — respondia 1,02 m para
+   um mago de 1,83 m, e o enquadramento **cortava a cabeça**. Descoberto tentando
+   julgar a pose nova: não dava para dizer se o mago estava caído ou de pé porque
+   a régua estava errada. São dois casos e não há fórmula única: **malha skinada
+   é desenhada pelo esqueleto** e o `global_transform` dela não participa do
+   desenho (multiplicar por ele deu 0,018 m para a Pyra, que renderiza em 1,78).
+   Regressão conferida: Pyra 1,78 e Brok 1,40, exatamente as fichas.
+
+**A pose de `derrubado` foi reescrita DUAS vezes depois de fotografada** — a
+primeira afundava no terreno, a segunda lia como em pé. Calibrar no escuro não
+funciona; foi a régua consertada que permitiu acertar.
+
+---
+
+### >>> 26/08/2026 (dia)
 
 **Duas decisões suas foram tomadas e executadas hoje:**
 1. **PR #2 mesclado na `main`** (`f03f97e`). O CI rodou de verdade e passou —
