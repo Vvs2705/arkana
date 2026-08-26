@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://world/Island.gd" id="1_island"]
 [ext_resource type="Shader" path="res://world/sky.gdshader" id="2_sky"]
+[ext_resource type="Script" path="res://world/Sol.gd" id="3_sol"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("2_sky")
@@ -86,6 +87,11 @@ script = ExtResource("1_island")
 ; ORTOGONAL (1 split) de proposito: PSSM com 2 splits redesenha TODO o casters
 ; duas vezes por frame, e o ganho nao paga no ARM64. Com max_distance em 60m e
 ; atlas 2048 o texel sai ~6cm, o suficiente pro que o jogador olha.
+; 26/08: os 60m aqui sao o REPOUSO, com o mago no chao. Quem cai do castelo ve
+; a ilha de 200m de altura, e a 60m de alcance ela nao tinha UMA sombra — o
+; numero foi calibrado quando a ilha era 180m e ninguem caia do ceu. world/Sol.gd
+; abre o alcance junto com a altura e o fecha de volta ao pousar, mantendo o
+; texel fino no chao. Continua 1 split: nada disso reabre PSSM.
 ; fade_start 0.85: a sombra MORRE em rampa nos ultimos 15% em vez de cortar numa
 ; linha reta atravessando a ilha (o corte seco e' o defeito classico do PSSM).
 [node name="Sun" type="DirectionalLight3D" parent="."]
@@ -99,6 +105,7 @@ shadow_opacity = 0.92
 directional_shadow_mode = 0
 directional_shadow_max_distance = 60.0
 directional_shadow_fade_start = 0.85
+script = ExtResource("3_sol")
 
 [node name="Env" type="WorldEnvironment" parent="."]
 environment = SubResource("Env")

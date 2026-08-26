@@ -51,7 +51,75 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — auditoria externa executada (25/08/2026)
+### >>> COMECE POR AQUI — 26/08/2026
+
+**Duas decisões suas foram tomadas e executadas hoje:**
+1. **PR #2 mesclado na `main`** (`f03f97e`). O CI rodou de verdade e passou —
+   `12 selftests headless`, SUCCESS. Era a única coisa que nem você nem eu
+   tínhamos observado até então.
+2. **As 160 referências de arte foram para o Git LFS.** Elas existiam em UM lugar
+   só, sem cópia, desde que os .zip da entrega foram apagados na higienização.
+   Agora têm histórico e backup.
+   **O custo, dito de frente:** um clone limpo passou a puxar ~350 MB de LFS. A
+   cota gratuita do GitHub é 1 GB de armazenamento e 1 GB de banda por mês —
+   cabe, mas são ~3 clones limpos por mês. Se estourar: pacote de dados pago ou
+   storage externo. Não há terceira saída.
+
+**O que foi feito depois disso, na branch `feat/artes-em-lfs`:**
+
+**a) O Arkana passou a abrir com a cara dele.** Até hoje a PRIMEIRA coisa que o
+jogador via era o **logo do Godot** — `project.godot` não tinha nenhuma chave de
+`boot_splash`. E o ícone na gaveta era o retrato de corpo inteiro da Pyra num
+quadrado de 96 px. Agora os dois são o **Selo**, o mesmo pentágono da tela de
+título. *(Correção de registro: a nota antiga dizia que o ícone era o padrão do
+Godot. Não era. Conferido abrindo o APK.)*
+- **Como:** o Selo saiu de dentro de `Menu.gd` para `menu/Selo.gd`. Era classe
+  aninhada, e quem gera os PNG roda como `--script`, antes dos autoloads — um
+  preload de `Menu.gd` ali morre em "Identifier not found: Bus". `menu/_marca.gd`
+  renderiza os 4 PNG a partir desse mesmo Selo, para o desenho continuar tendo
+  um dono só. É ferramenta de ateliê, fora do APK.
+- **Por quê assim:** a alternativa era redesenhar o selo num editor de imagem —
+  e no dia em que você mudasse o dourado existiriam duas verdades divergindo em
+  silêncio.
+- A frente do ícone adaptativo sai em 64% do quadro: o Android mascara os
+  432×432 e só garante o miolo.
+
+**b) A sombra voltou a existir na fase que abre a partida.** Vista do castelo a
+200 m, a ilha inteira não projetava UMA sombra. `directional_shadow_max_distance`
+valia 60 m — calibrado quando a ilha tinha 180 m e ninguém caía do céu.
+- **Errei duas hipóteses antes de achar**, e ambas foram descartadas por medida:
+  o toon shader (cena de isolamento mostrou que ele recebe sombra igual ao
+  material padrão) e o balanço de energia (subir o sol de 1,55 para 4,5 clareou
+  tudo e não trouxe sombra nenhuma).
+- **O conserto não é aumentar o número:** o atlas tem 2048 px e cobre o alcance
+  inteiro. A 60 m o texel é ~6 cm; a 400 m vira ~20 cm e borra a sombra PERTO,
+  onde o jogador passa 95% da partida. `world/Sol.gd` faz o alcance **seguir a
+  altura** — abre no ar, fecha ao pousar. Um split só; nada reabre PSSM.
+- A ferramenta de calibragem também mentia: mantinha o sol em repouso nas
+  tomadas aéreas. Corrigida.
+
+**c) `docs/infra/` — a pasta técnica que você pediu.** Servidores, contas, custos
+e a regra dos 10+. Ela começa por um fato que muda todas as respostas: **o Arkana
+não tem uma linha de rede.** Nenhum `@rpc`, nenhum `multiplayer`, nenhum
+`HTTPRequest`. Contratar servidor hoje é alugar garagem para um carro que ainda
+não foi construído.
+- **O item que ATRASA o lançamento se ficar para o fim:** a conta de loja tem
+  verificação de identidade e período de teste fechado que se contam em
+  **semanas**. O relógio dela corre em paralelo ao desenvolvimento.
+- **Quatro decisões suas ficaram em aberto lá** (`04-DADOS-E-MENORES.md` §5):
+  conta de jogador, apelido visível, amizade/grupo, compra dentro do app.
+
+**Por que a Sintonia NÃO foi implementada, mesmo sendo o maior buraco:** o GDD §9
+trava — *"mudanças em combate, `Balance` e formato de partida dependentes de
+V1–V5 esperam o playtest humano do Roblox"*. Dar um parceiro ao jogador
+transforma 1×6 em 2×5: é mudança de formato. A mesma linha libera o que foi
+feito: *"personagens, ambientes, pipeline e apresentação do Godot podem
+avançar"*. A Sintonia já está inteira no Roblox (1.314 linhas) e o GDD §274 já
+decidiu o caso solo — falta o playtest, não o código.
+
+---
+
+### (25/08) — auditoria externa executada, mantida como histórico
 
 Um plano de auditoria em 12 tarefas foi executado na branch
 `chore/auditoria-organizacao-arkana`. **Nada foi mesclado na `main`.**

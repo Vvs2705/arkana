@@ -37,9 +37,17 @@ func _ready() -> void:
 	print("=== ORCAMENTO ===")
 	print("SIZE=%.0fm  geracao=%.0f ms" % [float(_isl.SIZE), gen_ms])
 	_print_static_budget()
+	var bus: Node = get_tree().root.get_node_or_null("Bus")
 	for s in _shots():
 		cam.position = s[1]
 		cam.look_at(s[2], Vector3.UP)
+		# A ferramenta fotografava um estado que o JOGO NUNCA TEM: o alcance da
+		# sombra segue a altura do jogador (world/Sol.gd), e aqui ele ficava
+		# sempre em repouso. Resultado: as tomadas aereas saiam sem uma sombra e
+		# a calibragem mentia justo na fase que abre a partida. Avisar a altura
+		# da CAMARA e' o que faz a foto valer como medida.
+		if bus != null:
+			bus.queda_altura.emit(maxf(s[1].y - float(_isl.height(s[1].x, s[1].z)), 0.0), 0.0)
 		for i in 6:
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw
