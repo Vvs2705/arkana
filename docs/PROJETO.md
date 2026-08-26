@@ -51,7 +51,32 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — as concept arts existem e estão validadas
+### >>> COMECE POR AQUI — o CASTELO 3D existe, e o site é a via oficial
+
+**26/08, fim de tarde — o primeiro modelo de cenário nasceu.** E uma ordem do
+Diretor mudou o processo no meio: *"quero ver todos os processos lá no site,
+a arte e tudo disponível na minha área de trabalho da plataforma"*.
+
+- **Verificado no navegador: tarefa de API NÃO aparece no workspace Meshy.**
+  A política nova está em DIRECAO.md §10.2: **peça-herói gera no WEBAPP, na
+  conta dele** (processo visível); API só para validação/scripts.
+- O castelo saiu pelas DUAS vias no mesmo dia (60 créditos ao todo, saldo
+  3.134): o do **site é o oficial** ("Aetherstone Citadel", 1,9 M tris,
+  texturizado, visível na galeria dele); o da API (30.917 tris) é backup e
+  candidato a base low-poly. Ambos em `cenario/01-castelo-voador/origem/`
+  (fora do git — a nuvem do oficial é a própria conta Meshy dele).
+- **Próximo passo do castelo:** Blender (decimar OU retopo com bake do
+  hi-poly) → `godot/world/modelos/castelo.glb` → pendurar em `Castelo.gd` →
+  FPS no aparelho. Detalhes em `cenario/01-castelo-voador/00-MODELO.md`.
+- **A repaginação do CHÃO tem plano e portões** (pergunta dele, respondida):
+  DIRECAO.md §10.1 — o chão é a 3ª onda, depois dos heróis e do FPS medido,
+  em três sub-ondas (árvores/pedras → splat do terreno → água), cada uma com
+  FPS antes/depois. Herói é um objeto; o chão é o mundo.
+- Fila do Meshy no site: **Luvas** (3 modelos) → **Baú**.
+
+---
+
+### (26/08, tarde — concept arts validadas, histórico)
 
 **O ciclo de arte fechou o primeiro loop completo** (26/08, tarde): prompts em
 `docs/prompts/` → o Diretor gerou 55 imagens no ChatGPT → validação contra os
