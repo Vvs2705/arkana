@@ -101,6 +101,7 @@ estao em [docs/ROBLOX.md](docs/ROBLOX.md) e
 | [docs/ANDROID.md](docs/ANDROID.md) | estado e pipeline Android atual |
 | [docs/MESHY.md](docs/MESHY.md) | concept art -> modelo 3D riggado, com custos medidos |
 | [docs/ART.md](docs/ART.md) | direcao visual e o que ainda nao foi decidido |
+| [docs/infra/](docs/infra/00-LEIA.md) | servidores, contas, custos e a regra dos 10+ — o que existe por tras do jogo |
 | [godot/ARQUITETURA.md](godot/ARQUITETURA.md) | contratos internos do jogo 3D |
 | [CHANGELOG.md](CHANGELOG.md) | marcos mantidos do projeto ativo |
 
