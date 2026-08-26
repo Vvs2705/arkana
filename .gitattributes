@@ -6,3 +6,15 @@ godot/characters/modelos/*.png filter=lfs diff=lfs merge=lfs -text
 godot/characters/modelos/*.PNG filter=lfs diff=lfs merge=lfs -text
 godot/characters/modelos/*.ktx2 filter=lfs diff=lfs merge=lfs -text
 godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text
+
+# Concept art dos 20 magos (8 vistas cada, 306 MB). Decisao do Diretor em
+# 26/08/2026: elas passam a viver NO repositorio, via LFS. Antes existiam em UM
+# lugar so' no disco dele, sem copia — os .zip da entrega foram apagados na
+# higienizacao apos conferencia MD5, e isso deixou a materia-prima da modelagem
+# 3D sem backup nenhum. LFS resolve o risco de perda e da' historico.
+# CUSTO REAL, para ninguem se surpreender: o repo passa a puxar ~350 MB de LFS
+# num clone limpo. A cota gratuita do GitHub e' 1 GB de armazenamento e 1 GB de
+# banda por mes — cabe, mas sao ~3 clones limpos por mes antes de estourar a
+# banda. Se estourar, a saida e' comprar data pack ou mover para storage externo.
+personagens/**/arte/_originais/*.png filter=lfs diff=lfs merge=lfs -text
+personagens/**/arte/_originais/*.PNG filter=lfs diff=lfs merge=lfs -text
