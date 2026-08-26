@@ -51,7 +51,47 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — a DIREÇÃO de 26/08 existe e manda
+### >>> COMECE POR AQUI — as fases da DIREÇÃO executadas (26/08, tarde)
+
+Ordem do Diretor: *"faça todas as fases necessárias"*. Quatro fases entraram,
+cada uma com teste provado em vermelho:
+
+**1. A Lei das Luvas.** Todo slot nascia com varinha — "desarmado" não existia
+no jogo. Agora TODOS caem de mãos nuas; sem luva não há ataque básico (tática/
+suprema são natas); o bot desarmado CAÇA a luva mais próxima (grupo
+`loot_arma`) e o auto-upgrade equipa na chegada; o player NÃO tem auto-pegar
+(decisão nº 5 — o botão vira TROCAR com luva na mão); loot pego de mãos nuas é
+CONSUMIDO (o swap deixaria "arma vazia" fantasma no chão). Nomes de exibição:
+Luva Comum / Luva de Conjurador / Manopla — ids internos intactos.
+
+**2. O lobby de TREINO** (decisão nº 19). Botão no menu; mesma cena da partida
+com pedido via static consumida no `_ready` do Main (sobrevive à troca de cena;
+o consumo impede herança — a prova em vermelho derrubou 5 testes em cascata sem
+ele). Sem zona, sem relógio, sem queda; as 3 luvas expostas no spawn; 2 bonecos
+que regeneram; suprema em 5 s. Tutorial não-obrigatório: fase futura.
+
+**3. O castelo cruza o céu VAZIO** (decisão nº 14). O corpo fica invisível de
+`_ready` até `saltar()` — surge do nada, sancionado. Vale para player e bots
+pelo mesmo caminho.
+
+**4. A água deixou de ser cenário.** Lâmina no peito (1,2 m) → nadar: 55% da
+velocidade no PRODUTO ÚNICO, corpo FLUTUA (gravidade não puxa ao leito). Sair
+= roupa encharcada (80% por 2,5 s). Quem responde onde há água é a ilha
+(`agua_y`), pelas MESMAS cotas que desenham a lâmina (agora constantes).
+**Pendente da água:** MERGULHAR para esconder (pede botão novo), atirar só na
+superfície, animação de nado.
+
+**Ainda sem código, da DIREÇÃO:** braço ergue/abaixa + recarga da luva
+(animação); bots usando tática/suprema; sons de passos/respiração (os canais de
+percepção já existem — falta o áudio); tutorial básico.
+
+**Armadilha de teste registrada:** `queue_free()` num Main de teste deixa a
+ilha REAL viva (adiada) no grupo "ilha" até o fim do frame — o teste seguinte
+pergunta a lâmina para a ilha errada. Em teste, `free()` imediato.
+
+---
+
+### (26/08, meio-dia — a DIREÇÃO nasce, histórico)
 
 O Diretor respondeu a entrevista de 20 perguntas sobre luvas, habilidades,
 castelo, água e bots. **Tudo está em [DIRECAO.md](DIRECAO.md)** — até ele colar
