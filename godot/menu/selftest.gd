@@ -10,7 +10,9 @@
 ##   4. a selecao lista os 20, marca EM BREVE so nos 11-20, abre e fecha o perfil;
 ##   5. Configuracoes tem as 4 abas do GDD par.12, um "Restaurar padrao" por aba,
 ##      e settings.json sobrevive a ida e volta ao disco (inclusive corrompido);
-##   6. JOGAR emite Bus.game_start_requested SEM trocar de cena.
+##   6. JOGAR emite Bus.game_start_requested SEM trocar de cena;
+##   7. a MARCA existe e esta' ligada: o Selo na tela de titulo, e os PNG de
+##      icone/splash que o motor e o Android carregam por caminho em texto.
 ##
 ## NOTA (mesma do gameplay/selftest.gd): em modo --script os autoloads so'
 ## registram DEPOIS deste arquivo compilar — Bus chega via get_node no 1o frame.
@@ -37,6 +39,7 @@ func _run() -> void:
 	_check(menu is Control, "cena instancia com raiz Control")
 
 	_teste_botoes(menu)
+	_teste_marca(menu)
 	_teste_area_segura(menu)
 	_teste_ficha_elenco()
 	_teste_selecao(menu)
@@ -60,6 +63,49 @@ func _teste_botoes(menu: Control) -> void:
 		if b != null:
 			_check(b.custom_minimum_size.y >= min48,
 				"%s >= 48dp (%.0fpx >= %.0fpx)" % [nome, b.custom_minimum_size.y, min48])
+
+
+# --- a marca: o selo na tela, e os PNG que icone e splash carregam ---------
+# Ate' 26/08 NADA aqui cobria o selo. Ele saiu de dentro de Menu.gd para
+# menu/Selo.gd naquele dia, e o portao teria ficado verde mesmo se a tela de
+# titulo tivesse voltado vazia. Estes cinco checks foram provados em vermelho
+# tirando o selo da tela e apagando o PNG.
+#
+# Os caminhos de icone e splash vivem como TEXTO em project.godot e
+# export_presets.cfg: ninguem compila, ninguem avisa. Um arquivo renomeado vira
+# icone padrao do Godot no aparelho do Diretor, sem uma linha de erro. Por isso
+# o teste le' o disco em vez de confiar na configuracao.
+func _teste_marca(menu: Control) -> void:
+	var titulo: Control = menu.find_child("Titulo", false, false)
+	var selo: Node = null
+	if titulo != null:
+		for n in titulo.find_children("*", "Control", true, false):
+			var s: Script = n.get_script()
+			if s != null and s.resource_path == "res://menu/Selo.gd":
+				selo = n
+				break
+	_check(selo != null, "tela de titulo tem o Selo (menu/Selo.gd)")
+	if selo != null:
+		_check(selo.get_child_count() > 0 and selo.get_child(0) is Label
+			and (selo.get_child(0) as Label).text == "A",
+			"o Selo carrega o 'A' dourado no centro")
+
+	# FileAccess, nao ResourceLoader: apagar o PNG e deixar o .import para tras
+	# NAO derruba ResourceLoader.exists() — ele acha o .ctex ja' importado em
+	# .godot/imported/ e responde "existe". Medido em 26/08: com esta checagem
+	# escrita com ResourceLoader, apagar selo-432.png manteve o teste VERDE.
+	# Este selftest so' roda a partir da pasta do projeto, onde o PNG cru esta'
+	# em disco; num APK exportado so' existiria o .ctex, e a pergunta seria outra.
+	for peca in ["icone-192", "selo-432", "fundo-432", "splash-512"]:
+		_check(FileAccess.file_exists("res://menu/art/marca/%s.png" % peca),
+			"marca: %s.png existe (gere com menu/_marca.gd)" % peca)
+
+	_check(ProjectSettings.get_setting("application/config/icon", "")
+		== "res://menu/art/marca/icone-192.png",
+		"project.godot aponta o icone para a marca")
+	_check(ProjectSettings.get_setting("application/boot_splash/image", "")
+		== "res://menu/art/marca/splash-512.png",
+		"project.godot tem splash PROPRIA (sem ela o jogador ve o logo do Godot)")
 
 
 # --- area segura: nenhuma tela de conteudo encosta na borda crua ------------

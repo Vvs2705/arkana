@@ -7,7 +7,19 @@ config/name="Arkana"
 ; A porta de entrada e' o MENU (R18) — a partida e' carregada pelo botao JOGAR.
 run/main_scene="res://menu/Menu.tscn"
 config/features=PackedStringArray("4.4", "Mobile")
-config/icon="res://menu/art/01.png"
+; MARCA (26/08). O icone era o RETRATO da Pyra: um corpo inteiro espremido num
+; quadrado de 96 px, ilegivel na gaveta do aparelho e amarrado a UM personagem
+; num jogo de 20. Agora e' o Selo — o mesmo desenho da tela de titulo, gerado
+; por menu/_marca.gd a partir de menu/Selo.gd, para nunca divergir dele.
+config/icon="res://menu/art/marca/icone-192.png"
+; ABERTURA. Sem estas linhas o motor mostra o LOGO DO GODOT: ate' 26/08 a
+; primeira coisa que o jogador via ao abrir o Arkana nao era o Arkana.
+; bg_color e' Estilo.NOITE_FUNDA (#05070F), o mesmo fundo da tela de titulo,
+; para a splash emendar no menu sem piscar cor.
+boot_splash/bg_color=Color(0.0196, 0.0275, 0.0588, 1)
+boot_splash/image="res://menu/art/marca/splash-512.png"
+boot_splash/fullsize=false
+boot_splash/use_filter=true
 
 [autoload]
 Balance="*res://core/Balance.gd"
