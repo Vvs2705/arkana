@@ -272,6 +272,26 @@ func _check_real_pyra_glb() -> void:
 	_check(m.get_anim_length("cast") > m.get_cast_fire_time(),
 		"pyra.glb real tem cast sincronizavel")
 
+	# METAL DOMADO (video do Diretor, 26/08: a personagem anda como SILHUETA
+	# PRETA pela ilha). O PBR da Meshy traz metallic alto, e metal e' quase todo
+	# reflexo: sem reflection probe o renderer mobile devolve breu. O Mage
+	# grampeia metallic <= 0.2 e roughness >= 0.45 na importacao. VERMELHO se
+	# alguem remover o _domar_pbr.
+	var pior_metal := 0.0
+	var pilha: Array = [m]
+	while not pilha.is_empty():
+		var n: Node = pilha.pop_back()
+		for c in n.get_children():
+			pilha.append(c)
+		if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+			var mi := n as MeshInstance3D
+			for s in mi.mesh.get_surface_count():
+				var mat := mi.mesh.surface_get_material(s)
+				if mat is StandardMaterial3D:
+					pior_metal = maxf(pior_metal, (mat as StandardMaterial3D).metallic)
+	_check(pior_metal <= 0.21,
+		"metallic grampeado p/ mobile sem probe (pior: %.2f)" % pior_metal)
+
 	# O modelo do glTF olha para +Z; o jogo anda para -Z. Sem a meia-volta o
 	# personagem corre de costas e patina — foi o que o Diretor viu no aparelho
 	# em 25/08. Este teste fica VERMELHO se alguem tirar a correcao do Mage.gd.

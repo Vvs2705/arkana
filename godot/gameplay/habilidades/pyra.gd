@@ -104,7 +104,11 @@ static func estado_acabou(k: KitRunner, nome: String) -> void:
 	k.tatica_cd = maxf(k.tatica_cd, float(s.esfria_dur))
 	k.avisar_cd("tatica", k.tatica_cd)
 	k.buff_velocidade(float(s.esfria_vel), float(s.esfria_dur))
-	k.avisar_estado("braco_frio", true)
+	# LIGAR_ESTADO, nunca avisar_estado direto: o aviso cru liga o chip da HUD
+	# e NINGUEM desliga — no video do Diretor (26/08) "BRACO FRIO" ficou preso
+	# na tela do segundo 2 ao 55. Pelo relogio de estados ele expira sozinho e
+	# a HUD recebe o desligamento pela mesma borda de sempre.
+	k.ligar_estado("braco_frio", float(s.esfria_dur))
 
 
 static func dano_recebido(_k: KitRunner, _quanto: float, _el: String) -> void:

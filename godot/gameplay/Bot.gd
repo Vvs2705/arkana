@@ -186,12 +186,18 @@ func _shoot() -> void:
 	# precisam ser aplicadas aos bots" — o Diretor, 26/08).
 	if not ArmaSlot.armado_de(self):
 		return
-	_fire_cd = float(ArmaSlot.spec_de(self, element).fire_rate) * FIRE_RATE_MULT
+	# O elemento e' o da LUVA equipada (DIRECAO.md §1) — o sorteado no _ready
+	# virou so' fallback de pawn sem slot.
+	var slot := ArmaSlot.de(self)
+	var el: String = element if slot == null else slot.elemento_do_disparo(element)
+	_fire_cd = float(ArmaSlot.spec_de(self, el).fire_rate) * FIRE_RATE_MULT
 	_cast = 0.3
 	var from := global_position + Vector3(0, 1.4, 0)
 	var to := target.global_position + Vector3(0, 1.2, 0)
 	var dir := (to - from).normalized().rotated(Vector3.UP, randf_range(-AIM_SPREAD, AIM_SPREAD))
-	Projectile.launch(get_parent(), self, from + dir * 0.9, dir, element)
+	Projectile.launch(get_parent(), self, from + dir * 0.9, dir, el)
+	if visual != null and visual.has_method("play_anim"):
+		visual.play_anim("cast")  # retrigger por tiro — mesmo motivo do Player
 	anim("cast")
 
 

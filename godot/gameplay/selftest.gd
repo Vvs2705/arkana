@@ -82,6 +82,7 @@ func _run() -> void:
 	_test_lei_das_luvas_no_bot()
 	_test_treino()
 	_test_agua()
+	_test_elemento_na_luva()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -223,6 +224,54 @@ func _test_bot_death() -> void:
 	_check(_died.size() == 1 and _died[0] == b, "Bus.entity_died emitido")
 	_check(not b.is_physics_processing(), "bot morto para de agir")
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
+
+
+## O ELEMENTO MORA NA LUVA (26/08 — DIRECAO.md §1: "cada luva tem sua cor e
+## seu elemento proprio"). Vermelho provado revertendo o equipar sem elemento.
+func _test_elemento_na_luva() -> void:
+	print("[Luvas: o elemento e' da luva, nao do carrossel]")
+	var slot_scr: GDScript = load("res://gameplay/ArmaSlot.gd")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var arena := Node3D.new()
+	root.add_child(arena)
+	var pawn := Node3D.new()
+	arena.add_child(pawn)
+	var slot: Node3D = slot_scr.new()
+	pawn.add_child(slot)
+
+	var luva: Node3D = loot_scr.criar("varinha", PackedStringArray(), "water")
+	arena.add_child(luva)
+	luva.pegar(slot)
+	_check(str(slot.elemento) == "water", "pegar leva o ELEMENTO da luva junto")
+	_check(slot.elemento_do_disparo("fire") == "water",
+			"o disparo sai com o elemento DA LUVA — o carrossel nao manda mais")
+	_check(Array(slot.elementos("fire")) == ["water"],
+			"weapon_equipped anuncia o elemento travado para a HUD")
+
+	# TROCA: a luva do chao guarda o proprio elemento; a que desce tambem
+	var outra: Node3D = loot_scr.criar("cajado", PackedStringArray(), "earth")
+	arena.add_child(outra)
+	outra.pegar(slot)
+	_check(str(slot.elemento) == "earth", "trocou: a nova luva impoe o elemento dela")
+	_check(str(outra.arma_id) == "varinha" and str(outra.elemento) == "water",
+			"a velha ficou no chao COM o elemento dela — o swap viaja completo")
+
+	# o espalhar oferece VARIEDADE deterministica
+	var ilha_scr := GDScript.new()
+	ilha_scr.source_code = "extends Node3D\nfunc height(_x: float, _z: float) -> float:\n\treturn 3.0\n"
+	ilha_scr.reload()
+	var ilha: Node3D = ilha_scr.new()
+	arena.add_child(ilha)
+	var mapa := Node3D.new()
+	arena.add_child(mapa)
+	loot_scr.espalhar(mapa, ilha)
+	var vistos := {}
+	for n in mapa.get_children():
+		if n.get_script() == loot_scr:
+			vistos[str(n.elemento)] = true
+	_check(vistos.size() >= 3,
+			"o loot da ilha cicla elementos (%d distintos) — quem quer um, ANDA" % vistos.size())
+	arena.queue_free()
 
 
 ## A AGUA (26/08 — DIRECAO.md §3): peito coberto = nadar (devagar, flutuando

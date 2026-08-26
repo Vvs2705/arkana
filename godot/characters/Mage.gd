@@ -211,6 +211,15 @@ func play_anim(nome: String) -> void:
 		nome = ANIM_FALLBACK[nome]
 		anim = _anim_name(nome)
 	if player.has_animation(anim):
+		# DISPARO CONTINUO (queixa do Diretor, 26/08: "ao lancar magia o boneco
+		# balanca a mao para cima e fica por isso"): pedir a MESMA animacao de
+		# tiro unico enquanto ela toca nao fazia nada — play() com o clipe
+		# corrente nao reinicia — e no fim o clipe congelava no ultimo quadro,
+		# braco no ar, ate' o proximo TROCAR de nome. Um-so-disparo pedido de
+		# novo agora REINICIA; as de laco continuam intocadas.
+		if not (nome in ANIMS_EM_LACO) and player.current_animation == anim \
+				and player.is_playing():
+			player.stop()
 		player.play(anim, float(BLEND.get(nome, 0.15)))
 		if player == _external_player:
 			# PEDIDO, nunca o substituto. "pegar" cai em "cast" nos modelos que
@@ -466,6 +475,7 @@ func _build_imported_model() -> bool:
 		inst.free()
 		return false
 	_aplica_laco(player, aliases)
+	_domar_pbr(inst)
 	inst.name = "ExternalModel"
 	(inst as Node3D).rotation.y = MODEL_YAW   # ver MODEL_YAW: +Z do glTF -> -Z do Godot
 	add_child(inst)
@@ -485,6 +495,31 @@ func _anim_name(contract_name: String) -> String:
 ## Liga o laco nas animacoes continuas do modelo externo. Ver ANIMS_EM_LACO.
 ## A Animation vem do .glb IMPORTADO e e' compartilhada pelo cache de cenas —
 ## por isso marcamos uma vez, na montagem, e nao a cada play().
+## METAL DA MESHY NO MOBILE (26/08). O PBR dos modelos vem com mapa metallic,
+## e metal e' quase todo REFLEXO: sem reflection probe (nao ha' nenhuma — e nao
+## cabe no orcamento), o renderer mobile devolve breu. No video do Diretor a
+## personagem anda como uma SILHUETA PRETA pela ilha inteira. Grampear o fator
+## metallic devolve o difuso; o brilho "de metal" que sobrevive e' o specular
+## comum, que nao depende de probe. Roughness ganha piso pelo mesmo motivo.
+static func _domar_pbr(raiz: Node) -> void:
+	var pilha: Array = [raiz]
+	while not pilha.is_empty():
+		var n: Node = pilha.pop_back()
+		for c in n.get_children():
+			pilha.append(c)
+		if not (n is MeshInstance3D):
+			continue
+		var mi := n as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(s)
+			if m is StandardMaterial3D:
+				var sm := m as StandardMaterial3D
+				sm.metallic = minf(sm.metallic, 0.2)
+				sm.roughness = maxf(sm.roughness, 0.45)
+
+
 static func _aplica_laco(player: AnimationPlayer, aliases: Dictionary) -> void:
 	for contrato in ANIMS_EM_LACO:
 		if not aliases.has(contrato):

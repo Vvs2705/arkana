@@ -16,6 +16,12 @@ const TITULO_TOQUE := "TOQUE PARA COMEÇAR"
 # ---------------------------------------------------------------- menu principal
 const MENU_JOGAR := "JOGAR"
 const MENU_TREINO := "TREINO"
+## Pausa em partida (GDD §12: ESC -> PAUSA). Pedido do Diretor em 26/08: um
+## icone no canto superior direito abre as configuracoes DENTRO do jogo.
+const HUD_PAUSA := "II"
+const PAUSA_TITULO := "PAUSA"
+const PAUSA_RETOMAR := "RETOMAR"
+const PAUSA_ABANDONAR := "ABANDONAR PARTIDA"
 const MENU_PERSONAGENS := "PERSONAGENS"
 const MENU_CONFIG := "CONFIGURAÇÕES"
 const MENU_SAIR := "SAIR"

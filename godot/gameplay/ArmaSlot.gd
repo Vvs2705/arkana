@@ -27,6 +27,11 @@ const META_GESTO := "gesto_pegar_inicio"
 ## e ninguem jamais estava desarmado — a Lei das Luvas nao existia no codigo.
 var arma_id := ""
 var par: PackedStringArray = PackedStringArray()  # so' a manopla usa
+## O ELEMENTO DA LUVA (26/08 — DIRECAO.md §1: "cada luva tem sua cor e seu
+## elemento proprio"). Vazio = luva legada sem elemento (testes antigos): o
+## disparo cai no elemento escolhido, como antes. A manopla ignora isto — o
+## par fixo dela continua mandando.
+var elemento := ""
 ## Pega sozinho quando o loot e' de tier ESTRITAMENTE melhor. E' o que faz o
 ## loop funcionar hoje, sem a HUD: ninguem recusa um upgrade. O prompt do Bus
 ## continua saindo para o botao "PEGAR" cobrir sidegrade/downgrade.
@@ -87,6 +92,8 @@ func dados() -> Dictionary:
 
 
 func elementos(escolhido: String) -> PackedStringArray:
+	if int(Arma.dados(arma_id).elementos) <= 1 and elemento != "":
+		return PackedStringArray([elemento])
 	return Arma.elementos_de(arma_id, par, escolhido)
 
 
@@ -95,18 +102,23 @@ func elementos(escolhido: String) -> PackedStringArray:
 ## simultaneos" vira coisa que o dedo sente, sem inventar UI nova.
 func elemento_do_disparo(escolhido: String) -> String:
 	var els := elementos(escolhido)
-	if els.size() < 2:
-		return escolhido
-	_alt = (_alt + 1) % els.size()
-	return els[_alt]
+	if els.size() >= 2:
+		_alt = (_alt + 1) % els.size()
+		return els[_alt]
+	# A LUVA MANDA (26/08): quem tem elemento proprio dispara ELE, nao o do
+	# carrossel. Luva sem elemento (legado/teste) segue o escolhido.
+	return elemento if elemento != "" else escolhido
 
 
-## Troca a arma ativa. p_par so' importa para a manopla (par fixo, sem troca).
-func equipar(id: String, p_par: PackedStringArray = PackedStringArray()) -> void:
+## Troca a arma ativa. p_par so' importa para a manopla (par fixo, sem troca);
+## p_elemento e' o elemento DA LUVA (fica nela, viaja com ela no swap).
+func equipar(id: String, p_par: PackedStringArray = PackedStringArray(),
+		p_elemento := "") -> void:
 	if not Arma.existe(id):
 		return
 	arma_id = id
 	par = p_par
+	elemento = p_elemento
 	_alt = 0
 	_montar_visual()
 	var d := dados()
@@ -216,58 +228,106 @@ func _montar_visual() -> void:
 		_modelo.queue_free()
 	if arma_id == "":
 		return  # maos nuas: nenhum modelo na mao — a ausencia E' a leitura
-	_modelo = modelo(arma_id)
+	_modelo = modelo(arma_id, elemento)
 	_modelo.position = MAO_OFFSET
 	add_child(_modelo)
 
 
 ## MODELO PROCEDURAL da arma (zero binario — regra do projeto). Primitivas da
-## engine, nada de malha em disco. COR + FORMA (GDD §10): a silhueta sozinha
-## ja' diz o tier, mesmo em preto e branco.
-##   varinha -> bastao curto e fino com ponta redonda
-##   cajado  -> bastao longo com cristal facetado no topo
-##   manopla -> punho fechado + 3 dedos, e o BRILHO NAS MAOS que o GDD exige
-##              como contrapartida do poder (denuncia o portador)
-static func modelo(arma_id_: String) -> Node3D:
+## engine, nada de malha em disco.
+##
+## 26/08 (queixa do Diretor no teste: "ainda temos varinhas e bastoes na tela,
+## precisa mudar tudo para luvas"): os tres tiers viraram LUVAS — punho, dorso,
+## dedos. A COR vem do ELEMENTO da luva (DIRECAO.md §1: cor+elemento proprios);
+## a FORMA diz o tier: punho curto (comum), punho longo com nos de cristal
+## (conjurador), placas grossas com 2 gemas (manopla — o brilho alto continua
+## sendo o tell do GDD §16.2). Modelo definitivo vem do Meshy (DIRECAO §10,
+## peca no 2); este e' o procedural que segura a leitura ate' la'.
+static func modelo(arma_id_: String, elemento_ := "") -> Node3D:
 	var n := Node3D.new()
 	n.name = "ModeloArma"
-	var c := Arma.cor(arma_id_)
+	var c := Projectile.tint(elemento_) if elemento_ != "" else Arma.cor(arma_id_)
 	match arma_id_:
 		"cajado":
-			_haste(n, 0.045, 1.55, Color("6b5136"))
-			var cristal := MeshInstance3D.new()
-			var pr := PrismMesh.new()
-			pr.size = Vector3(0.26, 0.34, 0.26)
-			cristal.mesh = pr
-			cristal.position.y = 0.92
-			cristal.material_override = mat_brilho(c, 3.0)
-			n.add_child(cristal)
+			_luva(n, c, 1)
 		"manopla":
-			var punho := MeshInstance3D.new()
-			var bx := BoxMesh.new()
-			bx.size = Vector3(0.19, 0.20, 0.15)
-			punho.mesh = bx
-			punho.material_override = mat_brilho(c, 4.0)  # brilho ALTO: o tell do GDD
-			n.add_child(punho)
-			for i in 3:  # 3 dedos: silhueta de punho, sem copiar simbolo nenhum
-				var dedo := MeshInstance3D.new()
-				var d := BoxMesh.new()
-				d.size = Vector3(0.05, 0.055, 0.13)
-				dedo.mesh = d
-				dedo.position = Vector3(-0.06 + 0.06 * float(i), 0.13, 0.01)
-				dedo.material_override = mat_brilho(c, 4.0)
-				n.add_child(dedo)
+			_luva(n, c, 2)
 		_:
-			_haste(n, 0.032, 0.72, Color("5c4a3a"))
-			var ponta := MeshInstance3D.new()
-			var sp := SphereMesh.new()
-			sp.radius = 0.075
-			sp.height = 0.15
-			ponta.mesh = sp
-			ponta.position.y = 0.40
-			ponta.material_override = mat_brilho(c, 2.2)
-			n.add_child(ponta)
+			_luva(n, c, 0)
 	return n
+
+
+## A luva em primitivas: punho (cilindro), dorso (caixa), 4 dedos + polegar.
+## `tier` muda silhueta e brilho — nunca so' a cor (GDD §10).
+static func _luva(parent: Node3D, cor: Color, tier: int) -> void:
+	var couro := Color("3a3230")
+	var brilho: float = [1.6, 2.4, 4.0][tier]
+	# punho/cano — mais longo por tier
+	var cuff := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = 0.055
+	cy.bottom_radius = 0.062 + 0.012 * float(tier)
+	cy.height = 0.10 + 0.05 * float(tier)
+	cuff.mesh = cy
+	cuff.material_override = mat_brilho(cor.darkened(0.45), brilho * 0.3)
+	parent.add_child(cuff)
+	# dorso da mao
+	var dorso := MeshInstance3D.new()
+	var bx := BoxMesh.new()
+	bx.size = Vector3(0.085, 0.10, 0.045 + 0.012 * float(tier))
+	dorso.mesh = bx
+	dorso.position.y = 0.10
+	dorso.material_override = mat_brilho(couro.lerp(cor, 0.25), brilho * 0.4)
+	parent.add_child(dorso)
+	# 4 dedos
+	for i in 4:
+		var dedo := MeshInstance3D.new()
+		var d := BoxMesh.new()
+		d.size = Vector3(0.018, 0.055, 0.02)
+		dedo.mesh = d
+		dedo.position = Vector3(-0.030 + 0.020 * float(i), 0.175, 0.0)
+		dedo.material_override = mat_brilho(couro.lerp(cor, 0.2), brilho * 0.35)
+		parent.add_child(dedo)
+	# polegar
+	var pol := MeshInstance3D.new()
+	var pd := BoxMesh.new()
+	pd.size = Vector3(0.02, 0.045, 0.02)
+	pol.mesh = pd
+	pol.position = Vector3(0.052, 0.115, 0.008)
+	pol.rotation.z = -0.5
+	pol.material_override = mat_brilho(couro.lerp(cor, 0.2), brilho * 0.35)
+	parent.add_child(pol)
+	# a RUNA no dorso: a cor do elemento acesa — e' o que se le' de longe
+	var runa := MeshInstance3D.new()
+	var rp := PrismMesh.new()
+	rp.size = Vector3(0.045, 0.045, 0.012)
+	runa.mesh = rp
+	runa.position = Vector3(0, 0.105, 0.034 + 0.008 * float(tier))
+	runa.rotation.x = PI / 2.0
+	runa.material_override = mat_brilho(cor, brilho)
+	parent.add_child(runa)
+	if tier >= 1:
+		# nos de cristal do conjurador (e da manopla) sobre os dedos
+		for i in 4:
+			var no_ := MeshInstance3D.new()
+			var np := PrismMesh.new()
+			np.size = Vector3(0.016, 0.02, 0.016)
+			no_.mesh = np
+			no_.position = Vector3(-0.030 + 0.020 * float(i), 0.21, 0.0)
+			no_.material_override = mat_brilho(cor, brilho)
+			parent.add_child(no_)
+	if tier >= 2:
+		# as 2 gemas da manopla: os DOIS elementos, visiveis (o portador se
+		# denuncia — limitador do GDD §16.2)
+		for i in 2:
+			var gema := MeshInstance3D.new()
+			var g := SphereMesh.new()
+			g.radius = 0.022
+			g.height = 0.04
+			gema.mesh = g
+			gema.position = Vector3(-0.022 + 0.045 * float(i), 0.06, 0.035)
+			gema.material_override = mat_brilho(cor, 5.0)
+			parent.add_child(gema)
 
 
 static func _haste(parent: Node3D, raio: float, alt: float, cor: Color) -> void:

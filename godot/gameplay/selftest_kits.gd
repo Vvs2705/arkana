@@ -334,6 +334,13 @@ func _test_pyra() -> void:
 	_check(k.tatica_cd >= float(s.esfria_dur) - 0.15, "⚖️ braco frio: %.0fs sem tatica"
 			% float(s.esfria_dur))
 	_check(not k.pronto_tatica(), "⚖️ tatica realmente bloqueada com o braco frio")
+	# O CHIP DESLIGA (video do Diretor, 26/08: BRACO FRIO preso na tela do
+	# segundo 2 ao 55). Pelo relogio de estados ele expira e avisa a HUD.
+	_check(k.estado_ativo("braco_frio"), "braco_frio esta' no RELOGIO de estados")
+	_andar(k, float(s.esfria_dur) + 0.2)
+	_check(not k.estado_ativo("braco_frio"), "braco_frio EXPIRA sozinho")
+	_check(_tem_estado("braco_frio", false),
+			"e a HUD recebe o DESLIGAMENTO — o chip nao fica preso na tela")
 	k._physics_process(0.05)
 	_check(is_equal_approx(float(p.status_mult), float(s.esfria_vel)),
 			"⚖️ braco frio: -15%% de velocidade")

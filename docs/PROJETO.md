@@ -51,7 +51,53 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — as fases da DIREÇÃO executadas (26/08, tarde)
+### >>> COMECE POR AQUI — o vídeo do Diretor avaliado, e o que ele rendeu
+
+O Diretor testou o APK 12:20 e mandou vídeo (55 s, treino). **Quatro defeitos
+reais saíram dele, três já corrigidos com teste vermelho:**
+
+1. **"BRAÇO FRIO" preso na tela** (do segundo 2 ao 55). Causa: a Pyra ligava o
+   chip com `avisar_estado` direto — fora do relógio de estados, ninguém
+   desligava. Agora `ligar_estado(esfria_dur)`: expira e avisa a HUD.
+2. **A personagem anda como SILHUETA PRETA.** Causa MEDIDA: o PBR da Meshy vem
+   com `metallic = 1.00`, e metal é quase todo reflexo — sem reflection probe o
+   mobile devolve breu. `Mage._domar_pbr` grampeia metallic ≤ 0.2 / roughness
+   ≥ 0.45 na importação.
+3. **O carrossel MENTIA**: mostrava VENTO e o tiro saía FOGO (o elemento agora
+   é da luva). Luva de elemento travado esconde o carrossel; mãos nuas devolvem.
+4. **"Caixote bege gigante"** no 0:11 — não é bug: é o MURO do elemento TERRA.
+   Feio de doer; entra na fila visual (Meshy §10).
+
+**O que mais entrou nesta leva:**
+- **O elemento MORA NA LUVA** (decisão dele): loot cicla os 5 pelo mapa,
+  pegar/trocar viaja com o elemento, o disparo ignora o carrossel.
+- **Bastões viraram LUVAS** na tela (punho/dorso/dedos procedurais, cor do
+  elemento, silhueta por tier). Modelo definitivo: Meshy (peça nº 2).
+- **PAUSA em partida** (pedido do vídeo + GDD §12): ícone no canto superior
+  direito → RETOMAR / CONFIGURAÇÕES (o MESMO menu/Config.gd) / ABANDONAR.
+- **O braço desce**: pedir `cast` de novo REINICIA o clipe (antes o disparo
+  contínuo subia o braço no 1º tiro e congelava — a queixa literal dele).
+
+**Pendências NOVAS do vídeo/feedback (por ordem do que ele falou):**
+- A QUEDA "ainda está estranha" — sem detalhe suficiente; pedir o que
+  exatamente (pose? velocidade? câmera?) ou vídeo da queda.
+- Gesto do baú: agachar e FICAR (canalizar sustentado), não agachar-levantar
+  em loop. Pede clipe próprio (Meshy anim library / Blender).
+- Biblioteca de animação Meshy: baixar cair/planar/pegar/derrubado/nadar para
+  Pyra e Brok (grátis no webapp); o que não existir, animar no Blender.
+- Layout dos botões AJUSTÁVEL pelo jogador (edição de posição na tela).
+- Timer "3:00" e "BOTS 0" aparecem no treino — esconder/trocar por "TREINO".
+- Sons com profundidade: magias, água, corpo (o Diretor pediu; hoje é síntese).
+- Silhueta do cenário de fundo lê como PRÉDIOS no horizonte (q04/q06) —
+  quebra fantasia; revisar as rochas de fundo.
+
+**Concept art:** o Diretor vai gerar imagens por IA com prompts nossos ANTES de
+qualquer crédito Meshy — prompts entregues no chat de 26/08 (castelo, luvas,
+baú). Regra: imagem aprovada por ele → multi-image no Meshy.
+
+---
+
+### (26/08, tarde — as 4 fases da DIREÇÃO, histórico)
 
 Ordem do Diretor: *"faça todas as fases necessárias"*. Quatro fases entraram,
 cada uma com teste provado em vermelho:
