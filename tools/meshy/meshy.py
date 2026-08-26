@@ -11,6 +11,7 @@ Uso:
     python tools/meshy/meshy.py tudo 01-pyra        # os dois em sequencia
     python tools/meshy/meshy.py status <task_id>    # consulta uma tarefa
     python tools/meshy/meshy.py saldo               # testa a chave
+    python tools/meshy/meshy.py prop 01-castelo-voador frente-selo lateral-porta-salto costas tres-quartos 30000
 
 Saida: godot/characters/modelos/<slug>/
 """
@@ -197,6 +198,58 @@ def riggar(slug: str, task_id: str | None = None) -> None:
     print(f"  creditos usados: {t.get('consumed_credits', '?')}")
 
 
+def prop(slug: str, vistas: list[str], alvo_poly: int) -> None:
+    """PROP de cenario via /multi-image-to-3d — ate' 4 vistas, sem rig.
+
+    O bloqueio historico do multi-imagem (docs/MESHY.md §3) era das vistas de
+    PERSONAGEM defeituosas do lote de 24/08. As vistas de cenario de 26/08
+    foram geradas ja' separadas e com angulos reais — e' exatamente o caso em
+    que o endpoint rende: o perfil informa a espessura que a frontal nao tem.
+
+    Saida: cenario/<slug>/origem/ (fora do git, como o origem dos personagens:
+    a URL da Meshy MORRE em dias — o arquivo local e' a unica copia crua).
+    """
+    pasta = RAIZ / "cenario" / slug / "arte"
+    if not pasta.exists():
+        sys.exit(f"ERRO: {pasta} nao existe")
+    uris = []
+    for v in vistas:
+        arq = pasta / f"{v}.png"
+        if not arq.exists():
+            sys.exit(f"ERRO: falta a vista {arq}")
+        b64 = base64.b64encode(arq.read_bytes()).decode()
+        print(f"  vista: {arq.name} ({arq.stat().st_size // 1024} KB)")
+        uris.append(f"data:image/png;base64,{b64}")
+
+    print(f"[prop] {slug}: {len(uris)} vistas, alvo {alvo_poly} tris")
+    corpo = {
+        "image_urls": uris,
+        "ai_model": "latest",
+        "topology": "triangle",
+        "target_polycount": alvo_poly,
+        "should_remesh": True,
+        "should_texture": True,
+        "enable_pbr": True,
+        "texture_resolution": RESOLUCAO_TEXTURA,
+        "target_formats": ["glb"],
+    }
+    tid = pedir("POST", "/multi-image-to-3d", corpo)["result"]
+    print(f"  task: {tid}")
+    t = esperar("/multi-image-to-3d", tid, "prop")
+
+    dest = RAIZ / "cenario" / slug / "origem"
+    baixar(t["model_urls"]["glb"], dest / f"{slug.split('-', 1)[-1]}.glb")
+    for i, tex in enumerate(t.get("texture_urls") or []):
+        for papel, chave_url in (
+            ("albedo", "base_color"), ("normal", "normal"),
+            ("roughness", "roughness"), ("metallic", "metallic"),
+        ):
+            if tex.get(chave_url):
+                sufixo = f"_{i}" if i else ""
+                baixar(tex[chave_url], dest / f"{papel}{sufixo}.png")
+    print(f"  creditos usados: {t.get('consumed_credits', '?')}")
+
+
 def altura(slug: str) -> float:
     """Le a altura da ficha do personagem — o rig escala por ela.
     Brok tem 1,40m e Basalto 2,30m: mandar 1.7 para todos apaga a raca."""
@@ -228,6 +281,18 @@ def main() -> None:
         saldo()
     elif cmd == "status":
         print(json.dumps(pedir("GET", f"/image-to-3d/{arg}"), indent=2)[:2000])
+    elif cmd == "prop":
+        # uso: prop <pasta-em-cenario> <vista1> [vista2 vista3 vista4] [poly]
+        if arg is None:
+            sys.exit("informe o slug do cenario, ex.: 01-castelo-voador")
+        resto = sys.argv[3:]
+        poly = 30000
+        if resto and resto[-1].isdigit():
+            poly = int(resto[-1])
+            resto = resto[:-1]
+        if not resto:
+            sys.exit("informe de 1 a 4 nomes de vista (sem .png)")
+        prop(arg, resto[:4], poly)
     elif cmd == "gerar":
         gerar(arg or sys.exit("informe o slug, ex.: 01-pyra"))
     elif cmd == "riggar":

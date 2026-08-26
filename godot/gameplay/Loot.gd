@@ -38,14 +38,17 @@ const QTD_CAJADO := 4
 const SEED_LOOT := 1301       # seed fixo: mesma ilha, mesmo loot, sempre
 
 var arma_id := "varinha"
+## O elemento DESTA luva (viaja com ela no swap). DIRECAO.md §1.
+var elemento := "fire"
 var par: PackedStringArray = PackedStringArray()  # par fixo, so' manopla
 var _pivo: Node3D
 
 
-static func criar(p_arma_id: String, p_par := PackedStringArray()) -> Loot:
+static func criar(p_arma_id: String, p_par := PackedStringArray(), p_elemento := "fire") -> Loot:
 	var l := Loot.new()
 	l.arma_id = p_arma_id
 	l.par = p_par
+	l.elemento = p_elemento
 	return l
 
 
@@ -69,8 +72,9 @@ func _montar() -> void:
 		_pivo.queue_free()
 	_pivo = Node3D.new()
 	_pivo.position.y = ALTURA
-	var m := ArmaSlot.modelo(arma_id)  # mesmo modelo da mao: o que voce ve' e'
-	m.position.y = -0.3                # o que voce equipa
+	var m := ArmaSlot.modelo(arma_id, elemento)  # mesmo modelo da mao: o que
+	m.position.y = -0.3                          # voce ve' e' o que equipa
+	m.scale = Vector3.ONE * 2.6  # luva e' pequena; no chao ela AMPLIA para ler de longe
 	_pivo.add_child(m)
 	add_child(_pivo)
 	var cor := Arma.cor(arma_id)
@@ -181,8 +185,9 @@ func pegar(slot: ArmaSlot) -> bool:
 		return false
 	var velha := slot.arma_id
 	var velho_par := slot.par
+	var velho_el := slot.elemento
 	var cor := Arma.cor(arma_id)  # cor do que esta' sendo PEGO (o swap vem abaixo)
-	slot.equipar(arma_id, par)
+	slot.equipar(arma_id, par, elemento)
 	_prompt(slot.get_parent(), false)  # o prompt some: ja' pegou
 	ArmaSlot.gesto(slot.get_parent())
 	_faisca(cor)
@@ -195,6 +200,7 @@ func pegar(slot: ArmaSlot) -> bool:
 		return true
 	arma_id = velha
 	par = velho_par
+	elemento = velho_el
 	_montar()
 	return true
 
@@ -228,7 +234,10 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 	for i in QTD_VARINHA:
 		var ang := TAU * float(i) / float(QTD_VARINHA) + rng.randf_range(-0.22, 0.22)
 		var raio := rng.randf_range(14.0, 62.0)
-		if _por(parent, island, rng, "varinha", Vector2(cos(ang), sin(ang)) * raio):
+		# O ELEMENTO CICLA pelos 5 (deterministico pelo indice): a ilha inteira
+		# oferece variedade — quem quer um elemento especifico tem que ANDAR.
+		if _por(parent, island, rng, "varinha", Vector2(cos(ang), sin(ang)) * raio,
+				Balance.ELEMENTS[i % Balance.ELEMENTS.size()]):
 			n += 1
 	# cajados: 1 por POI — ir ao ponto de interesse tem que pagar.
 	# A ordem das chaves de um Dictionary const e' a de declaracao (por isso
@@ -238,7 +247,8 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 		var c: Vector2 = POIS[nomes[i]]
 		var a := rng.randf() * TAU
 		if _por(parent, island, rng, "cajado",
-				c + Vector2(cos(a), sin(a)) * rng.randf_range(6.0, 15.0)):
+				c + Vector2(cos(a), sin(a)) * rng.randf_range(6.0, 15.0),
+				Balance.ELEMENTS[(i + 2) % Balance.ELEMENTS.size()]):
 			n += 1
 	return n
 
@@ -247,7 +257,7 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 ## do terreno (o lago fica em -2.4 e o alagado em 0.45 — o corte em 1.4 exclui
 ## os dois sem o loot precisar conhecer o formato da ilha).
 static func _por(parent: Node3D, island: Node, rng: RandomNumberGenerator,
-		arma_id_: String, alvo: Vector2) -> bool:
+		arma_id_: String, alvo: Vector2, elemento_ := "fire") -> bool:
 	## A busca ABRE a cada tentativa (4m -> 37m). Sem isso o cajado do lago e o
 	## do alagado simplesmente NAO nasciam: os dois POIs sao agua, e um jitter
 	## fixo de 9m nunca alcancava a margem. Abrindo em espiral o loot pousa na
@@ -263,7 +273,7 @@ static func _por(parent: Node3D, island: Node, rng: RandomNumberGenerator,
 			h = float(island.height(p.x, p.y))
 			if h < 1.4 or h > 8.5:
 				continue
-		var l := criar(arma_id_)
+		var l := criar(arma_id_, PackedStringArray(), elemento_)
 		parent.add_child(l)
 		l.global_position = Vector3(p.x, h, p.y)
 		return true

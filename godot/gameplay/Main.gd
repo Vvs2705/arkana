@@ -167,11 +167,11 @@ func _montar_treino() -> void:
 	# as tres luvas, em fila, a 3-5m do jogador (a manopla com par fixo de
 	# exemplo — no jogo real ela so' nasce no Bau Celestial)
 	var base := player.global_position
-	var fila := [["varinha", PackedStringArray()],
-			["cajado", PackedStringArray()],
-			["manopla", PackedStringArray(["fire", "wind"])]]
+	var fila := [["varinha", PackedStringArray(), "fire"],
+			["cajado", PackedStringArray(), "lightning"],
+			["manopla", PackedStringArray(["fire", "wind"]), "fire"]]
 	for i in fila.size():
-		var l: Loot = Loot.criar(str(fila[i][0]), fila[i][1])
+		var l: Loot = Loot.criar(str(fila[i][0]), fila[i][1], str(fila[i][2]))
 		arena.add_child(l)
 		var pos := base + Vector3(3.0 + float(i) * 1.6, 0.0, 2.5)
 		pos.y = _altura(pos) + 0.4

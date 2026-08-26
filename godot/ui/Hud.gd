@@ -31,6 +31,8 @@ var tatica_btn: AcaoButton
 var suprema_btn: AcaoButton
 var pegar_btn: AcaoButton
 var carousel: ElementCarousel
+var pausa_btn: AcaoButton
+var _pausa_overlay: Control
 var aviso: HudAviso
 var hp_bar: ProgressBar
 var mana_bar: ProgressBar
@@ -131,6 +133,7 @@ func aplicar_config(cfg: Dictionary) -> void:
 
 
 func bind_player(p: Player) -> void:
+	carousel.visible = true  # partida nova nasce de maos nuas: elemento livre
 	player = p
 	hp_bar.max_value = float(Balance.PLAYER.hp)
 	hp_bar.value = p.hp
@@ -469,6 +472,10 @@ func _on_arma(pawn: Node, _arma_id: String, nome: String, raridade: String,
 	## ve'. O pulso dura menos que o gesto do mago, entao os dois se somam.
 	arma_lbl.modulate = Color(2.2, 2.2, 2.2)
 	create_tween().tween_property(arma_lbl, "modulate", Color.WHITE, 0.45)
+	# A LUVA TRAVA O ELEMENTO (26/08 — DIRECAO.md §1): com elemento na luva o
+	# carrossel virava MENTIRA — mostrava VENTO e o tiro saia FOGO (visto no
+	# video do Diretor). Com o elemento travado ele some; volta de maos nuas.
+	carousel.visible = elementos.is_empty() or str(elementos[0]) == ""
 
 
 # ---------- derrubado (GDD §3.7/§3.8) ----------
@@ -603,6 +610,11 @@ func _layout(sl := Safe.left(), st := Safe.top(), sr := Safe.right(), sb := Safe
 		dir = b.offset_left
 
 	var slot := Dp.px(52.0)
+	# pausa: canto superior direito, abaixo do relogio da partida
+	pausa_btn.offset_right = -(sr + g)
+	pausa_btn.offset_left = pausa_btn.offset_right - Dp.px(44.0)
+	pausa_btn.offset_top = st + g + Dp.px(58.0)
+	pausa_btn.offset_bottom = pausa_btn.offset_top + Dp.px(44.0)
 	carousel.offset_right = -(sr + g)
 	carousel.offset_left = carousel.offset_right - slot * float(Balance.ELEMENTS.size())
 	carousel.offset_bottom = fire_btn.offset_top - Dp.px(10.0)
@@ -789,6 +801,12 @@ func _build_sticks() -> void:
 	# 52dp (>= 48dp) em UMA fileira: 260dp cabem no canto direito sem invadir a
 	# zona do joystick (35% da esquerda) nem a de olhar — 2 fileiras so' se um
 	# 6o elemento entrar.
+	# PAUSA (pedido do Diretor 26/08 + GDD §12): icone no canto superior
+	# direito abre RETOMAR / CONFIGURACOES / ABANDONAR dentro da partida.
+	# process_mode ALWAYS: com a arvore pausada, so' eles continuam ouvindo.
+	pausa_btn = _acao(Textos.HUD_PAUSA, Color(0.75, 0.78, 0.90),
+			func() -> void: _abrir_pausa())
+	pausa_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	carousel = ElementCarousel.new()
 	_canto(carousel)
 	carousel.chosen.connect(func(el: String) -> void:
@@ -857,3 +875,70 @@ func _build_end() -> void:
 	box.add_child(menu_btn)
 	_end_center.add_child(box)
 	add_child(end_screen)
+
+
+# ---------------------------------------------------------------- pausa
+
+## A PAUSA DE PARTIDA (GDD §12: Retomar / Configuracoes / Abandonar). Montada
+## UMA vez, escondida; get_tree().paused congela o mundo e so' o que e' ALWAYS
+## continua ouvindo o dedo. As Configuracoes sao o MESMO menu/Config.gd do menu
+## principal — uma tela, dois lugares, zero divergencia.
+func _abrir_pausa() -> void:
+	if _pausa_overlay == null:
+		_montar_pausa()
+	get_tree().paused = true
+	_pausa_overlay.visible = true
+
+
+func _retomar() -> void:
+	get_tree().paused = false
+	if _pausa_overlay != null:
+		_pausa_overlay.visible = false
+
+
+func _abandonar() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://menu/Menu.tscn")
+
+
+func _montar_pausa() -> void:
+	_pausa_overlay = Control.new()
+	_pausa_overlay.name = "Pausa"
+	_pausa_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	_pausa_overlay.visible = false
+	add_child(_pausa_overlay)
+	_pausa_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var veu := ColorRect.new()
+	veu.color = Color(0.02, 0.03, 0.06, 0.82)
+	_pausa_overlay.add_child(veu)
+	veu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var cc := CenterContainer.new()
+	_pausa_overlay.add_child(cc)
+	cc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 14)
+	cc.add_child(v)
+	var titulo := Estilo.rotulo(Textos.PAUSA_TITULO, 34, Estilo.OURO)
+	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(titulo)
+	var retomar := Estilo.botao(Textos.PAUSA_RETOMAR, "BtnRetomar", 52.0)
+	retomar.pressed.connect(_retomar)
+	v.add_child(retomar)
+	var cfg := Estilo.botao(Textos.MENU_CONFIG, "BtnPausaConfig", 52.0)
+	cfg.pressed.connect(_abrir_config_na_pausa)
+	v.add_child(cfg)
+	var sair := Estilo.botao(Textos.PAUSA_ABANDONAR, "BtnAbandonar", 52.0)
+	sair.pressed.connect(_abandonar)
+	v.add_child(sair)
+
+
+func _abrir_config_na_pausa() -> void:
+	var Cfg := load("res://menu/Config.gd") as GDScript
+	if Cfg == null:
+		return  # fiacao defensiva: sem a tela, a pausa continua funcionando
+	var c: Control = Cfg.new()
+	c.name = "ConfigNaPausa"
+	_pausa_overlay.add_child(c)
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c.voltar_pedido.connect(func() -> void: c.queue_free())

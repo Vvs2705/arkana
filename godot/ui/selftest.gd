@@ -423,10 +423,38 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 	bus.loot_prompt.emit("Coisa", "raridade_que_nao_existe", true)
 	_check(hud.pegar_btn.visible, "raridade desconhecida nao quebra o prompt de loot")
 	_check(hud.arma_lbl.text == "", "rotulo da arma nasce vazio")
+
+	# PAUSA (26/08 — pedido do Diretor + GDD §12). Vermelho provado apagando o
+	# paused=true de _abrir_pausa.
+	_check(hud.pausa_btn != null and hud.pausa_btn.visible,
+			"o icone de PAUSA existe no canto superior")
+	hud._abrir_pausa()
+	# `paused` e' da SceneTree (este script) — root aqui e' a Window, e
+	# acessar .paused nela ABORTAVA a secao inteira em silencio.
+	_check(paused, "abrir pausa CONGELA a arvore")
+	_check(hud._pausa_overlay != null and hud._pausa_overlay.visible,
+			"o overlay traz Retomar/Configuracoes/Abandonar")
+	_check(hud._pausa_overlay.find_child("BtnRetomar", true, false) != null
+			and hud._pausa_overlay.find_child("BtnPausaConfig", true, false) != null
+			and hud._pausa_overlay.find_child("BtnAbandonar", true, false) != null,
+			"os tres botoes do GDD §12 existem")
+	hud._retomar()
+	_check(not paused and not hud._pausa_overlay.visible,
+			"RETOMAR devolve o jogo")
+
+	# O CARROSSEL HONESTO (video do Diretor: mostrava VENTO e saia FOGO): luva
+	# com elemento travado ESCONDE o carrossel; maos nuas o devolvem.
+	_check(hud.carousel.visible, "carrossel visivel de maos nuas")
+	bus.weapon_equipped.emit(jogador, "varinha", "Luva Comum", "comum",
+			PackedStringArray(["water"]))
+	_check(not hud.carousel.visible, "luva de elemento travado ESCONDE o carrossel")
+	hud.bind_player(jogador)
+	_check(hud.carousel.visible, "partida nova (maos nuas) devolve o carrossel")
 	var slot: Node = (load("res://gameplay/ArmaSlot.gd") as GDScript).new()
 	slot.name = "ArmaSlot"
 	jogador.add_child(slot)
 	slot.equipar("cajado")
+	print("DBG pos-equipar:", jogador.get_children())
 	# O nome de exibicao e' "Luva de Conjurador" desde 26/08 (DIRECAO.md §1: a
 	# arma arcana virou luva). O id interno segue "cajado" — o rotulo nao.
 	_check(hud.arma_lbl.text.begins_with("Luva de Conjurador"),
@@ -442,6 +470,7 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 	_check(hud.arma_lbl.text == minha, "arma de BOT nao sequestra o rotulo do jogador")
 
 	# -------------------------- prioridade: quem salva a vida GANHA a faixa ----
+	print("DBG pre-bau:", jogador.get_children())
 	bus.bau_pousou.emit(Vector3(5, 0, 5))
 	bus.zona_fechando.emit(2, Vector3.ZERO, 40.0, 9.0)
 	bus.kit_telegraph.emit("01-pyra", "suprema", 2.0, Vector3.ZERO)

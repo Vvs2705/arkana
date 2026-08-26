@@ -202,9 +202,13 @@ func _try_fire() -> void:
 	# So' o ATAQUE: tatica e suprema sao natas e nao passam por aqui.
 	if not ArmaSlot.armado_de(self):
 		return
-	# A ARMA ARCANA manda no ataque (GDD §16.2): cadencia, mana e alcance saem
-	# dela, nao do elemento puro.
-	var s: Dictionary = ArmaSlot.spec_de(self, element)
+	# A ARMA ARCANA manda no ataque (GDD §16.2) — e desde 26/08 o ELEMENTO
+	# tambem e' dela (DIRECAO.md §1): o spec sai do elemento QUE VAI SAIR, nao
+	# do carrossel; senao a mana cobrada seria a de um elemento e o tiro de outro.
+	var slot0 := ArmaSlot.de(self)
+	var el_previsto: String = element if slot0 == null else (
+			slot0.elemento if slot0.elemento != "" else element)
+	var s: Dictionary = ArmaSlot.spec_de(self, el_previsto)
 	if _fire_cd > 0.0 or mana < float(s.mana_cost):
 		return
 	# LIMITADOR DE KIT: "sai 1s sem conjurar" (Veu) vale para o ATAQUE tambem.
@@ -225,6 +229,11 @@ func _try_fire() -> void:
 	var from := global_position + Vector3(0, 1.4, 0)
 	var aim_dir := (_aim_point() - from).normalized()
 	Projectile.launch(get_parent(), self, from + aim_dir * 0.9, aim_dir, el_tiro)
+	# Retrigger POR TIRO: anim() so' repassa quando o NOME muda, entao no fogo
+	# continuo o braco subia no 1o tiro e congelava. Chamar o visual direto
+	# reinicia o clipe a cada disparo (Mage.play_anim trata o reinicio).
+	if visual != null and visual.has_method("play_anim"):
+		visual.play_anim("cast")
 	anim("cast")
 
 

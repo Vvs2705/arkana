@@ -440,6 +440,61 @@ personagem completo custa ~41.
 3. Baú → Ruínas → Torres → Altar
 4. Depois da leva autoral: passada Discover nos genéricos (árvores/pedras)
 
+**Os prompts de concept estão prontos** em [`docs/prompts/`](prompts/00-LEIA.md)
+— um arquivo por peça, com ficha física em metros, prompt mestre, as 4 vistas
+separadas que o Meshy exige, negative prompt e critérios de aprovação. Pasta
+única por ordem do Diretor: todo prompt futuro nasce nela.
+
+### 10.1 A repaginação do CHÃO — quando (pergunta do Diretor, 26/08)
+
+*"Todo o design da ilha, como o chão e tudo mais, também deveria ter essa
+repaginação — avalie quando, para todos terem a mesma qualidade."*
+
+**A resposta curta: o chão é a TERCEIRA onda, e há duas razões técnicas para
+não ser a primeira.**
+
+1. **Os heróis definem a linguagem que o chão vai imitar.** Castelo, luvas e
+   baú estabelecem o vocabulário de material (a pedra pintada, o bronze, o
+   veio da madeira). Repaginar o chão ANTES deles é pintar sem paleta — e
+   redo garantido quando os heróis chegarem com outra cara.
+2. **O chão mexe no fill-rate da tela INTEIRA, e o FPS nunca foi medido.**
+   Trocar textura de terreno, água e grama altera o custo de TODO quadro.
+   Sem linha de base no Poco F4, uma regressão fica invisível até virar
+   reclamação. Herói é um objeto; o chão é o mundo.
+
+**A ordem oficial:**
+
+| Onda | O quê | Portão de entrada |
+|---|---|---|
+| 1 (em curso) | Castelo → Luvas → Baú no Meshy e NO JOGO | concepts aprovados ✅ |
+| 2 | **MEDIR FPS no aparelho** com os heróis dentro | heróis integrados |
+| 3a | Árvores + pedras (Discover retrabalhado — substitui os pirulitos) | FPS base anotado |
+| 3b | Textura do terreno: splat pintado (grama/terra/areia/rocha + macro) | 3a medida |
+| 3c | Água nova + grama modelada + detritos de POI | 3b medida |
+
+**Por que 3a antes de 3b:** árvore e pedra são OBJETOS — trocam sem tocar o
+gerador do terreno e dão o maior salto visual por real gasto. A textura do
+chão mexe no shader de tudo (risco médio). A água fica por último porque já
+lê razoavelmente. **Cada onda entra com FPS antes/depois no aparelho** — o
+que não passa no portão, volta.
+
+**O que NUNCA entra na repaginação:** a altura, a colisão e o determinismo do
+terreno (os três sistemas da seção 10 continuam mandando).
+
+### 10.2 Política Meshy: o site é a via oficial (ordem do Diretor, 26/08)
+
+*"Quero ver todos os processos lá no site; a arte e tudo que usarmos no Meshy
+disponíveis na minha área de trabalho na plataforma."*
+
+Verificado no navegador: **tarefas de API NÃO aparecem no workspace** — a
+Meshy separa as duas vias. Portanto:
+
+- **Peça-herói gera no WEBAPP, na conta dele** (Multi-View, processo visível
+  de ponta a ponta na galeria). A API fica para validação/scripts.
+- O castelo de 26/08 saiu pelas duas vias: o do site é o OFICIAL; o da API
+  (30 créditos, 30.917 tris, GLB válido em `cenario/01-castelo-voador/origem/`)
+  fica como backup offline de comparação.
+
 **O que muda no código:** quase nada — `Island.gd` já instancia malha externa
 por caminho (`_add_mesh`), e o modelo do castelo pendura em `world/Castelo.gd`.
 A regra dura continua: colisão SIMPLES feita à mão por peça (primitivas),

@@ -51,7 +51,126 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — as fases da DIREÇÃO executadas (26/08, tarde)
+### >>> COMECE POR AQUI — as 5 peças-herói existem em 3D, na conta do Diretor
+
+**26/08, fim de tarde.** A fila inteira da DIREÇÃO §10 virou modelo: Castelo,
+Luva Comum, Luva de Conjurador, Manopla e Baú — todos pelo SITE, visíveis na
+galeria dele, Multi-View das vistas ortogonais aprovadas. Placar e ressalvas em
+`cenario/00-MODELOS-3D.md`. **210 créditos no dia · saldo 2.984.**
+
+**A regra que nasceu no meio, por correção DELE:** revisar o modelo NO VIEWER
+antes de baixar. Ele pegou dois defeitos na Conjurador v1 (gema extra no
+anelar + palma sem os símbolos) que eu ia deixar passar. A v2 corrigiu a
+geometria (4 cristais exatos, contados em zoom); a palma lisa persistiu em 2/2
+gerações → **o bordado vira decal no Blender** (determinístico, grátis), não
+terceira loteria de 30 créditos.
+
+**Pergunta dele respondida:** as 5 cores da Luva Comum NÃO são 5 modelos — é
+UM master (o vermelho) + recolor de material no motor, como as luvas
+procedurais já fazem. 5 gerações custariam 5× e dariam 5 geometrias.
+
+**Blender INSTALADO (winget).** A esteira da próxima fase, por peça: decimar
+(~2 M → alvo de jogo) + bake de normal + decal da palma (conjurador) → GLB de
+jogo em `godot/world/modelos/` (git/LFS) → pendurar nas cenas (castelo em
+`Castelo.gd`; luvas em `ArmaSlot.modelo()` no lugar do procedural; baú em
+`BauCelestial`) → colisão simples à mão → **FPS no aparelho** (DIRECAO §10.1).
+
+**Aba do Meshy deixada ABERTA no Chrome dele** — os processos estão todos lá.
+
+---
+
+### (26/08, fim de tarde — o castelo 3D nasce, histórico)
+
+**26/08, fim de tarde — o primeiro modelo de cenário nasceu.** E uma ordem do
+Diretor mudou o processo no meio: *"quero ver todos os processos lá no site,
+a arte e tudo disponível na minha área de trabalho da plataforma"*.
+
+- **Verificado no navegador: tarefa de API NÃO aparece no workspace Meshy.**
+  A política nova está em DIRECAO.md §10.2: **peça-herói gera no WEBAPP, na
+  conta dele** (processo visível); API só para validação/scripts.
+- O castelo saiu pelas DUAS vias no mesmo dia (60 créditos ao todo, saldo
+  3.134): o do **site é o oficial** ("Aetherstone Citadel", 1,9 M tris,
+  texturizado, visível na galeria dele); o da API (30.917 tris) é backup e
+  candidato a base low-poly. Ambos em `cenario/01-castelo-voador/origem/`
+  (fora do git — a nuvem do oficial é a própria conta Meshy dele).
+- **Próximo passo do castelo:** Blender (decimar OU retopo com bake do
+  hi-poly) → `godot/world/modelos/castelo.glb` → pendurar em `Castelo.gd` →
+  FPS no aparelho. Detalhes em `cenario/01-castelo-voador/00-MODELO.md`.
+- **A repaginação do CHÃO tem plano e portões** (pergunta dele, respondida):
+  DIRECAO.md §10.1 — o chão é a 3ª onda, depois dos heróis e do FPS medido,
+  em três sub-ondas (árvores/pedras → splat do terreno → água), cada uma com
+  FPS antes/depois. Herói é um objeto; o chão é o mundo.
+- Fila do Meshy no site: **Luvas** (3 modelos) → **Baú**.
+
+---
+
+### (26/08, tarde — concept arts validadas, histórico)
+
+**O ciclo de arte fechou o primeiro loop completo** (26/08, tarde): prompts em
+`docs/prompts/` → o Diretor gerou 55 imagens no ChatGPT → validação contra os
+critérios de cada ficha → **54 aprovadas, 1 para regerar** → transportadas
+para `cenario/<peça>/arte/` (o espelho de `personagens/`), 112 MB no LFS.
+
+- **Veredito e lupa:** `cenario/00-VALIDACAO.md` — inclui a checagem legal
+  anti-FMA da palma da Conjurador (passou) e o critério mais fino da Manopla
+  (polegar+médio em ouro, os dedos do estalo — exato).
+- **A reprovada:** a key art do Altar (48) sem os dois obeliscos tombados — o
+  texto de ajuste está no 00-VALIDACAO, pronto para colar no gerador.
+- **Custo LFS atualizado:** ~470 MB totais → ~2 clones limpos/mês na cota.
+- **Próximo passo da arte:** Castelo → Meshy multi-imagem (frente-selo +
+  lateral-porta-salto + costas + tres-quartos). Depois: Luvas → Baú.
+
+---
+
+### (26/08, tarde — o vídeo do Diretor avaliado, histórico)
+
+O Diretor testou o APK 12:20 e mandou vídeo (55 s, treino). **Quatro defeitos
+reais saíram dele, três já corrigidos com teste vermelho:**
+
+1. **"BRAÇO FRIO" preso na tela** (do segundo 2 ao 55). Causa: a Pyra ligava o
+   chip com `avisar_estado` direto — fora do relógio de estados, ninguém
+   desligava. Agora `ligar_estado(esfria_dur)`: expira e avisa a HUD.
+2. **A personagem anda como SILHUETA PRETA.** Causa MEDIDA: o PBR da Meshy vem
+   com `metallic = 1.00`, e metal é quase todo reflexo — sem reflection probe o
+   mobile devolve breu. `Mage._domar_pbr` grampeia metallic ≤ 0.2 / roughness
+   ≥ 0.45 na importação.
+3. **O carrossel MENTIA**: mostrava VENTO e o tiro saía FOGO (o elemento agora
+   é da luva). Luva de elemento travado esconde o carrossel; mãos nuas devolvem.
+4. **"Caixote bege gigante"** no 0:11 — não é bug: é o MURO do elemento TERRA.
+   Feio de doer; entra na fila visual (Meshy §10).
+
+**O que mais entrou nesta leva:**
+- **O elemento MORA NA LUVA** (decisão dele): loot cicla os 5 pelo mapa,
+  pegar/trocar viaja com o elemento, o disparo ignora o carrossel.
+- **Bastões viraram LUVAS** na tela (punho/dorso/dedos procedurais, cor do
+  elemento, silhueta por tier). Modelo definitivo: Meshy (peça nº 2).
+- **PAUSA em partida** (pedido do vídeo + GDD §12): ícone no canto superior
+  direito → RETOMAR / CONFIGURAÇÕES (o MESMO menu/Config.gd) / ABANDONAR.
+- **O braço desce**: pedir `cast` de novo REINICIA o clipe (antes o disparo
+  contínuo subia o braço no 1º tiro e congelava — a queixa literal dele).
+
+**Pendências NOVAS do vídeo/feedback (por ordem do que ele falou):**
+- A QUEDA "ainda está estranha" — sem detalhe suficiente; pedir o que
+  exatamente (pose? velocidade? câmera?) ou vídeo da queda.
+- Gesto do baú: agachar e FICAR (canalizar sustentado), não agachar-levantar
+  em loop. Pede clipe próprio (Meshy anim library / Blender).
+- Biblioteca de animação Meshy: baixar cair/planar/pegar/derrubado/nadar para
+  Pyra e Brok (grátis no webapp); o que não existir, animar no Blender.
+- Layout dos botões AJUSTÁVEL pelo jogador (edição de posição na tela).
+- Timer "3:00" e "BOTS 0" aparecem no treino — esconder/trocar por "TREINO".
+- Sons com profundidade: magias, água, corpo (o Diretor pediu; hoje é síntese).
+- Silhueta do cenário de fundo lê como PRÉDIOS no horizonte (q04/q06) —
+  quebra fantasia; revisar as rochas de fundo.
+
+**Concept art:** o Diretor gera as imagens por IA ANTES de qualquer crédito
+Meshy. **Os prompts completos moram em `docs/prompts/`** (pasta única, ordem
+dele): 8 peças, cada uma com ficha física em metros, prompt mestre, 4 vistas
+separadas (a lição do painel plano de 21/08), negative e critérios de
+aprovação. Regra: imagem aprovada → multi-image no Meshy.
+
+---
+
+### (26/08, tarde — as 4 fases da DIREÇÃO, histórico)
 
 Ordem do Diretor: *"faça todas as fases necessárias"*. Quatro fases entraram,
 cada uma com teste provado em vermelho:
