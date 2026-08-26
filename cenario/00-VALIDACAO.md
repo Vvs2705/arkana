@@ -3,7 +3,8 @@
 **Origem:** `Downloads/concept arts` (ChatGPT, 55 PNGs ~2K), geradas pelo
 Diretor com os prompts de `docs/prompts/`. **Validadas uma a uma contra os
 critérios de aprovação de cada arquivo de prompt**, com lupa nos pontos
-críticos. Resultado: **54 aprovadas · 1 para regerar** (texto de ajuste no fim).
+críticos. Resultado: **55/55 aprovadas** — a key art do Altar foi regerada em 26/08
+(tarde) com o texto de ajuste abaixo e passou na revalidação.
 
 ## O que a lupa conferiu (os pontos que reprovariam)
 
@@ -31,9 +32,17 @@ críticos. Resultado: **54 aprovadas · 1 para regerar** (texto de ajuste no fim
    Irrelevante para o modelo 3D — a alternância é material dinâmico no jogo.
 3. **Âncora do castelo inteira** (a ficha pedia corrente partida). Cosmético.
 
-## ❌ A ÚNICA REPROVADA — texto de ajuste
+## ✅ A reprovada foi REGERADA e aprovada (26/08, tarde)
 
-**Arquivo:** `08-altar-sintonia/arte/keyart-REGERAR.png` (a nº 48 do lote).
+A key art original do Altar (nº 48) mostrava os cinco obeliscos de pé. O
+Diretor regerou com o texto de ajuste abaixo; a v2
+(`keyart-conjunto.png`, vinda de `09-key-art-dois-obeliscos-caidos.png` do
+pacote v2 dele) passou: **três obeliscos acesos, dois MORTOS com gemas
+pretas** — um em três tambores com a árvore dourada, um caído inteiro — e os
+demais critérios mantidos (pegadas, esfera trançada, Selo sem ocultismo).
+A reprovada foi removida do repositório.
+
+**Arquivo original reprovado:** a nº 48 do lote.
 
 **O que está errado:** os CINCO obeliscos aparecem de pé com as gemas acesas.
 A ficha (docs/prompts/08, item 1) exige **DOIS obeliscos tombados com gemas
