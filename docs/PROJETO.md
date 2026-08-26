@@ -91,9 +91,11 @@ reais saíram dele, três já corrigidos com teste vermelho:**
 - Silhueta do cenário de fundo lê como PRÉDIOS no horizonte (q04/q06) —
   quebra fantasia; revisar as rochas de fundo.
 
-**Concept art:** o Diretor vai gerar imagens por IA com prompts nossos ANTES de
-qualquer crédito Meshy — prompts entregues no chat de 26/08 (castelo, luvas,
-baú). Regra: imagem aprovada por ele → multi-image no Meshy.
+**Concept art:** o Diretor gera as imagens por IA ANTES de qualquer crédito
+Meshy. **Os prompts completos moram em `docs/prompts/`** (pasta única, ordem
+dele): 8 peças, cada uma com ficha física em metros, prompt mestre, 4 vistas
+separadas (a lição do painel plano de 21/08), negative e critérios de
+aprovação. Regra: imagem aprovada → multi-image no Meshy.
 
 ---
 

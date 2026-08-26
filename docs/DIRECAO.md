@@ -440,6 +440,11 @@ personagem completo custa ~41.
 3. Baú → Ruínas → Torres → Altar
 4. Depois da leva autoral: passada Discover nos genéricos (árvores/pedras)
 
+**Os prompts de concept estão prontos** em [`docs/prompts/`](prompts/00-LEIA.md)
+— um arquivo por peça, com ficha física em metros, prompt mestre, as 4 vistas
+separadas que o Meshy exige, negative prompt e critérios de aprovação. Pasta
+única por ordem do Diretor: todo prompt futuro nasce nela.
+
 **O que muda no código:** quase nada — `Island.gd` já instancia malha externa
 por caminho (`_add_mesh`), e o modelo do castelo pendura em `world/Castelo.gd`.
 A regra dura continua: colisão SIMPLES feita à mão por peça (primitivas),
