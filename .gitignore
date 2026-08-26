@@ -57,3 +57,4 @@ keystore.properties
 # (docs/PASSOS_GRAFICOS.md secao 6).
 godot/characters/modelos/*/
 !godot/characters/modelos/*.glb
+cenario/*/origem/
