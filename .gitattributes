@@ -18,3 +18,11 @@ godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text
 # banda. Se estourar, a saida e' comprar data pack ou mover para storage externo.
 personagens/**/arte/_originais/*.png filter=lfs diff=lfs merge=lfs -text
 personagens/**/arte/_originais/*.PNG filter=lfs diff=lfs merge=lfs -text
+
+# Concept art de CENARIO aprovada em 26/08 (55 pecas: castelo, luvas, bau,
+# ruinas, torre, altar) — mesma decisao das 160 referencias de personagens:
+# arte versionada no LFS. Novo total de LFS ~470 MB; a cota gratis (1 GB de
+# armazenamento / 1 GB de banda por mes) passa a render ~2 clones limpos por
+# mes. Estourou: data pack ou storage externo (nao ha' terceira saida).
+cenario/**/arte/*.png filter=lfs diff=lfs merge=lfs -text
+cenario/**/arte/*.PNG filter=lfs diff=lfs merge=lfs -text
