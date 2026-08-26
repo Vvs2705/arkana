@@ -128,10 +128,31 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ visual
 
-## PROCEDURAL, zero binario (regra do projeto). O castelo e' visto a 300m de
-## distancia e por ~30s por partida: 6 malhas sem sombra bastam para ler
-## "castelo" na silhueta, e sombra a 320m so' custaria atlas.
+## O MODELO DE JOGO (26/08): o "Aetherstone Citadel" gerado no Meshy a partir
+## do concept aprovado, decimado a 30k tris no Blender. As primitivas antigas
+## viram FALLBACK (fiacao defensiva: sem o arquivo, a partida abre igual).
+const MODELO := "res://world/modelos/castelo.glb"
+
+
 func _montar_visual() -> void:
+	if ResourceLoader.exists(MODELO):
+		var ps: Variant = load(MODELO)
+		if ps is PackedScene:
+			var m: Node3D = (ps as PackedScene).instantiate()
+			m.name = "ModeloCastelo"
+			add_child(m)
+			# O export poe o PE' do castelo em y=0; o visual antigo era
+			# centrado na origem (e a rota/portao miram a origem). Desce meio
+			# corpo para o miolo do castelo continuar no eixo da rota.
+			m.position.y = -26.0
+			Pbr.domar(m)  # metallic da Meshy vira breu sem probe (core/Pbr.gd)
+			return
+	_montar_fallback()
+
+
+## PROCEDURAL, zero binario — o plano B de sempre. O castelo e' visto a 300m e
+## por ~30s por partida: 6 malhas sem sombra leem "castelo" na silhueta.
+func _montar_fallback() -> void:
 	var pedra := StandardMaterial3D.new()
 	pedra.albedo_color = Color(0.42, 0.40, 0.47)
 	var telhado := StandardMaterial3D.new()

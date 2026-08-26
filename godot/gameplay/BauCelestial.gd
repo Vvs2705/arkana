@@ -314,11 +314,26 @@ func _chamar_bots() -> void:
 ## MODELO PROCEDURAL (zero binario — regra do projeto): caixa + tampa + cintas
 ## + fechadura, so' primitivas da engine. Ouro emissivo = a cor da raridade
 ## LENDARIA (Arma.RARIDADES), a mesma da manopla que esta' dentro.
+const MODELO := "res://world/modelos/bau.glb"
+
+
 func _montar() -> void:
 	var ouro := Arma.cor("manopla")
 	_pivo = Node3D.new()
 	_pivo.visible = false
 	add_child(_pivo)
+	# O MODELO DE JOGO (26/08): o "Gemforged Treasure" do Meshy, decimado a 8k
+	# e exportado ja' nas MEDIDAS DO CODIGO (1,15 m de largura — a colisao e o
+	# raio de canalizacao nao mudam). Primitivas viram fallback defensivo.
+	if ResourceLoader.exists(MODELO):
+		var ps: Variant = load(MODELO)
+		if ps is PackedScene:
+			var m: Node3D = (ps as PackedScene).instantiate()
+			m.name = "ModeloBau"
+			_pivo.add_child(m)
+			Pbr.domar(m)
+			_telegrafo(ouro)
+			return
 	var madeira := StandardMaterial3D.new()
 	madeira.albedo_color = Color("3a2b1e")
 	# corpo
