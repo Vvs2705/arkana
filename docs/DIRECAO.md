@@ -384,3 +384,63 @@ zigue-zague com faíscas.
    aprovação, agora com números).
 6. **§11** — castelo sem personagens visíveis; o botão de magia aciona o salto;
    o personagem surge ao acionar.
+
+
+---
+
+## 10. A ilha rumo ao lançamento — e o que sai do Meshy (pergunta de 26/08)
+
+O Diretor perguntou: para lançar, além de melhorar a ilha graficamente e
+colocar mais elementos, **o que vamos criar e o que usa o Meshy?**
+
+### Tamanho: densidade antes de área
+
+A ilha tem 300 m para **7 magos** — a proporção está saudável (o mini-BR do
+GDD §8 é 16–20 jogadores; quando o jogo chegar lá, a ilha cresce junto).
+Crescer área AGORA espalharia os mesmos 7 num mapa vazio e adiaria os
+encontros. **O caminho do lançamento é densidade**: mais elementos por POI,
+não mais metros. E cada leva de elementos entra com **FPS medido no aparelho**
+— que continua sem medição alguma.
+
+### O que NUNCA sai do Meshy (continua procedural)
+
+O **terreno em si**: altura, colisão, água, praia, grama. Três sistemas
+dependem de `Island.height()` ser determinístico e barato — o terreno reativo,
+a zona e o pouso da queda. Malha de IA aqui quebraria os três. O Meshy é para
+o que fica **em cima** do terreno.
+
+### O que vem do Discover (0 créditos + refino no Blender)
+
+A regra já escrita em `docs/pipeline-arte/CENARIO/04`: genérico se acha, não
+se gera — árvores, pedras, penhascos, arcos, colunas, caixas, barris, tochas,
+pontes, entulho. **Toda peça externa passa pela regra anti-asset-flip**
+(retextura, shader Arkana, mudança de proporção ou kitbashing — no mínimo uma).
+
+### O que se GERA no Meshy (créditos — a identidade não se acha pronta)
+
+Em ordem de aparição na tela do jogador:
+
+| # | Peça | Por quê | Créditos est. |
+|---|---|---|---|
+| 1 | **O Castelo Voador** | é a 1ª coisa da partida, e hoje é primitivas | ~20–35 |
+| 2 | **As 3 Luvas** (comum/conjurador/manopla) | viraram O loot central da Lei | ~15–60 |
+| 3 | **O Baú Celestial** | o evento mais anunciado do mapa | ~20 |
+| 4 | **Estátuas do Selo + arcos rúnicos** (Ruínas) | o POI vira lore, não pedra genérica | ~40 |
+| 5 | **Torres Arcanas** | têm função de gameplay (GDD) — autoral por regra | ~40 |
+| 6 | **Altar de Sintonia** | o pilar do jogo merece um landmark | ~20 |
+
+Estimativa da leva inteira: **~150–220 créditos** (props estáticos não pagam
+rig nem animação — só malha+textura, e remesh quando preciso). Referência: um
+personagem completo custa ~41.
+
+### Ordem de produção (uma peça por vez, medida no aparelho)
+
+1. Castelo (herói da abertura — o efeito "jogo de verdade" mais barato)
+2. Luvas (o jogador olha para elas a partida inteira: chão, mão e HUD)
+3. Baú → Ruínas → Torres → Altar
+4. Depois da leva autoral: passada Discover nos genéricos (árvores/pedras)
+
+**O que muda no código:** quase nada — `Island.gd` já instancia malha externa
+por caminho (`_add_mesh`), e o modelo do castelo pendura em `world/Castelo.gd`.
+A regra dura continua: colisão SIMPLES feita à mão por peça (primitivas),
+nunca trimesh do modelo de IA.
