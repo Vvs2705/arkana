@@ -78,6 +78,7 @@ func _run() -> void:
 	_test_combat_nan()
 	_test_gesture()
 	_test_bot_death()
+	_test_bot_percepcao()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -219,6 +220,85 @@ func _test_bot_death() -> void:
 	_check(_died.size() == 1 and _died[0] == b, "Bus.entity_died emitido")
 	_check(not b.is_physics_processing(), "bot morto para de agir")
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
+
+
+## PERCEPCAO E FFA (26/08 — DIRECAO.md §7). O defeito reintroduzivel: Main
+## cravava b.target = player no nascimento e os 6 bots sabiam onde o jogador
+## estava desde o 1o quadro, parado ou nao ("mesmo sem me mexer eles ja' me
+## notam" — o Diretor). Agora o alvo NASCE nulo e so' aparece pelos sentidos.
+## Provado em vermelho desligando _percebe e cravando o alvo de volta.
+func _test_bot_percepcao() -> void:
+	print("[Bot: percepcao — visto, ouvido, disparo, revide, FFA]")
+	var _pawn_scr: GDScript = load("res://gameplay/Pawn.gd")
+	var caçador: Node = _bot_scr.new()
+	root.add_child(caçador)
+	caçador.global_position = Vector3.ZERO
+	caçador.set_physics_process(false)  # a varredura e' chamada na mao
+
+	# nasce CEGO: ninguem lhe deu alvo
+	_check(caçador.target == null, "bot nasce SEM alvo (nada de b.target = player)")
+
+	# PARADO a 15 m: fora da visao (12) e sem passos — NAO e' notado.
+	var quieto: Node = _pawn_scr.new()
+	root.add_child(quieto)
+	quieto.global_position = Vector3(15, 0, 0)
+	quieto.velocity = Vector3.ZERO
+	caçador._percebe()
+	_check(caçador.target == null,
+			"parado a 15m NAO e' notado — ficar imovel esconde (a contra-jogada)")
+
+	# EM MOVIMENTO a 15 m: os passos denunciam (audicao 18).
+	quieto.velocity = Vector3(4, 0, 0)
+	caçador._percebe()
+	_check(caçador.target == quieto, "andando a 15m os PASSOS entregam")
+
+	# alvo morre -> esquece e volta a vagar
+	quieto.hp = 0.0
+	caçador._percebe()
+	_check(caçador.target == null, "alvo morto e' esquecido")
+
+	# VISTO: mesmo parado, a 8 m nao ha' como nao ver.
+	var perto: Node = _pawn_scr.new()
+	root.add_child(perto)
+	perto.global_position = Vector3(8, 0, 0)
+	perto.velocity = Vector3.ZERO
+	caçador._percebe()
+	_check(caçador.target == perto, "parado a 8m e' VISTO (dentro dos 12m)")
+
+	# FFA: outro BOT tambem e' presa — nao existe "so' o player".
+	caçador.target = null
+	perto.global_position = Vector3(100, 0, 0)
+	var rival: Node = _bot_scr.new()
+	root.add_child(rival)
+	rival.set_physics_process(false)
+	rival.global_position = Vector3(6, 0, 0)
+	caçador._percebe()
+	_check(caçador.target == rival, "FFA: bot caça bot — todos contra todos")
+
+	# DISPARO: conjurar a 25 m (alem da visao e dos passos) entrega a posicao.
+	caçador.target = null
+	rival.global_position = Vector3(100, 0, 0)
+	var atirador: Node = _pawn_scr.new()
+	root.add_child(atirador)
+	atirador.global_position = Vector3(25, 0, 0)
+	_bus.disparo.emit(atirador, atirador.global_position)
+	_check(caçador.target == atirador, "conjurar DENUNCIA a 25m (Bus.disparo)")
+
+	# REVIDE: tomar dano ensina QUEM bateu, mesmo fora de toda audicao.
+	caçador.target = null
+	var sniper: Node = _pawn_scr.new()
+	root.add_child(sniper)
+	sniper.global_position = Vector3(60, 0, 0)
+	_bus.damage_applied.emit(caçador, 12.0, "fire", sniper, false)
+	_check(caçador.target == sniper, "tomar dano ensina quem atacou (revide)")
+
+	# o proprio tiro do bot NAO o assusta (disparo proprio ignorado)
+	caçador.target = null
+	_bus.disparo.emit(caçador, caçador.global_position)
+	_check(caçador.target == null, "o proprio disparo nao vira alvo")
+
+	for n in [caçador, quieto, perto, rival, atirador, sniper]:
+		n.queue_free()
 
 
 func _test_elements() -> void:

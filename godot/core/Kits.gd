@@ -4,9 +4,11 @@
 ## Rebalancear kit = editar AQUI, nunca cacar constante dentro do efeito.
 ##
 ## AS DUAS LEIS DO GDD QUE ESTE ARQUIVO CARREGA NO FORMATO:
-##  1. ECONOMIA (§4.2) — ataque paga MANA; tatica e suprema pagam COOLDOWN.
-##     Por isso NAO existe campo "mana"/"custo" em nenhuma entrada abaixo: nao
-##     e' esquecimento, e' a lei. O selftest reprova se aparecer.
+##  1. ECONOMIA (§4.2, revista pelo Diretor em 26/08 — docs/DIRECAO.md §4) —
+##     ataque paga MANA; tatica paga COOLDOWN; a suprema paga CARGA: enche de
+##     0% a 100% com o tempo E com dano causado, e so' dispara cheia. Por isso
+##     NAO existe campo "mana"/"custo" em nenhuma entrada abaixo: nao e'
+##     esquecimento, e' a lei. O selftest reprova se aparecer.
 ##  2. TELEGRAFIA (§4.3) — "se mata rapido, avisa antes": toda suprema tem
 ##     "telegrafia" entre 1s e 4s de som+visual ANTES do efeito. O selftest
 ##     reprova telegrafia fora dessa faixa em qualquer mago implementado.
@@ -28,13 +30,23 @@ class_name Kits
 const TELEGRAFIA_MIN := 1.0
 const TELEGRAFIA_MAX := 4.0
 
+## Quanto da carga da suprema cada ponto de DANO CAUSADO vale (modelo Apex,
+## ordem do Diretor 26/08: "faca exatamente igual para facilitar a logica").
+## 0.0015 = 100 de dano adianta 15% da barra. AUMENTAR: agressao vira spam de
+## suprema. DIMINUIR: esconder-se carrega quase tao rapido quanto lutar — e o
+## ponto do modelo e' exatamente premiar quem luta.
+const CARGA_POR_DANO := 0.0015
+
 ## Campos que TODO mago tem. Quem nao declara herda daqui — inclusive os 17
 ## ainda nao implementados, que ficam declarados e inertes.
 const PADRAO := {
 	"nome": "?",
 	"implementado": false,
-	"tatica_cd": 14.0,     # s — KNOB
-	"suprema_cd": 100.0,   # s — KNOB
+	## Faixa oficial 5-10s (DIRECAO.md §4): agressao no teto, utilidade no piso.
+	"tatica_cd": 7.0,      # s — KNOB
+	## Segundos ate' a carga passiva encher 100% (dano causado ACELERA — ver
+	## CARGA_POR_DANO). Era "suprema_cd" de 100s: cooldown de suprema morreu em 26/08.
+	"suprema_carga": 45.0, # s — KNOB
 	"telegrafia": 1.5,     # s de aviso da suprema (GDD §4.3)
 	"passiva": {},
 	"tatica": {},
@@ -46,8 +58,8 @@ const MAGOS := {
 	"01-pyra": {
 		"nome": "Pyra",
 		"implementado": true,
-		"tatica_cd": 14.0,
-		"suprema_cd": 100.0,
+		"tatica_cd": 9.0,           # teto da faixa: a Muralha AGRIDE (dano+area)
+		"suprema_carga": 50.0,      # dano puro carrega devagar (DIRECAO.md §4)
 		"telegrafia": 1.4,          # rugido + brilho antes do Braco Livre
 		## Coracao de Fornalha: fogo NO CHAO nao a fere e reacende o braco.
 		"passiva": {
@@ -86,8 +98,8 @@ const MAGOS := {
 	"03-veu": {
 		"nome": "Véu",
 		"implementado": true,
-		"tatica_cd": 12.0,
-		"suprema_cd": 110.0,
+		"tatica_cd": 6.0,           # piso da faixa: Atravessar e' mobilidade pura
+		"suprema_carga": 40.0,      # utilidade de grupo enche mais rapido
 		"telegrafia": 1.6,          # o SINO espectral (counter sonoro, GDD §3)
 		## Entrelinha: desfoca depois de 4s parada de briga.
 		"passiva": {
@@ -118,7 +130,7 @@ const MAGOS := {
 		"nome": "Tessa",
 		"implementado": true,
 		"tatica_cd": 7.0,           # baixo de proposito: ela TECE varios fios
-		"suprema_cd": 95.0,
+		"suprema_carga": 45.0,      # defesa que absorve projeteis: meio da regua
 		"telegrafia": 1.8,          # o tear rune girando antes de abrir
 		## Compasso Runico: o marca-passo regenera escudo. A CAPACIDADE nao mora
 		## aqui: o escudo evolutivo e' do kernel (Balance.ESCUDO / shield_max).

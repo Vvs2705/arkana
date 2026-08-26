@@ -54,6 +54,11 @@ signal dodge_performed
 ## cadencia deles viraria cacofonia sem atenuacao por distancia; quando o Sfx
 ## ganhar posicionamento 3D, os bots entram.
 signal spell_cast(element: String)
+## TODO disparo do jogo, com POSICAO (26/08). Existe porque conjurar DENUNCIA:
+## a percepcao dos bots ouve por aqui ("barulho denuncia, sons de pegadas,
+## respiracao" — ordem do Diretor). Emitido por Projectile.launch, o ponto
+## unico por onde todo tiro ja' passa — nenhum atirador precisou mudar.
+signal disparo(pawn: Node, pos: Vector3)
 
 ## LOOT DE ARMAS ARCANAS (GDD §16.2 — R21). A HUD OBSERVA, nunca decide: quem
 ## equipa e' o ArmaSlot do pawn e quem troca o ataque e' o proprio spec da arma.

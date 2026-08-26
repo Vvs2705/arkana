@@ -8,7 +8,8 @@
 ##     KitRunner.acoplar(pawn, "01-pyra")
 ##
 ## AS DUAS LEIS QUE ESTE ARQUIVO FAZ CUMPRIR (e o selftest prova):
-##  1. ECONOMIA (§4.2): tatica e suprema pagam COOLDOWN. Nenhuma linha deste
+##  1. ECONOMIA (§4.2 + DIRECAO.md §4): tatica paga COOLDOWN; a suprema paga
+##     CARGA 0->100% (tempo + dano causado). Nenhuma linha deste
 ##     arquivo — nem dos kits em habilidades/ — le ou escreve pawn.mana.
 ##  2. TELEGRAFIA (§4.3): usar_suprema() NAO executa o efeito, ela AGENDA.
 ##     Entre o toque e o efeito ha' a fase de aviso (som+visual), grampeada
@@ -44,7 +45,10 @@ var dados: Dictionary = Kits.PADRAO.duplicate(true)
 # declarados dentro de um GDScript carregado).
 var impl = null                     # null = mago sem kit implementado
 var tatica_cd := 0.0
-var suprema_cd := 0.0
+## CARGA da suprema, 0..1 (26/08 — docs/DIRECAO.md §4). NAO e' cooldown: comeca
+## VAZIA na queda ("senao fica muito roubado"), enche com o tempo e com dano
+## causado, e a HUD mostra a porcentagem. Ao usar, volta a zero.
+var suprema_carga := 0.0
 var telegrafia := 0.0               # > 0 = suprema avisada, ainda nao aconteceu
 var silencio := 0.0                 # > 0 = "sem conjurar" (limitador da Veu)
 var estados := {}                   # nome -> s restantes (braco_livre, espectral...)
@@ -117,7 +121,7 @@ func configurar(mago: String) -> void:
 	dados = Kits.de(mago)
 	impl = IMPL.get(mago, null)
 	tatica_cd = 0.0
-	suprema_cd = 0.0
+	suprema_carga = 0.0   # toda partida comeca em 0% — ordem do Diretor
 	telegrafia = 0.0
 	estados.clear()
 	mem.clear()
@@ -136,8 +140,12 @@ func _ready() -> void:
 		Bus.kit_bound.emit(slug, impl != null)
 
 
-func _on_damage(alvo: Node, amount: float, element: String, _fonte: Node,
+func _on_damage(alvo: Node, amount: float, element: String, fonte: Node,
 		_no_escudo: bool) -> void:
+	# DANO CAUSADO acelera a carga (modelo Apex, 26/08): quem luta carrega
+	# antes de quem se esconde. `amount` ja' e' o dano EFETIVO do Combat.
+	if fonte == pawn and alvo != pawn:
+		_carregar_suprema(amount * Kits.CARGA_POR_DANO)
 	if alvo != pawn:
 		return
 	desde_dano = 0.0
@@ -172,16 +180,15 @@ func _physics_process(delta: float) -> void:
 
 func _tick_tempos(delta: float) -> void:
 	var tatica_antes := tatica_cd
-	var suprema_antes := suprema_cd
 	tatica_cd = maxf(tatica_cd - delta, 0.0)
-	suprema_cd = maxf(suprema_cd - delta, 0.0)
+	# A carga passiva da suprema: o TEMPO e' um dos dois canais (o outro e' o
+	# dano causado, em _on_damage). suprema_carga do Kits = segundos ate' 100%.
+	_carregar_suprema(delta / maxf(float(dados.suprema_carga), 0.001))
 	silencio = maxf(silencio - delta, 0.0)
 	desde_ataque += delta
 	desde_dano += delta
 	if tatica_antes > 0.0 and tatica_cd <= 0.0:
 		avisar_cd("tatica", 0.0)
-	if suprema_antes > 0.0 and suprema_cd <= 0.0:
-		avisar_cd("suprema", 0.0)
 	for nome in estados.keys():
 		var t := float(estados[nome]) - delta
 		if t <= 0.0:
@@ -248,7 +255,18 @@ func pronto_tatica() -> bool:
 
 
 func pronto_suprema() -> bool:
-	return impl != null and suprema_cd <= 0.0 and telegrafia <= 0.0 and pode_conjurar()
+	return impl != null and suprema_carga >= 1.0 and telegrafia <= 0.0 and pode_conjurar()
+
+
+## Toda carga entra por AQUI — o tique (tempo) e o dano causado. A borda dos
+## 100% avisa a HUD UMA vez, mesmo padrao de borda do cooldown da tatica.
+func _carregar_suprema(fracao: float) -> void:
+	if not (fracao > 0.0):  # NaN, zero e negativo barrados (idioma do Combat)
+		return
+	var antes := suprema_carga
+	suprema_carga = minf(suprema_carga + fracao, 1.0)
+	if antes < 1.0 and suprema_carga >= 1.0:
+		avisar_cd("suprema", 0.0)
 
 
 ## TATICA — paga COOLDOWN, nunca mana (GDD §4.2).
@@ -261,14 +279,15 @@ func usar_tatica() -> bool:
 	return true
 
 
-## SUPREMA — paga COOLDOWN e, antes do efeito, AVISA (GDD §4.3). Esta funcao
-## nunca executa o efeito: quem executa e' _tick_tempos quando o aviso acaba.
+## SUPREMA — gasta a CARGA inteira (volta a 0%) e, antes do efeito, AVISA
+## (GDD §4.3). Esta funcao nunca executa o efeito: quem executa e'
+## _tick_tempos quando o aviso acaba.
 func usar_suprema() -> bool:
 	if not pronto_suprema():
 		return false
-	suprema_cd = float(dados.suprema_cd)
+	suprema_carga = 0.0
 	telegrafia = clampf(float(dados.telegrafia), Kits.TELEGRAFIA_MIN, Kits.TELEGRAFIA_MAX)
-	avisar_cd("suprema", suprema_cd)
+	avisar_cd("suprema", float(dados.suprema_carga))
 	# GDD §4.3: "se mata rapido, avisa antes" — vale para TODOS, inclusive bot.
 	# Restringir ao player tornava a suprema inimiga muda, matando a contrajogada.
 	Bus.kit_telegraph.emit(slug, "suprema", telegrafia, pawn.global_position)
@@ -352,15 +371,17 @@ func frac_tatica() -> float:
 	return tatica_cd / maxf(float(dados.tatica_cd), 0.001)
 
 
+## Quanto FALTA (0 = pronta), como o cooldown antigo: a HUD desenha o arco e o
+## botao converte isto na porcentagem que o Diretor pediu (100 - falta).
 func frac_suprema() -> float:
-	return suprema_cd / maxf(float(dados.suprema_cd), 0.001)
+	return 1.0 - suprema_carga
 
 
 ## Sinais SO' do player: 6 bots emitindo cooldown viraria enxurrada no Bus.
 ## Emitimos na BORDA (usou / ficou pronto), nunca por frame — a HUD interpola.
 func avisar_cd(tipo: String, restante: float) -> void:
 	if pawn != null and pawn.is_in_group("player"):
-		var total := float(dados.tatica_cd if tipo == "tatica" else dados.suprema_cd)
+		var total := float(dados.tatica_cd if tipo == "tatica" else dados.suprema_carga)
 		Bus.kit_cooldown.emit(tipo, restante, total)
 
 

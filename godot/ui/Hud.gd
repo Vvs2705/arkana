@@ -762,6 +762,8 @@ func _build_sticks() -> void:
 			func() -> void: player.request_suprema())
 	tatica_btn.ativo = false   # ate' o kit_bound dizer que o mago tem kit
 	suprema_btn.ativo = false
+	# A suprema mostra PORCENTAGEM 0->100% (26/08) — e' carga, nao cooldown.
+	suprema_btn.mostra_carga = true
 
 	# PEGAR (GDD §16.2): nasce escondido e so' aparece com loot ao alcance.
 	pegar_btn = _acao(Textos.LOOT_PEGAR, Color(0.85, 0.90, 1.00),

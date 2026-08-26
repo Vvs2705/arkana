@@ -177,6 +177,11 @@ func _test_economia() -> void:
 	var mana0: float = float(p.mana)
 	_cds.clear()
 	_check(k.pronto_tatica(), "tatica pronta no spawn")
+	# A CARGA NO NASCIMENTO (26/08): tatica CHEIA, suprema VAZIA — e' a decisao
+	# "todos caem sem nenhum poder alem das habilidades; a suprema comeca em 0%".
+	# Aqui, ANTES de qualquer caminhada de tempo: 10s de teste ja' enchem 20%.
+	_check(is_zero_approx(k.suprema_carga), "suprema COMECA em 0% — nada de cair carregado")
+	_check(is_equal_approx(k.frac_suprema(), 1.0), "frac = 1.0 (falta tudo) a 0%")
 	_check(k.usar_tatica(), "tatica dispara")
 	_check(is_equal_approx(float(p.mana), mana0), "TATICA NAO consome mana")
 	_check(not _cds.is_empty() and _cds[0][0] == "tatica" and _cds[0][1] > 0.0,
@@ -191,10 +196,36 @@ func _test_economia() -> void:
 	_check(k.pronto_tatica(), "tatica volta quando o cooldown zera")
 	_check(_cds.any(func(e: Array) -> bool: return e[0] == "tatica" and float(e[1]) <= 0.0),
 			"Bus.kit_cooldown avisa a HUD quando fica pronta")
+	# ---- A CARGA DA SUPREMA (26/08 — DIRECAO.md §4). As checagens de
+	# nascimento estao la' em cima, antes das caminhadas de tempo da tatica —
+	# aqui a barra ja' andou, entao zera-se para medir o canal do TEMPO limpo.
+	k.suprema_carga = 0.0
+	_check(not k.pronto_suprema(), "a 0%% a suprema NAO dispara")
+	_check(not k.usar_suprema(), "usar a 0%% e' recusado")
+	var carga_s: float = float(k.dados.suprema_carga)
+	_andar(k, carga_s * 0.5)
+	_check(k.suprema_carga > 0.45 and k.suprema_carga < 0.55,
+			"o TEMPO enche: ~50%% na metade de %.0fs" % carga_s)
+	# DANO CAUSADO acelera (modelo Apex): o pawn e' a FONTE, o alvo e' outro.
+	var antes: float = k.suprema_carga
+	var outro := _inimigo(arena, Vector3(5, 0, 0))
+	_bus.damage_applied.emit(outro, 100.0, "fire", p, false)
+	_check(k.suprema_carga > antes + 0.10,
+			"100 de dano causado adianta a carga (CARGA_POR_DANO)")
+	# dano RECEBIDO nao carrega — senao apanhar viraria bateria
+	antes = k.suprema_carga
+	_bus.damage_applied.emit(p, 50.0, "fire", outro, false)
+	_check(is_equal_approx(k.suprema_carga, antes), "dano RECEBIDO nao enche a carga")
+	k.suprema_carga = 1.0
 	mana0 = float(p.mana)
-	_check(k.usar_suprema(), "suprema dispara")
+	_cds.clear()
+	_check(k.usar_suprema(), "a 100%% a suprema dispara")
 	_check(is_equal_approx(float(p.mana), mana0), "SUPREMA NAO consome mana")
-	_check(not k.usar_suprema(), "suprema bloqueada durante o proprio cooldown")
+	_check(is_zero_approx(k.suprema_carga), "usar GASTA a carga inteira: volta a 0%%")
+	_check(not k.usar_suprema(), "vazia de novo, bloqueada de novo")
+	_check(not _cds.is_empty() and _cds[0][0] == "suprema"
+			and is_equal_approx(float(_cds[0][2]), float(k.dados.suprema_carga)),
+			"Bus.kit_cooldown leva os segundos de carga para a HUD")
 	arena.queue_free()
 
 
@@ -206,6 +237,7 @@ func _test_telegrafia() -> void:
 	var k: Object = m[2]
 	_teles.clear()
 	var mana0: float = float(p.mana)
+	k.suprema_carga = 1.0  # o teste e' sobre o AVISO; a carga ja' foi provada
 	_check(k.usar_suprema(), "suprema aceita")
 	_check(k.telegrafia > 0.0, "existe fase de telegrafia")
 	_check(not k.estado_ativo("braco_livre"), "o EFEITO ainda nao aconteceu no toque")
@@ -233,6 +265,7 @@ func _test_telegrafia() -> void:
 	var m2 := _montar("01-pyra")
 	var k2: Object = m2[2]
 	k2.dados["telegrafia"] = 0.0
+	k2.suprema_carga = 1.0
 	k2.usar_suprema()
 	_check(k2.telegrafia >= float(_kits.TELEGRAFIA_MIN),
 			"telegrafia 0 e' grampeada no piso de 1s (a lei nao depende do dado)")
@@ -288,11 +321,17 @@ func _test_pyra() -> void:
 			"⚖️ vento empurra a muralha 3m (§14)")
 	# ⚖️ ao acabar a suprema o braco ESFRIA: 4s sem tatica e -15% de velocidade
 	var s: Dictionary = k.dados.suprema
-	k.suprema_cd = 0.0
+	k.suprema_carga = 1.0  # carga CHEIA: o teste quer usar a suprema ja'
 	k.usar_suprema()
 	_andar(k, float(k.dados.telegrafia) + float(s.duracao) + 0.2)
 	_check(not k.estado_ativo("braco_livre"), "a suprema tem duracao FIXA (6s)")
-	_check(k.tatica_cd >= float(s.esfria_dur) - 0.01, "⚖️ braco frio: %.0fs sem tatica"
+	# TOLERANCIA DE UM TIQUE (0.1) e nao de 0.01: a caminhada para' um tique
+	# DEPOIS de o estado expirar, entao o esfriamento ja' contou 0.1s. Ate'
+	# 26/08 a folga de 0.01 passava VACUAMENTE — a tatica_cd antiga de 14s
+	# ainda estava correndo (sobrava 6.4s) e mascarava o esfria de 4s. Com a
+	# tatica em 9s (DIRECAO.md) a sobra e' 1.4s, o maxf do esfria REALMENTE
+	# levanta para 4s, e este check passou a provar o que sempre disse provar.
+	_check(k.tatica_cd >= float(s.esfria_dur) - 0.15, "⚖️ braco frio: %.0fs sem tatica"
 			% float(s.esfria_dur))
 	_check(not k.pronto_tatica(), "⚖️ tatica realmente bloqueada com o braco frio")
 	k._physics_process(0.05)
@@ -350,7 +389,7 @@ func _test_veu() -> void:
 	# suprema: a Mare silencia TODO MUNDO por 5s e toca o sino
 	_states.clear()
 	var s: Dictionary = k.dados.suprema
-	k.suprema_cd = 0.0
+	k.suprema_carga = 1.0  # carga CHEIA: o teste quer usar a suprema ja'
 	k.usar_suprema()
 	_andar(k, float(k.dados.telegrafia) + 0.05)
 	_check(k.estado_ativo("mare"), "a Mare comeca depois do aviso")
@@ -419,7 +458,7 @@ func _test_tessa() -> void:
 	_bus.terrain_hit.emit("fire", fio.a, false)
 	_check(fio.is_queued_for_deletion(), "⚖️ UM golpe na ancora derruba o fio")
 	# suprema: o Tear-Mae absorve projetil inimigo, menos no curtissimo alcance
-	k.suprema_cd = 0.0
+	k.suprema_carga = 1.0  # carga CHEIA: o teste quer usar a suprema ja'
 	k.silencio = 0.0
 	k.usar_suprema()
 	_andar(k, float(k.dados.telegrafia) + 0.05)
@@ -438,7 +477,7 @@ func _test_tessa() -> void:
 			"⚖️ zona morta de %.0fm: nao engole curtissimo alcance" % float(s.zona_morta))
 	_check(is_equal_approx(float(p.shield), float(s.escudo_por_projetil)),
 			"o absorvido vira ESCUDO tecido (no escudo do kernel, nao num paralelo)")
-	k.suprema_cd = 0.0
+	k.suprema_carga = 1.0  # carga CHEIA: o teste quer usar a suprema ja'
 	k.usar_suprema()
 	_andar(k, float(k.dados.telegrafia) + 0.05)
 	_check(k.mem.get("tear") == tear, "⚖️ maximo 1 Tear-Mae por vez")

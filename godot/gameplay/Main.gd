@@ -84,7 +84,9 @@ func _build_match() -> void:
 	_dar_arma(player)
 	for i in bots_alive:
 		var b := Bot.new()
-		b.target = player
+		# SEM b.target = player (26/08): a partida e' FFA e o alvo nasce da
+		# PERCEPCAO do bot (Bot._percebe) — visto, ouvido, disparo, revide.
+		# Cravar o player aqui era o defeito "mesmo sem me mexer eles me notam".
 		arena.add_child(b)
 		_dar_arma(b)
 		b.global_position = pts[i + 1]

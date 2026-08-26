@@ -207,6 +207,13 @@ func _update_lean(delta: float) -> void:
 			minf(float(Balance.MOVE.bank_rate) * delta, 1.0))
 
 
+## Grupo da PERCEPCAO (26/08): os bots varrem "magos" para notar quem esta'
+## perto. Pawn de teste tambem entra — e' de proposito, os testes de percepcao
+## usam exatamente isso.
+func _enter_tree() -> void:
+	add_to_group("magos")
+
+
 func dodge_ready() -> bool:
 	return _dodge_cd <= 0.0 and hp > 0.0 and Derrubado.pode_agir(self)
 
