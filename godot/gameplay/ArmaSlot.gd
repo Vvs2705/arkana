@@ -94,7 +94,8 @@ func equipar(id: String, p_par: PackedStringArray = PackedStringArray()) -> void
 	_alt = 0
 	_montar_visual()
 	var d := dados()
-	Bus.weapon_equipped.emit(id, str(d.nome), str(d.raridade), elementos(""))
+	# O dono e o PAI: o slot vive pendurado no pawn (ver ArmaSlot.de()).
+	Bus.weapon_equipped.emit(get_parent(), id, str(d.nome), str(d.raridade), elementos(""))
 
 
 func tier() -> int:

@@ -188,7 +188,10 @@ def riggar(slug: str, task_id: str | None = None) -> None:
         if isinstance(r.get(k), str):
             baixar(r[k], dest / nome)
     for k, url in (r.get("basic_animations") or {}).items():
-        if isinstance(url, str) and url.endswith((".glb", ".fbx")) or "glb_url" in k:
+        # PRECEDENCIA: `and` liga mais forte que `or`, entao sem os parenteses
+        # isto virava (str and endswith) OR ("glb_url" in k) — e uma chave com
+        # glb_url e valor None passava direto para baixar(), que espera string.
+        if isinstance(url, str) and (url.endswith((".glb", ".fbx")) or "glb_url" in k):
             ext = "fbx" if "fbx" in k else "glb"
             baixar(url, dest / "anim" / f"{k.replace('_url','')}.{ext}")
     print(f"  creditos usados: {t.get('consumed_credits', '?')}")

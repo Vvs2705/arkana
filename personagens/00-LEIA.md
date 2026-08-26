@@ -39,6 +39,30 @@ A arte da direção anterior foi removida do disco em 25/08 e vive no commit
 `9643113` — para recuperar uma:
 `git show 9643113:personagens/01-pyra/arte/concept.png > saida.png`
 
+### Manifestos e armazenamento (25/08/2026)
+
+Cada personagem tem `arte/manifesto.md` com as oito vistas, dimensoes e SHA-256
+**do que esta' em disco**. Foram gerados por inspecao, e os 160 PNGs abrem sem
+erro — nenhum corrompido, nenhum faltando.
+
+**O que NAO temos, e por isso a norma de arte segue aberta:**
+
+1. o **documento mestre** da nova direcao aprovada pelo Diretor;
+2. o **`MANIFESTO.md`** e o **`SHA256SUMS.txt`** da entrega original.
+
+Sem o item 2 os hashes acima descrevem o que temos, mas **nao confirmam** que e'
+o aprovado. Sem o item 1 nao da' para afirmar que estas oito vistas sao as
+canonicas da direcao nova.
+
+**Os 10 zips da entrega nao existem mais**: foram apagados por mim na
+higienizacao de 25/08 (commit `6e9836e`) depois de conferir por MD5 que os 180
+arquivos eram byte a byte identicos ao disco. Nada se perdeu, mas a redundancia
+acabou — hoje os 160 PNGs existem em UM lugar so'.
+
+**Onde eles vao morar e' DECISAO DO DIRETOR** (Git LFS ou armazenamento externo
+duravel). As duas rotas estao descritas em `docs/ART.md`; nenhuma foi escolhida
+pela equipe.
+
 ### O que a auditoria de 25/08 mediu
 
 **O elenco tem três linguagens visuais diferentes, não uma.**

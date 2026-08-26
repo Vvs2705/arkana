@@ -14,7 +14,7 @@
 
 ---
 
-## DIRETRIZ PERMANENTE DO DIRETOR (26/08/2026)
+## DIRETRIZ PERMANENTE DO DIRETOR (25/08/2026)
 
 *"O tamanho do APK não importa hoje. Para testar e validar isso é irrelevante,
 meu celular suporta. O importante é validar com o que é real, mais importante
@@ -33,7 +33,7 @@ coisas, mas sem esse medo excessivo."*
   aparelho**. Pacote grande é irrelevante; jogo travando é o jogo não
   funcionando. Se um asset derrubar o FPS, o problema é o FPS — diga isso com
   MEDIÇÃO no aparelho, nunca com estimativa de disco.
-**O APARELHO DE TESTE, agora conhecido (26/08):** **Poco F4** — Snapdragon 870,
+**O APARELHO DE TESTE, agora conhecido (25/08):** **Poco F4** — Snapdragon 870,
 GPU Adreno 650, tela 120 Hz. Nao e' aparelho de entrada: e' alto desempenho de
 2022 e roda jogo pesado. Ate' hoje o projeto mirava "aparelho intermediario"
 generico, o que era chute. **A regua de desenvolvimento pode ser bem mais
@@ -51,7 +51,34 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI (26/08) — o Diretor precisa testar o APK
+### >>> COMECE POR AQUI — auditoria externa executada (25/08/2026)
+
+Um plano de auditoria em 12 tarefas foi executado na branch
+`chore/auditoria-organizacao-arkana`. **Nada foi mesclado na `main`.**
+
+**O que ele consertou de verdade:**
+- O auditor de modelos media VERTICE num orcamento definido em TRIANGULO, e
+  reprovava os DOIS modelos reais do jogo estando ambos dentro do alvo.
+- `Bus.damage_dealt` parecia ter consumidor, mas o gancho vivia num ramo `else`
+  que nunca rodava. Removido, junto com o mecanismo de troco que so' existia
+  para arredondar o sinal.
+- `weapon_equipped` e `bau_canalizando` nao diziam de QUEM eram: a HUD
+  adivinhava pelo id da arma, e um bot com a mesma arma mudava o icone do
+  jogador. Os dois passaram a carregar o `pawn`.
+- Os 6 bots passaram a CAIR do castelo, sob a mesma lei do jogador.
+- Os 12 autotestes viraram um comando so' (`godot/tests/run_all.sh`) com CI no
+  GitHub. Antes eram 12 linhas copiadas a mao — e comando copiado a mao e' como
+  se esquece um teste.
+
+**O que ficou BLOQUEADO, por falta de entrada externa:**
+- As 160 referencias de arte: falta o documento mestre da direcao aprovada e o
+  manifesto/checksums da entrega. Os 160 PNGs estao integros e com manifesto
+  gerado, mas **existem em UM lugar so', sem copia**.
+
+**O que NAO foi executado:** teste no Poco F4 — nenhum aparelho apareceu em
+`adb devices`. FPS segue sem medicao neste projeto.
+
+### (25/08, manha — o APK anterior, mantido como historico)
 
 O APK esta' em `godot/build/testes/`. **O que mudou e o que olhar:**
 
@@ -60,7 +87,10 @@ O APK esta' em `godot/build/testes/`. **O que mudou e o que olhar:**
    **Nao ha' magia durante a queda** — ordem dele, e esta' testada.
 2. **A ilha quase triplicou** (180 -> 300 m) e ficou mais legivel DO ALTO, que
    e' a vista nova que a queda criou. 7 POIs agora (era 4).
-3. **A patinacao acabou** — era animacao importada sem laco.
+3. **A patinacao dos pes**: as DUAS causas achadas foram corrigidas — o modelo
+   entrava virado 180 graus e a animacao importada entrava sem laco. **Falta
+   medir no aparelho** se o casamento entre cadencia da animacao e velocidade
+   real ainda satura (ver item 12 das dividas). Nao declare resolvido antes.
 4. **Pegar item e abrir bau viraram GESTO**, com a faisca saindo no quadro em
    que a mao chega ao chao.
 
@@ -136,32 +166,54 @@ de primeira classe) nao sao estilo — sao cicatrizes de defeitos medidos.
 4. Playtest do Roblox com gente de verdade (V1–V5). Login e publicacao sao ato dele.
 5. Contratar servidor e contas de loja quando chegar a hora (G5/G6) e responder o IARC.
 
-**A equipe faz, em ordem de valor:**
-0. **[FEITO 26/08]** ~~O laco das animacoes do modelo externo~~ — corrigido,
-   com teste provado em vermelho.
-0.1. **Bots nao caem do castelo** — nascem no chao. Mexe em `Bot.gd`, que nao
-   era de nenhuma raia desta fase. E' o buraco mais visivel da queda hoje.
-0.2. **Sem colisao no ar durante a queda**: o pouso e' sempre no terreno, nunca
-   em cima de arvore ou telhado. Marcado com `ponytail:` em `Queda._solo()`.
-0.3. **Dano cancela a canalizacao do bau?** PERGUNTA ABERTA AO DIRETOR. Hoje
-   cancelam: sair do raio, cair derrubado e morrer. Dano NAO cancela. E'
-   balanceamento — nao decidido pela equipe de proposito.
-1. **Os 17 kits que faltam** — e' o maior buraco de jogabilidade (secao 3).
-2. **A Sintonia** — um dos dois pilares de identidade, sem uma linha em codigo.
-3. **Corrigir os angulos das vistas** da concept art: nao existe perfil de 90
+**A equipe faz.** As pendencias estao separadas em TRES GRUPOS, porque
+misturar correcao com decisao de produto foi o que fez o proximo agente
+implementar por inferencia:
+
+### GRUPO 1 — correcoes tecnicas reproduziveis (pode fazer)
+1.1. **Medir a patinacao no aparelho.** As duas causas achadas foram corrigidas
+   (modelo virado e animacao sem laco). Falta medir se o casamento entre
+   cadencia e velocidade satura o teto de `Balance.ANIM` num anao de 1,40 m
+   usando clipe feito para ~1,70 m.
+1.2. **Corrigir os angulos das vistas** da concept art: nao ha' perfil de 90
+   graus no lote, e o "3/4" e' a frontal repetida. Trava o multi-imagem da Meshy.
+1.3. **Texturas do Brok**: duas de 2048. Consolidar SO' se material e comparacao
+   visual provarem que uma e' redundante.
+
+### GRUPO 2 — funcionalidades ja' especificadas (pode fazer, com teste)
+2.1. ~~Bots caem do castelo~~ **[FEITO 25/08]** — os 6 caem sob a mesma lei do
+   jogador, com 8 checagens no selftest da queda.
+2.2. **Animacao `derrubado`**: hoje o caido usa a de locomocao mais lenta. Entra
+   como OPCIONAL, com o mesmo mecanismo de `cair`/`planar`/`pegar`, para nao
+   derrubar modelo que nao tenha o clipe.
+2.3. **Os 17 kits que faltam** — o maior buraco de jogabilidade.
+2.4. **A Sintonia** — um dos dois pilares, sem uma linha em codigo.
+2.5. **Modelo 3D dos magos restantes.** Caminho provado: 30 creditos cada.
+
+### GRUPO 3 — DECISOES DO DIRETOR (nao implementar por inferencia)
+Cada uma esta' na secao 4 com as opcoes e o impacto. Enquanto nao houver
+resposta, o comportamento atual permanece e NAO deve ser "melhorado" sozinho:
+dano cancelar o bau, resultado do timeout, tabela da zona, colisao aerea,
+mergulho no mar, manopla da Pyra, armazenamento das artes, remocao da branch
+antiga, protecao da main e contas de publicacao.
+
+### O que sobrou fora dos grupos
+ — e' o maior buraco de jogabilidade (secao 3).
+- ~~A Sintonia~~ (ver 2.4) — um dos dois pilares de identidade, sem uma linha em codigo.
+- ~~Angulos das vistas~~ (ver 1.2) da concept art: nao existe perfil de 90
    graus no lote, e o "3/4" e' a frontal repetida. Isso trava o multi-imagem
    da Meshy e independe da decisao de estilo.
-4. Modelo 3D dos magos restantes. **O caminho esta provado de ponta a ponta**
+- ~~Modelo 3D dos restantes~~ (ver 2.5) **O caminho esta provado de ponta a ponta**
    (25/08): concept -> Meshy multi-imagem -> remesh 15k -> rig -> animacoes ->
    .glb -> jogo. Custo medido: **30 creditos** por personagem (remesh, rig e
    animacao saem de graca no webapp; na API o remesh custa 5).
-5. **Corrigir o teto de vertices do `model_audit.gd`**: ele reprova em 20.000 e
+- **[FEITO 25/08]** ~~teto de vertices do model_audit~~ — agora mede TRIANGULO: ele reprova em 20.000 e
    **os dois modelos reais reprovam** (Pyra 22.561, Brok 29.212) mesmo estando
    dentro do orcamento de 15k triangulos. Costura de UV multiplica vertice — o
    teto foi escrito na metrica errada.
-6. **Texturas acima do orcamento**: o Brok trouxe duas de 2048 (13,6 MB no
+- ~~Texturas do Brok~~ (ver 1.3): o Brok trouxe duas de 2048 (13,6 MB no
    pacote). TECH_ART pede 2K para hero, entao passa, mas duas e' desperdicio.
-5. Vozes (560 falas escritas, nenhuma gerada) e arte de UI (68 prompts prontos).
+5. Vozes (560 falas escritas, nenhuma gravada) e arte de UI (68 prompts prontos).
    **Bloqueante para publicar:** o APK ainda usa o icone padrao do Godot.
 
 ---
@@ -233,7 +285,7 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
    `KitRunner.IMPL`). Hoje quem não tem kit joga sem tática nem suprema.
 2. **A Sintonia não existe** (GDD §9) — é um dos dois pilares de identidade do
    jogo e não há uma linha dela em código.
-3. **Só a Pyra tem modelo 3D.** Os outros 19 usam o mago procedural genérico.
+3. **Só Pyra e Brok tem modelo 3D.** Os outros 18 usam o mago procedural.
    Pipeline pronto em `tools/meshy/` (ver [MESHY.md](MESHY.md)).
    ⚠️ **As vistas da concept art tem defeito de angulo** (nao ha perfil de 90
    graus; o "3/4" e' a frontal repetida), entao o fluxo multi-imagem da Meshy
@@ -241,7 +293,8 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
    ver `personagens/00-LEIA.md`.
 
 ### Qualidade e conteúdo
-4. **Vozes**: 560 falas escritas em `audio/vozes/`, **nenhum áudio gerado**. O
+4. **Vozes**: 560 falas escritas em `audio/vozes/`, **nenhum áudio gerado**
+   (conferido: `grep -hcE '^[0-9]+ \[' audio/vozes/*.txt` — 20 magos x 28). O
    fluxo está no `00-LEIA.txt` de lá (ElevenLabs).
 5. **Arte de UI**: 68 prompts prontos em `docs/prompts-arte/`, nada gerado.
    ⚠️ **Bloqueante para publicar**: o APK ainda usa o **ícone padrão do Godot** —
@@ -258,8 +311,9 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
 10. `Balance.PLAYER.jump` é KNOB **órfão**: nenhum código usa. Ou entra um botão
     de pulo, ou o número sai.
 11. Falta animação `"derrubado"`; hoje o caído usa a de locomoção mais lenta.
-12. **A patinação dos pés não está resolvida.** A meia-volta do modelo (25/08)
-    tirou a causa maior — o personagem corria de costas —, mas o casamento entre
+12. **A patinação dos pés: duas causas corrigidas, uma por medir.** Corrigidos
+    a meia-volta do modelo (corria de costas) e o laço ausente da animação
+    importada (tocava três passos e congelava). Falta medir se o casamento entre
     cadência da animação e velocidade real (`Pawn._sync_anim_speed`) é limitado
     por um teto em `Balance.ANIM`. O Brok tem 1,40 m e usa um clipe de corrida
     da biblioteca da Meshy provavelmente feito para ~1,70 m: se a razão
@@ -272,7 +326,7 @@ Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
 
 ## 3.5 Decisão de sequência: FUNCIONALIDADE antes de ARTE DE CENÁRIO
 
-**Decidido pelo Diretor em 26/08/2026**, com estas palavras: *"depois de
+**Decidido pelo Diretor em 25/08/2026**, com estas palavras: *"depois de
 validarmos funcionalidades, seria interessante começar a desenvolver mais em 3D
 a ilha, árvores, mais ambientes, deixar mais bonito assim como estamos
 melhorando os personagens"*.
@@ -286,7 +340,7 @@ antes da decisão:
 1. **Desenhos por quadro.** As 158 árvores custam praticamente UM desenho hoje,
    porque compartilham a mesma malha procedural via MultiMesh. Modelo importado
    traz material próprio e quebra isso. É o risco número um no celular.
-2. ~~**Tamanho do pacote.**~~ **ARGUMENTO DERRUBADO PELO DIRETOR em 26/08.**
+2. ~~**Tamanho do pacote.**~~ **ARGUMENTO DERRUBADO PELO DIRETOR em 25/08.**
    Palavras dele: *"o tamanho do APK não importa hoje... o importante é validar
    com o que é real... eu tenho mais de 20 GB disponíveis"*. **Não use peso de
    pacote como motivo para recusar qualidade enquanto o jogo está em
@@ -357,7 +411,7 @@ roblox/         "Campo de Provas" — frente ativa de validação humana
 personagens/    as 20 fichas + o ateliê de arte de cada um
 docs/           GDD (fonte da verdade) e os estudos
   pipeline-arte/  o pacote de pipeline Meshy (concept -> 3D), material de apoio
-audio/vozes/    as 560 falas para gerar no ElevenLabs
+audio/vozes/    as 560 falas para gerar no ElevenLabs (20 magos x 28)
 tools/meshy/    pipeline concept art → personagem 3D riggado
 infra/          planejamento de servidores, custos e distribuição
 ```
@@ -405,7 +459,7 @@ recebe manutenção. Continua recuperável pelo histórico do Git.
 | **21/08** | **R20/R20.1** — elenco descolado do Apex com marcas mágicas próprias; Pyra em 3D pela Meshy; zona, habilidades, escudo, derrubado, armas arcanas, baú e HUD completa; área segura corrigida; estudo de dano |
 
 | 24/08 | Novo lote de concept art dos 20 magos (8 vistas cada) |
-| **26/08** | **A QUEDA**: castelo voador, salto, planeio e pouso · ilha 180 -> 300 m com 7 POIs e leitura aerea · gesto de pegar item e abrir bau · fim da patinacao · zona e terreno passam a ESCALAR com o mapa |
+| **25/08** | **A QUEDA**: castelo voador, salto, planeio e pouso · ilha 180 -> 300 m com 7 POIs e leitura aerea · gesto de pegar item e abrir bau · fim da patinacao · zona e terreno passam a ESCALAR com o mapa |
 | **25/08** | **Brok em 3D pela Meshy** (multi-imagem + rig + 5 animações), APK de 106 MB → 54 MB ao excluir o ateliê da exportação; **higienização**: -398 MB em duplicatas e material superseded; ateliê de arte fora do git; pipeline Meshy achatado em `docs/pipeline-arte/`; `meshy.py` consertado; auditoria visual dos 20 e da validade do pacote de pipeline |
 
 Detalhe de cada mudança: `git log` e o [CHANGELOG](../CHANGELOG.md).

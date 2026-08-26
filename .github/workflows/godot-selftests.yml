@@ -1,0 +1,53 @@
+# Portao automatico do jogo 3D: roda os MESMOS 12 autotestes que rodam na
+# maquina de quem desenvolve, pelo MESMO script. Se o CI e o local divergirem,
+# um dos dois passa a mentir — por isso aqui nao ha' lista de testes: ha' uma
+# chamada a godot/tests/run_all.sh.
+#
+# O export Android NAO entra aqui de proposito: depende de SDK, JDK, templates e
+# keystore. Ele ganha workflow proprio quando existir politica de release.
+name: Selftests Godot
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  selftests:
+    name: 12 selftests headless
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Baixar o repositorio (com LFS)
+        uses: actions/checkout@v4
+        with:
+          # Os modelos .glb da Pyra e do Brok vivem em LFS. Sem isto o checkout
+          # traz ponteiros de 132 bytes e characters/selftest.gd reprova por
+          # "modelo ausente" — vermelho pelo motivo errado.
+          lfs: true
+
+      - name: Conferir que o LFS materializou
+        run: |
+          git lfs ls-files
+          ls -l godot/characters/modelos/pyra.glb godot/characters/modelos/brok.glb
+
+      - name: Instalar o Godot 4.4.1 (release oficial, versao fixa)
+        env:
+          # Versao CRAVADA. Action flutuante ou "latest" faria o portao mudar de
+          # comportamento sem ninguem ter mexido no projeto.
+          GODOT_VERSION: 4.4.1-stable
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          cd "$RUNNER_TEMP/godot"
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+          ./godot --version
+
+      - name: Rodar os 12 selftests
+        run: GODOT_BIN="$RUNNER_TEMP/godot/godot" bash godot/tests/run_all.sh

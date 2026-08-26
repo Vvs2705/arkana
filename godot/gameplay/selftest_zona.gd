@@ -21,7 +21,6 @@ var _bus: Node
 var _bal: Node
 var _zona: GDScript
 var _pawn: GDScript
-var _dmg: Array = []        # damage_dealt (legado, int)
 var _dmg_full: Array = []   # damage_applied (novo, float)
 var _avisos: Array = []
 var _fechamentos: Array = []
@@ -38,7 +37,6 @@ func _run() -> void:
 	_bal = root.get_node("Balance")
 	_zona = load("res://gameplay/Zona.gd")
 	_pawn = load("res://gameplay/Pawn.gd")
-	_bus.damage_dealt.connect(func(t: Node, a: int, e: String) -> void: _dmg.append([t, a, e]))
 	_bus.damage_applied.connect(func(t: Node, a: float, e: String, s: Node, esc: bool) -> void:
 		_dmg_full.append([t, a, e, s, esc]))
 	_bus.zona_avisou.connect(func(f: int, c: Vector3, r: float, s: float) -> void:
@@ -284,7 +282,6 @@ func _test_dano() -> void:
 
 	var hp_dentro: float = float(dentro.hp)
 	var hp_fora: float = float(fora.hp)
-	_dmg.clear()
 	_dmg_full.clear()
 	_zdano.clear()
 	_zestado.clear()
@@ -298,12 +295,12 @@ func _test_dano() -> void:
 	_check(_dmg_full.size() == 1, "UM sinal de dano por tique, nao um por frame")
 	_check(_dmg_full[0][3] == null, "a tempestade nao tem autor (source null: e' ambiente)")
 	_check(str(_dmg_full[0][2]) == "zona", "o dano sai etiquetado como 'zona'")
-	var zeros := 0
-	for e in _dmg:
-		if int(e[1]) <= 0:
-			zeros += 1
-	_check(_dmg.size() == 1 and zeros == 0,
-			"o sinal LEGADO saiu %d (>= 1): o dano-zero de 60Hz nao existe aqui" % int(_dmg[0][1]))
+	# Migrado do extinto `damage_dealt` em 25/08/2026. A cobertura e' a mesma e
+	# ela importa: a zona nao pode emitir dano ZERO a 60 Hz — era isso que o
+	# arredondamento para int do sinal antigo mascarava.
+	_check(float(_dmg_full[0][1]) > 0.0,
+			"o dano do tique e' %.2f (> 0): o dano-zero de 60Hz nao existe aqui"
+			% float(_dmg_full[0][1]))
 
 	## O tique do BOT nao pode acender a vinheta do player.
 	_check(_zdano.is_empty(), "bot fora da zona NAO emite zona_dano (so' o player)")

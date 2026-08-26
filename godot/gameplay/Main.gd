@@ -123,7 +123,16 @@ func _build_match() -> void:
 	if ResourceLoader.exists(QUEDA_SCRIPT):
 		var qs: GDScript = load(QUEDA_SCRIPT)
 		if qs != null:
-			qs.iniciar(arena, island, player)
+			var q = qs.iniciar(arena, island, player)
+			## OS BOTS CAEM JUNTO, pela mesma lei: passo de fisica desligado ate'
+			## pousar, entao nenhum deles conjura no ar. Compartilham o castelo
+			## do jogador — ha' UM castelo no ceu, nao sete.
+			if q != null:
+				var lista: Array = []
+				for n in arena.get_children():
+					if n is Bot:
+						lista.append(n)
+				qs.iniciar_bots(lista, island, q.castelo)
 	hud.bind_player(player)
 	hud.hide_end()
 	hud.update_match(time_left, bots_alive)

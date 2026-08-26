@@ -132,12 +132,10 @@ func _connect_bus() -> void:
 	## MIGRACAO DO DANO (Bus.gd §damage_applied): o sinal novo carrega QUEM
 	## causou e SE bateu em escudo — da o "clank" de escudo, separa o tique de
 	## DoT (source == null) do acerto direto e traz o alvo para calcular
-	## distancia. Enquanto ele existir, o legado `damage_dealt` NAO e ouvido:
-	## os dois juntos tocariam o mesmo acerto duas vezes.
-	if bus.has_signal("damage_applied"):
-		_hook(bus, "damage_applied", _on_damage_applied)
-	else:
-		_hook(bus, "damage_dealt", _on_damage_dealt)
+	## distancia. O legado `damage_dealt` foi REMOVIDO em 25/08/2026: so' era
+	## conectado no ramo else, que nunca rodava porque `damage_applied` sempre
+	## existiu. Sinal sem ouvinte de producao e' contrato morto.
+	_hook(bus, "damage_applied", _on_damage_applied)
 	_hook(bus, "entity_died", _on_entity_died)
 	_hook(bus, "player_killed_bot", _on_player_killed_bot)
 	_hook(bus, "dodge_performed", _on_dodge)
@@ -347,11 +345,6 @@ func _on_damage_applied(target: Node, _amount: float, element: String,
 		_play_at("hit", pos, -6.0, P_NORMAL, 60)
 
 
-## Legado: so' e' conectado se o Bus ainda nao tiver `damage_applied`.
-func _on_damage_dealt(_target: Node, _amount: int, _element: String) -> void:
-	_play("hit", -6.0, P_NORMAL, 60)
-
-
 ## "Derrubado" e' um BAQUE, nunca sofrimento (classificacao 10+).
 func _on_entity_died(entity: Node) -> void:
 	var pos := (entity as Node3D).global_position if entity is Node3D else Vector3.ZERO
@@ -409,7 +402,7 @@ func _on_loot_prompt(_nome: String, _raridade: String, perto: bool) -> void:
 ## e ARMA o estalo dos dedos para os proximos disparos do player.
 ## ⚠️ `weapon_equipped` nao diz QUEM equipou (ver PEDIDOS): usamos a raridade,
 ## e o par de 2 elementos, como assinatura da manopla.
-func _on_weapon_equipped(_arma_id: String, _nome: String, raridade: String,
+func _on_weapon_equipped(_pawn: Node, _arma_id: String, _nome: String, raridade: String,
 		elementos: PackedStringArray) -> void:
 	if raridade == "lendaria" or elementos.size() >= 2:
 		_manopla = true
@@ -474,7 +467,7 @@ func _on_bau_pousou(_pos: Vector3) -> void:
 
 ## Chega a CADA frame de fisica enquanto o player canaliza (BauCelestial._process)
 ## — por isso NAO gera stream nova: so' mexe no pitch de um loop que ja' toca.
-func _on_bau_canalizando(progresso: float) -> void:
+func _on_bau_canalizando(_pawn: Node, progresso: float) -> void:
 	if progresso <= 0.0:
 		_parar_evento()
 		return

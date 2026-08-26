@@ -51,7 +51,7 @@ func _run() -> void:
 	_combat = load("res://gameplay/Combat.gd")
 	_fg = load("res://gameplay/FireGesture.gd")
 	_bot_scr = load("res://gameplay/Bot.gd")
-	_bus.damage_dealt.connect(func(t: Node, a: int, e: String) -> void:
+	_bus.damage_applied.connect(func(t: Node, a: float, e: String, _s: Node, _x: bool) -> void:
 		_dmg_events.append([t, a, e]))
 	_bus.damage_applied.connect(func(t: Node, a: float, e: String, src: Node, esc: bool) -> void:
 		_dmg_full.append([t, a, e, src, esc]))
@@ -64,14 +64,14 @@ func _run() -> void:
 		_thits.append([el, pos, strong]))
 	_bus.player_killed_bot.connect(func(bot_name: String) -> void: _kills.append(bot_name))
 	_bus.dodge_performed.connect(func() -> void: _dodges += 1)
-	_bus.weapon_equipped.connect(func(id: String, nome: String, rar: String,
+	_bus.weapon_equipped.connect(func(_pawn: Node, id: String, nome: String, rar: String,
 			els: PackedStringArray) -> void: _armados.append([id, nome, rar, els]))
 	_bus.loot_prompt.connect(func(nome: String, rar: String, perto: bool) -> void:
 		_prompts.append([nome, rar, perto]))
 	_bus.bau_anunciado.connect(func(pos: Vector3, segs: float) -> void:
 		_bau_anuncios.append([pos, segs]))
 	_bus.bau_pousou.connect(func(pos: Vector3) -> void: _bau_pousos.append(pos))
-	_bus.bau_canalizando.connect(func(pr: float) -> void: _bau_prog.append(pr))
+	_bus.bau_canalizando.connect(func(_pawn: Node, pr: float) -> void: _bau_prog.append(pr))
 	_bus.bau_aberto.connect(func(por_player: bool, els: PackedStringArray) -> void:
 		_bau_abertos.append([por_player, els]))
 	_test_combat_damage()
@@ -88,6 +88,7 @@ func _run() -> void:
 	_test_armas()
 	_test_loot()
 	_test_bau()
+	_test_dono_dos_sinais()
 	_test_game_feel()
 	_test_restart()
 	_test_sinal_sem_zero()  # roda por ULTIMO: audita todos os eventos da sessao
@@ -114,6 +115,37 @@ func _check(cond: bool, name: String) -> void:
 		printerr("  FALHA - " + name)
 
 
+## QUEM emitiu? `weapon_equipped` e `bau_canalizando` tinham consumidor mas nao
+## diziam de quem eram. A HUD contornava comparando o arma_id com o slot do
+## jogador: se um BOT equipasse a MESMA arma, o icone do jogador mudava. Sinal
+## ambiguo obriga cada consumidor a adivinhar, e cada um adivinha diferente.
+func _test_dono_dos_sinais() -> void:
+	print("[Bus: quem emitiu? arma e bau carregam o dono]")
+	var assinaturas := {}
+	for sig in _bus.get_signal_list():
+		var nomes: Array = []
+		for arg in sig["args"]:
+			nomes.append(String(arg["name"]))
+		assinaturas[String(sig["name"])] = nomes
+	for nome in ["weapon_equipped", "bau_canalizando"]:
+		var args: Array = assinaturas.get(nome, [])
+		_check(args.size() > 0 and String(args[0]) == "pawn",
+			"%s abre com `pawn`: o sinal diz de QUEM e' (%s)" % [nome, str(args)])
+
+	# O emissor real: o slot vive como filho do pawn, entao quem equipou e' o pai.
+	var armados: Array = []
+	_bus.weapon_equipped.connect(func(pawn: Node, id: String, _n: String, _r: String,
+			_e: PackedStringArray) -> void: armados.append([pawn, id]))
+	var dono := Node3D.new()
+	root.add_child(dono)
+	var slot: Node = load("res://gameplay/ArmaSlot.gd").new()
+	dono.add_child(slot)
+	slot.equipar("varinha")
+	_check(armados.size() == 1 and armados[0][0] == dono,
+		"weapon_equipped carrega o pawn que equipou, nao so' o id da arma")
+	dono.queue_free()
+
+
 func _dummy(hp0: float) -> Node:
 	var s := GDScript.new()
 	s.source_code = "extends Node\nvar hp := 0.0"
@@ -130,7 +162,11 @@ func _test_combat_damage() -> void:
 	_dmg_events.clear()
 	_check(_combat.deal(d, 13.0, "fire"), "Combat.deal aplica dano")
 	_check(is_equal_approx(float(d.hp), 37.0), "hp reduziu 50 -> 37")
-	_check(_dmg_events.size() == 1 and _dmg_events[0][1] == 13, "Bus.damage_dealt emitiu 13")
+	# Migrado do extinto `damage_dealt` em 25/08/2026. O que a checagem cobre nao
+	# mudou: o VALOR do dano tem que chegar ao barramento. Mudou o sinal que o
+	# leva — e o novo carrega float, entao 13.0 e nao 13.
+	_check(_dmg_events.size() == 1 and is_equal_approx(float(_dmg_events[0][1]), 13.0),
+		"Bus.damage_applied levou 13 ao barramento")
 	d.queue_free()
 
 

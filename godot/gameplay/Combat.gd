@@ -14,7 +14,6 @@ class_name Combat
 
 ## Troco de dano fracionario por alvo (ver comentario em deal()). Alvo morto
 ## sai do dicionario em entity_died — sem isso vaza um float por bot por partida.
-static var _troco: Dictionary = {}
 
 
 ## `source` = quem causou (null p/ terreno/ambiente). `ignora_escudo` = e' DoT.
@@ -59,13 +58,11 @@ static func deal(target: Node, amount: float, element := "fire", source: Node = 
 
 	_creditar(source, target, efetivo)
 	Bus.damage_applied.emit(target, efetivo, element, source, no_escudo > 0.0)
-	_emitir_legado(target, efetivo, element)
 	if na_vida > 0.0 and target.is_in_group("player"):
 		Bus.health_changed.emit(float(target.hp), float(Balance.PLAYER.hp))
 	# DERRUBADO (gameplay/Derrubado.gd): quem tem esquadrao CAI em vez de morrer.
 	# false = morre mesmo (solo, bot, ou finalizacao de quem ja' estava caido).
 	if target.hp <= 0.0 and not Derrubado.interceptar(target, source):
-		_troco.erase(target.get_instance_id())
 		Bus.entity_died.emit(target)
 		if target.has_method("die"):
 			target.die()
@@ -128,20 +125,3 @@ static func _evoluir(who: Node) -> void:
 	who.shield = float(who.shield) + float(niveis[novo - 1]) - float(niveis[lv - 1])
 	who.shield_level = novo
 	Bus.shield_changed.emit(who, float(who.shield), float(niveis[novo - 1]), novo)
-
-
-## DANO FRACIONARIO (bug achado em 21/08, docs/DANO.md §2.3): o sinal LEGADO
-## carrega int, e int(round(0.1)) = 0 — numero de dano invisivel, ~60 sons de
-## acerto por segundo e o tween da vinheta morto e recriado todo frame. Aqui o
-## troco acumula e so' emite quando fecha 1. O sinal NOVO (damage_applied) sai
-## sempre, em float: quem migrar para ele nao precisa deste malabarismo.
-static func _emitir_legado(target: Node, amount: float, element: String) -> void:
-	var inteiro := int(amount)
-	if inteiro < 1:
-		var id := target.get_instance_id()
-		var resto := float(_troco.get(id, 0.0)) + amount
-		inteiro = int(resto)
-		_troco[id] = resto - float(inteiro)
-		if inteiro < 1 and target.hp > 0.0:
-			return
-	Bus.damage_dealt.emit(target, maxi(inteiro, 1), element)

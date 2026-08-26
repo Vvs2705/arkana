@@ -6,7 +6,44 @@
 |---|---|---|
 | Logo, tipografia, paleta, key art | **GDD §10** | normatizado |
 | Regras permanentes de legibilidade e cosmético | este documento | normatizado |
-| **Estilo de renderização dos personagens** | **ninguém ainda** | **PENDENTE DO DIRETOR** |
+| **Estilo de renderização dos personagens** | Diretor (aprovado FORA do repositório) | **norma ainda não fechada aqui** — ver abaixo |
+
+## A nova direção de arte dos personagens
+
+**Estado em 25/08/2026:** o Diretor **aprovou** uma nova direção artística para
+os personagens **fora deste repositório**, junto com uma nova entrega de
+referências. A norma **não está fechada aqui** porque as entradas ainda não
+chegaram ao projeto.
+
+**O que falta receber para fechar a norma:**
+
+1. o documento mestre aprovado da direção de arte;
+2. os pacotes de imagens da entrega, com manifesto e checksums.
+
+**Regra ao receber:** copiar o conteúdo do documento mestre **exatamente como
+ele veio**. Não reconstruir de memória, não reinterpretar, não "melhorar". A
+direção é decisão do Diretor; este arquivo só a registra.
+
+### Onde as 160 referencias vao morar — DECISAO DO DIRETOR, nao tomada
+
+Sao ~307 MB de materia-prima. Duas rotas, com o custo de cada uma:
+
+**Rota A — Git LFS.** Tudo versionado e verificavel por qualquer pessoa que
+clonar. Custa cota de LFS e trafego a cada clone. So' vale se a cota do
+repositorio comportar o volume e o crescimento futuro (mais 18 personagens
+modelados significam mais entregas).
+
+**Rota B — armazenamento externo duravel.** Em Git ficam apenas os manifestos,
+hashes, dimensoes e a localizacao. Nao consome cota, mas **exige que o
+armazenamento pertenca ao projeto** — link de conversa ou pasta pessoal nao
+serve, porque some junto com quem o criou.
+
+Enquanto nao houver decisao, os 160 PNGs seguem apenas em disco local, sem
+copia. Isso e' um risco real e esta' escrito aqui de proposito.
+
+**Enquanto isso não chega**, o que vale como evidência técnica é a auditoria
+abaixo — que descreve o lote ANTERIOR e continua útil para não repetir os mesmos
+erros de vista e de coerência. Ela **não** é a norma nova.
 
 O ART.md afirmava antes que sua fonte de verdade era "GDD seção 10". Isso estava
 errado e é a razão desta tabela existir: a §10 trata de **marca** — logo,
@@ -129,7 +166,7 @@ premium"). É proposta da equipe, **não decisão**. Não trate como norma.
 ## Estado atual
 
 - **Mundo e ilha:** procedurais, com iluminação, tonemap e shaders próprios.
-- **Personagens:** só a Pyra tem modelo game-ready. Os outros 19 usam o mago
+- **Personagens:** Pyra e Brok tem modelo game-ready. Os outros 18 usam o mago
   procedural genérico.
 
 O plano de fases (G1–G4) mora em `ROADMAP_3D.md`; o caminho técnico de personagem

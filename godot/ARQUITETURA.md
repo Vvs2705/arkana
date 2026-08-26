@@ -9,6 +9,25 @@ Dono de `project.godot`, `core/` e deste arquivo: COORDENADOR.
 | `gameplay/` + `ui/` | raia GAMEPLAY | `gameplay/Main.tscn` (CENA PRINCIPAL: instancia Island + player + bots + HUD), controle 3ª pessoa, gesto único §19.3, Fogo, bots, loop 3min |
 | `export/` | raia MUNDO | `export_presets.cfg`, script `build_apk.sh`, config headless |
 
+## O PORTAO
+
+Antes de qualquer entrega, um comando so':
+
+```bash
+bash godot/tests/run_all.sh
+```
+
+Ele roda os 12 autotestes e **encerra no primeiro que falhar**. Sucesso e' a
+linha `ARKANA: 12/12 selftests executados com sucesso.` — nao a mensagem de
+commit de ninguem.
+
+**Quem criar selftest novo o acrescenta ao vetor `SELFTESTS` do runner.** Teste
+fora da lista nao roda no portao nem no CI: ele nao falha, ele deixa de existir.
+
+**Armadilha medida:** `quit(1)` dentro de `_initialize()` faz o Godot sair com
+codigo ZERO — um teste escrito assim passaria calado. Falhe pelo caminho normal
+(contar falhas e sair de dentro do `_process`).
+
 ## Regras que atravessaram (docs/PONTE.md — só o PROVADO)
 - Dano passa por UM lugar (`gameplay/Combat.gd`); NaN se barra com `not (x > 0)`.
 - Velocidade é produto único (base × terreno × status) — ninguém escreve direto.

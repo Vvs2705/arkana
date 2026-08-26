@@ -399,7 +399,9 @@ func _on_bau_pousou(pos: Vector3) -> void:
 ## (o quanto falta), mas o ESTADO virou anel no meio de baixo: a faixa e' texto
 ## e texto que troca nao le' como perda. Regra do projeto — cancelar e' estado
 ## de 1a classe, e estado se le' em COR + FORMA (ver HudAviso.canalizar).
-func _on_bau_canalizando(progresso: float) -> void:
+func _on_bau_canalizando(pawn: Node, progresso: float) -> void:
+	if pawn != null and pawn != player:
+		return  # canalizacao de bot nao acende a barra do jogador
 	if progresso <= 0.0:
 		## INTERROMPEU. A faixa volta ao texto de "da' pra abrir", mas quem diz
 		## que o progresso MORREU e' o anel virando X (cor + forma): so' trocar
@@ -448,10 +450,11 @@ func _on_loot_prompt(nome: String, raridade: String, perto: bool) -> void:
 		pegar_btn.queue_redraw()
 
 
-func _on_arma(arma_id: String, nome: String, raridade: String,
+func _on_arma(pawn: Node, _arma_id: String, nome: String, raridade: String,
 		elementos: PackedStringArray) -> void:
-	if not is_instance_valid(player) or ArmaSlot.de(player) == null \
-			or ArmaSlot.de(player).arma_id != arma_id:
+	# O sinal DIZ de quem e' (core/Bus.gd). Antes isto comparava o arma_id com
+	# o slot do jogador, e um BOT com a MESMA arma mudava o icone dele.
+	if pawn != player or not is_instance_valid(player):
 		return  # arma de bot nao entra no icone do jogador
 	arma_lbl.text = nome if elementos.size() < 2 \
 			else nome + Textos.HUD_SEP + Textos.ARMA_PAR % [_el(elementos[0]), _el(elementos[1])]

@@ -29,7 +29,13 @@ Contrato de animacoes:
 Inspecao tecnica:
 
 - `Mage.get_model_source()` informa se o visual veio do procedural ou de modelo externo;
-- `Mage.get_model_report()` retorna vertices, superficies, materiais, ossos e aliases
+- `Mage.get_model_report()` retorna **triangulos** (o portao do orcamento),
+  mais vertices, superficies, materiais, ossos e aliases como DIAGNOSTICO.
+  Triangulo e vertice nao sao a mesma coisa: costura de UV duplica vertice sem
+  criar triangulo. Pyra tem 15.492 triangulos e 22.561 vertices; Brok, 15.415 e
+  29.212. Ate' 25/08 o auditor cobrava vertice num teto de 20.000 e reprovava os
+  dois modelos reais do jogo estando ambos dentro do alvo.
+- `Mage.get_model_report()` tambem retorna vertices, superficies, materiais, ossos e aliases
   de animacao resolvidos para o modelo carregado.
 
 Nao colocar assets grandes fora do Git LFS.

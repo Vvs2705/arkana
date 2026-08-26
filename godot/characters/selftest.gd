@@ -71,6 +71,7 @@ func _run_checks() -> void:
 
 	# ---- shading: os quatro materiais precisam responder a luz de forma DIFERENTE,
 	# senao "tudo parece o mesmo material" (que era a queixa)
+	_check_orcamento_triangulos()
 	_check_materiais()
 
 	# ---- AO assado no vertice: a barra do manto tem que ser mais escura que a cintura
@@ -81,6 +82,75 @@ func _run_checks() -> void:
 	_check_mago("", "generico")
 	for slug in IDS.slugs():
 		_check_mago(slug, slug)
+
+
+## O ORCAMENTO E' EM TRIANGULO. Ate' 25/08 o auditor cobrava VERTICE num teto de
+## 20.000 e reprovava os DOIS modelos reais do jogo estando ambos por volta de
+## 15,4 mil triangulos: costura de UV duplica vertice sem criar triangulo. Estes
+## checks provam as tres coisas que o conserto precisa garantir.
+func _check_orcamento_triangulos() -> void:
+	print("[Orcamento geometrico medido em TRIANGULO]")
+	var MA := load("res://characters/model_audit.gd")
+	var Mage := load("res://characters/Mage.gd")
+	_check(int(MA.MAX_TRIANGLES) == 20000 and int(MA.MIN_TRIANGLES) == 12000,
+		"faixa aprovada e' 12k..20k triangulos, num lugar so'")
+
+	# 1) contagem correta em superficie NAO indexada: 3 vertices = 1 triangulo
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 30:
+		st.add_vertex(Vector3(i, 0, 0))
+		st.add_vertex(Vector3(i, 1, 0))
+		st.add_vertex(Vector3(i, 0, 1))
+	var solta: ArrayMesh = st.commit()
+	var arr: Array = solta.surface_get_arrays(0)
+	var nv := (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	_check(Mage._triangulos_da_superficie(solta, 0, arr, nv) == 30,
+		"superficie solta: 90 vertices contam 30 triangulos")
+
+	# 2) INDEXADA: o triangulo sai dos INDICES, nao dos vertices reaproveitados.
+	# E' exatamente o caso que fazia a conta vertices/3 mentir.
+	var st2 := SurfaceTool.new()
+	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 4:
+		st2.add_vertex(Vector3(i % 2, i / 2, 0))
+	st2.add_index(0); st2.add_index(1); st2.add_index(2)
+	st2.add_index(1); st2.add_index(2); st2.add_index(3)
+	var idx: ArrayMesh = st2.commit()
+	var arr2: Array = idx.surface_get_arrays(0)
+	var nv2 := (arr2[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	_check(Mage._triangulos_da_superficie(idx, 0, arr2, nv2) == 2,
+		"superficie indexada: 4 vertices e 6 indices contam 2 triangulos")
+
+	# 3) O PORTAO PEGA um modelo acima do teto. Sem este check, subir MAX para
+	# 20k so' teria trocado um numero errado por outro sem ninguem notar.
+	var st3 := SurfaceTool.new()
+	st3.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 20001:
+		st3.add_vertex(Vector3(i, 0, 0))
+		st3.add_vertex(Vector3(i, 1, 0))
+		st3.add_vertex(Vector3(i, 0, 1))
+	var gordo: ArrayMesh = st3.commit()
+	var arr3: Array = gordo.surface_get_arrays(0)
+	var nv3 := (arr3[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	var tris_gordo: int = Mage._triangulos_da_superficie(gordo, 0, arr3, nv3)
+	_check(tris_gordo > int(MA.MAX_TRIANGLES),
+		"malha de %d triangulos ESTOURA o teto de %d" % [tris_gordo, int(MA.MAX_TRIANGLES)])
+
+	# 4) os modelos reais: dentro da faixa, e o relatorio traz o campo
+	for slug in ["01-pyra", "13-brok"]:
+		var arq := "res://characters/modelos/%s.glb" % slug.split("-", true, 1)[1]
+		if not ResourceLoader.exists(arq):
+			continue
+		var m: Node3D = load("res://characters/Mage.tscn").instantiate()
+		m.mage_id = slug
+		root.add_child(m)
+		var r: Dictionary = m.get_model_report()
+		var t := int(r.get("triangles", 0))
+		_check(t >= int(MA.MIN_TRIANGLES) and t <= int(MA.MAX_TRIANGLES),
+			"%s: %d triangulos dentro da faixa (vertices %d, que NAO e' portao)"
+			% [slug, t, int(r["vertices"])])
+		m.queue_free()
 
 
 func _check_materiais() -> void:

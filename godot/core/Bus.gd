@@ -4,8 +4,7 @@
 ## jogo. Quem aplica dano e' um lugar so' (gameplay/Combat.gd).
 extends Node
 
-signal damage_dealt(target: Node, amount: int, element: String)
-## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). `damage_dealt` acima nao carrega
+## O SINAL DE DANO COMPLETO (docs/DANO.md §C1). O antigo `damage_dealt` nao carregava
 ## QUEM causou nem SE bateu em escudo — sem isso ficam impossiveis, todos de uma
 ## vez: indicador direcional, hitmarker correto (a HUD usa hoje a heuristica
 ## "alvo nao e' o player, logo fui eu"), credito de dano para a evolucao do
@@ -13,8 +12,9 @@ signal damage_dealt(target: Node, amount: int, element: String)
 ##   amount    : FLOAT — dano EFETIVO aplicado (escudo + vida). Nunca 0.
 ##   source    : quem causou (null = terreno/DoT/ambiente, nao tem direcao)
 ##   on_shield : o escudo do alvo absorveu ao menos parte deste acerto
-## `damage_dealt` continua saindo em paralelo so' enquanto ui/Hud.gd e
-## audio/Sfx.gd nao migram — quando migrarem, o legado morre (ver relatorio).
+## O antigo `damage_dealt` foi REMOVIDO em 25/08/2026: ui/Hud.gd e audio/Sfx.gd
+## ja' tinham migrado, e o unico gancho restante era um ramo `else` que nunca
+## rodava. Sinal sem ouvinte de producao e' contrato morto.
 signal damage_applied(target: Node, amount: float, element: String, source: Node, on_shield: bool)
 ## ESCUDO EVOLUTIVO (GDD §5). A HUD OBSERVA; quem muda escudo e' o Combat.
 signal shield_changed(entity: Node, shield: float, shield_max: float, level: int)
@@ -50,7 +50,7 @@ signal terrain_changed(kind: String, pos: Vector3)  # p/ audio/UI observarem
 signal player_killed_bot(bot_name: String)          # p/ kill feed e audio
 signal dodge_performed
 ## O som do disparo toca no INSTANTE do cast (o impacto ja' tem o proprio som
-## via terrain_hit/damage_dealt). So' o PLAYER emite por ora — 6 bots na
+## via terrain_hit/damage_applied). So' o PLAYER emite por ora — 6 bots na
 ## cadencia deles viraria cacofonia sem atenuacao por distancia; quando o Sfx
 ## ganhar posicionamento 3D, os bots entram.
 signal spell_cast(element: String)
@@ -61,7 +61,12 @@ signal spell_cast(element: String)
 signal loot_prompt(nome: String, raridade: String, perto: bool)
 ## weapon_equipped: alguem trocou de arma. elementos traz 1 (varinha/cajado) ou
 ## os 2 FIXOS da manopla.
-signal weapon_equipped(arma_id: String, nome: String, raridade: String, elementos: PackedStringArray)
+## `pawn` vem PRIMEIRO de proposito: quem consome le' o dono antes de qualquer
+## outra coisa. Ate' 25/08/2026 este sinal nao dizia de quem era, e a HUD
+## adivinhava comparando o arma_id com o slot do jogador — um BOT equipando a
+## MESMA arma mudava o icone do jogador. Sinal ambiguo obriga cada consumidor a
+## adivinhar, e cada um adivinha diferente.
+signal weapon_equipped(pawn: Node, arma_id: String, nome: String, raridade: String, elementos: PackedStringArray)
 
 ## HABILIDADES DOS MAGOS (GDD §3 e §4 — raia GAMEPLAY/HABILIDADES). A HUD e o
 ## audio OBSERVAM; quem decide habilidade e' um lugar so' (gameplay/KitRunner).
@@ -99,7 +104,9 @@ signal bau_anunciado(pos: Vector3, segundos: float)
 signal bau_pousou(pos: Vector3)
 ## bau_canalizando: barra de progresso 0..1 do PLAYER abrindo. 0.0 = cancelou
 ## (saiu do raio). So' sai quando o player esta' canalizando — bot e' ruido.
-signal bau_canalizando(progresso: float)
+## `pawn` primeiro, mesma razao de weapon_equipped: sem ele o sinal so' podia
+## ser do player por convencao, e convencao nao e' contrato.
+signal bau_canalizando(pawn: Node, progresso: float)
 ## bau_aberto: acabou. `por_player` diz se a manopla foi para o jogador ou para
 ## um bot (kill feed: "a manopla caiu em outras maos"); `elementos` traz os 2
 ## FIXOS dela, para a HUD mostrar o par que o carrossel nao pode mais trocar.
