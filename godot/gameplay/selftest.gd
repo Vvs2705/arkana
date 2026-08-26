@@ -79,6 +79,7 @@ func _run() -> void:
 	_test_gesture()
 	_test_bot_death()
 	_test_bot_percepcao()
+	_test_lei_das_luvas_no_bot()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -220,6 +221,66 @@ func _test_bot_death() -> void:
 	_check(_died.size() == 1 and _died[0] == b, "Bus.entity_died emitido")
 	_check(not b.is_physics_processing(), "bot morto para de agir")
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
+
+
+## A LEI DAS LUVAS NO BOT (26/08 — DIRECAO.md §1 e §7): desarmado nao atira,
+## e a prioridade vira ACHAR a luva do chao. Vermelho provado tirando o
+## bloqueio do _shoot e a busca do vagar.
+func _test_lei_das_luvas_no_bot() -> void:
+	print("[Bot: a Lei das Luvas — desarmado nao atira, e caca a luva]")
+	var slot_scr: GDScript = load("res://gameplay/ArmaSlot.gd")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var proj: GDScript = load("res://gameplay/Projectile.gd")
+	var arena := Node3D.new()
+	root.add_child(arena)
+	var b: Node = _bot_scr.new()
+	arena.add_child(b)
+	b.set_physics_process(false)
+	b.global_position = Vector3.ZERO
+	var slot: Node3D = slot_scr.new()
+	b.add_child(slot)
+	var alvo: Node = _bot_scr.new()
+	arena.add_child(alvo)
+	alvo.set_physics_process(false)
+	alvo.global_position = Vector3(5, 0, 0)
+	b.target = alvo
+
+	# desarmado: _shoot e' um nao-evento — nenhum projetil nasce
+	var antes := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			antes += 1
+	b._shoot()
+	var depois := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			depois += 1
+	_check(depois == antes, "bot DESARMADO nao atira (a Lei vale para ele)")
+
+	# armado, o mesmo _shoot dispara
+	slot.equipar("varinha")
+	b._fire_cd = 0.0
+	b._shoot()
+	var final := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			final += 1
+	_check(final == antes + 1, "armado, o MESMO _shoot dispara")
+
+	# desarmado de novo, o vagar aponta para a luva mais proxima do chao
+	slot.arma_id = ""
+	var luva: Node3D = loot_scr.new()
+	arena.add_child(luva)
+	luva.global_position = Vector3(30, 0, 0)
+	_check(b._loot_mais_perto() == luva, "acha a luva mais proxima (grupo loot_arma)")
+	b.target = null
+	b._repick = 0.0
+	b.set_physics_process(true)
+	b._physics_process(0.05)
+	b.set_physics_process(false)
+	_check(b._wander_to.distance_to(luva.global_position) < 0.5,
+			"desarmado, o VAGAR vira busca: anda para a luva")
+	arena.queue_free()
 
 
 ## PERCEPCAO E FFA (26/08 — DIRECAO.md §7). O defeito reintroduzivel: Main
@@ -924,6 +985,9 @@ func _test_bau() -> void:
 	mapa.add_child(p)
 	var slot: Node3D = slot_scr.new()
 	p.add_child(slot)
+	# Com a Lei das Luvas o pawn nasce de maos nuas; este teste e' sobre a
+	# TROCA no bau (a velha fica no chao), entao arma-se o pawn primeiro.
+	slot.equipar("varinha")
 	p.global_position = a.global_position
 	c._entrou(p)
 	_check(not c.is_processing(), "bau que ainda NAO pousou nao canaliza")
@@ -1073,7 +1137,15 @@ func _test_loot() -> void:
 	root.add_child(pawn)
 	var slot: Node3D = slot_scr.new()
 	pawn.add_child(slot)
-	_check(str(slot.arma_id) == "varinha", "todo mundo comeca de varinha")
+	# A LEI DAS LUVAS (26/08 — DIRECAO.md §1). Provada em vermelho voltando o
+	# default para "varinha": os tres primeiros checks caem juntos.
+	_check(str(slot.arma_id) == "", "todo mundo nasce de MAOS NUAS — a luva se acha no mapa")
+	_check(not slot_scr.armado_de(pawn), "com slot e sem luva, DESARMADO de verdade")
+	_check(int(slot.tier()) == -1,
+			"maos nuas = tier -1: a primeira varinha do chao E' upgrade (auto do bot)")
+	slot.equipar("varinha")
+	_check(slot_scr.armado_de(pawn), "equipou: armado")
+	slot.arma_id = ""  # de volta as maos nuas para os checks de fallback abaixo
 	_check(slot_scr.de(pawn) == slot, "ArmaSlot.de acha o slot do pawn")
 	var sem := Node3D.new()
 	root.add_child(sem)

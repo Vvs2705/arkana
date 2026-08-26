@@ -50,6 +50,9 @@ static func criar(p_arma_id: String, p_par := PackedStringArray()) -> Loot:
 
 
 func _ready() -> void:
+	# Grupo da BUSCA dos bots (Bot._loot_mais_perto): bot desarmado precisa
+	# achar as luvas do chao sem varrer a arvore inteira.
+	add_to_group("loot_arma")
 	var col := CollisionShape3D.new()
 	var sp := SphereShape3D.new()
 	sp.radius = RAIO_PEGAR
@@ -180,12 +183,19 @@ func pegar(slot: ArmaSlot) -> bool:
 	var velho_par := slot.par
 	var cor := Arma.cor(arma_id)  # cor do que esta' sendo PEGO (o swap vem abaixo)
 	slot.equipar(arma_id, par)
-	arma_id = velha
-	par = velho_par
-	_montar()
 	_prompt(slot.get_parent(), false)  # o prompt some: ja' pegou
 	ArmaSlot.gesto(slot.get_parent())
 	_faisca(cor)
+	# MAOS NUAS nao viram loot: com todos caindo desarmados (DIRECAO.md §1) o
+	# swap antigo deixaria uma "arma vazia" fantasma no chao — cada primeira
+	# pegada da partida criaria uma. O loot e' CONSUMIDO; a troca de verdade
+	# (arma por arma) continua deixando a velha no lugar, padrao de BR.
+	if velha == "":
+		queue_free()
+		return true
+	arma_id = velha
+	par = velho_par
+	_montar()
 	return true
 
 

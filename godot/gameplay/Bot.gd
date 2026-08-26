@@ -77,6 +77,14 @@ func _physics_process(delta: float) -> void:
 		if _repick <= 0.0 or global_position.distance_to(_wander_to) < 1.5:
 			_repick = randf_range(2.0, 5.0)
 			_wander_to = global_position + Vector3(randf_range(-12, 12), 0, randf_range(-12, 12))
+			# DESARMADO, a prioridade e' ACHAR LUVA (DIRECAO.md §7: os bots nas
+			# leis do jogador). O vagar aponta para o loot mais perto; o
+			# auto-upgrade do proprio loot equipa quando ele chega em cima.
+			if not ArmaSlot.armado_de(self):
+				var alvo_loot := _loot_mais_perto()
+				if alvo_loot != null:
+					_wander_to = alvo_loot.global_position
+					_repick = 6.0
 		dir = _flat(_wander_to - global_position)
 	if alive_target and dist < CHASE_DIST:
 		_maybe_dodge(delta)
@@ -140,6 +148,21 @@ func _revidar(alvo: Node, _amount: float, _el: String, fonte: Node, _esc: bool) 
 	ir_para((fonte as Pawn).global_position)
 
 
+## A luva mais proxima no chao (grupo "loot_arma"). Sem teto de distancia:
+## um bot desarmado atravessa o mapa por uma arma — e' o que um jogador faria.
+func _loot_mais_perto() -> Node3D:
+	var melhor: Node3D = null
+	var d2 := INF
+	for n in get_tree().get_nodes_in_group("loot_arma"):
+		if not (n is Node3D) or not is_instance_valid(n):
+			continue
+		var dd := global_position.distance_squared_to((n as Node3D).global_position)
+		if dd < d2:
+			d2 = dd
+			melhor = n
+	return melhor
+
+
 func _flat(v: Vector3) -> Vector3:
 	v.y = 0.0
 	if v.length_squared() < 0.0001:
@@ -159,6 +182,10 @@ func _maybe_dodge(delta: float) -> void:
 
 
 func _shoot() -> void:
+	# A Lei das Luvas vale para o bot IGUAL ("todas as logicas do jogo
+	# precisam ser aplicadas aos bots" — o Diretor, 26/08).
+	if not ArmaSlot.armado_de(self):
+		return
 	_fire_cd = float(ArmaSlot.spec_de(self, element).fire_rate) * FIRE_RATE_MULT
 	_cast = 0.3
 	var from := global_position + Vector3(0, 1.4, 0)

@@ -135,6 +135,9 @@ const DERRUBADO_ALIADO := "ALIADO DERRUBADO"
 
 ## LOOT E ARMA ARCANA (GDD §16.2).
 const LOOT_PEGAR := "PEGAR"
+## Com luva na mao o botao muda de nome (decisao no 5, 26/08): pegar e trocar
+## sao atos diferentes e o dedo tem que saber qual vai cometer.
+const LOOT_TROCAR := "TROCAR"
 ## O "peguei" em palavra. O pulso do rotulo da arma ja' confirma no olho; isto
 ## atende quem precisa de texto e serve de base para leitor de tela depois.
 const LOOT_PEGOU := "PEGOU: %s"

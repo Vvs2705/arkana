@@ -198,9 +198,12 @@ func _try_fire() -> void:
 	# excecao viva disso: quem canaliza por ela e' a Lumen (passiva Maos Livres).
 	if not Derrubado.pode_agir(self) or is_in_group("reanimando"):
 		return
+	# A LEI DAS LUVAS (26/08 — DIRECAO.md §1): sem luva nao ha' ataque basico.
+	# So' o ATAQUE: tatica e suprema sao natas e nao passam por aqui.
+	if not ArmaSlot.armado_de(self):
+		return
 	# A ARMA ARCANA manda no ataque (GDD §16.2): cadencia, mana e alcance saem
-	# dela, nao do elemento puro. Sem arma equipada o spec cai na varinha, que
-	# e' a linha de base 1.0 — mesmo comportamento de antes do sistema existir.
+	# dela, nao do elemento puro.
 	var s: Dictionary = ArmaSlot.spec_de(self, element)
 	if _fire_cd > 0.0 or mana < float(s.mana_cost):
 		return

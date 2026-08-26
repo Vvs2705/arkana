@@ -441,6 +441,10 @@ func _el(id: String) -> String:
 ## e' leitura). Raridade que a HUD nao conhece cai no disco branco de sempre.
 func _on_loot_prompt(nome: String, raridade: String, perto: bool) -> void:
 	pegar_btn.visible = perto
+	# PEGAR de maos nuas, TROCAR com luva na mao (decisao no 5, 26/08): o
+	# rotulo avisa que a acao tem custo — trocar deixa a sua no chao.
+	pegar_btn.rotulo = Textos.LOOT_TROCAR if ArmaSlot.armado_de(player) \
+			else Textos.LOOT_PEGAR
 	if perto:
 		var r: Dictionary = Arma.RARIDADES.get(raridade,
 				{"cor": Color.WHITE, "forma": ""})

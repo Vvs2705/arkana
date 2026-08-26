@@ -144,9 +144,15 @@ func _build_match() -> void:
 ## Toda queda do ceu comeca com uma VARINHA (GDD §16.2). O slot e' um no' filho
 ## — Player.gd/Bot.gd/Pawn.gd nao sabem que ele existe (composicao); quem
 ## precisa da arma de alguem chama ArmaSlot.de(pawn).
+## Da' o SLOT — nunca mais a arma (26/08, DIRECAO.md §1: todos caem de maos
+## nuas; achar a primeira luva e' a corrida de abertura da partida).
 func _dar_arma(pawn: Pawn) -> void:
 	var slot := ArmaSlot.new()
 	slot.name = "ArmaSlot"
+	# Decisao no 5 do Diretor: o PLAYER equipa apertando PEGAR — nada de troca
+	# automatica por pisar em cima ("trocar a luva boa sem querer e' roubo").
+	# O bot mantem o auto: o "apertar" dele e' implicito.
+	slot.auto_upgrade = pawn is Bot
 	pawn.add_child(slot)
 
 
