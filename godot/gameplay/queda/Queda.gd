@@ -168,6 +168,12 @@ func _ready() -> void:
 	## SPAWN (no chao) e um salto imediato terminaria em pouso instantaneo —
 	## foi o que apareceu ao rodar a queda contra a ilha de verdade.
 	_grudar()
+	## O CASTELO VIAJA SEM BONECOS (decisao no 14, 26/08 — DIRECAO.md §2):
+	## como a nave do Apex e o onibus do Fortnite, o que cruza o ceu e' um
+	## OBJETO, nao uma multidao pendurada. O mago SURGE ao acionar o salto —
+	## "mesmo que ele surja do nada isso nao e' um problema", palavras dele.
+	if _player is Node3D:
+		(_player as Node3D).visible = false
 	_meia_ilha = Castelo.lado(_island) * 0.5
 	_anim("cair")   # no portao a pose de queda ja' le' como "prestes a saltar"
 	Bus.queda_fase.emit(fase)
@@ -236,6 +242,10 @@ func _duracao_rota() -> float:
 func saltar() -> bool:
 	if fase != "no_castelo":
 		return false
+	# O SURGIMENTO (decisao no 14): o corpo aparece na janela do castelo no
+	# instante do salto — antes disso o castelo viaja vazio.
+	if _player is Node3D:
+		(_player as Node3D).visible = true
 	_fase("caindo")
 	_anim("cair")
 	return true

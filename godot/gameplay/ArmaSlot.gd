@@ -22,7 +22,10 @@ const GESTO_S := 0.65
 const GESTO_CONTATO_S := 0.24
 const META_GESTO := "gesto_pegar_inicio"
 
-var arma_id := "varinha"
+## VAZIO = MAOS NUAS (26/08 — DIRECAO.md §1: "todos caem sem luva; achar a
+## primeira e' a corrida de abertura"). Ate' entao todo slot nascia com varinha
+## e ninguem jamais estava desarmado — a Lei das Luvas nao existia no codigo.
+var arma_id := ""
 var par: PackedStringArray = PackedStringArray()  # so' a manopla usa
 ## Pega sozinho quando o loot e' de tier ESTRITAMENTE melhor. E' o que faz o
 ## loop funcionar hoje, sem a HUD: ninguem recusa um upgrade. O prompt do Bus
@@ -56,6 +59,19 @@ static func spec_de(pawn: Node, el: String) -> Dictionary:
 static func arma_de(pawn: Node) -> String:
 	var s := de(pawn)
 	return "varinha" if s == null else s.arma_id
+
+
+## A LEI DAS LUVAS (DIRECAO.md §1): sem luva NAO ha' ataque basico. Pawn SEM
+## slot continua atacando (fiacao defensiva: pawn de teste e cena avulsa nao
+## conhecem o sistema); pawn COM slot e maos nuas esta' desarmado de verdade.
+## Habilidades (passiva/tatica/suprema) NAO passam por aqui — sao natas.
+static func armado_de(pawn: Node) -> bool:
+	var s := de(pawn)
+	return s == null or s.arma_id != ""
+
+
+func armado() -> bool:
+	return arma_id != ""
 
 
 func _ready() -> void:
@@ -99,6 +115,11 @@ func equipar(id: String, p_par: PackedStringArray = PackedStringArray()) -> void
 
 
 func tier() -> int:
+	## Maos nuas = tier -1: QUALQUER luva do chao e' upgrade. Sem isto,
+	## Arma.tier("") caia no fallback varinha (tier 0) e o auto-upgrade do bot
+	## recusava a primeira varinha da vida dele — bot desarmado para sempre.
+	if arma_id == "":
+		return -1
 	return Arma.tier(arma_id)
 
 
@@ -193,6 +214,8 @@ static func _visual_animado(pawn: Node) -> Node:
 func _montar_visual() -> void:
 	if is_instance_valid(_modelo):
 		_modelo.queue_free()
+	if arma_id == "":
+		return  # maos nuas: nenhum modelo na mao — a ausencia E' a leitura
 	_modelo = modelo(arma_id)
 	_modelo.position = MAO_OFFSET
 	add_child(_modelo)

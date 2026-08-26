@@ -79,6 +79,9 @@ func _run() -> void:
 	_test_gesture()
 	_test_bot_death()
 	_test_bot_percepcao()
+	_test_lei_das_luvas_no_bot()
+	_test_treino()
+	_test_agua()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -220,6 +223,163 @@ func _test_bot_death() -> void:
 	_check(_died.size() == 1 and _died[0] == b, "Bus.entity_died emitido")
 	_check(not b.is_physics_processing(), "bot morto para de agir")
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
+
+
+## A AGUA (26/08 — DIRECAO.md §3): peito coberto = nadar (devagar, flutuando
+## na lamina); sair = uns segundos de roupa encharcada; poca no tornozelo NAO
+## e' nado. Vermelhos provados tirando o limiar do peito e a saida molhada.
+func _test_agua() -> void:
+	print("[Agua: nadar do peito, flutuar, e sair encharcado]")
+	# ilha de mentira: lamina em y=2.0 dentro de um disco de 10m; seco fora
+	var ilha_scr := GDScript.new()
+	ilha_scr.source_code = """extends Node3D
+func agua_y(x: float, _z: float) -> float:
+	return 2.0 if absf(x) <= 10.0 else -1e9
+func height(_x: float, _z: float) -> float:
+	return 0.0
+"""
+	ilha_scr.reload()
+	var ilha: Node3D = ilha_scr.new()
+	ilha.add_to_group("ilha")
+	root.add_child(ilha)
+	var p: Node = load("res://gameplay/Pawn.gd").new()
+	root.add_child(p)
+
+	# SECO (fora do disco): produto integro
+	p.global_position = Vector3(50, 0, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(not bool(p.nadando) and is_equal_approx(float(p.agua_mult), 1.0),
+			"em terra seca o produto nao muda")
+
+	# FUNDO (lamina 2.0, corpo em y=0 -> 2m de agua > peito 1.2): NADA
+	var v0: float = p.current_speed()
+	p.global_position = Vector3(0, 0, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(bool(p.nadando), "peito coberto -> modo NADAR")
+	_check(p.current_speed() < v0 * 0.6, "nadar e' devagar (produto unico, fator %.2f)" % float(p.NADO_MULT))
+	# flutua: a gravidade nao puxa para o leito
+	p.velocity = Vector3(0, -5, 0)
+	for i in 30:
+		p.apply_gravity(0.05)
+	_check(is_zero_approx(float(p.velocity.y)), "nadando, a gravidade nao puxa")
+	_check(absf(float(p.global_position.y) - (2.0 - float(p.PEITO))) < 0.15,
+			"o corpo FLUTUA com a lamina no peito (y ~ %.1f)" % (2.0 - float(p.PEITO)))
+
+	# POCA no tornozelo (corpo a 1.5 -> 0.5m de agua): NAO nada
+	p.global_position = Vector3(0, 1.5, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(not bool(p.nadando), "poca no tornozelo NAO e' nado (limiar do peito)")
+	_check(float(p._molhado_s) > 0.0 and is_equal_approx(float(p.agua_mult), float(p.MOLHADO_MULT)),
+			"saiu da agua ENCHARCADO: %.0f%% da velocidade" % (float(p.MOLHADO_MULT) * 100))
+
+	# a roupa seca: depois de MOLHADO_S o produto volta a 1.0
+	p.global_position = Vector3(50, 0, 0)
+	for i in 40:
+		p.move_velocity(Vector3.ZERO, 0.1)
+	_check(is_equal_approx(float(p.agua_mult), 1.0), "a roupa seca e a velocidade volta")
+	ilha.queue_free()
+	p.queue_free()
+
+
+## O LOBBY DE TREINO (26/08 — DIRECAO.md §8). Monta o Main INTEIRO em modo
+## treino e cobra o contrato: sem zona, sem queda (fisica do player LIGADA — na
+## partida real a queda a desliga), bonecos regenerando, as tres luvas expostas
+## e a suprema em 5s. Vermelho provado apagando o consumo da static.
+func _test_treino() -> void:
+	print("[Treino: o lobby da decisao no 19]")
+	var main_scr: GDScript = load("res://gameplay/Main.gd")
+	main_scr.proximo_treino = true
+	var m: Node = (load("res://gameplay/Main.tscn") as PackedScene).instantiate()
+	root.add_child(m)
+	_check(bool(m.modo_treino), "o pedido do menu vira modo treino")
+	_check(not bool(main_scr.proximo_treino),
+			"o pedido e' CONSUMIDO — a proxima partida normal nao herda o treino")
+	_check(m.zona == null, "treino NAO tem zona fechando")
+	_check((m.player as Node).is_physics_processing(),
+			"player no CHAO desde o comeco (a queda, que desligaria a fisica, nao roda)")
+	var bonecos := root.get_tree().get_nodes_in_group("boneco_treino")
+	_check(bonecos.size() == 2, "dois bonecos de treino")
+	var luvas := 0
+	for n in m.arena.get_children():
+		if n is Loot and (n as Node3D).global_position.distance_to(
+				(m.player as Node3D).global_position) < 12.0:
+			luvas += 1
+	_check(luvas >= 3, "as tres luvas expostas a passos do spawn (achou %d)" % luvas)
+	var k: Node = load("res://gameplay/KitRunner.gd").de(m.player)
+	_check(k != null and float(k.dados.suprema_carga) <= 6.0,
+			"suprema enche em ~5s no treino (testar esperando 50s e' fila, nao treino)")
+	# boneco apanha e regenera: o timer devolve vida
+	var alvo: Node = bonecos[0]
+	alvo.hp = 40.0
+	for f in alvo.get_children():
+		if f is Timer:
+			(f as Timer).timeout.emit()
+	_check(float(alvo.hp) > 40.0, "boneco REGENERA — apanhar sem culpa e' o servico dele")
+	# free() IMEDIATO, nao queue_free(): a ilha REAL deste Main esta' no grupo
+	# "ilha", e adiada ela sobrevive ate' o teste da AGUA — que entao pergunta a
+	# lamina para a ilha errada e conclui que o lago do teste e' terra seca.
+	# Custou 5 falhas em cascata descobrir isso.
+	m.free()
+
+
+## A LEI DAS LUVAS NO BOT (26/08 — DIRECAO.md §1 e §7): desarmado nao atira,
+## e a prioridade vira ACHAR a luva do chao. Vermelho provado tirando o
+## bloqueio do _shoot e a busca do vagar.
+func _test_lei_das_luvas_no_bot() -> void:
+	print("[Bot: a Lei das Luvas — desarmado nao atira, e caca a luva]")
+	var slot_scr: GDScript = load("res://gameplay/ArmaSlot.gd")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var proj: GDScript = load("res://gameplay/Projectile.gd")
+	var arena := Node3D.new()
+	root.add_child(arena)
+	var b: Node = _bot_scr.new()
+	arena.add_child(b)
+	b.set_physics_process(false)
+	b.global_position = Vector3.ZERO
+	var slot: Node3D = slot_scr.new()
+	b.add_child(slot)
+	var alvo: Node = _bot_scr.new()
+	arena.add_child(alvo)
+	alvo.set_physics_process(false)
+	alvo.global_position = Vector3(5, 0, 0)
+	b.target = alvo
+
+	# desarmado: _shoot e' um nao-evento — nenhum projetil nasce
+	var antes := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			antes += 1
+	b._shoot()
+	var depois := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			depois += 1
+	_check(depois == antes, "bot DESARMADO nao atira (a Lei vale para ele)")
+
+	# armado, o mesmo _shoot dispara
+	slot.equipar("varinha")
+	b._fire_cd = 0.0
+	b._shoot()
+	var final := 0
+	for c in arena.get_children():
+		if c.get_script() == proj:
+			final += 1
+	_check(final == antes + 1, "armado, o MESMO _shoot dispara")
+
+	# desarmado de novo, o vagar aponta para a luva mais proxima do chao
+	slot.arma_id = ""
+	var luva: Node3D = loot_scr.new()
+	arena.add_child(luva)
+	luva.global_position = Vector3(30, 0, 0)
+	_check(b._loot_mais_perto() == luva, "acha a luva mais proxima (grupo loot_arma)")
+	b.target = null
+	b._repick = 0.0
+	b.set_physics_process(true)
+	b._physics_process(0.05)
+	b.set_physics_process(false)
+	_check(b._wander_to.distance_to(luva.global_position) < 0.5,
+			"desarmado, o VAGAR vira busca: anda para a luva")
+	arena.queue_free()
 
 
 ## PERCEPCAO E FFA (26/08 — DIRECAO.md §7). O defeito reintroduzivel: Main
@@ -924,6 +1084,9 @@ func _test_bau() -> void:
 	mapa.add_child(p)
 	var slot: Node3D = slot_scr.new()
 	p.add_child(slot)
+	# Com a Lei das Luvas o pawn nasce de maos nuas; este teste e' sobre a
+	# TROCA no bau (a velha fica no chao), entao arma-se o pawn primeiro.
+	slot.equipar("varinha")
 	p.global_position = a.global_position
 	c._entrou(p)
 	_check(not c.is_processing(), "bau que ainda NAO pousou nao canaliza")
@@ -1073,7 +1236,15 @@ func _test_loot() -> void:
 	root.add_child(pawn)
 	var slot: Node3D = slot_scr.new()
 	pawn.add_child(slot)
-	_check(str(slot.arma_id) == "varinha", "todo mundo comeca de varinha")
+	# A LEI DAS LUVAS (26/08 — DIRECAO.md §1). Provada em vermelho voltando o
+	# default para "varinha": os tres primeiros checks caem juntos.
+	_check(str(slot.arma_id) == "", "todo mundo nasce de MAOS NUAS — a luva se acha no mapa")
+	_check(not slot_scr.armado_de(pawn), "com slot e sem luva, DESARMADO de verdade")
+	_check(int(slot.tier()) == -1,
+			"maos nuas = tier -1: a primeira varinha do chao E' upgrade (auto do bot)")
+	slot.equipar("varinha")
+	_check(slot_scr.armado_de(pawn), "equipou: armado")
+	slot.arma_id = ""  # de volta as maos nuas para os checks de fallback abaixo
 	_check(slot_scr.de(pawn) == slot, "ArmaSlot.de acha o slot do pawn")
 	var sem := Node3D.new()
 	root.add_child(sem)

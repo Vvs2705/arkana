@@ -22,7 +22,7 @@ const TIERS := ["varinha", "cajado", "manopla"]
 
 const ARMAS := {
 	"varinha": {
-		"nome": "Varinha",
+		"nome": "Luva Comum",     # DIRECAO.md §1: a arma arcana e' LUVA
 		"raridade": "comum",
 		## LINHA DE BASE — nao mexer sem recalibrar TODO o resto.
 		"dmg": 1.0,
@@ -35,7 +35,7 @@ const ARMAS := {
 		"suprema_bonus": 1.0,
 	},
 	"cajado": {
-		"nome": "Cajado",
+		"nome": "Luva de Conjurador",
 		"raridade": "raro",
 		## "alcance e dano maiores, conjuracao mais lenta" (GDD §16.2).
 		## KNOB: 1.55 de dano com 1.45 de atraso = ~7% de DPS a mais que a

@@ -427,7 +427,9 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 	slot.name = "ArmaSlot"
 	jogador.add_child(slot)
 	slot.equipar("cajado")
-	_check(hud.arma_lbl.text.begins_with("Cajado"),
+	# O nome de exibicao e' "Luva de Conjurador" desde 26/08 (DIRECAO.md §1: a
+	# arma arcana virou luva). O id interno segue "cajado" — o rotulo nao.
+	_check(hud.arma_lbl.text.begins_with("Luva de Conjurador"),
 		"equipar publica a arma do jogador na HUD ('%s')" % hud.arma_lbl.text)
 	var minha: String = hud.arma_lbl.text
 	# O sinal agora DIZ de quem e'. Emitimos com um pawn que NAO e' o jogador:
