@@ -51,7 +51,25 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o vídeo do Diretor avaliado, e o que ele rendeu
+### >>> COMECE POR AQUI — as concept arts existem e estão validadas
+
+**O ciclo de arte fechou o primeiro loop completo** (26/08, tarde): prompts em
+`docs/prompts/` → o Diretor gerou 55 imagens no ChatGPT → validação contra os
+critérios de cada ficha → **54 aprovadas, 1 para regerar** → transportadas
+para `cenario/<peça>/arte/` (o espelho de `personagens/`), 112 MB no LFS.
+
+- **Veredito e lupa:** `cenario/00-VALIDACAO.md` — inclui a checagem legal
+  anti-FMA da palma da Conjurador (passou) e o critério mais fino da Manopla
+  (polegar+médio em ouro, os dedos do estalo — exato).
+- **A reprovada:** a key art do Altar (48) sem os dois obeliscos tombados — o
+  texto de ajuste está no 00-VALIDACAO, pronto para colar no gerador.
+- **Custo LFS atualizado:** ~470 MB totais → ~2 clones limpos/mês na cota.
+- **Próximo passo da arte:** Castelo → Meshy multi-imagem (frente-selo +
+  lateral-porta-salto + costas + tres-quartos). Depois: Luvas → Baú.
+
+---
+
+### (26/08, tarde — o vídeo do Diretor avaliado, histórico)
 
 O Diretor testou o APK 12:20 e mandou vídeo (55 s, treino). **Quatro defeitos
 reais saíram dele, três já corrigidos com teste vermelho:**
