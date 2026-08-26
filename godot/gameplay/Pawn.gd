@@ -300,7 +300,24 @@ func anim(anim_name: String) -> void:
 ## Nome da animacao de locomocao pela velocidade REAL, com HISTERESE: entra em
 ## "run" acima de run_anim_enter e so' sai abaixo de run_anim_exit. Com um
 ## limiar so', a animacao pisca quando a velocidade fica na fronteira.
+##
+## DERRUBADO vem ANTES da histerese, e por aqui de proposito. Ate' 26/08 o caido
+## rastejava devagar, caia no lado "idle" do limiar e ficava DE PE' e parado no
+## meio da partida — de longe, indistinguivel de um mago escolhendo o proximo
+## passo. O aliado so' descobria quem dava para reerguer pela HUD.
+##
+## Por que a decisao mora AQUI e nao em Derrubado.gd: Player e Bot reescrevem a
+## animacao todo frame (`anim(... locomotion_anim())`), entao qualquer pedido
+## feito de fora seria apagado no frame seguinte — foi a licao que ArmaSlot.gesto
+## documentou para o gesto de pegar. So' que ali o gesto e' TRANSITORIO e volta
+## por relogio; derrubado e' SUSTENTADO e nao tem quando voltar. Estado
+## sustentado se resolve na fonte da decisao, nao driblando ela.
+##
+## A costura com Derrubado ja' existia neste arquivo (ver `dodge_ready`), entao
+## isto nao abre acoplamento novo.
 func locomotion_anim() -> String:
+	if Derrubado.esta(self):
+		return "derrubado"
 	var v := horizontal_speed()
 	if _run_anim:
 		if v < float(Balance.MOVE.run_anim_exit):

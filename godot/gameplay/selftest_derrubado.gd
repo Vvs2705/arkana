@@ -12,7 +12,9 @@
 ##   7. finalizacao por dano no chao mata na hora;
 ##   8. Bus.entity_died sai UMA vez por entidade, em toda a vida do estado;
 ##   9. os ganchos dos kits: Jardim da Aurora (50% mais rapido) e Lumen
-##      (proxy do grupo "reanimador" reergue sem corpo).
+##      (proxy do grupo "reanimador" reergue sem corpo);
+##  10. o CORPO conta a mesma historia que o estado: caido pede a animacao
+##      "derrubado", e nao a de locomocao mais lenta.
 ##
 ## NOTA: em modo --script os autoloads so' registram DEPOIS que este arquivo
 ## compila — por isso aqui NADA e' referenciado lexicalmente (Bus, Balance,
@@ -53,6 +55,7 @@ func _run() -> void:
 	_test_interrupcao()
 	_test_finalizacao()
 	_test_ganchos_dos_kits()
+	_test_corpo_conta_a_historia()
 	print("selftest derrubado: %s (%d falhas)" % ["OK" if fails == 0 else "FALHOU", fails])
 	quit(1 if fails > 0 else 0)
 
@@ -254,6 +257,51 @@ func _arena() -> Node3D:
 	var a := Node3D.new()
 	root.add_child(a)
 	return a
+
+
+## 10: O CORPO CONTA A MESMA HISTORIA (26/08). Defeito medido: o caido rasteja
+## devagar, cai no lado "idle" da histerese e fica DE PE' e PARADO no meio da
+## partida. De longe e' indistinguivel de um mago escolhendo o proximo passo, e
+## o aliado so' descobre quem da' para reerguer olhando a HUD — num battle
+## royale, informacao errada na silhueta e' pior que informacao nenhuma.
+##
+## O teste nao olha pixel: olha o NOME que o gameplay pede. Isso e' o suficiente
+## porque `Pawn.anim()` so' repassa o nome, e e' o que quebraria se alguem
+## voltasse a decidir locomocao sem perguntar pelo estado.
+func _test_corpo_conta_a_historia() -> void:
+	var a := Node3D.new()
+	root.add_child(a)
+	var p := _pawn(a, Vector3.ZERO)
+	var amigo := _pawn(a, Vector3(2, 0, 0))
+
+	_check(_pawn_scr.new().get_script() != null, "Pawn carrega")
+	# DE PE', parado: a locomocao normal continua mandando.
+	_check(p.locomotion_anim() == "idle",
+			"de pe' e parado -> idle (a regra antiga segue valendo)")
+
+	p.hp = 0.0
+	_der.interceptar(p, amigo)
+	_check(bool(_der.esta(p)), "entrou em derrubado")
+	_check(p.locomotion_anim() == "derrubado",
+			"CAIDO -> pede a animacao 'derrubado', nao a locomocao mais lenta")
+
+	# e o corpo volta a andar quando o estado acaba
+	_der.reerguer(p, amigo)
+	_check(not bool(_der.esta(p)), "saiu de derrubado")
+	_check(p.locomotion_anim() == "idle",
+			"reerguido -> a locomocao normal volta a mandar")
+
+	# o contrato do mago conhece a animacao, e ela e' EM LACO (estado sustentado,
+	# nao gesto): sem laco o caido congelaria no ultimo quadro — foi exatamente
+	# esse o defeito da patinacao da corrida, e nao vale repeti-lo aqui.
+	var mage: GDScript = load("res://characters/Mage.gd")
+	_check("derrubado" in mage.OPTIONAL_ANIMS,
+			"'derrubado' e' OPCIONAL (modelo sem o clipe nao quebra)")
+	_check("derrubado" in mage.ANIMS_EM_LACO,
+			"'derrubado' anda EM LACO — estado sustentado nao congela no fim")
+	_check(mage.ANIM_FALLBACK.get("derrubado", "") == "idle",
+			"sem o clipe, cai em idle (Pyra e Brok nao tem este clipe hoje)")
+	a.queue_free()
 
 
 func _pawn(a: Node3D, pos: Vector3, esquadrao := true) -> Node:

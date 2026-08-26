@@ -22,9 +22,10 @@ const DESTINO := "res://menu/art/marca"
 ## A TERCEIRA COLUNA existe por causa do icone ADAPTATIVO do Android: a frente
 ## e' de 432 px mas o sistema aplica uma mascara (circulo, squircle, gota — cada
 ## fabricante a sua) e SO' o miolo de ~66% e' garantido. Um selo desenhado ate' a
-## borda perde as gemas de cima e de baixo em metade dos aparelhos. Com 0.56 o
-## selo inteiro, incluindo o anel externo em raio 1.16, cabe dentro da zona
-## segura em qualquer mascara. O icone legado e a splash nao tem mascara: 1.0.
+## borda perde as gemas de cima e de baixo em metade dos aparelhos. Com 0.64 o
+## selo inteiro, incluindo o anel externo em raio 1.16, sai em ~246 px de
+## diametro contra os ~288 px garantidos — cabe em qualquer mascara, com folga e
+## sem sobrar margem a' toa. O icone legado e a splash nao tem mascara: 1.0.
 const PECAS := {
 	"fundo-432": [432, true, 0.0],    # fundo do adaptativo: so' o gradiente
 	"selo-432": [432, false, 0.64],   # frente do adaptativo: dentro da mascara

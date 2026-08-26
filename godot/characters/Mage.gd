@@ -42,10 +42,11 @@ const REQUIRED_ANIMS := ["idle", "run", "cast"]
 ## seja, uma feature nova apagaria os modelos que ja' funcionam.
 ## Quem chama pergunta antes com has_anim(); play_anim() cai no substituto
 ## abaixo em vez de reclamar no console.
-const OPTIONAL_ANIMS := ["cair", "planar", "pegar"]
+const OPTIONAL_ANIMS := ["cair", "planar", "pegar", "derrubado"]
 
 ## Para onde cada opcional cai quando o modelo nao a tem. Nunca fica sem pose.
-const ANIM_FALLBACK := {"cair": "idle", "planar": "idle", "pegar": "cast"}
+const ANIM_FALLBACK := {"cair": "idle", "planar": "idle", "pegar": "cast",
+		"derrubado": "idle"}
 
 ## MEIA-VOLTA OBRIGATORIA NO MODELO EXTERNO — nao e' gosto, e' conversao de
 ## convencao. glTF (e a Meshy, que exporta glTF) posiciona o personagem olhando
@@ -70,7 +71,7 @@ const MODEL_YAW := PI
 ## depois patina").
 ## "cast" fica de FORA de proposito: e' disparo unico, e o `cast_fired` depende
 ## de ela terminar. Em laco, o tiro sairia repetido.
-const ANIMS_EM_LACO := ["idle", "run", "cair", "planar"]
+const ANIMS_EM_LACO := ["idle", "run", "cair", "planar", "derrubado"]
 const ANIM_ALIASES := {
 	"idle": ["idle", "Idle", "IDLE", "Armature|Idle", "mixamo.com",
 		"standing_idle", "breathing_idle", "idle_01", "idle_loop",
@@ -93,6 +94,13 @@ const ANIM_ALIASES := {
 		"wingsuit", "hover", "Hovering", "flying", "Flying"],
 	"pegar": ["pegar", "pickup", "Pickup", "pick_up", "Picking Up", "grab",
 		"Grab", "interact", "Interacting", "loot", "crouch_pickup"],
+	# NENHUM modelo do elenco tem este clipe hoje (Pyra tem 3 animacoes, Brok
+	# tem 5). Os aliases ja' existem para o dia em que ele vier da biblioteca da
+	# Meshy — ate' la' o fallback segura, e quem realmente usa a animacao e' o
+	# mago procedural, que e' o que 18 dos 20 personagens rodam.
+	"derrubado": ["derrubado", "downed", "Downed", "knocked", "Knocked Down",
+		"knockdown", "crawl", "Crawl", "crawling", "Crawling", "wounded",
+		"injured", "dying", "getting_up", "lying"],
 }
 
 ## PRESETS DE MATERIAL — um shader so', quatro respostas de luz diferentes.
@@ -418,6 +426,7 @@ func _build() -> void:
 	lib.add_animation("cair", _anim_cair())
 	lib.add_animation("planar", _anim_planar())
 	lib.add_animation("pegar", _anim_pegar())
+	lib.add_animation("derrubado", _anim_derrubado())
 	_player.add_animation_library("", lib)
 	_anim_map = {"idle": "idle", "run": "run", "cast": "cast"}
 	_model_report = _make_model_report(self, _player, _model_source)
@@ -955,6 +964,66 @@ func _anim_pegar() -> Animation:
 	_tr(a, "Rig/Hips/Robe:rotation", [
 		[0.0, Vector3(0.006, 0, 0)], [0.26, Vector3(-0.10, 0, 0)],
 		[0.65, Vector3(0.006, 0, 0)]])
+	_tr(a, "Rig/Hips/Robe:scale", [[0.0, _robe_scale(1.0)]])
+	_tr(a, _P + "ArmR/HandR:scale", [[0.0, Vector3.ONE]])
+	_tr(a, _P + "ArmL/HandL:scale", [[0.0, Vector3.ONE]])
+	return a
+
+
+## DERRUBADO. Estado SUSTENTADO, entao anda EM LACO — nao e' disparo unico como
+## `pegar`. Ate' 26/08 o caido continuava usando a animacao de locomocao mais
+## lenta: ficava DE PE', parado, no meio da partida, e o unico sinal de que
+## estava caido era a HUD. Num battle royale isso e' informacao errada — o
+## aliado precisa LER pelo corpo, de longe e sem icone, quem da' para reerguer.
+##
+## VOCABULARIO 10+ (mesma lei de gameplay/Derrubado.gd): ninguem sangra e
+## ninguem se contorce. O mago esta' CAIDO e APOIADO num braco, respirando
+## pesado. A cada volta ele LEVANTA A CABECA procurando quem vem — esse beat e'
+## de proposito: e' o corpo dizendo "ainda da' tempo", que e' exatamente a
+## informacao que o estado carrega.
+##
+## Lento de proposito (3,4 s). A leitura tem que ser "parado, vivo, esperando",
+## e nao "agitado" — agitacao a esta distancia le' como combate.
+func _anim_derrubado() -> Animation:
+	var a := _new_anim(3.4, true)
+	# no chao, tombado para o lado do braco que apoia. O respiro e' a UNICA
+	# coisa que se mexe muito: sem ele o caido le' como cadaver, e cadaver nao
+	# se reergue — a silhueta estaria mentindo sobre a regra do jogo.
+	# QUADRIL no chao, corpo tombado para o lado do braco que apoia. A primeira
+	# versao usava -0.58 e pitch 0.78: fotografada, o mago AFUNDAVA no terreno e
+	# lia como amontoado de pano, nao como alguem apoiado. Menos queda e menos
+	# inclinacao — quem sustenta o peito e' o tronco, logo abaixo.
+	_tr(a, "Rig:position", [
+		[0.0, Vector3(0, -0.55, 0)], [1.7, Vector3(0, -0.522, 0)],
+		[3.4, Vector3(0, -0.55, 0)]])
+	_tr(a, "Rig:rotation", [
+		[0.0, Vector3(0.30, 0, 0.40)], [1.7, Vector3(0.27, 0, 0.38)],
+		[3.4, Vector3(0.30, 0, 0.40)]])
+	# esquerdo APOIA: estendido para tras e para baixo, quase sem se mexer — e'
+	# ele que sustenta o peso, e peso sustentado nao balanca.
+	_tr(a, _P + "ArmL:rotation", [
+		[0.0, Vector3(-0.30, 0, -1.15)], [1.7, Vector3(-0.34, 0, -1.12)],
+		[3.4, Vector3(-0.30, 0, -1.15)]])
+	# direito LIVRE: pende sobre o colo e, no beat da cabeca, se estende um
+	# pouco — o comeco de um gesto de chamar que o corpo nao termina.
+	_tr(a, _P + "ArmR:rotation", [
+		[0.0, Vector3(0.55, 0, 0.42)], [1.5, Vector3(0.30, 0, 0.62)],
+		[2.2, Vector3(0.42, 0, 0.52)], [3.4, Vector3(0.55, 0, 0.42)]])
+	# a cabeca: baixa, e SOBE uma vez por volta. E' o beat que diz "ainda da' tempo".
+	_tr(a, _P + "Head:rotation", [
+		[0.0, Vector3(0.40, 0.12, 0)], [1.4, Vector3(-0.06, -0.16, 0)],
+		[2.1, Vector3(0.08, -0.10, 0)], [3.4, Vector3(0.40, 0.12, 0)]])
+	# TRONCO: e' aqui que o peito se levanta. Sem esta contra-rotacao o mago
+	# fica de bruces e some no chao — foi o defeito da primeira foto. O respiro
+	# pesado tambem mora aqui, defasado do quadril (mesma licao do _anim_idle:
+	# sem atraso entre as partes o boneco e' uma peca so').
+	_tr(a, _P.trim_suffix("/") + ":rotation", [
+		[0.0, Vector3(-0.46, 0.08, -0.10)], [1.9, Vector3(-0.52, 0.05, -0.09)],
+		[3.4, Vector3(-0.46, 0.08, -0.10)]])
+	# manto ESPALHADO no chao: para de acompanhar o corpo e vira pano parado.
+	_tr(a, "Rig/Hips/Robe:rotation", [
+		[0.0, Vector3(-0.14, 0, 0.05)], [1.9, Vector3(-0.12, 0, 0.04)],
+		[3.4, Vector3(-0.14, 0, 0.05)]])
 	_tr(a, "Rig/Hips/Robe:scale", [[0.0, _robe_scale(1.0)]])
 	_tr(a, _P + "ArmR/HandR:scale", [[0.0, Vector3.ONE]])
 	_tr(a, _P + "ArmL/HandL:scale", [[0.0, Vector3.ONE]])
