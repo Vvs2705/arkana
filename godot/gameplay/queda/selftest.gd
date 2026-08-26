@@ -331,6 +331,9 @@ func _test_fases() -> void:
 	_check(_fases == ["no_castelo"], "e ja' publica a fase no Bus")
 	_check(not p.is_physics_processing(),
 			"o Player para de andar sozinho: quem conduz o corpo e' a queda")
+	# O CASTELO SEM BONECOS (decisao no 14 — DIRECAO.md §2). Provado em
+	# vermelho apagando o visible=false do _ready: os dois checks caem.
+	_check(not p.visible, "no castelo o corpo e' INVISIVEL — o ceu mostra um objeto, nao gente")
 
 	## 1. NO CASTELO — colado no castelo, e um toque salta.
 	## No FRAME ZERO, antes de qualquer passo: senao o mago passa o primeiro
@@ -343,6 +346,15 @@ func _test_fases() -> void:
 	_check(p.global_position.is_equal_approx(Vector3(10, 320, -20) + Vector3(q.PORTAO)),
 			"o mago viaja pendurado no portao do castelo")
 	_check(str(q.fase) == "no_castelo", "olhar e esperar NAO salta")
+	_check(not p.visible, "viajando, continua invisivel")
+	q.saltar()
+	_check(p.visible, "ao ACIONAR o salto o mago SURGE (do nada, e nao e' problema — o Diretor)")
+	# devolve o MUNDO INTEIRO ao estado de antes do salto de prova: a fase, a
+	# visibilidade E o rastro no Bus — saltar() publicou "caindo" e sem apagar
+	# esse eco as checagens de ordem-das-fases la' embaixo contam fase a mais.
+	q.fase = "no_castelo"
+	p.visible = false
+	_fases.resize(1)
 	p.request_fire()                       # o toque que a HUD ja' tem hoje
 	_passo(q, 1)
 	_check(str(q.fase) == "caindo", "UM TOQUE SALTA")
