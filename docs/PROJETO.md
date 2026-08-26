@@ -51,7 +51,35 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o CASTELO 3D existe, e o site é a via oficial
+### >>> COMECE POR AQUI — as 5 peças-herói existem em 3D, na conta do Diretor
+
+**26/08, fim de tarde.** A fila inteira da DIREÇÃO §10 virou modelo: Castelo,
+Luva Comum, Luva de Conjurador, Manopla e Baú — todos pelo SITE, visíveis na
+galeria dele, Multi-View das vistas ortogonais aprovadas. Placar e ressalvas em
+`cenario/00-MODELOS-3D.md`. **210 créditos no dia · saldo 2.984.**
+
+**A regra que nasceu no meio, por correção DELE:** revisar o modelo NO VIEWER
+antes de baixar. Ele pegou dois defeitos na Conjurador v1 (gema extra no
+anelar + palma sem os símbolos) que eu ia deixar passar. A v2 corrigiu a
+geometria (4 cristais exatos, contados em zoom); a palma lisa persistiu em 2/2
+gerações → **o bordado vira decal no Blender** (determinístico, grátis), não
+terceira loteria de 30 créditos.
+
+**Pergunta dele respondida:** as 5 cores da Luva Comum NÃO são 5 modelos — é
+UM master (o vermelho) + recolor de material no motor, como as luvas
+procedurais já fazem. 5 gerações custariam 5× e dariam 5 geometrias.
+
+**Blender INSTALADO (winget).** A esteira da próxima fase, por peça: decimar
+(~2 M → alvo de jogo) + bake de normal + decal da palma (conjurador) → GLB de
+jogo em `godot/world/modelos/` (git/LFS) → pendurar nas cenas (castelo em
+`Castelo.gd`; luvas em `ArmaSlot.modelo()` no lugar do procedural; baú em
+`BauCelestial`) → colisão simples à mão → **FPS no aparelho** (DIRECAO §10.1).
+
+**Aba do Meshy deixada ABERTA no Chrome dele** — os processos estão todos lá.
+
+---
+
+### (26/08, fim de tarde — o castelo 3D nasce, histórico)
 
 **26/08, fim de tarde — o primeiro modelo de cenário nasceu.** E uma ordem do
 Diretor mudou o processo no meio: *"quero ver todos os processos lá no site,
