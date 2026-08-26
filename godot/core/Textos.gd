@@ -15,6 +15,7 @@ const TITULO_TOQUE := "TOQUE PARA COMEÇAR"
 
 # ---------------------------------------------------------------- menu principal
 const MENU_JOGAR := "JOGAR"
+const MENU_TREINO := "TREINO"
 const MENU_PERSONAGENS := "PERSONAGENS"
 const MENU_CONFIG := "CONFIGURAÇÕES"
 const MENU_SAIR := "SAIR"

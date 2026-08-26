@@ -57,7 +57,7 @@ func _run() -> void:
 # --- 4 botoes de menu, alvo >= 48dp (mesma conversao do jogo: ui/Dp.gd) ------
 func _teste_botoes(menu: Control) -> void:
 	var min48 := maxf(Dp.px(Estilo.ALVO_DP), Estilo.ALVO_DP) - 0.5
-	for nome in ["BtnJogar", "BtnPersonagens", "BtnConfig", "BtnSair"]:
+	for nome in ["BtnJogar", "BtnTreino", "BtnPersonagens", "BtnConfig", "BtnSair"]:
 		var b: Button = menu.find_child(nome, true, false)
 		_check(b != null, "botao %s existe" % nome)
 		if b != null:
@@ -289,6 +289,18 @@ func _teste_bus(menu: Control) -> void:
 	if jogar != null:
 		jogar.pressed.emit()
 	_check(_sinal == 1, "JOGAR emite Bus.game_start_requested (1x)")
+
+	# TREINO (decisao no 19): o botao escreve o pedido na static do Main — e'
+	# assim que ele atravessa a troca de cena. Provado em vermelho apagando a
+	# escrita em Menu._on_treino.
+	var main_scr: GDScript = load("res://gameplay/Main.gd")
+	main_scr.proximo_treino = false
+	var treino: Button = menu.find_child("BtnTreino", true, false)
+	_check(treino != null, "botao TREINO existe no menu")
+	if treino != null:
+		treino.pressed.emit()
+	_check(bool(main_scr.proximo_treino), "TREINO pede o modo treino ao Main")
+	main_scr.proximo_treino = false  # limpa: nenhum teste seguinte herda
 
 
 func _check(cond: bool, name: String) -> void:

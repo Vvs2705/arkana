@@ -224,6 +224,11 @@ func _build_menu() -> Control:
 	var jogar := Estilo.botao(Textos.MENU_JOGAR, "BtnJogar", 56.0)
 	jogar.pressed.connect(_on_jogar)
 	v.add_child(jogar)
+	# TREINO (decisao no 19 do Diretor, 26/08): "todo jogo precisa de um lobby
+	# de treino — ali voce testa qualquer personagem, habilidades, luvas".
+	var treino := Estilo.botao(Textos.MENU_TREINO, "BtnTreino", 56.0)
+	treino.pressed.connect(_on_treino)
+	v.add_child(treino)
 	var pers := Estilo.botao(Textos.MENU_PERSONAGENS, "BtnPersonagens", 56.0)
 	pers.pressed.connect(func() -> void: _go(_tela_selecao))
 	v.add_child(pers)
@@ -234,6 +239,17 @@ func _build_menu() -> Control:
 	sair.pressed.connect(func() -> void: get_tree().quit())
 	v.add_child(sair)
 	return t
+
+
+## O treino e' a MESMA cena da partida com um pedido diferente: uma static no
+## script do Main (consumida no _ready de la'). Por que nao um sinal no Bus: o
+## pedido precisa SOBREVIVER a troca de cena, e sinal nao atravessa cena — a
+## static do script atravessa, e o consumo imediato impede que uma partida
+## normal futura herde o treino por engano.
+func _on_treino() -> void:
+	if ResourceLoader.exists("res://gameplay/Main.gd"):
+		(load("res://gameplay/Main.gd") as GDScript).proximo_treino = true
+	_on_jogar()
 
 
 func _on_jogar() -> void:

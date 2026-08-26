@@ -39,8 +39,16 @@ var zona: Zona
 var hud: Hud
 var _spawns: Array[Vector3] = []
 
+## O pedido de TREINO (decisao no 19 — DIRECAO.md §8). O menu escreve aqui e o
+## _ready consome: static porque precisa sobreviver a troca de cena, consumida
+## porque partida normal nenhuma pode herdar o treino por engano.
+static var proximo_treino := false
+var modo_treino := false
+
 
 func _ready() -> void:
+	modo_treino = proximo_treino
+	proximo_treino = false
 	island = _load_island()
 	add_child(island)
 	_collect_spawns()
@@ -58,6 +66,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if match_state != PLAYING:
 		return
+	if modo_treino:
+		return  # treino nao tem relogio: fica o tempo que quiser
 	time_left -= delta
 	if time_left <= 0.0:
 		time_left = 0.0
@@ -82,6 +92,8 @@ func _build_match() -> void:
 	player.global_position = pts[0]
 	player.set_mage(PLAYER_MAGE)
 	_dar_arma(player)
+	if modo_treino:
+		bots_alive = 0  # bonecos de treino nao contam vitoria — nascem em _montar_treino
 	for i in bots_alive:
 		var b := Bot.new()
 		# SEM b.target = player (26/08): a partida e' FFA e o alvo nasce da
@@ -110,7 +122,8 @@ func _build_match() -> void:
 	## nasce sob a Arena (os dois Timers dela param no fim da partida e somem no
 	## restart) e e' DETERMINISTICA pelo proprio seed — mesma sequencia de
 	## circulos toda partida, como manda o contrato do projeto.
-	zona = Zona.criar(arena, island)
+	## No TREINO nao ha' zona: ninguem aprende habilidade correndo da tempestade.
+	zona = null if modo_treino else Zona.criar(arena, island)
 	## A QUEDA DO CASTELO — a partida comeca no ar, nao no chao. O castelo cruza
 	## o mapa, o jogador salta quando quiser, cai, plana e pousa. Ordem do
 	## Diretor: durante a queda o mago NAO tem poder nenhum, so' o corpo.
@@ -122,7 +135,9 @@ func _build_match() -> void:
 	## Fiacao defensiva: sem o arquivo, nada acontece e a partida abre no chao.
 	## Os BOTS continuam nascendo no chao — faze-los cair e' raia de IA e mexeria
 	## em Bot.gd; esta' registrado como pendencia, nao como esquecimento.
-	if ResourceLoader.exists(QUEDA_SCRIPT):
+	if modo_treino:
+		_montar_treino()
+	elif ResourceLoader.exists(QUEDA_SCRIPT):
 		var qs: GDScript = load(QUEDA_SCRIPT)
 		if qs != null:
 			var q = qs.iniciar(arena, island, player)
@@ -144,6 +159,53 @@ func _build_match() -> void:
 ## Toda queda do ceu comeca com uma VARINHA (GDD §16.2). O slot e' um no' filho
 ## — Player.gd/Bot.gd/Pawn.gd nao sabem que ele existe (composicao); quem
 ## precisa da arma de alguem chama ArmaSlot.de(pawn).
+## O LOBBY DE TREINO (DIRECAO.md §8): sem zona, sem relogio, sem queda — o
+## jogador nasce no chao com as TRES luvas expostas a passos do spawn, dois
+## bonecos que regeneram para apanhar, e a suprema enchendo em 5s em vez de
+## 40-50 (testar suprema esperando 50s nao e' treino, e' fila).
+func _montar_treino() -> void:
+	# as tres luvas, em fila, a 3-5m do jogador (a manopla com par fixo de
+	# exemplo — no jogo real ela so' nasce no Bau Celestial)
+	var base := player.global_position
+	var fila := [["varinha", PackedStringArray()],
+			["cajado", PackedStringArray()],
+			["manopla", PackedStringArray(["fire", "wind"])]]
+	for i in fila.size():
+		var l: Loot = Loot.criar(str(fila[i][0]), fila[i][1])
+		arena.add_child(l)
+		var pos := base + Vector3(3.0 + float(i) * 1.6, 0.0, 2.5)
+		pos.y = _altura(pos) + 0.4
+		l.global_position = pos
+	# dois bonecos: Pawn cru (nao age, nao persegue) que REGENERA — apanhar
+	# sem culpa e' o servico deles. Grupo proprio para o selftest achar.
+	for i in 2:
+		var d := Pawn.new()
+		d.name = "Boneco%d" % i
+		arena.add_child(d)
+		d.add_to_group("boneco_treino")
+		var pos := base + Vector3(8.0 + float(i) * 3.0, 0.0, -2.0)
+		pos.y = _altura(pos) + 1.0
+		d.global_position = pos
+		var t := Timer.new()
+		t.wait_time = 1.0
+		t.autostart = true
+		d.add_child(t)
+		t.timeout.connect(func() -> void:
+			if is_instance_valid(d) and d.hp > 0.0:
+				d.hp = minf(d.hp + 15.0, 100.0))
+	# suprema em 5s: o dado e' por-instancia (Kits.de ja' duplica), entao isto
+	# nao vaza para partidas reais.
+	var k := KitRunner.de(player)
+	if k != null:
+		k.dados["suprema_carga"] = 5.0
+
+
+func _altura(pos: Vector3) -> float:
+	if island != null and island.has_method("height"):
+		return float(island.call("height", pos.x, pos.z))
+	return 0.0
+
+
 ## Da' o SLOT — nunca mais a arma (26/08, DIRECAO.md §1: todos caem de maos
 ## nuas; achar a primeira luva e' a corrida de abertura da partida).
 func _dar_arma(pawn: Pawn) -> void:

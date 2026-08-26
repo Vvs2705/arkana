@@ -80,6 +80,7 @@ func _run() -> void:
 	_test_bot_death()
 	_test_bot_percepcao()
 	_test_lei_das_luvas_no_bot()
+	_test_treino()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -221,6 +222,43 @@ func _test_bot_death() -> void:
 	_check(_died.size() == 1 and _died[0] == b, "Bus.entity_died emitido")
 	_check(not b.is_physics_processing(), "bot morto para de agir")
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
+
+
+## O LOBBY DE TREINO (26/08 — DIRECAO.md §8). Monta o Main INTEIRO em modo
+## treino e cobra o contrato: sem zona, sem queda (fisica do player LIGADA — na
+## partida real a queda a desliga), bonecos regenerando, as tres luvas expostas
+## e a suprema em 5s. Vermelho provado apagando o consumo da static.
+func _test_treino() -> void:
+	print("[Treino: o lobby da decisao no 19]")
+	var main_scr: GDScript = load("res://gameplay/Main.gd")
+	main_scr.proximo_treino = true
+	var m: Node = (load("res://gameplay/Main.tscn") as PackedScene).instantiate()
+	root.add_child(m)
+	_check(bool(m.modo_treino), "o pedido do menu vira modo treino")
+	_check(not bool(main_scr.proximo_treino),
+			"o pedido e' CONSUMIDO — a proxima partida normal nao herda o treino")
+	_check(m.zona == null, "treino NAO tem zona fechando")
+	_check((m.player as Node).is_physics_processing(),
+			"player no CHAO desde o comeco (a queda, que desligaria a fisica, nao roda)")
+	var bonecos := root.get_tree().get_nodes_in_group("boneco_treino")
+	_check(bonecos.size() == 2, "dois bonecos de treino")
+	var luvas := 0
+	for n in m.arena.get_children():
+		if n is Loot and (n as Node3D).global_position.distance_to(
+				(m.player as Node3D).global_position) < 12.0:
+			luvas += 1
+	_check(luvas >= 3, "as tres luvas expostas a passos do spawn (achou %d)" % luvas)
+	var k: Node = load("res://gameplay/KitRunner.gd").de(m.player)
+	_check(k != null and float(k.dados.suprema_carga) <= 6.0,
+			"suprema enche em ~5s no treino (testar esperando 50s e' fila, nao treino)")
+	# boneco apanha e regenera: o timer devolve vida
+	var alvo: Node = bonecos[0]
+	alvo.hp = 40.0
+	for f in alvo.get_children():
+		if f is Timer:
+			(f as Timer).timeout.emit()
+	_check(float(alvo.hp) > 40.0, "boneco REGENERA — apanhar sem culpa e' o servico dele")
+	m.queue_free()
 
 
 ## A LEI DAS LUVAS NO BOT (26/08 — DIRECAO.md §1 e §7): desarmado nao atira,
