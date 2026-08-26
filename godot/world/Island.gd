@@ -65,6 +65,10 @@ const MARSH_R := 22.0
 ## lago tinha 18 m. Fonte unica: quem desenha a agua e' quem diz onde ela esta'.
 const LAKE_DISC_R := 29.0
 const MARSH_DISC_R := 22.0
+## Cota da LAMINA de cada agua. Fonte unica: _build_water desenha com estas e
+## agua_y() responde com as mesmas — divergir aqui e' nadar dentro de terra.
+const LAKE_WATER_Y := 0.6
+const MARSH_WATER_Y := 0.55
 const FOREST := Vector2(-60, -66)
 const FOREST_R := 40.0
 const RUINS := Vector2(63, -73)      # plato elevado
@@ -159,6 +163,10 @@ var _mist_mat: ShaderMaterial
 
 
 func _ready() -> void:
+	# Grupo da BUSCA do nado (Pawn._agua_step): o pawn nao conhece a ilha por
+	# referencia — pergunta pela arvore, e boota sozinho sem ela (fiacao
+	# defensiva: em cena avulsa nao ha' agua nenhuma e nada quebra).
+	add_to_group("ilha")
 	_noise.seed = 7
 	_noise.frequency = 0.02
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -245,6 +253,25 @@ func _build() -> void:
 
 
 # ---------------------------------------------------------------- relevo
+
+## A SUPERFICIE D'AGUA em (x, z): a cota da lamina, ou SECO (-1e9) onde nao
+## ha' agua. E' a pergunta que o NADO do Pawn faz (DIRECAO.md §3: "agua na
+## altura do peito ja' inicia o modo nadar"). Mar = onde o terreno mergulha
+## abaixo do nivel do mar; lago e brejo = os MESMOS discos que _build_water
+## desenha, pelas MESMAS constantes — fonte unica, nadar casa com o desenho.
+const SECO := -1e9
+
+
+func agua_y(x: float, z: float) -> float:
+	var p2 := Vector2(x, z)
+	if p2.distance_to(LAKE) <= LAKE_DISC_R:
+		return LAKE_WATER_Y
+	if p2.distance_to(MARSH) <= MARSH_DISC_R:
+		return MARSH_WATER_Y
+	if height(x, z) < SEA_Y:
+		return SEA_Y
+	return SECO
+
 
 func height(x: float, z: float) -> float:
 	var p := Vector2(x, z)
@@ -553,9 +580,9 @@ func _build_water(parent: Node3D) -> void:
 	# cobre o disco (o plano d'agua fica enterrado). Errar pra mais e' de graca.
 	# Este e' o par que o selftest [lamina d'agua] guarda.
 	_add_mesh(parent, _disc_mesh(LAKE_DISC_R, _water_lake, 0.08),
-			Transform3D(Basis.IDENTITY, Vector3(LAKE.x, 0.6, LAKE.y)), "LakeWater", false)
+			Transform3D(Basis.IDENTITY, Vector3(LAKE.x, LAKE_WATER_Y, LAKE.y)), "LakeWater", false)
 	_add_mesh(parent, _disc_mesh(MARSH_DISC_R, _water_marsh, 0.12),
-			Transform3D(Basis.IDENTITY, Vector3(MARSH.x, 0.55, MARSH.y)), "MarshWater", false)
+			Transform3D(Basis.IDENTITY, Vector3(MARSH.x, MARSH_WATER_Y, MARSH.y)), "MarshWater", false)
 
 
 ## Disco em aneis; COLOR.r = fracao do raio (0 centro, 1 borda) — os shaders

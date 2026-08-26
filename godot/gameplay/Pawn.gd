@@ -9,6 +9,22 @@ const KNOCK_DECAY := 9.0  # m/s^2 — KNOB local; pedir entrada em Balance se so
 var hp: float = float(Balance.PLAYER.hp)
 var element := "fire"    # padrao do carrossel (Balance.ELEMENTS)
 var speed_factor := 1.0  # bots reduzem aqui, nunca no Balance
+## AGUA (26/08 — DIRECAO.md §3). `agua_mult` entra no PRODUTO UNICO da
+## velocidade como os demais fatores — nunca escreve m/s direto:
+##   nadando          0.55  "natural, nada de muito rapido"
+##   saindo molhado   0.8   "fisica de roupas molhadas", MOLHADO_S segundos
+## O nado comeca quando a lamina cobre o PEITO (1.2 m) — pisar numa poca nao
+## e' nadar. Quem responde onde ha' agua e' a ilha (agua_y, grupo "ilha");
+## sem ilha na arvore, tudo isto vale 1.0 e nada quebra.
+const NADO_MULT := 0.55
+const MOLHADO_MULT := 0.8
+const MOLHADO_S := 2.5
+const PEITO := 1.2
+var agua_mult := 1.0
+var nadando := false
+var _molhado_s := 0.0
+var _sup_nado := 0.0
+var _ilha: Node3D
 var terrain_mult := 1.0  # G2 (gelo/agua) escreve aqui
 var status_mult := 1.0   # lentidao/buff escrevem aqui
 var iframes_left := 0.0  # esquiva: Combat.deal barra dano enquanto > 0
@@ -43,13 +59,14 @@ var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_grav
 
 ## Velocidade e' PRODUTO UNICO (regra provada) — ninguem escreve m/s direto.
 func current_speed() -> float:
-	return float(Balance.PLAYER.speed) * terrain_mult * status_mult * speed_factor
+	return float(Balance.PLAYER.speed) * terrain_mult * status_mult * speed_factor * agua_mult
 
 
 ## Caminho UNICO da velocidade horizontal: produto unico + dash + knockback.
 ## Player e Bot passam por aqui — ninguem escreve velocity.x/z por fora.
 func move_velocity(dir: Vector3, delta: float) -> void:
 	status_step(delta)  # DoT (terreno + queimadura) e relogio dos estados
+	_agua_step(delta)
 	_dodge_cd = maxf(_dodge_cd - delta, 0.0)
 	iframes_left = maxf(iframes_left - delta, 0.0)
 	knockback = knockback.move_toward(Vector3.ZERO, KNOCK_DECAY * delta)
@@ -380,7 +397,41 @@ func set_tint(c: Color) -> void:
 		(visual.get_meta("fallback_mat") as StandardMaterial3D).albedo_color = c
 
 
+## O relogio da agua: decide nadar/molhado e o fator do produto unico.
+func _agua_step(delta: float) -> void:
+	var sup := _superficie_agua()
+	var fundo := sup > -1e8 and (sup - global_position.y) >= PEITO
+	if fundo:
+		_sup_nado = sup
+		nadando = true
+	elif nadando:
+		nadando = false
+		_molhado_s = MOLHADO_S  # roupa encharcada: a saida e' lenta uns segundos
+	if not nadando:
+		_molhado_s = maxf(_molhado_s - delta, 0.0)
+	agua_mult = NADO_MULT if nadando else (MOLHADO_MULT if _molhado_s > 0.0 else 1.0)
+
+
+func _superficie_agua() -> float:
+	if _ilha == null or not is_instance_valid(_ilha):
+		var tree := get_tree()
+		if tree == null:
+			return -1e9
+		_ilha = tree.get_first_node_in_group("ilha") as Node3D
+	if _ilha == null or not _ilha.has_method("agua_y"):
+		return -1e9
+	return float(_ilha.call("agua_y", global_position.x, global_position.z))
+
+
 func apply_gravity(delta: float) -> void:
+	## NADANDO o corpo FLUTUA com a lamina no peito: a gravidade nao puxa para
+	## o fundo do lago (2 m abaixo) nem o mago anda no leito como se nada
+	## houvesse — que era exatamente a queixa do Diretor.
+	if nadando:
+		velocity.y = 0.0
+		global_position.y = lerpf(global_position.y, _sup_nado - PEITO,
+				minf(6.0 * delta, 1.0))
+		return
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 

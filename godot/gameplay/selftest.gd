@@ -81,6 +81,7 @@ func _run() -> void:
 	_test_bot_percepcao()
 	_test_lei_das_luvas_no_bot()
 	_test_treino()
+	_test_agua()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -224,6 +225,62 @@ func _test_bot_death() -> void:
 	_check(not _combat.deal(b, 10.0), "morto nao toma dano de novo")
 
 
+## A AGUA (26/08 — DIRECAO.md §3): peito coberto = nadar (devagar, flutuando
+## na lamina); sair = uns segundos de roupa encharcada; poca no tornozelo NAO
+## e' nado. Vermelhos provados tirando o limiar do peito e a saida molhada.
+func _test_agua() -> void:
+	print("[Agua: nadar do peito, flutuar, e sair encharcado]")
+	# ilha de mentira: lamina em y=2.0 dentro de um disco de 10m; seco fora
+	var ilha_scr := GDScript.new()
+	ilha_scr.source_code = """extends Node3D
+func agua_y(x: float, _z: float) -> float:
+	return 2.0 if absf(x) <= 10.0 else -1e9
+func height(_x: float, _z: float) -> float:
+	return 0.0
+"""
+	ilha_scr.reload()
+	var ilha: Node3D = ilha_scr.new()
+	ilha.add_to_group("ilha")
+	root.add_child(ilha)
+	var p: Node = load("res://gameplay/Pawn.gd").new()
+	root.add_child(p)
+
+	# SECO (fora do disco): produto integro
+	p.global_position = Vector3(50, 0, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(not bool(p.nadando) and is_equal_approx(float(p.agua_mult), 1.0),
+			"em terra seca o produto nao muda")
+
+	# FUNDO (lamina 2.0, corpo em y=0 -> 2m de agua > peito 1.2): NADA
+	var v0: float = p.current_speed()
+	p.global_position = Vector3(0, 0, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(bool(p.nadando), "peito coberto -> modo NADAR")
+	_check(p.current_speed() < v0 * 0.6, "nadar e' devagar (produto unico, fator %.2f)" % float(p.NADO_MULT))
+	# flutua: a gravidade nao puxa para o leito
+	p.velocity = Vector3(0, -5, 0)
+	for i in 30:
+		p.apply_gravity(0.05)
+	_check(is_zero_approx(float(p.velocity.y)), "nadando, a gravidade nao puxa")
+	_check(absf(float(p.global_position.y) - (2.0 - float(p.PEITO))) < 0.15,
+			"o corpo FLUTUA com a lamina no peito (y ~ %.1f)" % (2.0 - float(p.PEITO)))
+
+	# POCA no tornozelo (corpo a 1.5 -> 0.5m de agua): NAO nada
+	p.global_position = Vector3(0, 1.5, 0)
+	p.move_velocity(Vector3.ZERO, 0.1)
+	_check(not bool(p.nadando), "poca no tornozelo NAO e' nado (limiar do peito)")
+	_check(float(p._molhado_s) > 0.0 and is_equal_approx(float(p.agua_mult), float(p.MOLHADO_MULT)),
+			"saiu da agua ENCHARCADO: %.0f%% da velocidade" % (float(p.MOLHADO_MULT) * 100))
+
+	# a roupa seca: depois de MOLHADO_S o produto volta a 1.0
+	p.global_position = Vector3(50, 0, 0)
+	for i in 40:
+		p.move_velocity(Vector3.ZERO, 0.1)
+	_check(is_equal_approx(float(p.agua_mult), 1.0), "a roupa seca e a velocidade volta")
+	ilha.queue_free()
+	p.queue_free()
+
+
 ## O LOBBY DE TREINO (26/08 — DIRECAO.md §8). Monta o Main INTEIRO em modo
 ## treino e cobra o contrato: sem zona, sem queda (fisica do player LIGADA — na
 ## partida real a queda a desliga), bonecos regenerando, as tres luvas expostas
@@ -258,7 +315,11 @@ func _test_treino() -> void:
 		if f is Timer:
 			(f as Timer).timeout.emit()
 	_check(float(alvo.hp) > 40.0, "boneco REGENERA — apanhar sem culpa e' o servico dele")
-	m.queue_free()
+	# free() IMEDIATO, nao queue_free(): a ilha REAL deste Main esta' no grupo
+	# "ilha", e adiada ela sobrevive ate' o teste da AGUA — que entao pergunta a
+	# lamina para a ilha errada e conclui que o lago do teste e' terra seca.
+	# Custou 5 falhas em cascata descobrir isso.
+	m.free()
 
 
 ## A LEI DAS LUVAS NO BOT (26/08 — DIRECAO.md §1 e §7): desarmado nao atira,
