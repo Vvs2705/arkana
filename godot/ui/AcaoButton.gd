@@ -28,6 +28,10 @@ var cd_frac := Callable()
 ## Segundos cheios do cooldown, para o numero no meio do botao. Chega pela BORDA
 ## (Bus.kit_cooldown), nunca por frame.
 var total_s := 0.0
+## true = botao de CARGA (a suprema, 26/08): em vez dos segundos que faltam,
+## mostra a PORCENTAGEM 0->100% que o Diretor pediu ("contador de porcentagem
+## iniciando em 0% ate' chegar em 100%"). O arco continua o mesmo.
+var mostra_carga := false
 ## false = APAGADO: 17 dos 20 magos ainda nao tem kit implementado. O botao
 ## aparece (o jogador ve que a habilidade existe) mas nao emite toque.
 var ativo := true
@@ -93,9 +97,13 @@ func _draw() -> void:
 	if rotulo != "":
 		draw_string(font, Vector2(0, c.y + fs * 0.35), rotulo,
 				HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 1, alfa))
-	# Segundos que faltam: le mais rapido que o arco quando o cooldown e' longo
-	# (a suprema passa de 60s em varios kits).
-	if frac > 0.0 and total_s > 0.0:
+	# Carga: a porcentagem QUE JA' ENCHEU (100 - falta). Cooldown: os segundos
+	# que faltam — le mais rapido que o arco quando o cooldown e' longo.
+	if frac > 0.0 and mostra_carga:
+		var pct := int(floorf((1.0 - frac) * 100.0))
+		draw_string(font, Vector2(0, c.y - fs * 0.9), str(pct) + "%",
+				HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 1, 0.95))
+	elif frac > 0.0 and total_s > 0.0:
 		var s := int(ceilf(frac * total_s))
 		draw_string(font, Vector2(0, c.y - fs * 0.9), str(s),
 				HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 1, 0.95))

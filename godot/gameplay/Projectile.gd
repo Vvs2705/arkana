@@ -61,6 +61,9 @@ static func launch(parent: Node, p_shooter: Node, from: Vector3, p_dir: Vector3,
 	p.dmg = float(s.dmg)
 	parent.add_child(p)
 	p.global_position = from
+	# Conjurar DENUNCIA (26/08): quem esta' perto ouve e vem. Ponto unico:
+	# player, bot e teste anunciam igual, sem editar nenhum atirador.
+	Bus.disparo.emit(p_shooter, from)
 	if absf(p.dir.y) < 0.99:
 		p.look_at(from + p.dir)  # lamina e dardo apontam para onde voam
 	return p

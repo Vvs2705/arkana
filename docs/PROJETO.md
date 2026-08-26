@@ -51,7 +51,48 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 26/08/2026 (noite)
+### >>> COMECE POR AQUI — a DIREÇÃO de 26/08 existe e manda
+
+O Diretor respondeu a entrevista de 20 perguntas sobre luvas, habilidades,
+castelo, água e bots. **Tudo está em [DIRECAO.md](DIRECAO.md)** — até ele colar
+as emendas no GDD, aquele arquivo é a palavra dele por escrito e nenhuma
+implementação pode contradizê-lo. O que já virou código, com teste vermelho:
+
+**a) FFA + percepção dos bots.** `Main.gd` cravava `b.target = player` no
+nascimento — "mesmo sem me mexer eles já me notam" não era IA agressiva, era
+ausência de percepção. Agora o bot nasce cego e NOTA por quatro canais com
+contra-jogada: VISTO (< 12 m), OUVIDO (< 18 m só em movimento — ficar parado
+esconde), DISPARO (< 30 m, `Bus.disparo` emitido por `Projectile.launch`, o
+ponto único de todo tiro) e REVIDE (tomar dano ensina quem bateu). Todos contra
+todos: bot caça bot.
+
+**b) A suprema virou CARGA 0→100%.** Cooldown morreu. Começa VAZIA na queda
+("senão fica muito roubado"), enche com o tempo (`suprema_carga` s por mago) e
+acelera com dano CAUSADO (`Kits.CARGA_POR_DANO`, modelo Apex por ordem dele).
+O botão da HUD mostra a porcentagem (`AcaoButton.mostra_carga`). Dano RECEBIDO
+não enche — apanhar não é bateria.
+
+**c) Táticas na faixa 5–10 s** (agressão no teto): Pyra 14→9, Véu 12→6, Tessa 7
+(mantido — decisão anterior deliberada). Tabela dos 20 em DIRECAO.md §4.
+
+**Um teste passava VACUAMENTE e foi consertado:** o "braço frio" da Pyra exigia
+`tatica_cd >= 4 s` após a suprema — passava porque o cooldown antigo de 14 s
+ainda estava correndo (sobrava 6,4 s) e mascarava o esfriamento. Com a tática em
+9 s a sobra é 1,4 s e o `maxf` do esfria é quem levanta para 4 — o check agora
+prova o que sempre disse provar (a tolerância virou 1 tique, não 0,01).
+
+**O que a DIREÇÃO manda e AINDA NÃO tem código** (ordem sugerida):
+1. Luvas como forma física (varinha/cajado → luva; PEGAR vira TROCAR com arma
+   na mão; braço ergue ao disparar/abaixa no cansaço; recarga da luva).
+2. Lobby de treino (decisão nº 19 — destrava o teste do próprio Diretor).
+3. Castelo sem bonecos + surgir ao acionar (decisão nº 14).
+4. Água: nadar do peito, tiro na superfície, mergulho esconde, saída lenta.
+5. Bots nas leis do jogador: caem sem luva, acham loot, usam tática/suprema.
+6. Sons de passos/respiração (a percepção já tem os canais; falta o áudio).
+
+---
+
+### (26/08, noite — animação derrubado, histórico)
 
 **ACHADO QUE MUDA PRIORIDADE — leia antes de planejar arte 3D.**
 
