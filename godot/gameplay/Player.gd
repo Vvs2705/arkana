@@ -21,6 +21,10 @@ var _fire_cd := 0.0
 var _cast := 0.0
 var _want_fire := false
 var _want_dodge := false
+## SALTO: o toque pede o pulo (consumido no passo de fisica, como os demais) e
+## SEGURAR o mesmo botao pede a flutuacao — um botao, duas leituras.
+var _want_jump := false
+var querendo_flutuar := false
 var _want_tatica := false
 var _want_suprema := false
 var _aiming := false
@@ -122,6 +126,7 @@ func set_mage(slug: String) -> void:
 
 func _physics_process(delta: float) -> void:
 	cam_yaw.global_position = global_position + Vector3(0, 1.85, 0)
+	_passo_do_ar(delta)
 	_fire_cd = maxf(_fire_cd - delta, 0.0)
 	_cast = maxf(_cast - delta, 0.0)
 	if mana < float(Balance.PLAYER.mana_max):
@@ -163,6 +168,31 @@ func _turn(dir: Vector3, delta: float) -> void:
 				minf(float(Balance.MOVE.turn_rate_aim) * pivo * delta, 1.0))
 	else:
 		face_dir(dir, delta, float(Balance.MOVE.turn_rate_free) * pivo)
+
+
+## O AR: pular e flutuar. A MANA e' cobrada AQUI porque o Player e' a
+## autoridade unica de custo (mesma regra do disparo, GDD §4.2) — o Pawn so'
+## obedece ao campo `flutuando`. Segurar o botao no chao nao acumula nada: sem
+## estar no ar, flutuar nao existe.
+## A HUD pede por aqui (mesma forma dos outros botoes: intencao agora,
+## consumo no passo de fisica).
+func pedir_pulo() -> void:
+	_want_jump = true
+
+
+func _passo_do_ar(delta: float) -> void:
+	if _want_jump:
+		_want_jump = false
+		pular()
+	var quer := querendo_flutuar and not is_on_floor() and flutua_restante() > 0.0 			and mana > 0.0 and Derrubado.pode_agir(self)
+	flutuando = quer
+	if not quer:
+		return
+	var custo := float(Balance.FLUTUAR.mana_por_s) * delta
+	mana = maxf(mana - custo, 0.0)
+	Bus.mana_changed.emit(mana, float(Balance.PLAYER.mana_max))
+	if mana <= 0.0:
+		flutuando = false   # mana no fim = a magia larga o corpo, na hora
 
 
 func _move_dir() -> Vector3:

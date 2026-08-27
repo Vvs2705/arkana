@@ -13,6 +13,12 @@ const PLAYER := {
 	## gerenciamento de recurso, o combate esfria e o TTK real sobe.
 	"mana_regen": 16.0,      # por segundo
 	"speed": 7.5,            # m/s — KNOB, recalibrar no aparelho
+	## SALTO ARCANO (27/08, ordem do Diretor apos o estudo do Spellbreak): o jogo
+	## nao tinha pulo NENHUM — o mago lutava como soldado, colado no chao. 5.2 m/s
+	## de impulso da' ~1,4 m de altura: passa uma cerca, ganha o telhado baixo,
+	## NAO vira plataforma. AUMENTAR vira jogo de pulinho; DIMINUIR nao sai do
+	## lugar e o botao mente.
+	"jump_v": 5.2,           # m/s — KNOB
 }
 
 ## OS 5 PERFIS DE ELEMENTO (retune docs/DANO.md §7.2). Alem dos 5 numeros de
@@ -199,6 +205,26 @@ const DODGE := {
 ## GAME FEEL (R20) — o PESO do personagem. O Diretor testou no aparelho e pediu
 ## "movimentacao e AGILIDADE": antes a velocidade era instantanea (liga/desliga
 ## como interruptor). Agora tudo passa por aceleracao. Todo numero aqui e' KNOB.
+## FLUTUAR — a licao central do Spellbreak (docs/referencias/SPELLBREAK.md §1.4:
+## "os jogadores mal ficam no chao por mais de dois segundos"), na dose do
+## Arkana. Eles levitam a vontade gastando mana e empilham TRES eixos de
+## mobilidade; o proprio pos-mortem culpa o teto de habilidade pela retencao
+## (§5). Aqui o eixo novo e' UM: segurar o SALTO no ar segura a queda por
+## poucos segundos, pagando MANA — a mesma mana do disparo, entao flutuar e'
+## deixar de atirar. Nao e' voo: nao sobe, so' cai devagar.
+const FLUTUAR := {
+	## Mana por segundo de flutuacao. Com mana_regen 16/s, 22 e' um deficit real:
+	## quem flutua fica sem tiro. AUMENTAR mata a mecanica; DIMINUIR faz flutuar
+	## de graca e o combate sai do chao de vez (o erro deles).
+	"mana_por_s": 22.0,
+	## Teto por flutuacao, em segundos. 2.0 e' o suficiente para atravessar um vao
+	## ou ganhar um beat de mira, e curto demais para virar posicao de sniper.
+	"dur_max": 2.0,
+	## Velocidade de DESCIDA flutuando (m/s, positiva = caindo). ~1/8 da queda
+	## livre: le' como magia segurando o corpo, nao como elevador parado.
+	"desc_v": 1.2,
+}
+
 const MOVE := {
 	## Aceleracao ao sair do lugar. Tempo ate a velocidade cheia = speed/accel.
 	## 45 com speed 7.5 = 0.17s. MAIOR = mais responsivo e mais "arcade";

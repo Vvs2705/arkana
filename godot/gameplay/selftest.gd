@@ -82,6 +82,7 @@ func _run() -> void:
 	_test_lei_das_luvas_no_bot()
 	_test_treino()
 	_test_batismo_e_placar_final()
+	_test_salto_e_flutuar()
 	_test_agua()
 	_test_elemento_na_luva()
 	_test_modelos_do_meshy()
@@ -405,6 +406,62 @@ func _test_modelos_do_meshy() -> void:
 			% [1.0, mat.metallic, 0.1, mat.roughness])
 	mi2.queue_free()
 
+
+## SALTO E FLUTUAR (27/08 — o eixo de mobilidade que faltava; a licao do
+## Spellbreak em docs/referencias/SPELLBREAK.md §1.4 e §5). Prova: pulo SO' do
+## chao, flutuar segura a queda mas NAO sobe, tem teto de tempo, custa MANA e
+## acaba quando a mana acaba; o chao devolve a flutuacao. Vermelho provado
+## tirando a guarda do is_on_floor e o teto de dur_max.
+## Player por load(): em modo --script os autoloads registram DEPOIS deste
+## arquivo compilar, entao nada aqui e' referenciado lexicalmente (regra do topo).
+func _player_scr_ar() -> GDScript:
+	return load("res://gameplay/Player.gd")
+
+
+func _test_salto_e_flutuar() -> void:
+	print("[Salto arcano e flutuar: o mago sai do chao (Spellbreak §1.4)]")
+	var p: CharacterBody3D = _player_scr_ar().new()
+	root.add_child(p)
+	p.velocity = Vector3.ZERO
+	# NO AR (CharacterBody3D recem-criado nao esta' no chao): pular e' negado
+	_check(not p.pular(), "no ar o pulo e' NEGADO (nao ha' pulo duplo)")
+	# flutuar segura a queda: sem flutuar a gravidade acelera; flutuando, nao
+	p.velocity = Vector3.ZERO
+	p.flutuando = false
+	for _i in 10:
+		p.apply_gravity(1.0 / 60.0)
+	var vy_caindo := p.velocity.y
+	_check(vy_caindo < -1.0, "caindo, a gravidade acelera (%.2f m/s)" % vy_caindo)
+	p.velocity = Vector3.ZERO
+	p.flutuando = true
+	p.apply_gravity(1.0 / 60.0)
+	_check(is_equal_approx(p.velocity.y, -float(_bal.FLUTUAR.desc_v)),
+			"flutuando, a descida e' constante e lenta (%.2f m/s)" % p.velocity.y)
+	_check(p.velocity.y < 0.0, "flutuar NAO sobe — nao e' voo (regra do §5)")
+	# o TETO de tempo: passado dur_max a flutuacao larga o corpo sozinha
+	var teto := float(_bal.FLUTUAR.dur_max)
+	for _i in 200:
+		p.apply_gravity(teto / 100.0)
+	_check(not p.flutuando, "passado o teto de %.1fs a flutuacao ACABA" % teto)
+	_check(p.flutua_restante() <= 0.0, "e o saldo de flutuacao zera")
+	p.free()
+
+	## A MANA e' o preco (autoridade unica de custo: o Player). Aqui se prova que
+	## segurar o botao no ar DRENA e que mana zero termina a flutuacao.
+	var pl: Node = _player_scr_ar().new()
+	root.add_child(pl)
+	pl.mana = 40.0
+	pl.querendo_flutuar = true
+	var antes := float(pl.mana)
+	for _i in 30:
+		pl._passo_do_ar(1.0 / 60.0)
+	_check(float(pl.mana) < antes - 5.0,
+			"flutuar CONSOME mana (%.0f -> %.0f): flutuar e' deixar de atirar"
+			% [antes, float(pl.mana)])
+	pl.mana = 0.0
+	pl._passo_do_ar(1.0 / 60.0)
+	_check(not pl.flutuando, "mana no fim: a magia larga o corpo na hora")
+	pl.free()
 
 ## A AGUA (26/08 — DIRECAO.md §3): peito coberto = nadar (devagar, flutuando
 ## na lamina); sair = uns segundos de roupa encharcada; poca no tornozelo NAO

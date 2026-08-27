@@ -40,6 +40,14 @@ var _touch := -1
 var _last_frac := -1.0
 
 
+## O dedo esta' NO botao agora? Existe para o botao de SALTO: toque = pulo
+## (sinal `tocado`), SEGURAR = flutuar (a HUD le' isto por frame e repassa ao
+## Player, do mesmo jeito que repassa o joystick). Um botao, duas leituras —
+## barato de tela, que e' o recurso escasso da HUD.
+func segurando() -> bool:
+	return _touch != -1
+
+
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 

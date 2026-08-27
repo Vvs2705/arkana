@@ -239,7 +239,9 @@ func _grudar() -> void:
 func _tocou() -> bool:
 	if not e_player:
 		return false          # bot nao tem dedo; ele salta pelo relogio da rota
-	var tocou := bool(_player.get("_want_fire")) or bool(_player.get("_want_dodge"))
+	## O botao de SALTO entrou na HUD em 27/08 e e', por nome e por gesto, o
+	## caminho natural de saltar do castelo — os outros dois seguem valendo.
+	var tocou := bool(_player.get("_want_fire")) or bool(_player.get("_want_dodge")) 			or bool(_player.get("_want_jump"))
 	if tocou:
 		_limpar_intencoes()
 	return tocou
@@ -421,6 +423,7 @@ func _altimetro(delta: float) -> void:
 func _limpar_intencoes() -> void:
 	_player.set("_want_fire", false)
 	_player.set("_want_dodge", false)
+	_player.set("_want_jump", false)
 	_player.set("_want_tatica", false)
 	_player.set("_want_suprema", false)
 

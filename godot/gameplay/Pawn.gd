@@ -25,7 +25,16 @@ const PEITO := 1.2
 ## precisa da histerese do run, que existe porque la' a velocidade CRUZA o
 ## limiar toda hora.
 const NADO_ANIM_V := 0.5
+## Descida (m/s) a partir da qual o corpo assume a pose de QUEDA. 1.5 e' ~0,15s
+## de gravidade: rapido para o olho, e longe o bastante de zero para quem so'
+## esta' parado sem chao embaixo (teste) nunca entrar em pose de queda.
+const QUEDA_ANIM_V := 1.5
 var agua_mult := 1.0
+## SALTO/FLUTUAR (27/08). `flutuando` e' escrito por quem PAGA a mana (o
+## Player e' a autoridade unica de custo, como no disparo); o Pawn so' obedece.
+## Bot nao flutua por ora — e' raia de IA e esta' registrado como pendencia.
+var flutuando := false
+var _flutua_s := 0.0
 var nadando := false
 var _molhado_s := 0.0
 var _sup_nado := 0.0
@@ -355,6 +364,16 @@ func locomotion_anim() -> String:
 	## que o jogo sempre teve — ninguem regride.
 	if nadando:
 		return "nadar" if horizontal_speed() > NADO_ANIM_V else "nadar_parado"
+	## NO AR o corpo tem pose propria — e os clipes JA' existem (a queda do
+	## castelo os trouxe): flutuando usa "planar", caindo usa "cair". Sem isto o
+	## mago pula fazendo pose de corrida, que foi a queixa do Diretor sobre a
+	## queda. Modelo sem os clipes cai no fallback do Mage e nada regride.
+	## O limiar existe por causa de um teste que ficou VERMELHO: um corpo parado
+	## fora do chao (o pawn solto do selftest, e no jogo o instante exato de sair
+	## da borda) nao esta' CAINDO — velocity.y ainda e' ~0. Sem ele, a histerese
+	## idle/run virava "cair" e o mago pisava no vazio em pose de queda.
+	if not is_on_floor() and (flutuando or velocity.y < -QUEDA_ANIM_V):
+		return "planar" if flutuando else "cair"
 	var v := horizontal_speed()
 	if _run_anim:
 		if v < float(Balance.MOVE.run_anim_exit):
@@ -436,6 +455,23 @@ func _superficie_agua() -> float:
 	return float(_ilha.call("agua_y", global_position.x, global_position.z))
 
 
+## SALTO ARCANO: so' do CHAO (nao ha' pulo duplo — o eixo novo e' um so').
+## Devolve false quando nao pula, para quem chamou nao gastar recurso a toa.
+## Nadando nao se pula: o corpo esta' na lamina, e sair da agua e' outra coisa.
+func pular() -> bool:
+	if nadando or not is_on_floor() or Derrubado.esta(self):
+		return false
+	velocity.y = float(Balance.PLAYER.jump_v)
+	return true
+
+
+## Quanto ainda da' para flutuar nesta ida ao ar, em segundos. O relogio zera
+## ao tocar o chao (ver apply_gravity) — flutuar e' UMA vez por salto, nao um
+## recurso que se administra no ar indefinidamente.
+func flutua_restante() -> float:
+	return maxf(float(Balance.FLUTUAR.dur_max) - _flutua_s, 0.0)
+
+
 func apply_gravity(delta: float) -> void:
 	## NADANDO o corpo FLUTUA com a lamina no peito: a gravidade nao puxa para
 	## o fundo do lago (2 m abaixo) nem o mago anda no leito como se nada
@@ -445,8 +481,19 @@ func apply_gravity(delta: float) -> void:
 		global_position.y = lerpf(global_position.y, _sup_nado - PEITO,
 				minf(6.0 * delta, 1.0))
 		return
-	if not is_on_floor():
-		velocity.y -= _gravity * delta
+	if is_on_floor():
+		_flutua_s = 0.0   # o chao devolve a flutuacao inteira para o proximo salto
+		flutuando = false
+		return
+	## FLUTUANDO: a queda passa a ser lenta e constante. Nao SOBE (isso seria
+	## voo, e voo livre e' o que desequilibra — ver Balance.FLUTUAR), e o teto
+	## de tempo mora aqui para nenhum caminho de fora esquecer de contar.
+	if flutuando and flutua_restante() > 0.0:
+		_flutua_s += delta
+		velocity.y = -float(Balance.FLUTUAR.desc_v)
+		return
+	flutuando = false
+	velocity.y -= _gravity * delta
 
 
 ## Vira o corpo para a direcao dir (XZ). Forward do node e' -Z.

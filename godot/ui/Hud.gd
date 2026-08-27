@@ -37,6 +37,7 @@ var suprema_btn: AcaoButton
 var pegar_btn: AcaoButton
 var carousel: ElementCarousel
 var pausa_btn: AcaoButton
+var salto_btn: AcaoButton
 var _pausa_overlay: Control
 var aviso: HudAviso
 var hp_bar: ProgressBar
@@ -200,6 +201,9 @@ func hide_end() -> void:
 func _process(delta: float) -> void:
 	if is_instance_valid(player):
 		player.move_input = joystick.value
+		# SEGURAR o SALTO = flutuar. Repassado por frame, como o joystick: a HUD
+		# encaminha intencao, quem decide (e paga a mana) e' o Player.
+		player.querendo_flutuar = salto_btn.segurando()
 	if _hit_flash > 0.0:
 		_hit_flash = maxf(_hit_flash - delta, 0.0)
 		_reticle.queue_redraw()
@@ -647,7 +651,14 @@ func _layout(sl := Safe.left(), st := Safe.top(), sr := Safe.right(), sb := Safe
 	pausa_btn.offset_left = pausa_btn.offset_right - Dp.px(44.0)
 	pausa_btn.offset_top = st + g + Dp.px(58.0)
 	pausa_btn.offset_bottom = pausa_btn.offset_top + Dp.px(44.0)
-	carousel.offset_right = -(sr + g)
+	# SALTO: acima do Fogo, mesma coluna do polegar direito. 64dp como a fileira
+	# de habilidade (piso de 48dp do projeto).
+	var lado_salto := Dp.px(64.0)
+	salto_btn.offset_right = -(sr + g)
+	salto_btn.offset_left = salto_btn.offset_right - lado_salto
+	salto_btn.offset_bottom = fire_btn.offset_top - Dp.px(10.0)
+	salto_btn.offset_top = salto_btn.offset_bottom - lado_salto
+	carousel.offset_right = salto_btn.offset_left - Dp.px(10.0)
 	carousel.offset_left = carousel.offset_right - slot * float(Balance.ELEMENTS.size())
 	carousel.offset_bottom = fire_btn.offset_top - Dp.px(10.0)
 	carousel.offset_top = carousel.offset_bottom - slot
@@ -844,6 +855,12 @@ func _build_sticks() -> void:
 	# nascia ~58dp ABAIXO da tela — invisivel no aparelho (2o video, 26/08).
 	pausa_btn.anchor_top = 0.0
 	pausa_btn.anchor_bottom = 0.0
+	## SALTO ARCANO (27/08): toque PULA, segurar FLUTUA (ver Pawn/Player). Mora
+	## onde o carrossel morava — acima do Fogo, no polegar direito: o carrossel
+	## agora nasce escondido (maos nuas nao tem elemento), entao a coluna estava
+	## livre e nenhum alvo de toque novo briga com outro.
+	salto_btn = _acao(Textos.HUD_SALTO, Color(0.80, 0.86, 1.0),
+			func() -> void: player.pedir_pulo())
 	carousel = ElementCarousel.new()
 	_canto(carousel)
 	carousel.chosen.connect(func(el: String) -> void:
