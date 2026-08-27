@@ -214,7 +214,13 @@ func _prompt(body: Node, dentro: bool) -> void:
 	if body == null or not is_instance_valid(body) or not body.is_in_group("player"):
 		return
 	var d := Arma.dados(arma_id)
-	Bus.loot_prompt.emit(str(d.nome), str(d.raridade), dentro)
+	## O QUE ESTA' NO CHAO, POR EXTENSO: nome + elemento (ordem do Diretor,
+	## 26/08). O elemento e' o que essa luva IMPOE ao disparo — quem passa por
+	## cima decide com a informacao completa, e nao "Luva Comum" (qual delas?).
+	## A manopla mostra o PAR; luva comum/conjurador, o elemento unico.
+	var els := par if not par.is_empty() else PackedStringArray([elemento])
+	Bus.loot_prompt.emit(Textos.arma_rotulo(str(d.nome), els),
+			str(d.raridade), dentro)
 
 
 ## TROCA (nao consome): a arma velha fica no chao no lugar desta. E' o padrao

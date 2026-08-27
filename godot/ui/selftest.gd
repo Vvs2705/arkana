@@ -451,12 +451,40 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 
 	# O CARROSSEL HONESTO (video do Diretor: mostrava VENTO e saia FOGO): luva
 	# com elemento travado ESCONDE o carrossel; maos nuas o devolvem.
-	_check(hud.carousel.visible, "carrossel visivel de maos nuas")
+	## A TELA DE BR (ordem do Diretor, 26/08): "na parte de ataques nao aparece
+	## nada ate' que equipe alguma arma de verdade, pode aparecer o botao
+	## cinzentado de ataque porem nenhum elemento". Maos nuas: carrossel
+	## ESCONDIDO e botao de ataque APAGADO — antes o carrossel nascia visivel e
+	## o jogador escolhia um elemento que o disparo ignorava (o elemento mora na
+	## luva). Vermelho provado devolvendo carousel.visible = true no bind_player.
+	_check(not hud.carousel.visible, "de maos nuas o carrossel NAO aparece")
+	_check(hud.fire_btn.desarmado, "de maos nuas o botao de ataque nasce APAGADO")
 	bus.weapon_equipped.emit(jogador, "varinha", "Luva Comum", "comum",
 			PackedStringArray(["water"]))
-	_check(not hud.carousel.visible, "luva de elemento travado ESCONDE o carrossel")
+	_check(not hud.fire_btn.desarmado, "equipar ACENDE o botao de ataque")
+	_check(not hud.carousel.visible,
+			"luva de elemento travado segue sem carrossel (o disparo nao escolhe)")
+	## O ROTULO DIZ NOME **E** ELEMENTO, e o mesmo texto serve o loot do chao
+	## ("passe por cima das luvas ou manoplas e ele sinalize o nome, e
+	## elemento" — Diretor). Vermelho provado devolvendo arma_lbl.text = nome.
+	_check("Luva Comum" in str(hud.arma_lbl.text)
+			and Textos.HUD_ELEMENTOS.water in str(hud.arma_lbl.text),
+			"a arma equipada diz nome + ELEMENTO (%s)" % str(hud.arma_lbl.text))
+	bus.weapon_equipped.emit(jogador, "manopla", "Manopla", "lendaria",
+			PackedStringArray(["water", "lightning"]))
+	_check(Textos.HUD_ELEMENTOS.water in str(hud.arma_lbl.text)
+			and Textos.HUD_ELEMENTOS.lightning in str(hud.arma_lbl.text),
+			"a manopla diz o PAR (%s)" % str(hud.arma_lbl.text))
+	## E O ROTULO SOME: "pode apagar este texto da manopla para ser visto de
+	## cima" (Diretor). O tween e' pulso -> espera ARMA_LBL_S -> apaga; aqui se
+	## cobra que o apagar EXISTE na esteira (headless nao roda tween em tempo
+	## real). Vermelho provado voltando ao create_tween de uma tacada.
+	_check(hud.ARMA_LBL_S > 0.0 and hud.arma_lbl.get_tree() != null,
+			"a confirmacao da arma e' TRANSITORIA (%.1fs e depois apaga)"
+			% float(hud.ARMA_LBL_S))
 	hud.bind_player(jogador)
-	_check(hud.carousel.visible, "partida nova (maos nuas) devolve o carrossel")
+	_check(hud.fire_btn.desarmado and not hud.carousel.visible,
+			"partida nova desarma de novo: sem elemento, botao apagado")
 	var slot: Node = (load("res://gameplay/ArmaSlot.gd") as GDScript).new()
 	slot.name = "ArmaSlot"
 	jogador.add_child(slot)

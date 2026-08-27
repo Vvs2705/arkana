@@ -8,6 +8,15 @@ signal fired                    # um pedido de disparo (o Player barra por mana)
 signal aim_state(aiming: bool)  # o player gira para a mira enquanto true
 signal aim_delta(rel: Vector2)  # arrasto -> camera/reticulo acompanham
 
+## DESARMADO: maos nuas nao atacam (DIRECAO.md par.1 — a Lei das Luvas). O
+## Player ja' barra o disparo; o que faltava era a TELA dizer isso antes do
+## dedo tentar. Ordem do Diretor (26/08): "pode aparecer o botao cinzentado de
+## ataque porem nenhum elemento" — e' o padrao de todo battle royale.
+## Quem liga/desliga e' a HUD (bind_player desarma, weapon_equipped arma).
+var desarmado := false:
+	set(v):
+		desarmado = v
+		queue_redraw()
 var gesture := FireGesture.new()
 var _touch := -1
 var _color := Projectile.tint("fire")
@@ -70,10 +79,14 @@ func _draw() -> void:
 	var c := size / 2.0
 	var r := minf(size.x, size.y) / 2.0 - Dp.px(4.0)
 	draw_circle(c + Vector2(Dp.px(2.0), Dp.px(3.0)), r, Color(0, 0, 0, 0.22))
-	draw_circle(c, r, Color(_color.darkened(0.35), 0.38))
-	draw_arc(c, r, 0, TAU, 40, Color(1, 1, 1, 0.62), Dp.px(1.8), true)
+	# Cinza sem elemento quando desarmado: a cor E o rotulo sao a mesma leitura.
+	var cor := Color(0.42, 0.44, 0.5) if desarmado else _color
+	draw_circle(c, r, Color(cor.darkened(0.35), 0.38))
+	draw_arc(c, r, 0, TAU, 40, Color(1, 1, 1, 0.30 if desarmado else 0.62),
+			Dp.px(1.8), true)
 	var fs := maxi(int(Dp.px(13.0)), 8)
-	draw_string(get_theme_default_font(), Vector2(0, c.y + fs * 0.35), _label,
+	draw_string(get_theme_default_font(), Vector2(0, c.y + fs * 0.35),
+			"" if desarmado else _label,
 			HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 1, 0.92, 0.92))
 	if gesture.visual(Time.get_ticks_msec()) == FireGesture.Visual.RING:
 		draw_arc(c, r + Dp.px(5.0), 0, TAU, 48, Color(0.2, 1.0, 0.4), Dp.px(3.5), true)

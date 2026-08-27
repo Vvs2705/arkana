@@ -288,6 +288,36 @@ func _test_elemento_na_luva() -> void:
 	var luva: Node3D = loot_scr.criar("varinha", PackedStringArray(), "water")
 	arena.add_child(luva)
 	luva.pegar(slot)
+	## O QUE ESTA' NO CHAO SE ANUNCIA POR EXTENSO (ordem do Diretor, 26/08):
+	## "passe por cima das luvas ou manoplas e ele sinalize o nome, e elemento".
+	## O evento e' o MESMO de sempre (entrar no raio do loot) — o que mudou e' o
+	## TEXTO: nome + elemento, pelo Textos.arma_rotulo que a HUD tambem usa, para
+	## as duas telas nunca divergirem. Vermelho provado voltando a so' d.nome.
+	var textos: GDScript = load("res://core/Textos.gd")
+	var quem := Node3D.new()
+	quem.add_to_group("player")          # _prompt so' fala do JOGADOR (bot e' ruido)
+	arena.add_child(quem)
+	var slot_q: Node3D = slot_scr.new()
+	quem.add_child(slot_q)
+	var no_chao: Node3D = loot_scr.criar("varinha", PackedStringArray(), "water")
+	arena.add_child(no_chao)
+	_prompts.clear()
+	no_chao._prompt(quem, true)
+	_check(_prompts.size() == 1
+			and "Luva Comum" in str(_prompts[0][0])
+			and str(textos.HUD_ELEMENTOS.water) in str(_prompts[0][0]),
+			"o loot no chao anuncia nome + ELEMENTO (%s)"
+			% (str(_prompts[0][0]) if not _prompts.is_empty() else "nada"))
+	var manopla: Node3D = loot_scr.criar("manopla",
+			PackedStringArray(["water", "lightning"]), "water")
+	arena.add_child(manopla)
+	_prompts.clear()
+	manopla._prompt(quem, true)
+	_check(not _prompts.is_empty()
+			and str(textos.HUD_ELEMENTOS.water) in str(_prompts[0][0])
+			and str(textos.HUD_ELEMENTOS.lightning) in str(_prompts[0][0]),
+			"a manopla no chao anuncia o PAR (%s)"
+			% (str(_prompts[0][0]) if not _prompts.is_empty() else "nada"))
 	_check(str(slot.elemento) == "water", "pegar leva o ELEMENTO da luva junto")
 	_check(slot.elemento_do_disparo("fire") == "water",
 			"o disparo sai com o elemento DA LUVA — o carrossel nao manda mais")

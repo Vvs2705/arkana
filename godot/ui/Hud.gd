@@ -23,6 +23,11 @@ extends CanvasLayer
 
 signal restart_pressed
 
+## Segundos que a confirmacao da arma equipada fica na tela antes de apagar.
+## 2.5s le' sem atrapalhar; SUBIR devolve a poluicao que o Diretor mandou
+## tirar, DESCER vira pisca-pisca ilegivel no meio de uma briga.
+const ARMA_LBL_S := 2.5
+
 var player: Player
 var joystick: VirtualJoystick
 var fire_btn: FireButton
@@ -133,7 +138,12 @@ func aplicar_config(cfg: Dictionary) -> void:
 
 
 func bind_player(p: Player) -> void:
-	carousel.visible = true  # partida nova nasce de maos nuas: elemento livre
+	## MAOS NUAS NAO TEM ELEMENTO (ordem do Diretor, 26/08): o carrossel dos 5
+	## so' faria sentido se o jogador pudesse escolher — e nao pode, o elemento
+	## mora na LUVA. Antes ele nascia visivel e o jogador escolhia um elemento
+	## que o disparo ignorava. O botao de ataque nasce APAGADO; equipar acende.
+	carousel.visible = false
+	fire_btn.desarmado = true
 	player = p
 	hp_bar.max_value = float(Balance.PLAYER.hp)
 	hp_bar.value = p.hp
@@ -158,6 +168,7 @@ func bind_player(p: Player) -> void:
 	escudo_bar.get_parent().visible = false
 	pegar_btn.visible = false
 	arma_lbl.text = ""
+	arma_lbl.modulate = Color.WHITE  # partida nova nao herda o fade da anterior
 
 
 func update_match(time_left: float, bots: int) -> void:
@@ -471,15 +482,28 @@ func _on_arma(pawn: Node, _arma_id: String, nome: String, raridade: String,
 	# o slot do jogador, e um BOT com a MESMA arma mudava o icone dele.
 	if pawn != player or not is_instance_valid(player):
 		return  # arma de bot nao entra no icone do jogador
-	arma_lbl.text = nome if elementos.size() < 2 \
-			else nome + Textos.HUD_SEP + Textos.ARMA_PAR % [_el(elementos[0]), _el(elementos[1])]
+	# UMA funcao monta o rotulo (Textos.arma_rotulo): o botao de PEGAR do chao
+	# e esta confirmacao dizem a MESMA coisa da MESMA forma — nome + elemento.
+	arma_lbl.text = Textos.arma_rotulo(nome, elementos)
 	arma_lbl.add_theme_color_override("font_color",
 			Arma.RARIDADES.get(raridade, {"cor": Color.WHITE}).cor)
 	## O "PEGUEI": o rotulo PISCA. Sem isso a unica confirmacao de que a troca
 	## aconteceu era um texto mudando num canto — no meio de uma briga ninguem
 	## ve'. O pulso dura menos que o gesto do mago, entao os dois se somam.
+	## SEM ARMA NAO HA' ATAQUE (DIRECAO.md par.1): equipar e' o que ACENDE o
+	## botao de disparo, com o elemento da luva. Ordem do Diretor (26/08): "na
+	## parte de ataques nao aparece nada ate' que equipe alguma arma de verdade"
+	## — como em todo battle royale.
+	fire_btn.desarmado = false
+	## E o rotulo agora SOME: antes ficava pendurado a partida inteira ("pode
+	## apagar este texto da manopla para ser visto de cima" — Diretor, 26/08).
+	## Confirmacao e' EVENTO, nao painel: quem quer saber o que tem na mao olha
+	## o botao de ataque, que diz o elemento. Pulso -> espera -> apaga.
 	arma_lbl.modulate = Color(2.2, 2.2, 2.2)
-	create_tween().tween_property(arma_lbl, "modulate", Color.WHITE, 0.45)
+	var tw := create_tween()
+	tw.tween_property(arma_lbl, "modulate", Color.WHITE, 0.45)
+	tw.tween_interval(ARMA_LBL_S)
+	tw.tween_property(arma_lbl, "modulate:a", 0.0, 0.5)
 	# A LUVA TRAVA O ELEMENTO (26/08 — DIRECAO.md §1): com elemento na luva o
 	# carrossel virava MENTIRA — mostrava VENTO e o tiro saia FOGO (visto no
 	# video do Diretor). Com o elemento travado ele some; volta de maos nuas.

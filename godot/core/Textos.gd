@@ -164,3 +164,23 @@ const HUD_ESTADOS := {
 	"revelado": "REVELADO",
 	"fio_zumbido": "FIO ZUMBINDO",
 }
+
+
+## O ROTULO DE UMA ARMA NA TELA: nome + o elemento que ela impoe ao disparo.
+## Ordem do Diretor (26/08): "e' ideal que passe por cima das luvas ou manoplas
+## e ele sinalize o nome, e elemento" — e o elemento da luva JA' e' o elemento
+## do ataque (DIRECAO.md par.1), entao dizer os dois na mesma linha e' dizer o
+## que aquela luva FAZ. Uma funcao so' porque duas telas mostram isto: o botao
+## de PEGAR/TROCAR (loot no chao) e a confirmacao de quem equipou.
+## Vazio/desconhecido devolve so' o nome — nunca "Luva · " pendurado.
+static func arma_rotulo(nome: String, els: PackedStringArray) -> String:
+	var limpos: Array = []
+	for e in els:
+		var s := str(e)
+		if s != "" and HUD_ELEMENTOS.has(s):
+			limpos.append(str(HUD_ELEMENTOS[s]))
+	if limpos.is_empty():
+		return nome
+	if limpos.size() == 1:
+		return nome + HUD_SEP + str(limpos[0])
+	return nome + HUD_SEP + ARMA_PAR % [limpos[0], limpos[1]]
