@@ -4,7 +4,9 @@
 ## agua apaga sem carbonizar, lago congela/descongela com colisao honesta,
 ## raio eletrifica so a agua conectada, muro nasce/expira/cai a tiro e NAO
 ## nasce em celula ocupada, vento paga do mesmo orcamento, hazard_at devolve
-## o dps certo por estado, e o reset nao vaza estado entre partidas.
+## o dps certo por estado, e o reset nao vaza estado entre partidas. O VISUAL
+## do muro (26/08) e' provado por estado consultavel: mesh deslocado por noise
+## deterministico + albedo NoiseTexture2D — nunca mais caixote de cor chapada.
 ## ANTI-VACUIDADE: reintroduz DOIS defeitos medidos do projeto-mae e mostra
 ## a guarda correspondente ficando VERMELHA (chance-por-tique carboniza;
 ## muro sem checagem de ocupacao empareda).
@@ -60,6 +62,7 @@ func _run() -> void:
 	_test_electrify()
 	_test_wall()
 	_test_wall_defect_red()
+	_test_wall_visual()
 	_test_wind_pays_budget()
 	_test_hazard()
 
@@ -380,6 +383,61 @@ func _test_wall_defect_red() -> void:
 	sys.defect_wall_ignores_occupancy = false
 	sys.reset()
 	body.queue_free()
+
+
+## VISUAL do muro (26/08: "caixote bege, feio de doer" — video do Diretor, 2x).
+## Headless nao renderiza: a prova e' por ESTADO CONSULTAVEL (regra do projeto,
+## nunca ler o renderer). O que se garante: (1) o mesh NAO e' mais um box liso
+## (vertices deslocados fora da casca do paralelepipedo), (2) o albedo e' uma
+## NoiseTexture2D — pedra com variacao, nao cor chapada, (3) pedra fosca
+## (roughness alta, metallic 0), (4) determinismo: 2 montagens = o MESMO muro
+## (seed fixa — contrato do projeto), (5) UM mesh compartilhado por todos os
+## muros (regra mobile) e (6) a COLISAO continua o Box exato do contrato.
+func _test_wall_visual() -> void:
+	var mesh: Mesh = sys._wall_mesh
+	_check(not (mesh is BoxMesh), "muro nao e' mais BoxMesh puro (o caixote de 26/08 morreu)")
+	_check(mesh is ArrayMesh and mesh.get_surface_count() == 1, "mesh de pedra: ArrayMesh gerado 1x")
+	# vertices DESLOCADOS: num box (subdividido ou nao) TODO vertice mora na
+	# casca — max(|x|/hx, |y|/hy, |z|/hz) == 1. Pedra de verdade sai da casca.
+	var arr: Array = (mesh as ArrayMesh).surface_get_arrays(0)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var hx: float = sys._cs * 0.96 * 0.5
+	var hy: float = sys._wall_h * 0.5
+	var off := 0
+	for v in verts:
+		var shell: float = maxf(maxf(absf(v.x) / hx, absf(v.y) / hy), absf(v.z) / hx)
+		if absf(shell - 1.0) > 0.01:
+			off += 1
+	_check(off > verts.size() / 4,
+			"silhueta quebrada por noise: %d/%d vertices fora da casca lisa" % [off, verts.size()])
+	# material: pedra com variacao, nunca cor chapada (e' o que era o bege)
+	var m: Material = (mesh as ArrayMesh).surface_get_material(0)
+	_check(m is StandardMaterial3D, "muro tem material proprio no surface")
+	if m is StandardMaterial3D:
+		var sm := m as StandardMaterial3D
+		_check(sm.albedo_texture is NoiseTexture2D,
+				"albedo do muro e' NoiseTexture2D (procedural, zero binario)")
+		_check(sm.albedo_texture != null and (sm.albedo_texture as NoiseTexture2D).noise is FastNoiseLite,
+				"a textura nasce de FastNoiseLite em runtime")
+		_check(sm.roughness >= 0.85, "pedra fosca: roughness alta (%.2f)" % sm.roughness)
+		_check(sm.metallic == 0.0, "pedra nao e' metal (metallic 0)")
+	# determinismo por contrato: seed fixa -> segunda montagem IDENTICA
+	var again: ArrayMesh = sys._build_wall_mesh()
+	_check(again.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] == verts,
+			"deterministico: 2a montagem do mesh e' identica (seed fixa)")
+	# em jogo: N muros, UM mesh (regra mobile — nunca gerar mesh por muro), e a
+	# colisao segue o Box EXATO do contrato (so' a leitura mudou)
+	var c := _wall_spot()
+	sys._apply_hit("earth", sys._cell_center(c), true)
+	var shared: bool = sys._walls.size() >= 5
+	for pair in sys._walls.values():
+		if (pair[0] as MeshInstance3D).mesh != sys._wall_mesh:
+			shared = false
+	_check(shared, "TODOS os muros compartilham UM mesh (%d muros)" % sys._walls.size())
+	_check(sys._wall_shape is BoxShape3D and sys._wall_shape.size.is_equal_approx(
+			Vector3(sys._cs * 0.96, sys._wall_h, sys._cs * 0.96)),
+			"colisao intocada: BoxShape3D com as dimensoes exatas do contrato")
+	sys.reset()
 
 
 func _test_wind_pays_budget() -> void:

@@ -39,6 +39,15 @@ const MARSH_SURFACE_Y := 0.55
 const LAKE_DISC_R := 18.0
 const MARSH_DISC_R := 15.0
 const LAND_R_PADRAO := 76.0
+## MURO DE PEDRA (26/08: o Diretor viu "caixote bege, feio de doer" no video,
+## duas vezes). A queixa e' de LEITURA, nao de regra: o muro subia como BoxMesh
+## de cor chapada. Receita do estudo Spellbreak (docs/referencias/SPELLBREAK.md):
+## leitura por SILHUETA e material, nunca por detalhe. Tudo aqui e' SO' visual —
+## colisao, hp, prazos e ocupacao de celula continuam identicos ao contrato.
+const WALL_SEED := 907        # seed FIXA do noise do muro — determinismo por contrato (2 montagens = o MESMO muro)
+const WALL_SUBDIV := 3        # cortes por eixo do box. SUBIR = pedra mais quebrada (+tris em TODO muro); DESCER = volta ao caixote
+const WALL_SIDE_AMP := 0.22   # m de barriga nas faces. SUBIR = mais organico (acima de ~0.3 vaza da celula); DESCER = mais reto
+const WALL_TOP_AMP := 0.35    # m de topo irregular. SUBIR = rocha mais bruta (acima de ~0.5 o visual mente a cobertura); DESCER = tampa reta
 
 enum { M_OUT, M_GROUND, M_FUEL, M_LAKE, M_MARSH }  # material: escrito 1x no build
 enum { S_NORMAL, S_BURNING, S_CHARRED, S_FROZEN, S_ZAP, S_WALL }  # a magia mexe aqui
@@ -78,7 +87,7 @@ var _zap: MeshInstance3D
 var _scorch_mm: MultiMesh
 var _ice_mesh: BoxMesh
 var _ice_shape: BoxShape3D
-var _wall_mesh: BoxMesh
+var _wall_mesh: ArrayMesh   # pedra gerada 1x (era BoxMesh — o caixote de 26/08)
 var _wall_shape: BoxShape3D
 var _flame_quad: QuadMesh
 
@@ -609,13 +618,12 @@ func _build_nodes() -> void:
 	_ice_shape = BoxShape3D.new()
 	_ice_shape.size = _ice_mesh.size
 
-	_wall_mesh = BoxMesh.new()
-	_wall_mesh.size = Vector3(_cs * 0.96, _wall_h, _cs * 0.96)
-	var wm := StandardMaterial3D.new()
-	wm.albedo_color = Color(0.52, 0.55, 0.62)
-	_wall_mesh.material = wm
+	# muro: mesh de PEDRA compartilhado por TODOS os muros (ver _build_wall_mesh).
+	# A COLISAO continua o Box EXATO de antes do reskin — o contrato de gameplay
+	# (celula, hp, prazo, anti-griefing) nao muda um milimetro; so' a leitura.
+	_wall_mesh = _build_wall_mesh()
 	_wall_shape = BoxShape3D.new()
-	_wall_shape.size = _wall_mesh.size
+	_wall_shape.size = Vector3(_cs * 0.96, _wall_h, _cs * 0.96)
 
 	# carvao no chao: 1 MultiMesh pre-alocado = 1 draw call, recicla as antigas
 	var plane := PlaneMesh.new()
@@ -671,6 +679,80 @@ func _build_nodes() -> void:
 	fm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	fm.albedo_color = Color(2.6, 1.2, 0.35)
 	_flame_quad.material = fm
+
+
+## Mesh de PEDRA do muro — gerado UMA vez na montagem e compartilhado por todos
+## os muros (mesma economia do BoxMesh antigo: 1 recurso, N instancias; nunca
+## por frame, nunca por muro). Box subdividido com vertices deslocados por
+## FastNoiseLite de SEED FIXA: e' o que quebra o paralelepipedo perfeito e da'
+## topo irregular lendo como pedra bruta — zero arquivo binario (regra do mundo
+## procedural) e deterministico por contrato (o selftest monta duas vezes e
+## compara). O deslocamento e' funcao da POSICAO do vertice, nao do indice:
+## os vertices duplicados da costura entre faces recebem o MESMO empurrao e a
+## casca nao rasga.
+func _build_wall_mesh() -> ArrayMesh:
+	var box := BoxMesh.new()
+	box.size = Vector3(_cs * 0.96, _wall_h, _cs * 0.96)
+	box.subdivide_width = WALL_SUBDIV
+	box.subdivide_height = WALL_SUBDIV
+	box.subdivide_depth = WALL_SUBDIV
+	var arr: Array = box.surface_get_arrays(0)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var nz := FastNoiseLite.new()
+	nz.seed = WALL_SEED
+	nz.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH  # a mesma familia da ilha
+	nz.frequency = 0.55  # feicao de ~2 m: UMA barriga por face, nao chiado de vertice
+	for i in verts.size():
+		var v := verts[i]
+		# o peso vertical cresce da base (0) ao topo (1): a base fica PLANTADA
+		# no chao e so' o topo quebra — silhueta de pedra erguida, nao de caixa
+		var t := clampf(v.y / _wall_h + 0.5, 0.0, 1.0)
+		v.x += nz.get_noise_3d(v.x, v.y, v.z) * WALL_SIDE_AMP
+		v.z += nz.get_noise_3d(v.x + 31.0, v.y, v.z - 17.0) * WALL_SIDE_AMP
+		v.y += nz.get_noise_3d(v.x - 23.0, v.y + 11.0, v.z) * WALL_TOP_AMP * t
+		verts[i] = v
+	arr[Mesh.ARRAY_VERTEX] = verts
+	var tmp := ArrayMesh.new()
+	tmp.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	# normais refeitas FACETADAS (deindex + generate): a luz encontra facetas de
+	# rocha em vez das 6 normais do caixote — o mesmo low-poly facetado das
+	# ruinas e rochas da ilha, entao a pedra PERTENCE ao mundo.
+	var st := SurfaceTool.new()
+	st.create_from(tmp, 0)
+	st.deindex()
+	st.generate_normals()
+	var mesh: ArrayMesh = st.commit()
+	mesh.surface_set_material(0, _wall_material())
+	return mesh
+
+
+## Material de pedra do muro: albedo por NoiseTexture2D (FastNoiseLite gerada
+## em runtime — ZERO binario no repo) com rampa nos tons de rocha da paleta da
+## ilha (Island.COL_ROCK #8e97ad e' o cinza-frio de referencia; o escuro puxa
+## pro marrom-terra dessaturado). Roughness cheia e metallic zero: pedra e'
+## fosca — o "bege chapado" do caixote era exatamente albedo liso + default.
+func _wall_material() -> StandardMaterial3D:
+	var wnz := FastNoiseLite.new()
+	wnz.seed = WALL_SEED + 1  # textura != silhueta: a MESMA dobra nos 2 canais denuncia o truque
+	wnz.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	wnz.fractal_octaves = 4   # veios finos por cima da mancha larga
+	wnz.frequency = 0.02      # ~2,5 manchas na textura. SUBIR = granito miudo; DESCER = mancha unica
+	var ramp := Gradient.new()
+	# do marrom-cinza fundo (fresta) ao cinza claro da crista — a faixa vive
+	# entre COL_MUD dessaturado e COL_ROCK/COL_STONE (Island.gd, GDD §10)
+	ramp.set_color(0, Color(0.33, 0.30, 0.28))
+	ramp.set_color(1, Color(0.62, 0.64, 0.70))
+	var tex := NoiseTexture2D.new()
+	tex.noise = wnz
+	tex.color_ramp = ramp
+	tex.seamless = true       # o mesmo material serve N muros lado a lado sem emenda
+	tex.width = 128           # px. SUBIR = grao mais fino e mais VRAM; 128 basta p/ 3 m vistos a 10 m (mobile)
+	tex.height = 128
+	var wm := StandardMaterial3D.new()
+	wm.albedo_texture = tex
+	wm.roughness = 1.0        # pedra fosca — CONTRATO do selftest
+	wm.metallic = 0.0         # ja' e' o default; explicito porque e' CONTRATO do selftest
+	return wm
 
 
 func _fx_on(idx: int) -> void:
