@@ -58,6 +58,7 @@ func _run() -> void:
 		_thits.append([e, p, s]))
 	_test_registro()
 	_test_economia()
+	_test_carga_no_ar()
 	_test_telegrafia()
 	_test_pyra()
 	_test_veu()
@@ -235,6 +236,37 @@ func _test_economia() -> void:
 	_check(not _cds.is_empty() and _cds[0][0] == "suprema"
 			and is_equal_approx(float(_cds[0][2]), float(k.dados.suprema_carga)),
 			"Bus.kit_cooldown leva os segundos de carga para a HUD")
+	arena.queue_free()
+
+
+## A CARGA NO AR (video do Diretor, 26/08): a barra da suprema andava assim que
+## a tela abria — a contagem so' pode comecar DEPOIS do pouso. O gancho e' o da
+## propria queda, `Queda.no_ar(pawn)`: ele procura um filho CHAMADO "Queda" e
+## le' `fase`, entao um stub com so' esse campo reproduz o mago no ar sem
+## levantar castelo nem ilha. A fiacao defensiva (pawn SEM no' "Queda" carrega
+## normal) ja' e' provada por _test_economia inteiro — todo pawn de la' nasce
+## sem queda e a barra enche.
+func _test_carga_no_ar() -> void:
+	print("[26/08: a carga da suprema NAO anda no ar — so' depois do pouso]")
+	var m := _montar("01-pyra")
+	var arena: Node3D = m[0]
+	var p: Node = m[1]
+	var k: Object = m[2]
+	var stub := GDScript.new()
+	stub.source_code = "extends Node\nvar fase := \"caindo\""
+	stub.reload()
+	var q: Node = stub.new()
+	q.name = "Queda"
+	p.add_child(q)
+	_andar(k, 5.0)
+	_check(is_zero_approx(k.suprema_carga), "no ar o TEMPO nao enche a carga")
+	var outro := _inimigo(arena, Vector3(5, 0, 0))
+	_bus.damage_applied.emit(outro, 100.0, "fire", p, false)
+	_check(is_zero_approx(k.suprema_carga),
+			"no ar nem DANO CAUSADO enche (o ponto unico barra os dois canais)")
+	q.set("fase", "pousou")
+	_andar(k, 1.0)
+	_check(k.suprema_carga > 0.0, "pousou: a carga volta a andar na hora")
 	arena.queue_free()
 
 

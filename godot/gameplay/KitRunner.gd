@@ -263,6 +263,13 @@ func pronto_suprema() -> bool:
 func _carregar_suprema(fracao: float) -> void:
 	if not (fracao > 0.0):  # NaN, zero e negativo barrados (idioma do Combat)
 		return
+	## NO AR A CARGA NAO ANDA (video do Diretor, 26/08: "a contagem da suprema
+	## so' comeca depois de cair no chao" — a barra enchia ja' na abertura, nos
+	## ~15s de queda). O gancho e' o da propria queda, `Queda.no_ar`, e barrar
+	## AQUI fecha os DOIS canais (tempo e dano causado) de uma vez. Pawn sem no'
+	## "Queda" (teste, cena solta) devolve false e carrega normal.
+	if Queda.no_ar(pawn):
+		return
 	var antes := suprema_carga
 	suprema_carga = minf(suprema_carga + fracao, 1.0)
 	if antes < 1.0 and suprema_carga >= 1.0:
