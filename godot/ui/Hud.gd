@@ -807,6 +807,11 @@ func _build_sticks() -> void:
 	pausa_btn = _acao(Textos.HUD_PAUSA, Color(0.75, 0.78, 0.90),
 			func() -> void: _abrir_pausa())
 	pausa_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	# _canto ancora no RODAPE (fileira do polegar); a pausa mora no TOPO. Sem
+	# re-ancorar, o offset_top do _layout contava da borda de BAIXO e o botao
+	# nascia ~58dp ABAIXO da tela — invisivel no aparelho (2o video, 26/08).
+	pausa_btn.anchor_top = 0.0
+	pausa_btn.anchor_bottom = 0.0
 	carousel = ElementCarousel.new()
 	_canto(carousel)
 	carousel.chosen.connect(func(el: String) -> void:

@@ -81,6 +81,7 @@ func _run() -> void:
 	_test_bot_percepcao()
 	_test_lei_das_luvas_no_bot()
 	_test_treino()
+	_test_batismo_e_placar_final()
 	_test_agua()
 	_test_elemento_na_luva()
 	_test_elements()
@@ -368,6 +369,39 @@ func _test_treino() -> void:
 	# "ilha", e adiada ela sobrevive ate' o teste da AGUA — que entao pergunta a
 	# lamina para a ilha errada e conclui que o lago do teste e' terra seca.
 	# Custou 5 falhas em cascata descobrir isso.
+	m.free()
+
+
+## O BATISMO DOS BOTS + O CONTADOR NO FIM (2o video do Diretor, 26/08).
+## Dois defeitos da mesma partida: o kill feed dizia "Voce derrubou
+## @CharacterBody3D@1718" (Projectile emite body.name e Main criava Bot.new()
+## sem nome), e a VITORIA congelava "BOTS 1" (o _process para no OVER e o
+## ultimo decremento nunca chegava a HUD). Vermelho provado sem o batismo do
+## Main e sem o update_match do _end_match.
+func _test_batismo_e_placar_final() -> void:
+	print("[Main: bots batizados e BOTS 0 na vitoria]")
+	var m: Node = (load("res://gameplay/Main.tscn") as PackedScene).instantiate()
+	root.add_child(m)
+	var bots: Array = []
+	for n in m.arena.get_children():
+		if n.get_script() == _bot_scr:
+			bots.append(n)
+	_check(bots.size() > 0, "a partida montou com bots (achou %d)" % bots.size())
+	var batizados := true
+	for b: Node in bots:
+		var nm := str(b.name)
+		if nm.begins_with("@") or "CharacterBody3D" in nm or nm == "" or nm == "?":
+			batizados = false
+	_check(batizados, "todo bot tem NOME de mago — nome interno nao vaza no kill feed")
+	# o fim: matar o ultimo bot tem que levar o 0 a HUD antes do OVER congelar
+	m.bots_alive = 1
+	m._on_entity_died(bots[0])
+	_check(m.match_state == m.OVER, "ultimo bot morto encerra a partida (OVER)")
+	var txt := str(m.hud.bots_lbl.text)
+	_check(txt == str(load("res://core/Textos.gd").HUD_BOTS) % 0,
+			"a tela de vitoria mostra BOTS 0 (mostrava: %s)" % txt)
+	# free() IMEDIATO, nao queue_free(): a ilha REAL deste Main vive no grupo
+	# "ilha" e adiada sobreviveria ate' o teste da AGUA (armadilha ja' paga).
 	m.free()
 
 

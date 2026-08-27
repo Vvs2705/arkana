@@ -110,6 +110,10 @@ func _build_match() -> void:
 			b.set_mage(slug)
 		else:
 			b.set_tint(BOT_TINTS[i % BOT_TINTS.size()])
+		# O BATISMO (2o video do Diretor, 26/08): o kill feed mostra body.name —
+		# sem nome, o Godot autogera "@CharacterBody3D@N" e o interno vazava
+		# na tela ("Voce derrubou @CharacterBody3D@1718").
+		b.name = str(Kits.de(slug).nome) if slug != "" else "Bot %d" % (i + 1)
 	## LOOT DA PARTIDA (GDD §16.2). Nasce sob a Arena: restart = loot novo e
 	## intacto, sem estado atravessando partida. Deterministico (seed fixo).
 	Loot.espalhar(arena, island)
@@ -231,6 +235,9 @@ func _on_entity_died(entity: Node) -> void:
 
 func _end_match(victory: bool) -> void:
 	match_state = OVER
+	# O ultimo decremento precisa chegar a HUD AQUI: o _process para no OVER
+	# e a vitoria congelava "BOTS 1" na tela (2o video do Diretor, 26/08).
+	hud.update_match(time_left, bots_alive)
 	arena.process_mode = Node.PROCESS_MODE_DISABLED
 	hud.show_end(victory)
 	Bus.match_over.emit(victory)

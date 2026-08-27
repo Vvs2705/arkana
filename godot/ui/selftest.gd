@@ -428,6 +428,13 @@ func _teste_sistemas(hud: CanvasLayer) -> void:
 	# paused=true de _abrir_pausa.
 	_check(hud.pausa_btn != null and hud.pausa_btn.visible,
 			"o icone de PAUSA existe no canto superior")
+	# O DEFEITO DO 2o VIDEO (26/08): visible=true nao prova botao NA TELA —
+	# _canto ancora no rodape e o offset_top do _layout conta do TOPO, entao a
+	# pausa nascia 58dp ABAIXO da borda inferior. Cobra-se o RETANGULO.
+	var r_pausa := _rect_de(hud.pausa_btn, cv)
+	_check(r_pausa.position.y >= ST and r_pausa.end.y <= cv.y - SB,
+			"PAUSA de fato NA TELA, abaixo do relogio (y %.0f..%.0f, tela %.0f)"
+			% [r_pausa.position.y, r_pausa.end.y, cv.y])
 	hud._abrir_pausa()
 	# `paused` e' da SceneTree (este script) — root aqui e' a Window, e
 	# acessar .paused nela ABORTAVA a secao inteira em silencio.
