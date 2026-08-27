@@ -51,6 +51,61 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> COMECE POR AQUI — as 5 ordens do Diretor viraram codigo e papel
+
+**27/08, madrugada (leva 5).** APK do teste:
+`godot/build/testes/arkana-2026-08-27_0836.apk` (141 MB). Portao 12/12 em cada
+passo, com vermelho provado. Branch `claude/whatsapp-video-review-799b24`.
+
+1. **A TELA DE BR** (`ec8b0cb`) — tres ordens numa raia:
+   - o rotulo da arma equipada **SOME** depois de 2,5 s (era painel pendurado a
+     partida inteira: *"pode apagar este texto da manopla para ser visto de
+     cima"*). Confirmacao virou EVENTO; quem quer saber o que tem na mao olha o
+     botao de ataque, que diz o elemento.
+   - **passar por cima de uma luva/manopla anuncia NOME + ELEMENTO** ("Luva
+     Comum · AGUA", "Manopla · AGUA + RAIO"). `Textos.arma_rotulo` e' o dono
+     unico do formato — o botao de PEGAR e a confirmacao nunca divergem.
+   - **de maos nuas NAO existe elemento na tela**: carrossel dos 5 escondido e
+     botao de ataque CINZA e sem rotulo. Equipar e' o que acende. (O teste
+     antigo cobrava a lei antiga — "carrossel visivel de maos nuas" — e foi
+     reescrito para a nova.)
+2. **A SUPREMA SO' CARREGA NO CHAO** (`52a2aa4`): a guarda mora no ponto unico
+   (`_carregar_suprema`), entao fecha os dois canais (tempo e dano) de uma vez.
+   O gancho `Queda.no_ar()` ja' existia escrito para isto.
+3. **AS MANOPLAS REDESENHADAS NO PAPEL** (`992e0c3`) —
+   `docs/design/MANOPLAS-FUSAO.md`: a manopla passa a conjurar UM ataque
+   FUNDIDO por par (o **Tufao de Brasas** = fogo+vento, o exemplo do Diretor),
+   nao dois tiros alternados. Os 10 pares herdam a identidade dos combos de
+   Sintonia que o Roblox ja' tem, em escala de ARMA (~1/4 do raio): a manopla
+   **vende** a Sintonia, nunca a substitui. Leitura pela lei do Spellbreak
+   (FORMA de um + PALETA do outro); efeitos SO' com as reacoes de DANO.md.
+4. **O ELENCO E A MOEDA** (`992e0c3`) — `docs/design/DESBLOQUEIO-ELENCO.md`:
+   10 jogaveis no lancamento, 10 desbloqueaveis por moeda ganha em partida
+   (a resposta direta a licao de retencao do Spellbreak), tudo offline/local —
+   o jogo nao tem uma linha de rede. Inclui o plano de producao 3D dos 18 que
+   faltam, com o portao de auditar as 4 vistas ANTES de gastar credito.
+   **Os dois docs esperam o martelo do Diretor** (lista dos 10, nome da moeda,
+   valores, e quais pares de fusao estreiam).
+
+**PYRA — aprovada por ele e em producao no site.** A geracao nativa
+multi-view passou no olho do Diretor ("pode incluir ela"). Estado: **remesh
+para 10K triangulos rodando** (gratis; o rig exige < 200k e o orcamento do
+projeto e' 15k/heroi). Depois: rig Humanoide com **altura 1,78** → os mesmos
+clipes do Brok (biblioteca: Mage Spell Cast — obrigatorio, o export omite o
+cast —, Caindo, Nadar ×2, Agachar-se Pegar, Gemido, Parado 1) + os 2
+Movimentos de IA **ja' pagos** na conta (Planar horizontal v2 = planar bom;
+Planar glide = mergulho) → download rigged/todos/arquivo unico →
+**SUBSTITUICAO inteira** do `godot/characters/modelos/pyra.glb` (o esqueleto
+novo != o do repo, entao NAO e' fusao) → `characters/selftest` (1,78 m) +
+clipes conferidos no motor. Saldo Meshy: **2.984**.
+
+**Armadilha nova do navegador, anotada:** a janela do Chrome mudou de escala e
+os cliques por coordenada passaram a desviar — no Meshy, clicar por `ref` do
+elemento (find) e' o unico caminho confiavel. Foi assim que o painel do
+remesh finalmente abriu.
+
+---
+
 ### >>> COMECE POR AQUI — a leva Spellbreak aplicada: 4 raias, fila visual atacada, Pyra em rig no site
 
 **26/08, madrugada (leva 4 — 4 raias em paralelo, todas com vermelho provado
