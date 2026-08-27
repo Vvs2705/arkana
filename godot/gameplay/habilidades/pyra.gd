@@ -122,6 +122,19 @@ static func dano_recebido(_k: KitRunner, _quanto: float, _el: String) -> void:
 class Brasas extends Node3D:
 	const TICK := 0.1
 
+	## ---- knobs do VISUAL (receita do Spellbreak — SPELLBREAK.md §2.2/2.3:
+	## a FORMA do elemento e' quem le; fogo e' nucleo emissivo + chama viva,
+	## animado em PASSOS de 12–15 fps, nunca interpolacao lisa) ----
+	const NUCLEO_ALTURA := 0.9   # m — SUBIR: vira parede que esconde o duelo; DESCER: some no mato
+	const CHAMAS_POR_M := 6      # particulas por m de linha — SUBIR: fogo denso E caro (mobile!)
+	const CHAMAS_MIN := 12       # piso: a poca do dash nao pode virar meia duzia de fagulhas
+	const CHAMAS_MAX := 48       # TETO mobile — SUBIR so' com medicao no aparelho do Diretor
+	const CHAMA_SOBE := 1.0      # m que cada chama sobe — SUBIR: fogo alto tampa a mira rasante
+	const CHAMA_VIDA := 0.7      # s de vida da chama — SUBIR: fogo "lento"; DESCER: vira fagulha
+	const CHAMA_QUAD := Vector2(0.30, 0.42)  # quad vertical: lambida de fogo, nao fagulha redonda
+	const FLICKER_PASSO := 0.08  # s entre degraus (~12,5 fps) — DESCER: vira lerp e perde o look
+	const FLICKER_NIVEIS := [2.2, 3.4, 2.8]  # energias do nucleo — a chama "respira" em degraus
+
 	var a := Vector3.ZERO
 	var b := Vector3.ZERO
 	var espessura := 1.0
@@ -134,6 +147,8 @@ class Brasas extends Node3D:
 	var eh_muralha := false
 	var _acc := 0.0
 	var _quem := {}   # id do alvo -> s restantes de rearme
+	var _flicker_acc := 0.0  # relogio do flicker (degraus, nunca por frame)
+	var _flicker_idx := 0
 
 	static func criar(kit: KitRunner, p_a: Vector3, p_b: Vector3, cfg: Dictionary,
 			muralha: bool, acende_terreno := false) -> Brasas:
@@ -176,6 +191,7 @@ class Brasas extends Node3D:
 			Bus.terrain_hit.connect(_on_terrain_hit)
 
 	func _physics_process(delta: float) -> void:
+		_flicker(delta)
 		duracao -= delta
 		if duracao <= 0.0:
 			queue_free()
@@ -234,24 +250,102 @@ class Brasas extends Node3D:
 			b += dir * empurra
 			global_position = (a + b) * 0.5
 
-	## VFX procedural (zero binario): uma faixa baixa de brasa. Baixa de
-	## proposito — "bloqueia visao rasante", nao a visao inteira.
+	## UM material de nucleo para TODAS as brasas (perf mobile): estatico,
+	## criado uma vez. O flicker mexe NELE — todas as brasas piscam juntas, e
+	## tudo bem: e' fogo da mesma maga, e um set por passo do relogio e' mais
+	## barato que um material (e um set) por brasa.
+	static var _mat_nucleo: StandardMaterial3D
+
+	static func _material_nucleo() -> StandardMaterial3D:
+		if _mat_nucleo == null:
+			_mat_nucleo = StandardMaterial3D.new()
+			_mat_nucleo.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			## O gradiente e' metade da leitura de fogo (GDD §10: cor + FORMA;
+			## chapado numa cor so' foi o que virou "retangulo laranja" no
+			## video do Diretor, 26/08): base laranja-avermelhada, topo amarelo.
+			var g := Gradient.new()
+			g.set_color(0, Color(0.95, 0.25, 0.05))  # base laranja-avermelhada
+			g.set_color(1, Color(1.0, 0.85, 0.25))   # topo amarelo
+			var tex := GradientTexture2D.new()
+			tex.gradient = g
+			tex.fill_from = Vector2(0, 1)  # v=1 e' a BASE do mesh...
+			tex.fill_to = Vector2(0, 0)    # ...e v=0 o topo
+			_mat_nucleo.albedo_texture = tex
+			_mat_nucleo.emission_enabled = true
+			_mat_nucleo.emission = Projectile.tint("fire")  # cor canonica (§10)
+			_mat_nucleo.emission_energy_multiplier = float(FLICKER_NIVEIS[0])
+		return _mat_nucleo
+
+	## Flicker em PASSOS (SPELLBREAK.md §2.2: VFX animado a 12–15 fps para o
+	## look de anime — nunca lerp continuo): a energia do emissivo SALTA entre
+	## niveis a cada FLICKER_PASSO. Chamado pelo _physics_process — e direto
+	## pelo selftest, com deltas a mao (headless nao renderiza; prova-se ESTADO).
+	func _flicker(delta: float) -> void:
+		if _mat_nucleo == null:
+			return
+		_flicker_acc += delta
+		if _flicker_acc < FLICKER_PASSO:
+			return
+		_flicker_acc = fmod(_flicker_acc, FLICKER_PASSO)
+		_flicker_idx = (_flicker_idx + 1) % FLICKER_NIVEIS.size()
+		_mat_nucleo.emission_energy_multiplier = float(FLICKER_NIVEIS[_flicker_idx])
+
+	## VFX procedural (zero binario): a licao do Spellbreak (SPELLBREAK.md
+	## §2.3) — a Flamewall le a distancia como linha laranja VIVA, nunca um
+	## retangulo estatico. Aqui: nucleo baixo em CUNHA (topo pontudo = silhueta
+	## de chama; billboard NAO — e' uma linha no mundo), gradiente emissivo e
+	## chamas subindo em particula. Baixa de proposito — "bloqueia visao
+	## rasante", nao a visao inteira. ZERO luz dinamica: a OmniLight que morava
+	## aqui custava caro no mobile e o projeto ilumina com COR.
 	func _visual() -> void:
+		var comp := maxf(a.distance_to(b), espessura * 2.0)
 		var m := MeshInstance3D.new()
-		var caixa := BoxMesh.new()
-		caixa.size = Vector3(maxf(a.distance_to(b), espessura * 2.0), 0.9, espessura * 2.0)
-		m.mesh = caixa
-		m.material_override = KitRunner.mat_brilho(Color(1.0, 0.35, 0.05, 0.55), 3.0)
-		m.position.y = 0.45
+		var cunha := PrismMesh.new()
+		cunha.size = Vector3(espessura * 2.0, NUCLEO_ALTURA, comp)
+		m.mesh = cunha
+		m.material_override = _material_nucleo()
+		m.position.y = NUCLEO_ALTURA * 0.5
 		add_child(m)
-		# A caixa e' comprida no X: giramos o no' para que o +X local aponte de
+		# A cunha e' comprida no Z: giramos o no' para que o +Z local aponte de
 		# a para b. (global_position so' e' escrito depois do add_child, em
 		# criar() — por isso aqui NADA depende da posicao, so' da direcao.)
 		var d := b - a
 		if d.length_squared() > 0.0001:
-			rotation.y = atan2(-d.z, d.x)
-		var luz := OmniLight3D.new()  # UMA luz por brasa (regra mobile do §14)
-		luz.light_color = Color(1.0, 0.5, 0.15)
-		luz.omni_range = 6.0
-		luz.position.y = 1.0
-		add_child(luz)
+			rotation.y = atan2(d.x, d.z)
+		add_child(_chamas(comp))
+
+	## UMA GPUParticles3D por brasa (mobile): chamas de ~1 m subindo ao longo
+	## da linha, encolhendo ate' sumir — mesmo estilo de quad billboard do
+	## burst do Projectile. local_coords: empurrada pelo vento, a chama vai junto.
+	func _chamas(comp: float) -> GPUParticles3D:
+		var p := GPUParticles3D.new()
+		p.amount = clampi(int(comp * CHAMAS_POR_M), CHAMAS_MIN, CHAMAS_MAX)
+		p.lifetime = CHAMA_VIDA
+		p.local_coords = true
+		var pm := ParticleProcessMaterial.new()
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+		pm.emission_box_extents = Vector3(espessura, 0.05, comp * 0.5)
+		pm.direction = Vector3.UP
+		pm.spread = 8.0
+		pm.gravity = Vector3.ZERO
+		# velocidade derivada dos knobs: sobe CHAMA_SOBE durante CHAMA_VIDA
+		pm.initial_velocity_min = CHAMA_SOBE / CHAMA_VIDA * 0.8
+		pm.initial_velocity_max = CHAMA_SOBE / CHAMA_VIDA * 1.2
+		pm.color = Projectile.tint("fire")
+		var curva := Curve.new()  # nasce cheia, morre um fiapo — leitura de chama
+		curva.add_point(Vector2(0.0, 1.0))
+		curva.add_point(Vector2(1.0, 0.05))
+		var ct := CurveTexture.new()
+		ct.curve = curva
+		pm.scale_curve = ct
+		p.process_material = pm
+		var quad := QuadMesh.new()
+		quad.size = CHAMA_QUAD
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.vertex_color_use_as_albedo = true
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		quad.material = mat
+		p.draw_pass_1 = quad
+		p.emitting = true
+		return p

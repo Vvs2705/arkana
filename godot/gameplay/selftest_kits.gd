@@ -114,6 +114,15 @@ func _filhos_do_grupo(arena: Node3D, grupo: String) -> Array:
 	return out
 
 
+## O nucleo visual de uma brasa da Pyra (headless nao renderiza: o teste
+## consulta o ESTADO do no' — mesh, material, particulas — nunca o renderer).
+func _nucleo_de(muro: Node) -> MeshInstance3D:
+	for c in muro.get_children():
+		if c is MeshInstance3D:
+			return c
+	return null
+
+
 func _tem_estado(nome: String, ligado: bool) -> bool:
 	for e in _states:
 		if e[0] == nome and bool(e[1]) == ligado:
@@ -287,6 +296,38 @@ func _test_pyra() -> void:
 	var muro: Node = muros[0]
 	_check(is_equal_approx(muro.a.distance_to(muro.b), float(t.comprimento)),
 			"muralha de %.0fm (GDD)" % float(t.comprimento))
+	## O VISUAL NOVO (video do Diretor, 26/08: a muralha lia como RETANGULO
+	## CHAPADO laranja). Receita Spellbreak: forma de chama + emissivo em
+	## gradiente + particulas + flicker em passos. Prova por ESTADO consultavel.
+	var nucleo := _nucleo_de(muro)
+	_check(nucleo != null and nucleo.mesh is PrismMesh,
+			"nucleo em CUNHA (silhueta de chama) — nao mais caixa chapada")
+	var vmat: StandardMaterial3D = nucleo.material_override if nucleo != null else null
+	_check(vmat != null and vmat.emission_enabled, "nucleo EMISSIVO (fogo brilha sozinho)")
+	_check(vmat != null and vmat.emission.is_equal_approx(_proj.tint("fire")),
+			"emissivo na cor canonica do FOGO (paleta §10)")
+	_check(vmat != null and vmat.albedo_texture is GradientTexture2D,
+			"gradiente vertical: base avermelhada, topo amarelo — nao cor chapada")
+	var chamas: GPUParticles3D = null
+	var luz_dinamica := false
+	for c in muro.get_children():
+		if c is GPUParticles3D:
+			chamas = c
+		if c is Light3D:
+			luz_dinamica = true
+	_check(chamas != null and chamas.emitting, "UMA GPUParticles3D de chamas, emitindo")
+	_check(chamas != null and chamas.amount <= 48, "mobile: no maximo 48 particulas por muralha")
+	_check(not luz_dinamica, "ZERO luz dinamica na muralha (mobile ilumina com COR)")
+	# flicker em PASSOS (12-15 fps do Spellbreak): meio passo do relogio nao
+	# muda nada; o passo cheio TROCA a energia num degrau — nunca lerp continuo.
+	muro._flicker_acc = 0.0
+	var e0: float = vmat.emission_energy_multiplier if vmat != null else 0.0
+	muro._flicker(0.04)
+	_check(vmat != null and is_equal_approx(vmat.emission_energy_multiplier, e0),
+			"flicker: MEIO passo do relogio nao muda a energia (sem lerp)")
+	muro._flicker(0.05)
+	_check(vmat != null and not is_equal_approx(vmat.emission_energy_multiplier, e0),
+			"flicker: o passo cheio TROCA a energia em degrau")
 	# dano moderado em quem atravessa — e NUNCA na dona (fogo dela nao a fere)
 	var vitima := _inimigo(arena, muro.global_position)
 	# Desde a R22 o dano bate no ESCUDO antes da vida: a conta e' vida+escudo.
@@ -315,6 +356,10 @@ func _test_pyra() -> void:
 	k.tatica_cd = 0.0
 	k.usar_tatica()
 	var muro2: Node = _filhos_do_grupo(arena, "brasas_pyra")[0]
+	# perf mobile: TODAS as muralhas dividem o MESMO material de nucleo
+	var nucleo2 := _nucleo_de(muro2)
+	_check(nucleo2 != null and nucleo2.material_override == vmat,
+			"UM material de nucleo COMPARTILHADO entre muralhas (perf mobile)")
 	var pos_antes: Vector3 = muro2.global_position
 	_bus.terrain_hit.emit("wind", pos_antes + Vector3(0, 0, 2.0), false)
 	_check(is_equal_approx(pos_antes.distance_to(muro2.global_position), float(t.vento_empurra)),
