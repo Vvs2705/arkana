@@ -167,6 +167,14 @@ func update_match(time_left: float, bots: int) -> void:
 	bots_lbl.text = Textos.HUD_BOTS % bots
 
 
+## No TREINO nao existe relogio nem contagem que importe — mostrar "3:00" e
+## "BOTS 0" era mentira de partida (pendencia do video do Diretor, 26/08).
+## O canto diz o que a cena e': TREINO.
+func update_treino() -> void:
+	timer_lbl.text = Textos.MENU_TREINO
+	bots_lbl.text = ""
+
+
 func show_end(victory: bool) -> void:
 	end_lbl.text = Textos.HUD_VITORIA if victory else Textos.HUD_DERROTA
 	end_lbl.add_theme_color_override("font_color",

@@ -94,6 +94,7 @@ func _run() -> void:
 	_test_dodge()
 	_test_armas()
 	_test_loot()
+	_test_loot_emissivo()
 	_test_bau()
 	_test_dono_dos_sinais()
 	_test_game_feel()
@@ -151,6 +152,49 @@ func _test_dono_dos_sinais() -> void:
 	_check(armados.size() == 1 and armados[0][0] == dono,
 		"weapon_equipped carrega o pawn que equipou, nao so' o id da arma")
 	dono.queue_free()
+
+
+## O LOOT ACENDE (26/08, leva Spellbreak): em contra-luz o corpo do item era
+## VULTO PRETO — o feixe lia, o item nao. O chao poe o banho emissivo na cor
+## do elemento POR INSTANCIA (override de superficie); a luva NA MAO nasce de
+## modelo limpo — a emissao nao pode viajar. Vermelho provado removendo a
+## chamada de _emissao_corpo no Loot.
+func _test_loot_emissivo() -> void:
+	print("[Loot: o corpo do item acende na cor do elemento (Spellbreak)]")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var proj: GDScript = load("res://gameplay/Projectile.gd")
+	var cor: Color = proj.tint("water")
+	var l: Node3D = loot_scr.criar("varinha", PackedStringArray(), "water")
+	root.add_child(l)
+	_check(_superficies_acesas(l, cor) >= 1,
+			"o item no CHAO tem superficie emissiva na cor do elemento (%d)"
+			% _superficies_acesas(l, cor))
+	# contra-prova: o modelo recem-criado para a MAO nasce sem o banho — se
+	# acender junto, o material compartilhado do .glb foi contaminado.
+	var mao: Node3D = load("res://gameplay/ArmaSlot.gd").modelo("varinha", "water")
+	root.add_child(mao)
+	_check(_superficies_acesas(mao, cor) == 0,
+			"a luva NA MAO nasce limpa — a emissao do chao nao contamina o .glb")
+	l.free()
+	mao.free()
+
+
+func _superficies_acesas(raiz: Node, cor: Color) -> int:
+	var acesas := 0
+	var pilha: Array = [raiz]
+	while not pilha.is_empty():
+		var n: Node = pilha.pop_back()
+		for c in n.get_children():
+			pilha.append(c)
+		if not (n is MeshInstance3D):
+			continue
+		var mi := n as MeshInstance3D
+		for s in mi.get_surface_override_material_count():
+			var m := mi.get_surface_override_material(s)
+			if m is StandardMaterial3D and (m as StandardMaterial3D).emission_enabled \
+					and (m as StandardMaterial3D).emission.is_equal_approx(cor):
+				acesas += 1
+	return acesas
 
 
 func _dummy(hp0: float) -> Node:
@@ -364,6 +408,20 @@ func height(_x: float, _z: float) -> float:
 	p.move_velocity(Vector3.ZERO, 0.1)
 	_check(bool(p.nadando), "peito coberto -> modo NADAR")
 	_check(p.current_speed() < v0 * 0.6, "nadar e' devagar (produto unico, fator %.2f)" % float(p.NADO_MULT))
+	## A ANIMACAO DO NADO (26/08, leva Spellbreak): a decisao mora na fonte
+	## (locomotion_anim), como o derrubado. Vermelho provado sem o desvio.
+	p.velocity = Vector3.ZERO
+	_check(p.locomotion_anim() == "nadar_parado",
+			"nadando parado, a locomocao e' 'nadar_parado' (boiar)")
+	p.velocity = Vector3(3.0, 0.0, 0.0)
+	_check(p.locomotion_anim() == "nadar", "com bracada, a locomocao e' 'nadar'")
+	p.velocity = Vector3.ZERO
+	var mage_scr: GDScript = load("res://characters/Mage.gd")
+	_check("nadar" in Array(mage_scr.OPTIONAL_ANIMS)
+			and str(mage_scr.ANIM_FALLBACK.get("nadar", "")) == "run"
+			and mage_scr.ANIM_ALIASES.has("nadar_parado")
+			and "nadar" in Array(mage_scr.ANIMS_EM_LACO),
+			"o contrato nadar/nadar_parado existe no Mage: alias + laco + fallback 'run' (nao regride)")
 	# flutua: a gravidade nao puxa para o leito
 	p.velocity = Vector3(0, -5, 0)
 	for i in 30:
@@ -384,8 +442,13 @@ func height(_x: float, _z: float) -> float:
 	for i in 40:
 		p.move_velocity(Vector3.ZERO, 0.1)
 	_check(is_equal_approx(float(p.agua_mult), 1.0), "a roupa seca e a velocidade volta")
-	ilha.queue_free()
-	p.queue_free()
+	# free() IMEDIATO, nao queue_free(): a ilha falsa esta' no grupo "ilha" e,
+	# adiada, sobrevive ate' o fim do frame — o teste de HISTERESE seguinte
+	# poe um pawn em (0,0,0), DENTRO deste lago fantasma, e a locomocao (que
+	# agora consulta a agua) devolve "nadar" onde ele espera idle/run. E' a
+	# MESMA armadilha ja' paga pelo teste do treino, pela terceira via.
+	ilha.free()
+	p.free()
 
 
 ## O LOBBY DE TREINO (26/08 — DIRECAO.md §8). Monta o Main INTEIRO em modo
@@ -415,6 +478,11 @@ func _test_treino() -> void:
 	var k: Node = load("res://gameplay/KitRunner.gd").de(m.player)
 	_check(k != null and float(k.dados.suprema_carga) <= 6.0,
 			"suprema enche em ~5s no treino (testar esperando 50s e' fila, nao treino)")
+	## O RELOGIO DO TREINO (pendencia do video de 26/08): "3:00" e "BOTS 0" eram
+	## mentira de partida. Vermelho provado voltando o update_match no treino.
+	_check(str(m.hud.timer_lbl.text) == str(load("res://core/Textos.gd").MENU_TREINO)
+			and str(m.hud.bots_lbl.text) == "",
+			"o canto do treino diz TREINO, sem relogio nem BOTS")
 	# boneco apanha e regenera: o timer devolve vida
 	var alvo: Node = bonecos[0]
 	alvo.hp = 40.0

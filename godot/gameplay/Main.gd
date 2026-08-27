@@ -156,7 +156,10 @@ func _build_match() -> void:
 				qs.iniciar_bots(lista, island, q.castelo)
 	hud.bind_player(player)
 	hud.hide_end()
-	hud.update_match(time_left, bots_alive)
+	if modo_treino:
+		hud.update_treino()   # o canto diz "TREINO", nao um 3:00 que nao corre
+	else:
+		hud.update_match(time_left, bots_alive)
 	Bus.match_started.emit()
 
 

@@ -20,6 +20,11 @@ const NADO_MULT := 0.55
 const MOLHADO_MULT := 0.8
 const MOLHADO_S := 2.5
 const PEITO := 1.2
+## Acima disto (m/s) a bracada e' "nadar"; abaixo, "nadar_parado" (boiar).
+## Nadando a 55% da base (~3,3 m/s), 0.5 fica bem longe da fronteira — nao
+## precisa da histerese do run, que existe porque la' a velocidade CRUZA o
+## limiar toda hora.
+const NADO_ANIM_V := 0.5
 var agua_mult := 1.0
 var nadando := false
 var _molhado_s := 0.0
@@ -342,6 +347,14 @@ func anim(anim_name: String) -> void:
 func locomotion_anim() -> String:
 	if Derrubado.esta(self):
 		return "derrubado"
+	## NADANDO a locomocao e' outra (bracada ou boiar) — e a decisao mora AQUI
+	## pela mesma razao do derrubado: Player e Bot reescrevem a animacao todo
+	## frame, entao pedido feito de fora seria apagado no frame seguinte. Quem
+	## decide SE esta' nadando e' a agua (_agua_step); aqui so' se le. Modelo
+	## sem o clipe cai no fallback do Mage (nadar->run), que e' o comportamento
+	## que o jogo sempre teve — ninguem regride.
+	if nadando:
+		return "nadar" if horizontal_speed() > NADO_ANIM_V else "nadar_parado"
 	var v := horizontal_speed()
 	if _run_anim:
 		if v < float(Balance.MOVE.run_anim_exit):

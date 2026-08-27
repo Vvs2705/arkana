@@ -42,11 +42,15 @@ const REQUIRED_ANIMS := ["idle", "run", "cast"]
 ## seja, uma feature nova apagaria os modelos que ja' funcionam.
 ## Quem chama pergunta antes com has_anim(); play_anim() cai no substituto
 ## abaixo em vez de reclamar no console.
-const OPTIONAL_ANIMS := ["cair", "planar", "pegar", "derrubado"]
+const OPTIONAL_ANIMS := ["cair", "planar", "pegar", "derrubado",
+		"nadar", "nadar_parado"]
 
 ## Para onde cada opcional cai quando o modelo nao a tem. Nunca fica sem pose.
+## nadar cai em "run" (e nao em idle): o corpo meio submerso se mexendo com a
+## passada de corrida e' EXATAMENTE o comportamento que o jogo tinha antes do
+## clipe existir — o fallback nao pode regredir ninguem.
 const ANIM_FALLBACK := {"cair": "idle", "planar": "idle", "pegar": "cast",
-		"derrubado": "idle"}
+		"derrubado": "idle", "nadar": "run", "nadar_parado": "idle"}
 
 ## MEIA-VOLTA OBRIGATORIA NO MODELO EXTERNO — nao e' gosto, e' conversao de
 ## convencao. glTF (e a Meshy, que exporta glTF) posiciona o personagem olhando
@@ -71,7 +75,8 @@ const MODEL_YAW := PI
 ## depois patina").
 ## "cast" fica de FORA de proposito: e' disparo unico, e o `cast_fired` depende
 ## de ela terminar. Em laco, o tiro sairia repetido.
-const ANIMS_EM_LACO := ["idle", "run", "cair", "planar", "derrubado"]
+const ANIMS_EM_LACO := ["idle", "run", "cair", "planar", "derrubado",
+		"nadar", "nadar_parado"]
 const ANIM_ALIASES := {
 	"idle": ["idle", "Idle", "IDLE", "Armature|Idle", "mixamo.com",
 		"standing_idle", "breathing_idle", "idle_01", "idle_loop",
@@ -101,6 +106,13 @@ const ANIM_ALIASES := {
 	"derrubado": ["derrubado", "downed", "Downed", "knocked", "Knocked Down",
 		"knockdown", "crawl", "Crawl", "crawling", "Crawling", "wounded",
 		"injured", "dying", "getting_up", "lying"],
+	# A AGUA E' JOGAVEL desde 26/08 (nadar do peito, DIRECAO.md §3) — estes dois
+	# fecham o ciclo: o Pawn pede, o modelo que tiver o clipe (Brok ja' tem, da
+	# biblioteca da Meshy) responde, e quem nao tiver cai no fallback acima.
+	"nadar": ["nadar", "swim", "Swim", "swimming", "Swimming", "swim_forward",
+		"Swim_Forward", "breaststroke", "freestyle"],
+	"nadar_parado": ["nadar_parado", "swim_idle", "Swim_Idle", "treading",
+		"treading_water", "Water_Idle", "float", "floating"],
 }
 
 ## PRESETS DE MATERIAL — um shader so', quatro respostas de luz diferentes.
