@@ -342,16 +342,37 @@ func _test_castelo() -> void:
 			"o castelo nasce no comeco da rota")
 	_check(not cast.is_processing() and not cast.is_physics_processing(),
 			"o castelo NAO gasta _process (a travessia e' Tween, engine-side)")
+	# A LEI MUDOU em 26/08 (DIRECAO §10): o castelo de jogo e' o modelo do
+	# Meshy decimado ("Aetherstone Citadel", 30k tris). Este teste cobrava
+	# "zero binario" — que era a lei ate' os concepts serem aprovados. Agora:
+	# com o arquivo presente, o filho e' ModeloCastelo; o PROCEDURAL continua
+	# vivo como fallback e e' provado logo abaixo, chamando-o direto.
 	var malhas := 0
-	var sombra := false
-	for f in cast.get_children():
-		if f is MeshInstance3D:
+	var pilha: Array = [cast]
+	while not pilha.is_empty():
+		var f0: Node = pilha.pop_back()
+		for c0 in f0.get_children():
+			pilha.append(c0)
+		if f0 is MeshInstance3D:
 			malhas += 1
-			if (f as MeshInstance3D).cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
-				sombra = true
-	_check(malhas >= 4 and malhas <= 12,
-			"silhueta procedural em %d malhas (zero binario, orcamento mobile)" % malhas)
-	_check(not sombra, "nenhuma malha do castelo projeta sombra a 320m de altura")
+	if ResourceLoader.exists(str(cast.MODELO)):
+		_check(cast.get_node_or_null("ModeloCastelo") != null,
+				"com o .glb no lugar, o castelo VESTE o modelo do Meshy")
+		_check(malhas >= 1, "o modelo traz malha de verdade (%d)" % malhas)
+	else:
+		_check(malhas >= 4 and malhas <= 12,
+				"sem o .glb, a silhueta procedural segura (%d malhas)" % malhas)
+	# o fallback NUNCA pode morrer: um castelo cru monta as primitivas mesmo
+	# com o modelo existindo no projeto.
+	var cru: Node3D = _castelo.new()
+	arena.add_child(cru)
+	cru._montar_fallback()
+	var malhas_fb := 0
+	for f1 in cru.get_children():
+		if f1 is MeshInstance3D:
+			malhas_fb += 1
+	_check(malhas_fb >= 4, "o fallback procedural continua vivo (%d malhas)" % malhas_fb)
+	cru.free()
 	ilha.free()
 	arena.queue_free()
 	_blocos.append("castelo")

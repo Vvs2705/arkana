@@ -149,7 +149,38 @@ quase pretos da queda.
 
 ---
 
-### (26/08, fim de tarde — as 5 peças-herói em 3D, histórico)
+### (26/08, noite — os modelos do Meshy entram no jogo, histórico)
+
+**26/08, noite.** A esteira do Blender rodou e os 5 heróis entraram no APK:
+
+- **`tools/blender/otimizar.py`** (headless): decima preservando UV (o
+  normal/albedo do Meshy continua valendo — sem re-bake), escala para METROS
+  reais e põe o pé em y=0. Resultados: castelo 30k tris/52 m · luvas 3,5–5k
+  em tamanho real (0,32–0,46 m) · baú 8k **nas medidas do código** (1,15 m —
+  colisão e canalização intocadas).
+- **`core/Pbr.gd`** — o grampo do metal virou dono único (a lição do mago
+  preto): `Pbr.domar()` em todo modelo Meshy instanciado.
+- **Integração com fallback defensivo em tudo**: `Castelo._montar_visual`
+  veste `world/modelos/castelo.glb` (primitivas viram `_montar_fallback`);
+  `BauCelestial._montar` veste `bau.glb`; `ArmaSlot.modelo()` veste
+  `gameplay/modelos/luva-<id>.glb` — sem arquivo, o procedural de sempre.
+- **Teste da lei antiga atualizado**: o selftest da queda cobrava "zero
+  binário" no castelo — a DIREÇÃO §10 mudou a lei; agora cobra o modelo
+  vestido E o fallback vivo (chamado direto). Vermelhos: caminho quebrado (3),
+  Pbr removido (1).
+- **APK: 140 MB** (era 53) — os 5 GLB com texturas 2K. Ordem do Diretor de
+  25/08 vale: tamanho não é critério agora; compressão vem na fase de loja.
+
+**Pendências REGISTRADAS da fase:** recolor por elemento das luvas-modelo
+(hoje usam as cores master; a runa procedural é quem colore por elemento no
+fallback) · decal do bordado na palma da Conjurador (Blender manual) ·
+castelo saiu 52 m de ALTURA (o Meshy esticou a rocha; ficha era 34 m — ajustar
+escala/eixo na passada fina) · **FPS no Poco F4 continua sem medição — é o
+portão da repaginação do chão (DIRECAO §10.1)**.
+
+---
+
+### (26/08, fim de tarde — 5 heróis em 3D na conta, histórico)
 
 **26/08, fim de tarde.** A fila inteira da DIREÇÃO §10 virou modelo: Castelo,
 Luva Comum, Luva de Conjurador, Manopla e Baú — todos pelo SITE, visíveis na

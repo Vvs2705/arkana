@@ -244,6 +244,19 @@ func _montar_visual() -> void:
 ## sendo o tell do GDD §16.2). Modelo definitivo vem do Meshy (DIRECAO §10,
 ## peca no 2); este e' o procedural que segura a leitura ate' la'.
 static func modelo(arma_id_: String, elemento_ := "") -> Node3D:
+	# O MODELO DE JOGO (26/08): as luvas do Meshy (decimadas no Blender, em
+	# tamanho real) por arma_id. O procedural continua como fallback defensivo
+	# — e continua sendo quem da' a COR DO ELEMENTO; o recolor por elemento dos
+	# modelos e' a pendencia registrada em cenario/00-MODELOS-3D.md.
+	if Arma.existe(arma_id_):
+		var caminho := "res://gameplay/modelos/luva-%s.glb" % arma_id_
+		if ResourceLoader.exists(caminho):
+			var ps: Variant = load(caminho)
+			if ps is PackedScene:
+				var g: Node3D = (ps as PackedScene).instantiate()
+				g.name = "ModeloArmaGLB"
+				Pbr.domar(g)
+				return g
 	var n := Node3D.new()
 	n.name = "ModeloArma"
 	var c := Projectile.tint(elemento_) if elemento_ != "" else Arma.cor(arma_id_)

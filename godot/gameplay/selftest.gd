@@ -84,6 +84,7 @@ func _run() -> void:
 	_test_batismo_e_placar_final()
 	_test_agua()
 	_test_elemento_na_luva()
+	_test_modelos_do_meshy()
 	_test_elements()
 	_test_escudo()
 	_test_evolucao()
@@ -273,6 +274,62 @@ func _test_elemento_na_luva() -> void:
 	_check(vistos.size() >= 3,
 			"o loot da ilha cicla elementos (%d distintos) — quem quer um, ANDA" % vistos.size())
 	arena.queue_free()
+
+
+## OS MODELOS DO MESHY NO JOGO (26/08 — DIRECAO §10). Tres leis num teste:
+## o modelo veste quando o arquivo existe; o procedural NUNCA morre (fallback
+## defensivo); e todo modelo passa pelo grampo do metal (core/Pbr.gd — a licao
+## do mago preto). Vermelho provado quebrando o caminho e o grampo.
+func _test_modelos_do_meshy() -> void:
+	print("[Modelos Meshy: luvas vestem o .glb, fallback vivo, metal domado]")
+	var slot_scr: GDScript = load("res://gameplay/ArmaSlot.gd")
+
+	var g: Node3D = slot_scr.modelo("varinha", "fire")
+	_check(g.name == "ModeloArmaGLB",
+			"luva 'varinha' veste o modelo do Meshy (luva-varinha.glb)")
+	var achou_malha := false
+	var pilha: Array = [g]
+	while not pilha.is_empty():
+		var n0: Node = pilha.pop_back()
+		for c0 in n0.get_children():
+			pilha.append(c0)
+		if n0 is MeshInstance3D and (n0 as MeshInstance3D).mesh != null:
+			achou_malha = true
+			var mi := n0 as MeshInstance3D
+			for s in mi.mesh.get_surface_count():
+				var m := mi.mesh.surface_get_material(s)
+				if m is StandardMaterial3D:
+					_check(float((m as StandardMaterial3D).metallic) <= Pbr.METAL_MAX + 0.001,
+							"o metal da luva chega DOMADO (%.2f)" % (m as StandardMaterial3D).metallic)
+					pilha.clear()
+					break
+	_check(achou_malha, "o modelo da luva tem malha de verdade")
+	g.free()
+
+	_check(slot_scr.modelo("cajado").name == "ModeloArmaGLB", "cajado veste o .glb")
+	_check(slot_scr.modelo("manopla").name == "ModeloArmaGLB", "manopla veste o .glb")
+
+	# fallback: id que nao existe na tabela Arma -> procedural de sempre
+	var fb: Node3D = slot_scr.modelo("id_que_nao_existe", "fire")
+	_check(fb.name == "ModeloArma", "id desconhecido cai no PROCEDURAL — fallback vivo")
+	_check(fb.get_child_count() > 0, "e o procedural monta pecas")
+	fb.free()
+
+	# o grampo em si, no menor exemplo possivel
+	var bx := BoxMesh.new()
+	var mat := StandardMaterial3D.new()
+	mat.metallic = 1.0
+	mat.roughness = 0.1
+	bx.material = mat
+	var mi2 := MeshInstance3D.new()
+	mi2.mesh = bx
+	root.add_child(mi2)
+	Pbr.domar(mi2)
+	_check(is_equal_approx(mat.metallic, Pbr.METAL_MAX)
+			and is_equal_approx(mat.roughness, Pbr.ASPEREZA_MIN),
+			"Pbr.domar grampeia metallic %.1f->%.1f e roughness %.1f->%.2f"
+			% [1.0, mat.metallic, 0.1, mat.roughness])
+	mi2.queue_free()
 
 
 ## A AGUA (26/08 — DIRECAO.md §3): peito coberto = nadar (devagar, flutuando
@@ -1219,6 +1276,11 @@ func _test_bau() -> void:
 		if n.get_script() == loot_scr and str(n.arma_id) == "varinha":
 			velhas += 1
 	_check(velhas == 1, "a varinha trocada ficou no chao onde o bau abriu")
+	# O VISUAL (26/08): com bau.glb no projeto, o pivo veste o modelo do Meshy
+	# (as primitivas de madeira sao o fallback, cobertas pelo teste do castelo).
+	if ResourceLoader.exists(str(a.MODELO)):
+		_check(a._pivo.get_node_or_null("ModeloBau") != null,
+				"o Bau Celestial veste o modelo do Meshy (bau.glb)")
 
 	p.queue_free()
 	mapa.queue_free()
