@@ -142,7 +142,25 @@ def baixar(url: str, destino: Path) -> None:
     print(f"  salvo: {destino.relative_to(RAIZ)} ({destino.stat().st_size // 1024} KB)")
 
 
+## PERSONAGEM NAO PASSA MAIS POR AQUI (27/08/2026, ordem do Diretor).
+## A API entrega malha e um rig SEM a etapa de marcacao de articulacoes que o
+## site tem — e o resultado, medido no aparelho dele, foi animacao de robo. Os
+## 18 magos feitos por esta funcao foram APAGADOS do projeto.
+## Personagem se cria no SITE, um por um. Isto continua valendo para PROPS e
+## cenario (ver `prop`), onde nao ha esqueleto.
+PERSONAGEM_PELA_API = False
+
+BARRADO = (
+    "BARRADO: personagem se cria no SITE da Meshy, um por um. "
+    "A API nao tem a marcacao de articulacoes do rig e o resultado anima "
+    "como robo (ordem do Diretor, 27/08). "
+    "Para props e cenario use: meshy.py prop <slug> <vistas>"
+)
+
+
 def gerar(slug: str) -> str:
+    if not PERSONAGEM_PELA_API:
+        sys.exit(BARRADO)
     print(f"[1/2] Gerando malha 3D de {slug}")
     corpo = {
         "image_url": concept_em_data_uri(slug),
@@ -175,6 +193,8 @@ def gerar(slug: str) -> str:
 
 
 def riggar(slug: str, task_id: str | None = None) -> None:
+    if not PERSONAGEM_PELA_API:
+        sys.exit(BARRADO)
     print(f"[2/2] Riggando {slug}")
     glb = SAIDA / slug / f"{slug}.glb"
     if task_id:

@@ -1785,9 +1785,20 @@ func _test_restart() -> void:
 	var n_bots := int(_bal.MATCH.bots)
 	_check(is_instance_valid(arena1), "partida 1 montada")
 	_check(_count_bots(arena1) == n_bots, "%d bots na partida 1" % n_bots)
-	_check(main.player.visual != null and main.player.visual.has_method("get_model_source") \
-		and str(main.player.visual.get_model_source()).begins_with("external:res://characters/modelos/pyra.glb"),
-		"player inicia como Pyra GLB")
+	## O QUE ESTE TESTE COBRA MUDOU EM 27/08. Ele cravava
+	## "external:res://characters/modelos/pyra.glb" e virou vermelho quando o
+	## Diretor mandou apagar os 20 modelos (os da API animavam como robo; os dois
+	## do site tinham clipe duplicado — o `cast` era copia do `cair`). Enquanto o
+	## elenco e' refeito no site, o player nasce no mago PROCEDURAL, e isso e' o
+	## fallback funcionando, nao defeito.
+	## O que continua sendo lei: o player nasce com o mago de PLAYER_MAGE vestido,
+	## seja pelo .glb ou pelo procedural — e nunca sem visual nenhum.
+	var fonte_visual := ""
+	if main.player.visual != null and main.player.visual.has_method("get_model_source"):
+		fonte_visual = str(main.player.visual.get_model_source())
+	_check(main.player.visual != null, "o player tem visual")
+	_check(fonte_visual == "procedural" or fonte_visual.begins_with("external:"),
+			"player nasce com mago vestido (fonte: %s)" % fonte_visual)
 	# suja o estado: dano no player, mata um bot, gasta tempo e mana.
 	# 90 e' de proposito: 50 comem o escudo N1 e 40 TRANSBORDAM para a vida.
 	_combat.deal(main.player, 90.0)

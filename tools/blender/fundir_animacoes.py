@@ -1,3 +1,18 @@
+# NAO USE ISTO PARA PERSONAGEM. (27/08/2026, ordem do Diretor.)
+#
+# Fundir clipes de um personagem no esqueleto de outro FOI O DEFEITO: os magos
+# ficaram com animacao de robo, e o brok.glb saiu com CLIPE DUPLICADO —
+# 'mage_soell_cast' era uma copia de 'cair', 'derrubado' era copia de 'Idle_02'
+# e 'nadar_parado' era copia de 'Walking'. Dez clipes distintos vendidos como
+# treze: ao lancar magia, o mago tocava a animacao de CAIR.
+#
+# O caminho certo para personagem e' o SITE da Meshy, um por um: la' o rig tem
+# uma etapa de MARCACAO DE ARTICULACOES (queixo, ombros, cotovelos, pulsos,
+# virilha, joelhos, tornozelos) que a API nao tem, e as animacoes sao aplicadas
+# ao esqueleto DAQUELE corpo, nao retargetadas de outro.
+#
+# Este arquivo fica para PROPS e cenario, onde nao ha esqueleto para confundir.
+#
 # Funde clipes de animacao de um GLB da Meshy no GLB de jogo de um personagem.
 # Mesmo esqueleto dos dois lados (acoes retargetam por NOME de osso).
 # Uso (headless):

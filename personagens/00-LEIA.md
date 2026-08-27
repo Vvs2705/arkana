@@ -73,6 +73,14 @@ pela equipe.
 | Pintura semi-realista | 7 | 01, 03, 05, 06, 07, 10, 12 |
 | Anime / manhwa | 6 | 02, 08, 11, 15, 19, 20 |
 
+> ⚠️ **CORRIGIDO EM 27/08/2026 — o paragrafo abaixo NAO vale como regra geral.**
+> Conferido imagem a imagem: o perfil da **Veu** e' um **90 graus de verdade**
+> (um olho, uma orelha, nenhum peito visivel); o do **Basalto** e' mesmo um 3/4.
+> E' **caso a caso**. Repetir esta frase sem abrir o arquivo levou a equipe a
+> escrever 20 prompts para REFAZER do zero uma arte que existia desde 24/08 —
+> e o Diretor teve que perguntar *"por que isso dos personagens se eles existem
+> dentro da pasta do projeto?"*. **Antes de citar isto, abra o PNG.**
+
 **Defeito de vistas, vale para os 20:** a `vista-3-4` é a frontal repetida em
 12 de 12 conferidos, e a `vista-lateral` é um três-quartos de ~60-70°. **Não
 existe perfil de 90° no lote.** Consequência prática: o fluxo multi-imagem da

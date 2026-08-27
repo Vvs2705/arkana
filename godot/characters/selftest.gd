@@ -231,9 +231,22 @@ func _check_elenco_vestido() -> void:
 			sem_clipe.append(slug)
 		m.free()
 	_check(total >= 20, "o elenco tem %d magos" % total)
-	_check(sem_modelo.is_empty(),
-			"todo mago tem .glb: %d de %d (faltam: %s)"
-			% [com_modelo, total, ", ".join(sem_modelo) if not sem_modelo.is_empty() else "nenhum"])
+	## QUANTOS TEM MODELO nao e' portao — e' PLACAR, e por isso so' imprime.
+	##
+	## Era portao ate' 27/08 e virou vermelho no dia em que o Diretor mandou apagar
+	## os 20 modelos: os feitos pela API animavam como robo e os dois feitos no site
+	## carregavam clipes duplicados (o `cast` era uma COPIA do `cair` — conferido).
+	## Enquanto o elenco e' refeito no site, um por um, faltar modelo e' o ESTADO
+	## ESPERADO, nao defeito: o Mage tem fallback procedural de proposito.
+	## Portao vermelho por semanas nao protege nada — ele ensina a ignorar o portao.
+	print("  placar  %d de %d magos com .glb (faltam: %s)"
+			% [com_modelo, total,
+			", ".join(sem_modelo) if not sem_modelo.is_empty() else "nenhum"])
+	## ESTE CONTINUA PORTAO, e e' o que tem dentes: modelo que EXISTE tem que ser
+	## VESTIDO. Um .glb no disco que o Mage rejeita em silencio (falta idle/run/cast)
+	## e' o modo de falhar mais caro do pipeline — paga-se o modelo e o mago nunca
+	## aparece. Com 0 modelos passa trivialmente; a cada mago que volta do site,
+	## ele passa a cobrar de verdade.
 	_check(sem_clipe.is_empty(),
 			"todo mago VESTE o .glb (nao caiu no procedural): %d de %d (falharam: %s)"
 			% [vestidos, com_modelo,
