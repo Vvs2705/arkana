@@ -16,6 +16,12 @@ const RAIO_PEGAR := 2.2      # m — KNOB: raio em que o prompt aparece
 const GIRO_S := 6.0          # s por volta — KNOB (lento; loot nao e' pirulito)
 const FLUTUA_M := 0.16       # m de sobe-e-desce — KNOB
 const ALTURA := 0.85         # m do chao ate' o centro do modelo
+## KNOB — auto-iluminacao do CORPO do item no chao. Video do Diretor (26/08):
+## em contra-luz o modelo Meshy vira VULTO PRETO — o feixe le', o item nao.
+## Receita do Spellbreak (docs/referencias/SPELLBREAK.md, loot): item emissivo,
+## que nao depende da luz da cena. Energia baixa de proposito: leitura a
+## distancia, nao lanterna (o toon do projeto e' estilizado, nao neon).
+const EMISSAO_CORPO := 0.35
 
 ## Centros dos POIs — ESPELHO de world/Island.gd (raia MUNDO). Duplicados de
 ## proposito: `world/` e' de outra raia e o loot nao pode depender do formato
@@ -75,6 +81,7 @@ func _montar() -> void:
 	var m := ArmaSlot.modelo(arma_id, elemento)  # mesmo modelo da mao: o que
 	m.position.y = -0.3                          # voce ve' e' o que equipa
 	m.scale = Vector3.ONE * 2.6  # luva e' pequena; no chao ela AMPLIA para ler de longe
+	_emissao_corpo(m)
 	_pivo.add_child(m)
 	add_child(_pivo)
 	var cor := Arma.cor(arma_id)
@@ -88,6 +95,45 @@ func _montar() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tf.tween_property(_pivo, "position:y", ALTURA, 1.3) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## O CORPO do item acende na cor do ELEMENTO da luva (EMISSAO_CORPO acima).
+## So' materiais SOMBREADOS (= os do .glb do Meshy): o fallback procedural ja'
+## e' UNSHADED emissivo (ArmaSlot.mat_brilho) e nao precisa de ajuda.
+## TRES armadilhas que este bloco desarma:
+## 1. o material do .glb e' COMPARTILHADO entre instancias — mexer nele acende
+##    a luva NA MAO de todo mundo. Por isso: duplicate() + override DE
+##    SUPERFICIE, que vive no no' desta instancia e morre com ela (ao pegar,
+##    a mao instancia modelo novo do .glb intacto — nada viaja).
+## 2. o Meshy importa com emission_enabled=true mas emission=PRETO + textura
+##    emissiva quase toda preta (medido 26/08): "ja e' emissivo" e' mentira.
+## 3. a textura emissiva preta engoliria a cor — por isso ela e' anulada e
+##    fica so' o banho chapado da cor do elemento.
+func _emissao_corpo(raiz: Node) -> void:
+	var cor := Projectile.tint(elemento)
+	var pilha: Array = [raiz]
+	while not pilha.is_empty():
+		var n: Node = pilha.pop_back()
+		for c in n.get_children():
+			pilha.append(c)
+		if not (n is MeshInstance3D):
+			continue
+		var mi := n as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var m: Material = mi.get_active_material(s)
+			if not (m is StandardMaterial3D):
+				continue
+			var sm := m as StandardMaterial3D
+			if sm.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+				continue  # procedural: ja' se ilumina sozinho
+			var dup := sm.duplicate() as StandardMaterial3D
+			dup.emission_enabled = true
+			dup.emission = cor
+			dup.emission_texture = null
+			dup.emission_energy_multiplier = EMISSAO_CORPO
+			mi.set_surface_override_material(s, dup)
 
 
 ## Feixe vertical: o que faz o loot ser VISTO de longe. Altura por raridade —
