@@ -74,18 +74,23 @@ e portão 12/12).** APK do teste: `godot/build/testes/arkana-2026-08-26_2249.apk
    (noise determinístico seed 907, topo irregular, facetado como as rochas da
    ilha) + albedo NoiseTexture2D — zero binário. Colisão EXATA.
 
-**Pyra no site (em andamento):** upload do `pyra.glb` (texturas mantidas,
-licença PRIVADO) → **rig Humanoide rodando na conta dele** (altura corrigida
-para 1,78; marcador de virilha reposicionado abaixo do cinto — o vestido pune
-peso de perna errado). Próximo ao terminar: Animar → mesmos clipes do Brok
-(biblioteca grátis: Caindo, Nadar ×2, Agachar-se Pegar, Gemido) + os 2
-Movimentos de IA JÁ PAGOS da conta (Planar horizontal v2 = o planar bom;
-Planar glide = mergulho) + **Mage Spell Cast da biblioteca** (o export omite
-o cast — no upload dela os 3 clipes originais foram descartados pelo site,
-então o cast PRECISA vir da biblioteca) → download rigged+todos+arquivo
-único → como o esqueleto NOVO ≠ o do repo, é SUBSTITUIÇÃO INTEIRA do
-`pyra.glb` (não fusão) → conferir 1,78 m no characters/selftest + clipes no
-motor. O Diretor autorizou recriar do zero no site se o upload falhar.
+**PYRA RECRIADA NO SITE — aguardando o VEREDITO do Diretor.** O upload do
+glb antigo foi riggado e chegou a receber clipes, mas o Diretor REPROVOU no
+olho ("longe de ficar boa") e mandou recriar como as peças-herói. Feito:
+geração nativa Multi-View na conta dele (30 créditos, saldo 2.994) com
+frente + perfil esquerdo + costas das vistas aprovadas (a "3/4" NÃO entrou:
+é a frontal repetida e ensinaria o perfil errado), Meshy 7 + Ultra + Textura
++ Pose A-Pose + licença PRIVADO. Resultado: 1,97 M faces, revisado no viewer
+com zoom — braço-manopla de bronze em chamas no lado ESQUERDO certo, rosto
+com as marcas de lava, capelete queimado nas costas, braçadeira no braço
+direito. **Está na área de trabalho dele, primeira posição da galeria.**
+Quando ELE aprovar: remesh ~15k (grátis no site) → rig (altura 1,78!) →
+os mesmos clipes do Brok (biblioteca: Mage Spell Cast, Caindo, Nadar ×2,
+Agachar-se Pegar, Gemido, Parado 1 + os 2 Movimentos de IA já pagos) →
+download rigged/todos/arquivo único → SUBSTITUIÇÃO inteira do `pyra.glb`
+(esqueleto novo ≠ repo) → characters/selftest (1,78 m) + clipes no motor.
+Os DOIS uploads antigos dela (T-pose e riggado) seguem na galeria — remover
+só se o Diretor mandar.
 
 **Perguntas abertas ao Diretor:** (a) os rótulos de bússola ("Manopla · ÁGUA
 + RAIO") lendo do outro lado do mapa são wayfinding proposital ou poluição?
