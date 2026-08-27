@@ -1,0 +1,37 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://dn16llyum43e3"
+path="res://.godot/imported/maris_texture_0.png-337c90d3303b9c13357af04aaa831c9e.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "d20236811897a06d92dafe1a978dd59e"
+}
+
+[deps]
+
+source_file="res://characters/modelos/maris_texture_0.png"
+dest_files=["res://.godot/imported/maris_texture_0.png-337c90d3303b9c13357af04aaa831c9e.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1

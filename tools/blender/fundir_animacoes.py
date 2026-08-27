@@ -2,7 +2,17 @@
 # Mesmo esqueleto dos dois lados (acoes retargetam por NOME de osso).
 # Uso (headless):
 #   blender --background --python tools/blender/fundir_animacoes.py -- \
-#       <repo.glb> <novo_com_clipes.glb> <saida.glb>
+#       <repo.glb> <novo_com_clipes.glb> <saida.glb> [manter]
+#
+# O 4o argumento "manter" inverte o descarte: clipe que NAO esta na tabela
+# RENOMEAR fica, com o nome original. Serve para o caso oposto ao de 26/08 —
+# ali o repo tinha os clipes e a Meshy trazia os novos; em 27/08 e o contrario,
+# o personagem novo vem do rig da API com so' walking/running, e quem DOA os
+# clipes e um personagem que ja funciona (brok.glb: Idle_02, Running,
+# mage_soell_cast — os tres obrigatorios de Mage.REQUIRED_ANIMS).
+# CONFERIDO em 27/08: o rigger da Meshy entrega o MESMO esqueleto para todos —
+# 24 ossos, mesmos nomes, mesma ordem em brok.glb e em 03-veu_rigged.glb —
+# entao a acao retargeta por nome de osso sem uma linha de codigo a mais.
 #
 # O que faz: importa o modelo do REPO (malha+rig+acoes que o jogo ja' usa,
 # incluindo o cast — que o export "Todos Adicionados" da Meshy OMITIU),
@@ -13,7 +23,8 @@ import bpy
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:]
-REPO, NOVO, SAIDA = argv
+REPO, NOVO, SAIDA = argv[:3]
+MANTER = len(argv) > 3 and argv[3] == "manter"
 
 # clipes novos -> nome que o jogo conhece (Mage.gd). Match por substring:
 # o importador pode prefixar/sufixar nomes de acao.
@@ -40,8 +51,10 @@ mantidas = []
 for a in novas:
     alvo = next((v for k, v in RENOMEAR.items() if k in a.name), None)
     if alvo is None:
-        bpy.data.actions.remove(a)  # duplicata do que o repo ja' tem (Idle/Run/...)
-        continue
+        if not MANTER:
+            bpy.data.actions.remove(a)  # duplicata do que o repo ja' tem
+            continue
+        alvo = a.name               # doador: o clipe fica com o nome original
     a.name = alvo
     mantidas.append(alvo)
 

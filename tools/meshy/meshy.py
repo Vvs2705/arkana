@@ -108,12 +108,25 @@ def concept_em_data_uri(slug: str) -> str:
 
     LIMITACAO CONHECIDA: mandamos 1 imagem (/image-to-3d) e o atelie tem 4
     vistas por mago. O endpoint /multi-image-to-3d aceita ate' 4 e daria um
-    modelo melhor — mas as vistas do lote atual estao erradas (o "3/4" e' a
-    frontal repetida e nao existe perfil de 90 graus), entao mandar as quatro
-    hoje nao ajudaria. Ver docs/pipeline-arte/PERSONAGENS/02-REFERENCIAS_MULTI_VIEW.md
+    modelo melhor.
+
+    ATENCAO A UMA AUDITORIA VELHA: o texto que estava aqui dizia que as quatro
+    vistas do lote "estao erradas" e que "nao existe perfil de 90 graus" — vinha
+    da auditoria de 25/08. CONFERIDO IMAGEM A IMAGEM em 27/08: e' verdade em
+    ALGUNS (o do Basalto e' um 3/4), mas FALSO em outros — o perfil da Veu e' um
+    90 graus de verdade (um olho, uma orelha, nenhum peito). Antes de repetir a
+    frase, abrir o arquivo. Foi assim que 18 magos quase foram gerados de novo
+    do zero por arte que ja existia.
     """
     arte = RAIZ / "personagens" / slug / "arte"
-    frente = arte / "_originais" / "master-reference-frente.png"
+    # RECORTE tem precedencia sobre a referencia mestra. Existe para o caso em
+    # que o concept aprovado tem, de proposito, MAIS DE UMA FIGURA — o
+    # Ilusionista e o reflexo dele, medido em 27/08: a Meshy modelou os dois
+    # colados num corpo so'. O reflexo e' peca separada (VFX ou segundo modelo);
+    # aqui vai o corpo solido. Quem cria o recorte deixa o arquivo ao lado da
+    # mestra e NAO mexe nela — a mestra continua sendo a arte aprovada.
+    recorte = arte / "_originais" / "frente-recorte.png"
+    frente = recorte if recorte.exists() else arte / "_originais" / "master-reference-frente.png"
     if not frente.exists():
         sys.exit(f"ERRO: falta {frente}\n"
                  f"       o atelie de arte nao vai para o git; veja personagens/00-LEIA.md")

@@ -178,6 +178,66 @@ func _check_model_pipeline() -> void:
 		"sem .glb importado, Mage cai no procedural")
 	_check_imported_model_contract()
 	_check_real_pyra_glb()
+	_check_elenco_vestido()
+
+
+## O ELENCO INTEIRO VESTIDO (27/08). Em 27/08 os 18 magos que faltavam sairam da
+## arte que JA' EXISTIA em personagens/*/arte/_originais/ — 30 creditos de malha
+## + 5 de rig cada — e receberam os clipes do Brok pela fusao do Blender.
+##
+## POR QUE ESTE TESTE EXISTE, e nao e' cerimonia: Mage.REQUIRED_ANIMS exige
+## idle/run/cast, e um modelo externo que nao tenha os tres e' REJEITADO — o Mage
+## cai no mago procedural e o personagem desaparece do jogo EM SILENCIO, sem uma
+## linha no console. E' o modo de falhar mais caro do pipeline de personagem:
+## paga-se 35 creditos por um mago que nunca aparece.
+##
+## O que ele cobra:
+##   1. todo mago do elenco tem arquivo .glb no lugar que model_path_for() procura
+##   2. todo modelo que existe resolve os TRES obrigatorios
+##   3. a contagem — para que apagar um modelo fique vermelho em vez de silencioso
+##
+## VERMELHO PROVADO em 27/08 renomeando godot/characters/modelos/veu.glb.
+func _check_elenco_vestido() -> void:
+	var mage_scr: GDScript = load("res://characters/Mage.gd")
+	var elenco_scr: GDScript = load("res://menu/Elenco.gd")
+	var total := 0
+	var com_modelo := 0
+	var vestidos := 0
+	var sem_modelo: Array = []
+	var sem_clipe: Array = []
+	for ficha in elenco_scr.MAGOS:
+		var slug := str(ficha.get("slug", ""))
+		if slug == "":
+			continue
+		total += 1
+		var caminho: String = mage_scr.model_path_for(slug)
+		if not ResourceLoader.exists(caminho):
+			sem_modelo.append(slug)
+			continue
+		com_modelo += 1
+		var m: Node3D = mage_scr.new()
+		root.add_child(m)
+		m.set_mage(slug)
+		## NAO BASTA has_anim(): quando o modelo externo e' REJEITADO o Mage cai no
+		## procedural, e o procedural TEM idle/run/cast — o teste passaria verde com
+		## o mago sumido do jogo, que e' exatamente o defeito silencioso que este
+		## bloco existe para pegar. Provado em 27/08: quebrando o alias do cast,
+		## esta linha continuava verde ate' passar a cobrar a FONTE.
+		var fonte := str(m.get_model_source())
+		var tres: bool = fonte.begins_with("external:") and bool(m.has_anim("idle")) 				and bool(m.has_anim("run")) and bool(m.has_anim("cast"))
+		if tres:
+			vestidos += 1
+		else:
+			sem_clipe.append(slug)
+		m.free()
+	_check(total >= 20, "o elenco tem %d magos" % total)
+	_check(sem_modelo.is_empty(),
+			"todo mago tem .glb: %d de %d (faltam: %s)"
+			% [com_modelo, total, ", ".join(sem_modelo) if not sem_modelo.is_empty() else "nenhum"])
+	_check(sem_clipe.is_empty(),
+			"todo mago VESTE o .glb (nao caiu no procedural): %d de %d (falharam: %s)"
+			% [vestidos, com_modelo,
+			", ".join(sem_clipe) if not sem_clipe.is_empty() else "nenhum"])
 
 
 func _check_imported_model_contract() -> void:
