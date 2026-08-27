@@ -76,6 +76,18 @@ const HZ_ALTIMETRO := 10.0
 ## o jogador olharia para a parede em vez do mapa que ele precisa ler.
 const PORTAO := Vector3(0.0, -6.0, 0.0)
 
+## A ABERTURA E' O CASTELO (ordem do Diretor, 26/08): "ele deve aparecer no
+## ceu, voando, como uma ilha flutuante — e nao a imagem de como vemos ele por
+## dentro; a camera fica mais distante". Enquanto se viaja, o pivô da camera
+## larga o ombro do mago (que esta' pendurado SOB a rocha — era por isso que a
+## abertura era um breu de pedra) e vai ao coracao do castelo, com o braco
+## recuado ate' aqui: a ilha voadora inteira contra o ceu, o mapa la' embaixo,
+## e o arrastar de olhar vira ORBITA em volta dela. No salto tudo volta ao
+## ombro — o corte e' o mesmo dos BRs. 90m enquadra os ~52m do castelo com
+## folga; DESCER aproxima (a rocha volta a encher a tela), SUBIR miniaturiza.
+const CAM_CASTELO_DIST := 90.0
+const CAM_CASTELO_ALVO := Vector3(0.0, 6.0, 0.0)
+
 ## Seed proprio dos bots: mexer no loot ou na zona nao pode mudar onde eles
 ## pousam (mesma regra dos outros sistemas deterministicos do projeto).
 const SEED_BOTS := 5171
@@ -99,6 +111,8 @@ var _t := 0.0                # relogio da rota do castelo
 var _meia_ilha := 0.0        # SIZE/2 do mapa desta partida (cache: ver _mover)
 var _vy := 0.0               # velocidade de DESCIDA, positiva (m/s)
 var _alt_acc := 0.0          # relogio do altimetro
+var _arm_len := -1.0         # braco original da camera, devolvido no salto
+var _arm_mask := 0
 
 
 ## A UNICA porta de entrada. Poe o player no castelo e devolve o no' que manda
@@ -176,6 +190,7 @@ func _ready() -> void:
 		(_player as Node3D).visible = false
 	_meia_ilha = Castelo.lado(_island) * 0.5
 	_anim("cair")   # no portao a pose de queda ja' le' como "prestes a saltar"
+	_cam_castelo(true)
 	Bus.queda_fase.emit(fase)
 
 
@@ -246,6 +261,7 @@ func saltar() -> bool:
 	# instante do salto — antes disso o castelo viaja vazio.
 	if _player is Node3D:
 		(_player as Node3D).visible = true
+	_cam_castelo(false)
 	_fase("caindo")
 	_anim("cair")
 	return true
@@ -355,10 +371,39 @@ func _fase(nova: String) -> void:
 
 ## A camera do Player e' reposicionada dentro do `_physics_process` dele, que
 ## esta' desligado — sem esta linha o mago cai e a camera fica no castelo.
+## No trajeto ("no_castelo") o pivô mora no CASTELO, nao no ombro (ver
+## CAM_CASTELO_DIST): e' o plano geral da ilha voadora que o Diretor pediu.
 func _camera() -> void:
 	var cam: Variant = _player.get("cam_yaw")
-	if cam is Node3D:
+	if not (cam is Node3D):
+		return
+	if fase == "no_castelo" and is_instance_valid(castelo):
+		(cam as Node3D).global_position = castelo.global_position + CAM_CASTELO_ALVO
+	else:
 		(cam as Node3D).global_position = _player.global_position + Vector3(0, 1.85, 0)
+
+
+## Liga/desliga o plano geral do castelo: braco da camera recuado e sem
+## colisao (a PROPRIA rocha encolheria o SpringArm e devolveria o breu).
+## Devolve exatamente o que encontrou — o ombro do mago nao e' desta maquina.
+func _cam_castelo(ligar: bool) -> void:
+	if not e_player:
+		return
+	var pitch: Variant = _player.get("cam_pitch")
+	if not (pitch is Node3D) or (pitch as Node3D).get_child_count() == 0:
+		return
+	var arm := (pitch as Node3D).get_child(0) as SpringArm3D
+	if arm == null:
+		return
+	if ligar:
+		_arm_len = arm.spring_length
+		_arm_mask = arm.collision_mask
+		arm.spring_length = CAM_CASTELO_DIST
+		arm.collision_mask = 0
+		_camera()   # ja' no frame zero — sem esperar o primeiro passo de fisica
+	elif _arm_len >= 0.0:
+		arm.spring_length = _arm_len
+		arm.collision_mask = _arm_mask
 
 
 ## Altimetro a HZ_ALTIMETRO. `velocidade` sai POSITIVA = descendo.

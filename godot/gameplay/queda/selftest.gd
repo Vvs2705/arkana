@@ -32,7 +32,7 @@ var _casts: Array = []       # spell_cast — tem que ficar VAZIO no ar
 ## das checagens nunca executadas (aconteceu na 1a rodada desta raia). Cada
 ## bloco se assina no fim; a assinatura que faltar VIRA FALHA.
 var _blocos: Array = []
-const BLOCOS := ["contrato", "rota", "castelo", "fases", "pouso", "sem_magia", "bots"]
+const BLOCOS := ["contrato", "rota", "castelo", "camera", "fases", "pouso", "sem_magia", "bots"]
 
 
 func _init() -> void:
@@ -62,6 +62,7 @@ func _run() -> void:
 	_test_contrato()
 	_test_rota()
 	_test_castelo()
+	_test_camera_castelo()
 	_test_fases()
 	_test_pouso_no_terreno()
 	_test_sem_magia()
@@ -113,6 +114,49 @@ func _passo(q: Node, n: int) -> void:
 		if not q.is_physics_processing():
 			return
 		_frame(q, q._player)
+
+
+## A ABERTURA E' O CASTELO (ordem do Diretor, 26/08): "ele deve aparecer no
+## ceu, voando, como uma ilha flutuante — e nao a imagem de como vemos ele por
+## dentro; a camera fica mais distante". No trajeto o pivô larga o ombro e vai
+## ao coracao do castelo com o braco recuado; no salto tudo volta ao ombro.
+## Vermelho provado removendo o desvio do pivô e o recuo do braco.
+func _test_camera_castelo() -> void:
+	print("[Camera: a abertura enquadra o castelo de FORA, voando]")
+	var arena := Node3D.new()
+	root.add_child(arena)
+	var ilha := _ilha(300.0, "return 0.0")
+	arena.add_child(ilha)
+	var p: CharacterBody3D = _player_scr.new()
+	arena.add_child(p)
+	var arm: SpringArm3D = p.cam_pitch.get_child(0) as SpringArm3D
+	var len0 := arm.spring_length
+	var mask0 := arm.collision_mask
+	var q: Node = _queda.iniciar(arena, ilha, p)
+	_frame(q, p)
+	var pivo: Node3D = p.cam_yaw
+	var castelo_pos: Vector3 = (q.castelo as Node3D).global_position
+	# O mago viaja COLADO no castelo (PORTAO), entao "perto do castelo" seria
+	# checagem vacua — o contrato e' LARGAR O OMBRO e subir ao coracao da rocha.
+	_check(pivo.global_position.distance_to(
+			p.global_position + Vector3(0, 1.85, 0)) > 5.0
+			and pivo.global_position.y > castelo_pos.y,
+			"no trajeto o pivô LARGA o ombro e sobe ao coracao do castelo")
+	_check(arm.spring_length >= 60.0,
+			"o braco recua para o plano geral (%.0fm)" % arm.spring_length)
+	_check(arm.collision_mask == 0,
+			"no ceu o braco nao colide (a propria rocha o encolheria)")
+	# o salto devolve a camera ao ombro do mago, exatamente como era
+	q.saltar()
+	_frame(q, p)
+	_check(is_equal_approx(arm.spring_length, len0),
+			"no salto o braco volta ao ombro (%.2f)" % len0)
+	_check(arm.collision_mask == mask0, "e a mascara de colisao volta")
+	_check(pivo.global_position.distance_to(
+			p.global_position + Vector3(0, 1.85, 0)) < 0.5,
+			"no salto o pivô volta ao mago")
+	arena.free()
+	_blocos.append("camera")
 
 
 ## OS BOTS CAEM JUNTO — pela MESMA lei do jogador.
