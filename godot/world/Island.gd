@@ -478,7 +478,11 @@ func height(x: float, z: float) -> float:
 	# sendo caminho (medido: com a crista cheia a rampa passava dos 45 graus do
 	# floor_max_angle padrao e o pico virava inalcancavel a pe').
 		var crag := 1.9 - 0.9 * ramp
-		h += wpk * (PEAK_H + crag * _noise.get_noise_2d(x * 2.0 - 400.0, z * 2.0 + 260.0) * 3.2)
+		## CRISTA MAIS FUNDA (3,2 -> 5,4 m). Medido no render de 27/08: com 3,2 a
+		## mesa era uma cupula LISA — de perto plastico, de longe mancha sem forma.
+		## A escarpa precisa de costela para o toon achar banda. A rampa subivel
+		## continua protegida porque `crag` anda ao contrario de `ramp`.
+		h += wpk * (PEAK_H + crag * _noise.get_noise_2d(x * 2.0 - 400.0, z * 2.0 + 260.0) * 5.4)
 
 	# --- DUNAS: areal costeiro com crista de vento ------------------------------
 	# A cota vira quase plana (2,2 m) e por cima entra uma onda DIRECIONAL de ~14 m
@@ -577,14 +581,65 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# 5) rocha por INCLINACAO e por altitude, as duas em rampa
 	# O corte de altitude subiu de 6,4-8,4 m para 11-15 m: com colinas de 12 m e
 	# plato de ruina em 9 m, o corte antigo pintaria de cinza METADE da ilha.
-	var wrk := maxf(smoothstep(0.74, 0.60, ny), smoothstep(12.5, 17.0, h))
-	c = c.lerp(COL_ROCK, wrk * 0.9)
+	## O LIMIAR ESTAVA FORA DA FAIXA REAL DO TERRENO. Era
+	## smoothstep(0.74, 0.60, ny), e MEDIDO em 27/08 sobre 25.484 amostras da ilha:
+	##   ny  p01 0,829 | p05 0,910 | p10 0,945 | p25 0,973 | mediana 0,988
+	## Ou seja a encosta MAIS INGREME da ilha e' 0,829 — a regra nunca disparava, e
+	## por isso o mapa era verde de ponta a ponta, sem uma face de rocha exposta.
+	## O comentario ao lado ate' avisava ("ny nunca cai de 0,73 aqui") e mesmo
+	## assim o numero ficou.
+	##
+	## Agora a faixa e' a REAL: 0,960 comeca a virar rocha (a encosta mais ingreme
+	## que ~12% do mapa tem) e 0,900 e' rocha cheia (os 5% mais ingremes). E a
+	## regra de ALTURA desceu de 12,5 para 10,5 m, porque a p75 do relevo e' 7,7 m
+	## A ROCHA SAI DA INCLINACAO AMPLA, nao do `ny` do vertice.
+	##
+	## Duas medicoes de 27/08 estao dentro desta linha:
+	##  1. o limiar antigo (0,74) estava FORA da faixa real do terreno — a encosta
+	##     mais ingreme da ilha e' ny 0,829 (p01 de 25.484 amostras), entao a regra
+	##     NUNCA disparava e o mapa era verde de ponta a ponta.
+	##  2. corrigindo o limiar para a faixa real, a EMENDA entre vertices vizinhos
+	##     saltou para 0,45 e o teste de fronteira de material barrou. `ny` e' de
+	##     altissima frequencia: entre dois vizinhos ele pula, e cor que pula e'
+	##     degrau.
+	##
+	## A inclinacao AMPLA (queda de cota sobre ~9 m de chao) muda devagar por
+	## construcao: ela descreve a ENCOSTA, nao a rugosidade. Rocha na encosta e' o
+	## que se quer; rocha na rugosidade e' chiado.
+	var passo_r := 4.5 * ESCALA
+	var dh := maxf(absf(height(x + passo_r, z) - height(x - passo_r, z)),
+			absf(height(x, z + passo_r) - height(x, z - passo_r))) / (2.0 * passo_r)
+	## dh e' tangente: 0 = plano, 0,30 ~ 17 graus, 0,62 ~ 32 graus.
+	## KNOB: baixar 0.30 espalha rocha por encosta mansa; subir devolve verde.
+	var wrk := maxf(smoothstep(0.30, 0.62, dh), smoothstep(10.5, 16.0, h))
+	c = c.lerp(COL_ROCK, wrk * 0.92)
+	## FACE DE ROCHA TEM PROFUNDIDADE. Sem isto a rocha entra como uma chapa
+	## cinza-azulada uniforme, que de longe le' igual a' campina — so' de outra
+	## cor. O ruido fino quebra a face em veio claro e fenda escura, que e' o que
+	## faz o toon achar banda no penhasco.
+	## FACE DE ROCHA TEM VEIO. Sem isto ela entra como chapa cinza-azulada
+	## uniforme — no render de 27/08 o macico do pico saiu com cara de concreto.
+	## Duas oitavas: `big` (~33 m base) quebra em bloco largo, `fine` (~9 m) da' o
+	## veio. Amplitude alta de proposito: pedra tem MAIS contraste interno que
+	## campina, e e' esse contraste que faz o toon achar banda no penhasco.
+	if wrk > 0.02:
+		c = c.lerp(c.darkened(0.46), wrk * big * 0.70)
+		c = c.lerp(c.darkened(0.28), wrk * fine * 0.55)
+		c = c.lerp(COL_STONE, wrk * smoothstep(0.46, 0.88, fine) * 0.42)
+		c = c.lerp(COL_MUD, wrk * smoothstep(0.62, 0.20, big) * 0.20)
 	# 5b) CUME do pico: acima de ~19 m so' existe o pico, e ele fica claro-frio.
 	#     E' a mancha que o jogador acha primeiro quando olha o mapa la' de cima.
 	# 20,5-27 m: a faixa acompanha o topo da mesa (28 m). Comecando cedo demais o pico fica
 	# branco e virava uma bolha sem relevo. Agora a encosta e' ROCHA (regra 5, que
 	# ja' pinta tudo acima de 17 m) e so' o cume batido de vento clareia.
-	c = c.lerp(COL_PEAK, smoothstep(20.5, 27.0, h) * 0.9)
+	## O CUME SO' NO ALTO, E FRACO. Com 20,5 m x 0,9 ele cobria o MACICO INTEIRO
+	## (o pico vai a 28 m e a mesa toda passa de 20) e apagava o veio da rocha —
+	## no render de 27/08 o pico saiu como uma cupula de concreto branco, sem
+	## forma. 25,5 m x 0,55 deixa a neve so' na tampa e a pedra aparecer embaixo.
+	## 0,72 e nao 0,55: a 0,55 o cume ficou perto DEMAIS do piso de pedra das
+	## ruinas (0,089 de diferenca) e o teste de leitura aerea barrou — os dois POIs
+	## precisam se distinguir de 200 m, que e' de onde o jogador escolhe onde cair.
+	c = c.lerp(COL_PEAK, smoothstep(24.0, 28.0, h) * 0.72)
 
 	# 6) areia da praia, tambem em rampa; o alagado nao vira praia
 	# Rampa LARGA (2,4m -> 0,5m de cota) E com o limiar puxado por ruido: sem o
