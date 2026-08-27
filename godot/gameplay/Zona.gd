@@ -177,10 +177,13 @@ static func plano(island: Node, p_seed := SEED_ZONA) -> Array:
 
 
 ## Centro novo dentro da folga. sqrt(randf()) para distribuir por AREA e nao
-## por raio (senao os centros se amontoam no meio). Rejeita agua pelo mesmo
-## corte de altura do BauCelestial — o circulo final nao pode ser um lago onde
-## ninguem pisa. ponytail: testa so' o ponto central; um circulo de 62m ainda
-## pode pegar o lago na borda, e deve mesmo (agua e' terreno, nao buraco).
+## por raio (senao os centros se amontoam no meio). Rejeita agua perguntando a
+## ILHA (`pode_pousar`) — o circulo final nao pode ser um lago onde ninguem pisa.
+## Era a janela 1.4-8.5 copiada do BauCelestial, cujo teto proibia o circulo
+## final no plato (9,0 m) e no pico (28 m): as duas unicas alturas de verdade do
+## mapa eram as duas onde a partida nunca podia terminar.
+## ponytail: testa so' o ponto central; um circulo de 62 m ainda pode pegar o
+## lago na borda, e deve mesmo (agua e' terreno, nao buraco).
 static func _sortear_centro(island: Node, rng: RandomNumberGenerator, c: Vector3,
 		folga: float) -> Vector3:
 	var ultimo := c
@@ -191,8 +194,7 @@ static func _sortear_centro(island: Node, rng: RandomNumberGenerator, c: Vector3
 		ultimo = p
 		if island == null or not is_instance_valid(island) or not island.has_method("height"):
 			return p
-		var h := float(island.height(p.x, p.z))
-		if h >= 1.4 and h <= 8.5:
+		if not island.has_method("pode_pousar") or island.pode_pousar(p.x, p.z):
 			return p
 	return ultimo  # ilha impossivel: aceita o ultimo palpite e o jogo segue
 

@@ -95,6 +95,7 @@ func _run() -> void:
 	_test_dodge()
 	_test_armas()
 	_test_loot()
+	_test_loot_na_ilha_real()
 	_test_loot_emissivo()
 	_test_bau()
 	_test_dono_dos_sinais()
@@ -1649,6 +1650,104 @@ func _pos_loot(mapa: Node3D) -> Array:
 	for l in mapa.get_children():
 		out.append([str(l.arma_id), (l as Node3D).global_position.snapped(Vector3.ONE * 0.001)])
 	return out
+
+
+## O LOOT CONTRA A ILHA DE VERDADE (27/08 — o furo que deixou o bug entrar).
+##
+## Os testes de loot que existiam passavam `null` ou uma ilha FALSA E PLANA
+## (height() devolvendo 3.0 sempre). Contra chao plano tudo cabe na janela de
+## altura e todo POI e' alcancavel, entao os dois defeitos reais passaram
+## VERDES por semanas dentro do APK:
+##   1. os 4 centros de POI do Loot eram copia congelada da ilha de 180 m, e o
+##      cajado mais proximo nascia a 23-41 m do POI (o das ruinas, FORA do plato)
+##   2. o corte `p.length() > 70` num mapa de LAND_R = 132 deixava 47% da ilha
+##      sem receber loot nenhum
+##
+## Por isso este teste instancia `world/Island.gd`. Um teste de distribuicao
+## contra terreno falso nao mede distribuicao, mede aritmetica.
+##
+## VERMELHO PROVADO: revertendo os POIs para os numeros antigos, ou devolvendo
+## o corte de 70 m, ou devolvendo o teto de 8,5 m — cada um sozinho derruba
+## uma linha diferente daqui.
+func _test_loot_na_ilha_real() -> void:
+	print("[Loot na ilha REAL: cajado no POI, ilha inteira servida, plato liberado]")
+	var isl_scr: GDScript = load("res://world/Island.gd")
+	var loot_scr: GDScript = load("res://gameplay/Loot.gd")
+	var isl: Node3D = isl_scr.new()
+	root.add_child(isl)
+
+	# A ILHA responde as duas perguntas novas (o contrato que Loot/Bau/Zona usam)
+	_check(isl.has_method("pode_pousar") and isl.has_method("pois"),
+			"a ilha responde pode_pousar() e pois() — ninguem mais adivinha")
+	_check(isl.pode_pousar(isl_scr.RUINS.x, isl_scr.RUINS.y),
+			"PLATO DAS RUINAS (%.1f m) e' chao valido — o teto de 8,5 proibia" 			% isl.height(isl_scr.RUINS.x, isl_scr.RUINS.y))
+	_check(isl.pode_pousar(isl_scr.PEAK.x, isl_scr.PEAK.y),
+			"TOPO DO PICO (%.1f m) e' chao valido — final em terreno alto existe" 			% isl.height(isl_scr.PEAK.x, isl_scr.PEAK.y))
+	_check(not isl.pode_pousar(isl_scr.LAKE.x, isl_scr.LAKE.y), "o meio do LAGO nao serve")
+	_check(not isl.pode_pousar(isl_scr.MARSH.x, isl_scr.MARSH.y), "o meio do ALAGADO nao serve")
+	_check(not isl.pode_pousar(isl_scr.LAND_R + 20.0, 0.0), "o MAR nao serve")
+
+	var mapa := Node3D.new()
+	root.add_child(mapa)
+	var n: int = loot_scr.espalhar(mapa, isl)
+	var total: int = int(loot_scr.QTD_VARINHA) + int(loot_scr.QTD_CAJADO)
+	_check(n == total, "na ilha real nasceram %d de %d loots" % [n, total])
+
+	# 1 CAJADO POR POI — o contrato do GDD, medido em metros
+	var cajados: Array[Vector2] = []
+	var mais_longe := 0.0
+	for c in mapa.get_children():
+		if c.get_script() != loot_scr:
+			continue
+		var xz := Vector2(c.position.x, c.position.z)
+		mais_longe = maxf(mais_longe, xz.length())
+		if str(c.arma_id) == "cajado":
+			cajados.append(xz)
+	# A regra com dentes nao e' uma tolerancia em metros, e' PAREAMENTO: cada
+	# cajado tem que ter como POI mais proximo o SEU. Com os centros congelados
+	# antigos isto caia na hora (os quatro apontavam para o lugar errado), e
+	# nenhuma tolerancia precisa ser inventada.
+	#
+	# MEDIDO depois da correcao: ruinas 12,5 m / floresta 14,8 m / lago 36,8 m /
+	# alagado 38,8 m. Os dois POIs de AGUA ficam longe do centro de proposito —
+	# lago e alagado sao bacias molhadas ate' ~48 m (o lerp de height()), e o
+	# cajado pousa na BEIRA seca, que e' onde ele devia estar. Por isso o teto
+	# absoluto e' a bacia (R + 26), nao o raio da cava.
+	var raios := {"alagado": isl_scr.MARSH_R, "floresta": isl_scr.FOREST_R,
+			"lago": isl_scr.LAKE_R, "ruinas": isl_scr.RUINS_R}
+	var pois: Dictionary = isl.pois()
+	for nome in pois:
+		var centro: Vector2 = pois[nome]
+		var perto := 1e9
+		var meu := Vector2.ZERO
+		for cj in cajados:
+			if cj.distance_to(centro) < perto:
+				perto = cj.distance_to(centro)
+				meu = cj
+		var dono: String = str(nome)
+		for outro in pois:
+			if meu.distance_to(pois[outro]) < meu.distance_to(pois[dono]):
+				dono = outro
+		_check(dono == str(nome), "o cajado mais proximo do POI %s pertence a ELE" % nome)
+		# O TETO E' DERIVADO DO POI, nao uma folga chutada — e a diferenca importa:
+		# com uma folga generosa (raio + 26 m) este teste passava VERDE com o bug
+		# dentro dele. Provado em 27/08 rodando a mutacao.
+		#
+		# Se da' para FICAR EM PE' no centro do POI (floresta, ruinas), o cajado
+		# tem que estar DENTRO do raio dele — 30 m fora do plato de 20 m nao e'
+		# "no POI", e' na colina ao lado. Se o centro e' agua (lago, alagado), o
+		# cajado pousa na beira seca de proposito, e o teto e' a bacia molhada
+		# (o lerp de height() morre em R + 26).
+		var seco: bool = isl.pode_pousar(centro.x, centro.y)
+		var teto: float = float(raios[nome]) + (0.0 if seco else 26.0)
+		_check(perto <= teto, "cajado do POI %s a %.1f m do centro (%s: teto %.0f m)" 				% [nome, perto, "chao seco" if seco else "bacia d'agua", teto])
+
+	# A ILHA INTEIRA e' servida: com o corte de 70 m nada passava dos 70
+	_check(mais_longe > 70.0,
+			"loot chega a %.1f m do centro — o corte de 70 m em LAND_R %.0f " 			% [mais_longe, isl_scr.LAND_R] + "deixava metade da ilha vazia")
+
+	isl.free()
+	mapa.free()
 
 
 func _test_restart() -> void:

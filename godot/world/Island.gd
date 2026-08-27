@@ -273,6 +273,41 @@ func agua_y(x: float, z: float) -> float:
 	return SECO
 
 
+## PRAIA — cota abaixo da qual nada de gameplay pousa. A areia molhada e' rota,
+## nao chao de spawn: um cajado na linha d'agua le' como se tivesse caido do
+## mar. Numero herdado dos 1,4 m que Loot, BauCelestial e Zona cravavam cada um
+## no seu arquivo (ver pode_pousar).
+const PRAIA_Y := 1.4
+
+
+## PODE POUSAR AQUI? Chao SECO acima da praia — a pergunta que loot, bau e zona
+## faziam com a MESMA janela cravada (1,4 a 8,5 m) em tres arquivos diferentes,
+## cada um comentando "mesmo corte do outro".
+##
+## MEDIDO EM 27/08/2026, com a ilha real: as tres copias erravam identico. O teto
+## de 8,5 m proibia o PLATO DAS RUINAS (9,0 m exatos) e o TOPO DO PICO (28 m) —
+## os dois unicos POIs do mapa com altura de verdade eram os dois onde nada podia
+## nascer. Nao ha' teto aqui de proposito: o pico tem uma encosta subivel
+## (PEAK_FACE) e final em terreno alto e' o que um battle royale quer.
+##
+## O piso e' DERIVADO, nao adivinhado: agua_y() ja' sabe onde e' lago, alagado e
+## mar (fonte unica com _build_water), e PRAIA_Y tira a faixa de areia.
+func pode_pousar(x: float, z: float) -> bool:
+	return agua_y(x, z) == SECO and height(x, z) >= PRAIA_Y
+
+
+## OS 4 POIs, para quem espalha coisa. Existe porque Loot.gd guardava uma COPIA
+## CONGELADA destes centros: a ilha cresceu de 180 m para 300 m, os quatro numeros
+## nao vieram, e os quatro cajados passaram a nascer a 23-41 m dos seus POIs — o
+## contrato "1 cajado por POI" estava quebrado dentro do APK. Quem desenha o POI
+## e' quem diz onde ele esta'.
+##
+## A ORDEM importa (o loot cicla elemento por indice, e o determinismo do mapa de
+## loot vem daqui): alfabetica, e POI novo entra no FIM, nunca no meio.
+func pois() -> Dictionary:
+	return {"alagado": MARSH, "floresta": FOREST, "lago": LAKE, "ruinas": RUINS}
+
+
 func height(x: float, z: float) -> float:
 	var p := Vector2(x, z)
 	var r := p.length()

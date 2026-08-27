@@ -23,14 +23,22 @@ const ALTURA := 0.85         # m do chao ate' o centro do modelo
 ## distancia, nao lanterna (o toon do projeto e' estilizado, nao neon).
 const EMISSAO_CORPO := 0.35
 
-## Centros dos POIs — ESPELHO de world/Island.gd (raia MUNDO). Duplicados de
-## proposito: `world/` e' de outra raia e o loot nao pode depender do formato
-## interno dela. Se a ilha mudar os POIs, muda estes 4 numeros.
+## FALLBACK dos centros de POI — usado SO' quando nao ha' ilha (teste, mundo de
+## emergencia). A fonte de verdade e' `island.pois()`.
+##
+## POR QUE NAO E' MAIS ESPELHO: ate' 27/08/2026 estes quatro numeros eram uma
+## copia declarada "de proposito" dos POIs da ilha. A ilha foi de 180 m para
+## 300 m, os numeros ficaram — e os quatro erravam por exatamente 0,60 (180/300).
+## MEDIDO: o cajado mais proximo de cada POI nascia a 23, 29, 30 e 41 m do
+## centro; o das ruinas caia FORA do proprio plato (RUINS_R = 20 m). O contrato
+## "1 cajado por POI" estava quebrado no APK, e o teste nao pegava porque
+## testava contra uma ilha falsa e plana. Copia de dado que muda apodrece: agora
+## se pergunta.
 const POIS := {
-	"alagado": Vector2(-42, 36),
-	"floresta": Vector2(-36, -40),
-	"lago": Vector2(45, 18),
-	"ruinas": Vector2(38, -44),
+	"alagado": Vector2(-70, 60),
+	"floresta": Vector2(-60, -66),
+	"lago": Vector2(75, 30),
+	"ruinas": Vector2(63, -73),
 }
 
 ## QUANTOS NASCEM (KNOBs — a curva de poder da partida mora aqui):
@@ -294,9 +302,12 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 	# cajados: 1 por POI — ir ao ponto de interesse tem que pagar.
 	# A ordem das chaves de um Dictionary const e' a de declaracao (por isso
 	# elas estao em ordem alfabetica la' em cima): determinismo sem sort.
-	var nomes: Array = POIS.keys()
+	var pois: Dictionary = POIS
+	if island != null and is_instance_valid(island) and island.has_method("pois"):
+		pois = island.pois()
+	var nomes: Array = pois.keys()
 	for i in mini(QTD_CAJADO, nomes.size()):
-		var c: Vector2 = POIS[nomes[i]]
+		var c: Vector2 = pois[nomes[i]]
 		var a := rng.randf() * TAU
 		if _por(parent, island, rng, "cajado",
 				c + Vector2(cos(a), sin(a)) * rng.randf_range(6.0, 15.0),
@@ -305,9 +316,12 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 	return n
 
 
-## Tenta pousar um loot perto de `alvo`. Rejeita agua, praia e mar pela ALTURA
-## do terreno (o lago fica em -2.4 e o alagado em 0.45 — o corte em 1.4 exclui
-## os dois sem o loot precisar conhecer o formato da ilha).
+## Tenta pousar um loot perto de `alvo`. Quem decide se o chao serve e' a ILHA
+## (`pode_pousar`: seco e acima da praia) — o loot nao repete janela de altura.
+## O corte antigo aqui era `h < 1.4 or h > 8.5` E um raio cravado de 70 m: o teto
+## banhava o plato das ruinas (9,0 m) e o raio deixava 47% da ilha (LAND_R = 132)
+## sem loot nenhum. O raio saiu de vez — `pode_pousar` ja' rejeita mar e agua, que
+## era a unica coisa que ele protegia.
 static func _por(parent: Node3D, island: Node, rng: RandomNumberGenerator,
 		arma_id_: String, alvo: Vector2, elemento_ := "fire") -> bool:
 	## A busca ABRE a cada tentativa (4m -> 37m). Sem isso o cajado do lago e o
@@ -318,12 +332,10 @@ static func _por(parent: Node3D, island: Node, rng: RandomNumberGenerator,
 		var busca := 4.0 + float(tentativa) * 3.0
 		var p := alvo if tentativa == 0 else alvo + Vector2(
 				rng.randf_range(-busca, busca), rng.randf_range(-busca, busca))
-		if p.length() > 70.0:
-			continue
 		var h := 1.0
 		if island != null and is_instance_valid(island) and island.has_method("height"):
 			h = float(island.height(p.x, p.y))
-			if h < 1.4 or h > 8.5:
+			if island.has_method("pode_pousar") and not island.pode_pousar(p.x, p.y):
 				continue
 		var l := criar(arma_id_, PackedStringArray(), elemento_)
 		parent.add_child(l)

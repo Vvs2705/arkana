@@ -82,9 +82,10 @@ static func agendar(parent: Node3D, island: Node, p_seed := Loot.SEED_LOOT) -> B
 	return b
 
 
-## Ponto de pouso: anel de campo aberto, longe do centro e longe da agua.
-## Mesmo corte de altura do Loot (1.4 a 8.5) — lago e alagado ficam de fora
-## sem que o bau precise conhecer o formato interno da ilha.
+## Ponto de pouso: anel de campo aberto, longe do centro e longe da agua. Quem
+## diz se o chao serve e' a ILHA (`pode_pousar`). Antes era a janela 1.4-8.5
+## copiada do Loot — e o teto proibia o bau no plato das ruinas (9,0 m), que e'
+## exatamente o tipo de lugar onde um bau lendario devia poder cair.
 static func _ponto(island: Node, rng: RandomNumberGenerator) -> Vector3:
 	for _tentativa in 16:
 		var ang := rng.randf() * TAU
@@ -93,7 +94,7 @@ static func _ponto(island: Node, rng: RandomNumberGenerator) -> Vector3:
 		var h := 1.0
 		if island != null and is_instance_valid(island) and island.has_method("height"):
 			h = float(island.height(p.x, p.y))
-			if h < 1.4 or h > 8.5:
+			if island.has_method("pode_pousar") and not island.pode_pousar(p.x, p.y):
 				continue
 		return Vector3(p.x, h, p.y)
 	return Vector3(0.0, 1.0, 0.0)  # ilha impossivel: cai no centro e o jogo segue
