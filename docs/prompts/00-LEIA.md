@@ -55,3 +55,14 @@ aprovação da imagem.**
 | 06 | Ruínas — estátuas e arcos | POI RUINS vira lore |
 | 07 | Torre Arcana | landmark com função de gameplay |
 | 08 | Altar de Sintonia | o monumento do pilar do jogo |
+
+## Os PERSONAGENS ficam em `personagens/`
+
+Ordem do Diretor de 27/08 (*"também já deixar criado as artes dos demais
+personagens"*): os prompts dos **18 magos sem modelo 3D** vivem em
+[`personagens/`](personagens/), um arquivo por mago —
+[`personagens/00-FILA.md`](personagens/00-FILA.md) é a ordem de produção e o
+custo em crédito, e [`personagens/00-REGRA-DAS-VISTAS.md`](personagens/00-REGRA-DAS-VISTAS.md)
+traz a lição do ângulo (o perfil de 90° que não existe no lote de 24/08) e os
+três blocos comuns — âncora de estilo, enquadramento de vista e negative base.
+Pyra (01) e Brok (13) ficam fora: já têm modelo.
