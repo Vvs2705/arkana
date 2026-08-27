@@ -87,17 +87,38 @@ passo, com vermelho provado. Branch `claude/whatsapp-video-review-799b24`.
    **Os dois docs esperam o martelo do Diretor** (lista dos 10, nome da moeda,
    valores, e quais pares de fusao estreiam).
 
-**PYRA — aprovada por ele e em producao no site.** A geracao nativa
-multi-view passou no olho do Diretor ("pode incluir ela"). Estado: **remesh
-para 10K triangulos rodando** (gratis; o rig exige < 200k e o orcamento do
-projeto e' 15k/heroi). Depois: rig Humanoide com **altura 1,78** → os mesmos
-clipes do Brok (biblioteca: Mage Spell Cast — obrigatorio, o export omite o
-cast —, Caindo, Nadar ×2, Agachar-se Pegar, Gemido, Parado 1) + os 2
-Movimentos de IA **ja' pagos** na conta (Planar horizontal v2 = planar bom;
-Planar glide = mergulho) → download rigged/todos/arquivo unico →
-**SUBSTITUICAO inteira** do `godot/characters/modelos/pyra.glb` (o esqueleto
-novo != o do repo, entao NAO e' fusao) → `characters/selftest` (1,78 m) +
-clipes conferidos no motor. Saldo Meshy: **2.984**.
+**PYRA — aprovada, riggada e com 11 clipes; falta SO' o gesto de disparo.**
+Estado no site (conta dele): geracao nativa multi-view aprovada -> **remesh 10.360
+faces / 4.992 vertices** (gratis) -> **rig Humanoide com altura 1,78** ->
+**11 clipes aplicados**: Planar (glide), Planar horizontal v2, Agachar-se
+Pegar, Andando, Caindo, Correndo, Gemido (derrubado), Mage Spell Cast, Nadar
+Parado, Nadar para frente, Parado 1. **NAO foi baixada ainda** — falta o cast.
+
+**O CAST E' O UNICO ITEM ABERTO (ordem do Diretor, 27/08):** *"o movimento de
+spell magic e' mais para magias que vem do chao e nosso objetivo e' disparo de
+magia... quero que ele fique com a mao estendida ou simulando jogando algo como
+na vida real, de filmes, animes"*. Duas geracoes por Texto para Motion (20
+creditos) NAO acertaram: a 1a fez arremesso por cima da cabeca + agachada, a 2a
+levantou o braco ao lado da cabeca (aceno). As duas foram descartadas.
+Caminhos que sobraram, em ordem de custo:
+1. **as 5 variantes gratuitas** da biblioteca (Mage Spell Cast 1..5) e os
+   vizinhos "Atacar" / "Correr e Atirar" / "Tiro Lateral" — aplicar e olhar
+   custa ZERO credito;
+2. **Video para Motion**: o Diretor grava 3s fazendo o gesto (ou um clipe de
+   referencia) e o Meshy converte — e' o caminho mais certeiro para um gesto
+   especifico;
+3. outra tentativa de texto com fraseado diferente (10 creditos, incerto).
+**Saldo: 2.964.**
+
+**Ao baixar (depois do cast resolvido):** rigged + todos + arquivo unico. Ai vem
+uma armadilha JA' conhecida: os clipes de IA (os planars e o cast novo) entram
+no .glb com **nome UUID**, nao com o nome que se digita — o `Mage.gd` resolve
+por ALIAS, entao e' obrigatorio um passe no Blender renomeando UUID -> alias
+(cair/planar/pegar/derrubado/nadar/cast) antes de virar `pyra.glb`. Sem isso o
+`cast` nao resolve, e sem `cast` o Mage REJEITA o modelo externo e cai no mago
+procedural — a Pyra sumiria de novo. O `tools/blender/fundir_animacoes.py` ja'
+faz esse mapeamento por substring; para ela e' SUBSTITUICAO (esqueleto novo),
+nao fusao.
 
 **Armadilha nova do navegador, anotada:** a janela do Chrome mudou de escala e
 os cliques por coordenada passaram a desviar — no Meshy, clicar por `ref` do
