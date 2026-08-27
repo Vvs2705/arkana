@@ -27,6 +27,26 @@ uniform float sheen : hint_range(0.0, 1.0) = 0.0;          // brilho duro (pedra
 uniform float sheen_sharp : hint_range(4.0, 64.0) = 22.0;
 uniform float macro_noise : hint_range(0.0, 0.5) = 0.0;    // manchas (terreno)
 uniform float macro_scale = 0.35;
+// OITAVA DE PERTO (27/08). O chao tinha SO' a mancha grande (macro_scale 0.19 =
+// onda de ~5 m), e a 2 m do olho isso e' uma superficie lisa: o render de dentro
+// do jogo mostrou campina de plastico. Esta oitava tem ~1,5 m e amplitude
+// pequena — nao desenha nada que se note, quebra a chapadura que se nota.
+// Custa UM hash a mais, e so' para quem liga (branch em uniform).
+uniform float detail_noise : hint_range(0.0, 0.4) = 0.0;
+uniform float detail_scale = 0.65;
+// TEXTURA DE CHAO (27/08). O shader era "sem textura" por orcamento, e por isso
+// o chao lia como PLASTICO: cor de vertice + uma oitava de hash nao fazem
+// superficie. UMA amostra de textura em cinza, LADRILHADA em espaco de mundo
+// (nao precisa de UV no terreno), resolve o que tres oitavas de ruido nao
+// resolviam — e custa uma amostra, nao tres hashes.
+//   * cinza, nao colorida: a COR continua vindo do vertice, entao toda a logica
+//     de bioma (praia, lama, rocha, cume) segue valendo sem tocar em nada.
+//   * duas texturas (chao e rocha) misturadas pelo MESMO peso de rocha que a
+//     cor de vertice usa, passado em COLOR.a pelo gerador do terreno.
+uniform sampler2D tex_chao : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D tex_rocha : source_color, filter_linear_mipmap, repeat_enable;
+uniform float tex_forca : hint_range(0.0, 1.0) = 0.0;
+uniform float tex_escala = 0.22;   // 1/m: 0,22 = ladrilho de ~4,5 m
 
 varying vec3 wpos;
 
@@ -58,6 +78,27 @@ void fragment() {
 		// olho: so' escurecer desenhava borroes cinzentos que leem como sujeira
 		// no chao; puxar pro amarelo le' como capim seco e some no conjunto.
 		col = mix(col, col * vec3(1.06, 0.88, 0.62), n * macro_noise * 2.0);
+	}
+	if (detail_noise > 0.0) {
+		// Duas amostras defasadas: uma so' desenha um xadrez visivel quando a
+		// camera fica rente ao chao (o filtro do vnoise e' quadrado).
+		float d = vnoise(wpos.xz * detail_scale) * 0.65
+				+ vnoise(wpos.xz * detail_scale * 2.7 + 31.0) * 0.35;
+		// So' BRILHO, nao matiz: matiz nesta escala vira sujeira. O terreno ja'
+		// tem a variacao de cor na cor de vertice.
+		col *= mix(1.0 - detail_noise, 1.0 + detail_noise, d);
+	}
+	if (tex_forca > 0.0) {
+		// Duas escalas do MESMO ladrilho, defasadas: mata a repeticao visivel do
+		// ladrilho de 4,5 m, que a 200 m de vista aparece como xadrez.
+		vec2 uv = wpos.xz * tex_escala;
+		float g = texture(tex_chao, uv).r * 0.65
+				+ texture(tex_chao, uv * 0.37 + 0.5).r * 0.35;
+		float r = texture(tex_rocha, uv * 1.7).r;
+		// COLOR.a carrega o peso de rocha que o terreno ja' calculou por
+		// inclinacao ampla e altura. Uma fonte para a cor e para a textura.
+		float m = mix(g, r, COLOR.a);
+		col *= mix(1.0, m * 1.35, tex_forca);
 	}
 	ALBEDO = col;
 	ROUGHNESS = 1.0;

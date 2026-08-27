@@ -241,8 +241,24 @@ func _ready() -> void:
 	_toon_terrain = _toon.duplicate()
 	_toon_terrain.set_shader_parameter("bands", 4.0)
 	_toon_terrain.set_shader_parameter("band_soft", 0.22)
-	_toon_terrain.set_shader_parameter("macro_noise", 0.11)
+	## MANCHA GRANDE MAIS FORTE e OITAVA DE PERTO ligada (27/08). Com 0,11 de
+	## mancha e nada de detalhe, o render de dentro do jogo mostrou campina de
+	## plastico: a 2 m do olho o chao era uma superficie lisa de uma cor so'.
+	## 0,17 na mancha da' regiao; 0,085 no detalhe tira a chapadura sem virar
+	## granulado. KNOB: subir detail_noise faz o chao cocar; descer volta o plastico.
+	_toon_terrain.set_shader_parameter("macro_noise", 0.17)
 	_toon_terrain.set_shader_parameter("macro_scale", 0.19)
+	_toon_terrain.set_shader_parameter("detail_noise", 0.085)
+	_toon_terrain.set_shader_parameter("detail_scale", 0.65)
+	_toon_terrain.set_shader_parameter("tex_chao",
+			load("res://world/textura/detalhe-chao.png"))
+	_toon_terrain.set_shader_parameter("tex_rocha",
+			load("res://world/textura/detalhe-rocha.png"))
+	## 0,55 e nao 1,0: a textura QUEBRA a superficie, nao pinta o chao. A cor
+	## continua vindo do vertice — e o que garante que praia, lama, musgo das
+	## ruinas e cume do pico continuem legiveis de 200 m.
+	_toon_terrain.set_shader_parameter("tex_forca", 0.55)
+	_toon_terrain.set_shader_parameter("tex_escala", 0.22)
 	_toon_terrain.set_shader_parameter("rim_strength", 0.06)  # chao nao tem silhueta
 	# Pedra: sheen duro no topo do bloco = a unica coisa que vende "material duro"
 	# num toon; a ruina para de parecer papelao recortado.
@@ -663,7 +679,13 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	c = c.lerp(COL_SAND, smoothstep(2.5, 0.15, h) * dry)
 	# 7) faixa MOLHADA na linha d'agua: areia perto do nivel do mar escurece. E' o
 	#    detalhe que separa "praia desenhada" de "praia molhada" e custa um lerp.
-	return c.lerp(c.darkened(0.28), smoothstep(1.7, 0.0, h))
+	c = c.lerp(c.darkened(0.28), smoothstep(1.7, 0.0, h))
+	## O ALFA CARREGA O PESO DE ROCHA. O terreno e' opaco, entao o canal estava
+	## livre — e o shader precisa saber onde e' pedra para trocar a textura de
+	## chao pela de rocha. Passar o peso que a COR ja' calculou e' uma fonte so':
+	## textura e cor nunca podem discordar sobre onde comeca o penhasco.
+	c.a = clampf(wrk, 0.0, 1.0)
+	return c
 
 
 ## AO DE VERTICE (G3) — o substituto barato do SSAO, que NAO existe no renderer
@@ -718,7 +740,7 @@ func _build_terrain(parent: Node3D) -> void:
 			norms[i] = nrm
 			var c := _lin(_vcolor(x, z, h, nrm.y))
 			var ao := _terrain_ao(x, z, h, nrm.y)   # AO multiplica em LINEAR
-			cols[i] = Color(c.r * ao, c.g * ao, c.b * ao)
+			cols[i] = Color(c.r * ao, c.g * ao, c.b * ao, c.a)
 	for iz in QUADS:
 		for ix in QUADS:
 			var a := iz * n1 + ix
@@ -1276,8 +1298,12 @@ func _grass_mesh() -> ArrayMesh:
 		var a := TAU * float(k) / 3.0 + 0.4
 		var d := Vector3(cos(a), 0, sin(a))
 		var side := Vector3(-d.z, 0, d.x)
-		var w := 0.085
-		var hgt := rng.randf_range(0.44, 0.74)
+		## LAMINA MENOR (27/08). Era 0,085 de largura e 0,44-0,74 m de altura: no
+		## render de dentro do jogo a grama saiu como ESPETO — cada tufo lia como
+		## objeto, nao como textura do chao, e era o que mais destoava das pecas
+		## esculpidas do kit. Grama tem que sumir no conjunto.
+		var w := 0.055
+		var hgt := rng.randf_range(0.26, 0.44)
 		var lean := d * rng.randf_range(0.05, 0.16)
 		var root := d * 0.05
 		var b0 := root - side * w
