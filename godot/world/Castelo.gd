@@ -46,8 +46,15 @@ const MARGEM := 0.62
 ## metade do mapa longe demais; DIMINUIR = todo mundo cai no mesmo lugar.
 const DESVIO := 0.18
 
-## Seed proprio: mexer no loot (Loot.gd) ou nos circulos (Zona.gd) nao pode
-## mudar por onde o castelo passa.
+## Seed de FALLBACK, usado SO' EM TESTE (proprio: mexer no loot ou nos circulos
+## nao pode mudar por onde o castelo passa).
+##
+## EM PARTIDA A ROTA E' SORTEADA — ver `criar`. Era este 3103 cravado, e o
+## resultado e' o mesmo defeito que a Zona tinha: o castelo cruzava a ilha pela
+## MESMA linha em toda partida que o jogo jamais rodou. Com rota fixa, o mapa
+## inteiro de decisao da abertura ("de onde eu salto?") tem UMA resposta certa
+## decorada, e a metade do mapa longe da rota nunca e' visitada por ninguem.
+## Ordem do Diretor (27/08), a mesma dos circulos: nada fixo que se possa decorar.
 const SEED_ROTA := 3103
 
 ## So' o FALLBACK de quando nao ha' ilha para consultar (selftest, cena solta).
@@ -56,6 +63,9 @@ const SEED_ROTA := 3103
 const LADO_PADRAO := 180.0
 
 var plano: Dictionary = {}   # {inicio: Vector3, fim: Vector3, duracao: float}
+## O seed DESTA rota. Guardado para a rede poder transmiti-lo (mesma razao de
+## Zona.seed_da_partida).
+var seed_da_rota := SEED_ROTA
 
 
 ## Lado do terreno em metros, LIDO da constante de quem esta' no mapa. Nao ha'
@@ -90,10 +100,21 @@ static func rota(lado_m: float, p_seed := SEED_ROTA) -> Dictionary:
 
 ## Poe um castelo em rota sobre `parent` (a Arena da partida: restart = castelo
 ## novo, sem nada atravessando partida).
-static func criar(parent: Node3D, island: Node, p_seed := SEED_ROTA) -> Castelo:
+##
+## A ROTA E' SORTEADA A CADA PARTIDA (`p_seed < 0`), pela mesma lei da Zona: o
+## determinismo vale DENTRO da partida (a rota inteira sai de um seed, calculada
+## de uma vez em `rota()`), nao entre partidas. Passe o seed a mao e ela se
+## repete — e' o que o selftest usa e o que o servidor vai transmitir.
+static func criar(parent: Node3D, island: Node, p_seed := -1) -> Castelo:
 	var c := _instanciar()
 	c.name = "Castelo"
-	c.plano = rota(lado(island), p_seed)
+	var s := p_seed
+	if s < 0:
+		var sorteio := RandomNumberGenerator.new()
+		sorteio.randomize()
+		s = int(sorteio.randi())
+	c.seed_da_rota = s
+	c.plano = rota(lado(island), s)
 	parent.add_child(c)
 	return c
 

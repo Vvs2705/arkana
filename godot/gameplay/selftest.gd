@@ -1347,10 +1347,33 @@ func _test_bau() -> void:
 	var c: Node3D = bau_scr.agendar(mapa, null, 4242)
 	_check(a.global_position.distance_to(c.global_position) > 0.001,
 			"seed diferente = ponto de pouso diferente")
+	## O ANEL E' FRACAO DO RAIO DE TERRA, para valer em qualquer tamanho de mapa.
+	var rt: float = float(bau_scr.RAIO_TERRA_PADRAO)
+	var r_min: float = float(bau_scr.RAIO_MIN_F) * rt
+	var r_max: float = float(bau_scr.RAIO_MAX_F) * rt
 	var raio := Vector2(a.global_position.x, a.global_position.z).length()
-	_check(raio >= float(bau_scr.RAIO_MIN) - 0.01 and raio <= float(bau_scr.RAIO_MAX) + 0.01,
+	_check(raio >= r_min - 0.01 and raio <= r_max + 0.01,
 			"pousa em campo ABERTO: anel de %.0f a %.0fm do centro (medido %.1fm)"
-			% [float(bau_scr.RAIO_MIN), float(bau_scr.RAIO_MAX), raio])
+			% [r_min, r_max, raio])
+
+	## E ACOMPANHA O MAPA: numa ilha com o dobro do raio o anel dobra junto. Com os
+	## 18/48 metros cravados de antes, o bau lendario de um mapa de 264 m de raio
+	## cairia sempre no miolo e a metade de fora nunca veria um.
+	var ilha_scr := GDScript.new()
+	ilha_scr.source_code = "extends Node3D
+func raio_terra() -> float:
+	return %f
+" % (rt * 2.0)
+	ilha_scr.reload()
+	var ilha_grande: Node3D = ilha_scr.new()
+	mapa.add_child(ilha_grande)
+	var g: Node3D = bau_scr.agendar(mapa, ilha_grande)
+	var rg := Vector2(g.global_position.x, g.global_position.z).length()
+	_check(rg > r_max,
+			"mapa com o dobro do raio: o bau pousa a %.0fm, fora do anel antigo (max %.0fm)"
+			% [rg, r_max])
+	g.queue_free()
+	ilha_grande.queue_free()
 	b.queue_free()
 
 	# --- A QUEDA: o relogio do proprio bau leva ESPERANDO -> CAINDO -> POUSADO
@@ -1713,11 +1736,9 @@ func _test_loot_na_ilha_real() -> void:
 	# lago e alagado sao bacias molhadas ate' ~48 m (o lerp de height()), e o
 	# cajado pousa na BEIRA seca, que e' onde ele devia estar. Por isso o teto
 	# absoluto e' a bacia (R + 26), nao o raio da cava.
-	var raios := {"alagado": isl_scr.MARSH_R, "floresta": isl_scr.FOREST_R,
-			"lago": isl_scr.LAKE_R, "ruinas": isl_scr.RUINS_R}
 	var pois: Dictionary = isl.pois()
 	for nome in pois:
-		var centro: Vector2 = pois[nome]
+		var centro: Vector2 = pois[nome].centro
 		var perto := 1e9
 		var meu := Vector2.ZERO
 		for cj in cajados:
@@ -1726,7 +1747,7 @@ func _test_loot_na_ilha_real() -> void:
 				meu = cj
 		var dono: String = str(nome)
 		for outro in pois:
-			if meu.distance_to(pois[outro]) < meu.distance_to(pois[dono]):
+			if meu.distance_to(pois[outro].centro) < meu.distance_to(pois[dono].centro):
 				dono = outro
 		_check(dono == str(nome), "o cajado mais proximo do POI %s pertence a ELE" % nome)
 		# O TETO E' DERIVADO DO POI, nao uma folga chutada — e a diferenca importa:
@@ -1738,13 +1759,19 @@ func _test_loot_na_ilha_real() -> void:
 		# "no POI", e' na colina ao lado. Se o centro e' agua (lago, alagado), o
 		# cajado pousa na beira seca de proposito, e o teto e' a bacia molhada
 		# (o lerp de height() morre em R + 26).
+		## O TETO E' FRACAO DO PROPRIO POI, para valer em qualquer tamanho de mapa.
+		## Chao seco: o cajado tem que estar DENTRO do raio. Agua: pousa na beira
+		## seca, e a bacia molhada vai a ~2,2x o raio da cava (o lerp de height()).
+		var r_poi := float(pois[nome].raio)
 		var seco: bool = isl.pode_pousar(centro.x, centro.y)
-		var teto: float = float(raios[nome]) + (0.0 if seco else 26.0)
+		var teto: float = r_poi * (1.0 if seco else 2.2)
 		_check(perto <= teto, "cajado do POI %s a %.1f m do centro (%s: teto %.0f m)" 				% [nome, perto, "chao seco" if seco else "bacia d'agua", teto])
 
 	# A ILHA INTEIRA e' servida: com o corte de 70 m nada passava dos 70
-	_check(mais_longe > 70.0,
-			"loot chega a %.1f m do centro — o corte de 70 m em LAND_R %.0f " 			% [mais_longe, isl_scr.LAND_R] + "deixava metade da ilha vazia")
+	## O loot tem que alcancar a BORDA do mapa, em qualquer tamanho. Fracao, nao
+	## metro: com "> 70 m" cravado este teste passaria verde num mapa de 2 km.
+	_check(mais_longe > float(isl_scr.LAND_R) * 0.5,
+			"loot chega a %.0f m do centro, mais da metade do raio de terra (%.0f m)" 			% [mais_longe, float(isl_scr.LAND_R)])
 
 	isl.free()
 	mapa.free()

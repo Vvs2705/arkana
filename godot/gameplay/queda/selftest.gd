@@ -333,13 +333,29 @@ func _test_castelo() -> void:
 	root.add_child(arena)
 	var ilha := _ilha(240.0, "return 3.0")
 	_rotas.clear()
-	var cast: Node3D = _castelo.criar(arena, ilha)
+	## SEED A MAO. Em partida a rota e' SORTEADA (27/08: rota fixa e' rota
+	## decorada), e um teste que compara contra `rota(240.0)` com o seed padrao
+	## passaria a comparar rotas diferentes. Passando o seed, o determinismo que
+	## importa — o de DENTRO da partida — continua provado.
+	var cast: Node3D = _castelo.criar(arena, ilha, 3103)
 	_check(_rotas.size() == 1, "Bus.castelo_rota sai UMA vez (a HUD desenha a linha)")
-	var esperada: Dictionary = _castelo.rota(240.0)
+	var esperada: Dictionary = _castelo.rota(240.0, 3103)
 	_check((_rotas[0][0] as Vector3).is_equal_approx(esperada.inicio),
 			"o sinal leva a rota do mapa DESTA partida (lado 240 do dublê)")
 	_check(cast.global_position.is_equal_approx(esperada.inicio),
 			"o castelo nasce no comeco da rota")
+
+	## A ROTA MUDA A CADA PARTIDA. Mesma lei dos circulos da Zona: com SEED_ROTA
+	## cravado o castelo cruzava a ilha pela MESMA linha em toda partida da
+	## historia do jogo, e "de onde eu salto?" tinha uma resposta decorada.
+	## VERMELHO PROVADO: devolvendo `p_seed := SEED_ROTA` na assinatura de criar().
+	var seeds := {}
+	for _i in 12:
+		var c2: Node3D = _castelo.criar(arena, ilha)
+		seeds[int(c2.seed_da_rota)] = true
+		c2.queue_free()
+	_check(seeds.size() >= 11,
+			"12 partidas sortearam %d rotas distintas — a rota NAO e' fixa" % seeds.size())
 	_check(not cast.is_processing() and not cast.is_physics_processing(),
 			"o castelo NAO gasta _process (a travessia e' Tween, engine-side)")
 	# A LEI MUDOU em 26/08 (DIRECAO §10): o castelo de jogo e' o modelo do

@@ -43,19 +43,81 @@ extends Node3D
 ## QUADS 132 = quad de 2,27 m (era 1,8 m). Continua bem acima do Nyquist da
 ## ondulacao curta do relevo (~12 m), que e' o detalhe mais fino que a malha
 ## precisa carregar; abaixo disso quem desenha e' a grama e a cor de vertice.
-const SIZE := 300.0          # m, lado do terreno (133x133 verts = 34.8k tris)
+## ============================================================================
+## ESCALA — O UNICO KNOB DO TAMANHO DO MAPA (27/08, ordem do Diretor: "um mapa
+## muito maior, mais exploravel").
+##
+## 1.0 = a ilha de 300 m aprovada em 26/08. 2.0 = 600 m de lado, 264 m de raio de
+## terra, QUATRO VEZES a area de chao.
+##
+## COMO FUNCIONA, E POR QUE E' BARATO: a escala e' HORIZONTAL. O relevo e' a
+## MESMA ilha amostrada com metade da frequencia — as colinas ficam 2x mais
+## largas, e a MESMA malha de 132x132 quads continua acima do Nyquist (o quad vai
+## de 2,27 m para 4,55 m, e o detalhe mais fino do relevo vai de 12 m para 24 m).
+## MEDIDO em 27/08: dobrar a escala mantem 34.848 faces de colisao e ~600 ms de
+## build. Area 4x, custo de terreno ZERO.
+##
+## A ALTURA NAO ESCALA de proposito: o pico continua com 28 m e a encosta com 39
+## graus. Dobrar a vertical junto tornaria toda ladeira insubivel e mudaria a
+## fisica do jogo, nao o tamanho do mapa.
+##
+## O QUE CUSTA: a DECORACAO, que escala por AREA (x ESCALA^2) para a densidade nao
+## cair. Grama, flores e seixos ja' nascem em grade com visibility_range_end, e a
+## grade tambem escala — entao o que se ve' na tela continua constante e o que
+## cresce e' memoria, nao quadro.
+##
+## KNOB: subir = mais mapa para explorar e mais tempo de travessia (a Zona escala
+## sozinha, porque a tabela dela e' fracao do raio); descer = mapa mais apertado.
+## ANTES DE SUBIR, MEDIR FPS NO APARELHO — e' o portao que este projeto ainda deve.
+const ESCALA := 2.0
+const INV_ESCALA := 1.0 / ESCALA
+## AREA relativa. Toda contagem de decoracao espalhada pela ilha multiplica por
+## isto: a densidade (coisas por metro quadrado) e' o que tem que ficar constante,
+## nao a contagem. Sem isto um mapa 4x maior recebe a MESMA grama e vira campo de
+## golfe — e foi o que a medicao de 27/08 mostrou ao crescer so' o SIZE: 45 draw
+## calls de decoracao simplesmente DESAPARECERAM, porque os scatters desistiam no
+## limite de tentativas em vez de avisar.
+const AREA := ESCALA * ESCALA
+## ============================================================================
+
+## O LAYOUT EM METROS-BASE. Nenhum destes numeros e' coordenada do mundo: o mundo
+## e' este layout multiplicado por ESCALA na horizontal. Quem desenha o relevo
+## (`height`) trabalha AQUI; quem PLANTA coisa no mundo usa as constantes
+## publicas logo abaixo, que sao estas x ESCALA.
+const B_SIZE := 300.0
+const B_LAND_R := 132.0
+const B_LAKE := Vector2(75, 30)
+const B_LAKE_R := 24.0
+const B_MARSH := Vector2(-70, 60)
+const B_MARSH_R := 22.0
+const B_LAKE_DISC_R := 29.0
+const B_MARSH_DISC_R := 22.0
+const B_FOREST := Vector2(-60, -66)
+const B_FOREST_R := 40.0
+const B_RUINS := Vector2(63, -73)
+const B_RUINS_R := 20.0
+const B_PEAK := Vector2(12, 84)
+const B_PEAK_R := 40.0
+const B_PEAK_TOP := 14.0
+const B_DUNES := Vector2(10, -98)
+const B_DUNES_R := 32.0
+const B_BAY_A := Vector2(-142, 30)
+const B_BAY_B := Vector2(-84, -4)
+const B_BAY_W := 16.0
+
+const SIZE := B_SIZE * ESCALA   # m, lado do terreno (133x133 verts = 34.8k tris)
 const QUADS := 132
 const SEA_Y := 0.0
 ## Raio de TERRA FIRME (a linha d'agua fica por volta disto, irregular). Tudo que
 ## e' espalhado le' daqui em vez de repetir 62/70/72/74/76 cravados pelo arquivo —
 ## foi o que fez a ampliacao caber num diff em vez de numa cacada.
-const LAND_R := 132.0
+const LAND_R := B_LAND_R * ESCALA
 
 # POIs (GDD §14 reinterpretados) — centros XZ locais
-const LAKE := Vector2(75, 30)
-const LAKE_R := 24.0
-const MARSH := Vector2(-70, 60)      # baixada/alagado
-const MARSH_R := 22.0
+const LAKE := B_LAKE * ESCALA
+const LAKE_R := B_LAKE_R * ESCALA
+const MARSH := B_MARSH * ESCALA      # baixada/alagado
+const MARSH_R := B_MARSH_R * ESCALA
 
 ## RAIO DA LAMINA D'AGUA — maior que o raio da CAVA (LAKE_R/MARSH_R) porque a
 ## agua tem que passar da beira e cobrir a areia molhada. Virou constante em
@@ -63,16 +125,16 @@ const MARSH_R := 22.0
 ## conduzir raio, e ate' entao os dois arquivos guardavam o numero separado —
 ## a ilha cresceu, o disco cresceu junto, e o terreno continuou achando que o
 ## lago tinha 18 m. Fonte unica: quem desenha a agua e' quem diz onde ela esta'.
-const LAKE_DISC_R := 29.0
-const MARSH_DISC_R := 22.0
+const LAKE_DISC_R := B_LAKE_DISC_R * ESCALA
+const MARSH_DISC_R := B_MARSH_DISC_R * ESCALA
 ## Cota da LAMINA de cada agua. Fonte unica: _build_water desenha com estas e
 ## agua_y() responde com as mesmas — divergir aqui e' nadar dentro de terra.
 const LAKE_WATER_Y := 0.6
 const MARSH_WATER_Y := 0.55
-const FOREST := Vector2(-60, -66)
-const FOREST_R := 40.0
-const RUINS := Vector2(63, -73)      # plato elevado
-const RUINS_R := 20.0
+const FOREST := B_FOREST * ESCALA
+const FOREST_R := B_FOREST_R * ESCALA
+const RUINS := B_RUINS * ESCALA      # plato elevado
+const RUINS_R := B_RUINS_R * ESCALA
 
 ## POIs NOVOS DO G5. Os tres sao RELEVO puro (uma conta a mais dentro de height()
 ## e um lerp a mais dentro de _vcolor): nao acrescentam um unico draw call, e sao
@@ -89,20 +151,20 @@ const RUINS_R := 20.0
 ##  * ENSEADA— fiorde: o mar entra 60 m ilha adentro. Nao e' lugar de pousar, e'
 ##             o que quebra a SILHUETA da ilha — de 200 m uma mordida azul na
 ##             borda vale mais que qualquer objeto que se pudesse plantar la'.
-const PEAK := Vector2(12, 84)
-const PEAK_R := 40.0                 # onde a encosta comeca
-const PEAK_TOP := 14.0               # raio do topo chato
-const PEAK_H := 18.0
+const PEAK := B_PEAK * ESCALA
+const PEAK_R := B_PEAK_R * ESCALA     # onde a encosta comeca
+const PEAK_TOP := B_PEAK_TOP * ESCALA # raio do topo chato
+const PEAK_H := 18.0                 # VERTICAL: nao escala (ver ESCALA)
 ## Para ONDE aponta a encosta subivel, em radianos. 4,6 rad aponta o setor manso
 ## para o MIOLO da ilha. Foi medido e corrigido: com o valor anterior (2,2 rad) a
 ## unica rampa a pe' apontava para o MAR — o pico tinha rota de subida e a rota
 ## nascia dentro d'agua. O resto do morro e' penhasco, de proposito.
 const PEAK_FACE := 4.6
-const DUNES := Vector2(10, -98)
-const DUNES_R := 32.0
-const BAY_A := Vector2(-142, 30)     # boca (no mar)
-const BAY_B := Vector2(-84, -4)      # fundo (ilha adentro)
-const BAY_W := 16.0
+const DUNES := B_DUNES * ESCALA
+const DUNES_R := B_DUNES_R * ESCALA
+const BAY_A := B_BAY_A * ESCALA      # boca (no mar)
+const BAY_B := B_BAY_B * ESCALA      # fundo (ilha adentro)
+const BAY_W := B_BAY_W * ESCALA
 
 # Paleta GDD §10 — saturada, "clima com COR, nunca falta de luz"
 const COL_GRASS := Color("58bd6d")
@@ -304,13 +366,44 @@ func pode_pousar(x: float, z: float) -> bool:
 ##
 ## A ORDEM importa (o loot cicla elemento por indice, e o determinismo do mapa de
 ## loot vem daqui): alfabetica, e POI novo entra no FIM, nunca no meio.
+##
+## CADA POI TEM CENTRO **E RAIO**. O raio nao e' informacao extra: quem espalha
+## coisa precisa saber o TAMANHO do POI para procurar chao dentro dele. Sem ele o
+## Loot procurava num raio cravado de ~37 m, e num mapa maior (ESCALA 2) o cajado
+## do alagado simplesmente nao nascia — a bacia molhada do brejo passou a ter 96 m
+## e a busca nunca alcancava a beira seca. Medido em 27/08.
 func pois() -> Dictionary:
-	return {"alagado": MARSH, "floresta": FOREST, "lago": LAKE, "ruinas": RUINS}
+	return {
+		"alagado": {"centro": MARSH, "raio": MARSH_R},
+		"floresta": {"centro": FOREST, "raio": FOREST_R},
+		"lago": {"centro": LAKE, "raio": LAKE_R},
+		"ruinas": {"centro": RUINS, "raio": RUINS_R},
+	}
 
 
+## O RAIO DE TERRA FIRME, para quem espalha coisa pela ilha inteira e precisa
+## saber onde ela acaba. Existe como METODO (e nao so' como const) porque o Loot
+## e' de outra raia e le' a ilha ENTREGUE, nao um preload.
+func raio_terra() -> float:
+	return LAND_R
+
+
+## O RELEVO. TUDO DENTRO DESTA FUNCAO ESTA' EM ESPACO-BASE (a ilha de 300 m):
+## a escala do mapa entra na PRIMEIRA LINHA e em nenhum outro lugar.
+##
+## E' por isso que o mapa cresce de graca. Um mapa 2x maior nao e' relevo novo, e'
+## o MESMO relevo amostrado com metade da frequencia: as colinas ficam 2x mais
+## largas, a costa 2x mais longa, e a malha de 132x132 quads continua servindo
+## porque o detalhe mais fino cresceu junto com o mapa. A alternativa — escalar
+## trinta literais de distancia espalhados por esta funcao — e' como se erra um
+## deles em silencio.
+##
+## A ALTURA SAI EM METROS DE VERDADE (nao escala). Ver o comentario de ESCALA.
 func height(x: float, z: float) -> float:
-	var p := Vector2(x, z)
+	var p := Vector2(x, z) * INV_ESCALA
 	var r := p.length()
+	x = p.x
+	z = p.y
 	# COSTA IRREGULAR (G4). `fall` era funcao do raio PURO, entao a ilha era um
 	# disco e a praia um anel de contorno perfeito — de cima lia como bolo. Um
 	# raio "efetivo" deformado por ruido (~+-11%) cria enseada e ponta sem tocar
@@ -344,13 +437,13 @@ func height(x: float, z: float) -> float:
 	# seja. Alargando a cava (5,9m a 31m) a queda cai pela metade, a areia ganha
 	# largura e o lago passa a ter beira que da' pra pisar — que e' o que o §14 quer
 	# quando a agua congela e vira rota.
-	h = lerpf(h, -2.4, 1.0 - smoothstep(LAKE_R * 0.3, LAKE_R + 20.0, p.distance_to(LAKE)))
-	var dm := p.distance_to(MARSH)
-	h = lerpf(h, 0.35, 1.0 - smoothstep(MARSH_R * 0.55, MARSH_R + 26.0, dm))
+	h = lerpf(h, -2.4, 1.0 - smoothstep(B_LAKE_R * 0.3, B_LAKE_R + 20.0, p.distance_to(B_LAKE)))
+	var dm := p.distance_to(B_MARSH)
+	h = lerpf(h, 0.35, 1.0 - smoothstep(B_MARSH_R * 0.55, B_MARSH_R + 26.0, dm))
 	h -= 0.5 * (1.0 - smoothstep(5.0, 13.0, dm))  # poca central do alagado
 	# Plato das ruinas subiu de 6,4 m para 9,0 m: numa ilha cujas colinas agora vao
 	# a ~12 m, um degrau de 6,4 m deixaria de ser degrau.
-	h = lerpf(h, 9.0, 1.0 - smoothstep(RUINS_R * 0.6, RUINS_R + 14.0, p.distance_to(RUINS)))
+	h = lerpf(h, 9.0, 1.0 - smoothstep(B_RUINS_R * 0.6, B_RUINS_R + 14.0, p.distance_to(B_RUINS)))
 
 	# --- PICO: mesa com UMA encosta subivel -------------------------------------
 	# `ramp` estica o raio da mesa num setor de ~120 graus (o cos so' conta onde e'
@@ -364,10 +457,10 @@ func height(x: float, z: float) -> float:
 	# TODO ponto da ilha por causa de um morro que ocupa 6% dela seria desperdicio
 	# puro. O resultado e' identico ao de calcular sempre (o corte e' onde o peso
 	# ja' era zero), so' que a ilha inteira nao paga o pedaco do pico.
-	var dpk := p.distance_to(PEAK)
-	if dpk < PEAK_R * 1.9:
-		var ramp := 1.0 + 0.9 * maxf(0.0, cos((p - PEAK).angle() - PEAK_FACE))
-		var wpk := smoothstep(PEAK_R * ramp, PEAK_TOP * ramp, dpk)
+	var dpk := p.distance_to(B_PEAK)
+	if dpk < B_PEAK_R * 1.9:
+		var ramp := 1.0 + 0.9 * maxf(0.0, cos((p - B_PEAK).angle() - PEAK_FACE))
+		var wpk := smoothstep(B_PEAK_R * ramp, B_PEAK_TOP * ramp, dpk)
 	# CRISTA. O primeiro render do pico entregou o defeito: sem esta linha ele saia
 	# uma cupula LISA e monocromatica — de perto uma bolha de plastico, de cima uma
 	# mancha sem forma. O ruido de 25 m de onda quebra a encosta em costela e
@@ -383,7 +476,7 @@ func height(x: float, z: float) -> float:
 	# A cota vira quase plana (2,2 m) e por cima entra uma onda DIRECIONAL de ~14 m
 	# — duna nao e' ruido isotropico, e' listra transversal ao vento. E' o que da'
 	# FORMA ao POI; sem ela o areal seria so' uma mancha bege (GDD §10 proibe).
-	var wdu := 1.0 - smoothstep(DUNES_R * 0.45, DUNES_R + 18.0, p.distance_to(DUNES))
+	var wdu := 1.0 - smoothstep(B_DUNES_R * 0.45, B_DUNES_R + 18.0, p.distance_to(B_DUNES))
 	if wdu > 0.0:
 		# A fase da senoide e' EMPURRADA por um ruido longo: sem isso as cristas
 		# saem paralelas e do chao o areal le' como veludo cotele, nao como duna.
@@ -398,9 +491,9 @@ func height(x: float, z: float) -> float:
 	# Mesma guarda barata: uma distancia ate' o MEIO do fiorde decide se vale a pena
 	# chamar a rotina de segmento. 66 m = meio comprimento (34) + o alcance da rampa
 	# (31); fora disso o peso e' zero por construcao.
-	if p.distance_to((BAY_A + BAY_B) * 0.5) < 66.0:
-		var db := p.distance_to(Geometry2D.get_closest_point_to_segment(p, BAY_A, BAY_B))
-		h = lerpf(h, -3.0, 1.0 - smoothstep(BAY_W * 0.35, BAY_W + 15.0, db))
+	if p.distance_to((B_BAY_A + B_BAY_B) * 0.5) < 66.0:
+		var db := p.distance_to(Geometry2D.get_closest_point_to_segment(p, B_BAY_A, B_BAY_B))
+		h = lerpf(h, -3.0, 1.0 - smoothstep(B_BAY_W * 0.35, B_BAY_W + 15.0, db))
 
 	h -= 3.2 * smoothstep(118.0, 150.0, redge)    # borda mergulha no mar
 	return h
@@ -421,14 +514,22 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# 0.95) e portanto NUNCA disparava — o chao continuou de um verde so'. As
 	# rampas abaixo vivem dentro da faixa REAL do ruido.
 	# Escalas: `big` sai em ~33m (mancha de regiao) e `fine` em ~9m (granulado).
-	var big := _noise.get_noise_2d(x * 1.5, z * 1.5) * 0.5 + 0.5
+	## O RUIDO EM ESPACO-BASE, igual a height(). Sem esta conversao a cor DESCOLA
+	## do relevo quando ESCALA > 1: as colinas dobrariam de largura e a mancha de
+	## capim seco continuaria com 33 m, ou seja, banda fina sobre morro largo. Pior
+	## que feio: `fine` (9,1 m) contra um quad de 4,55 m da' 2 amostras por periodo
+	## — abaixo do Nyquist, que e' exatamente o "chiado por vertice" que o selftest
+	## de emenda de material pega. Em base, as duas ondas crescem com o mapa.
+	var bx := x * INV_ESCALA
+	var bz := z * INV_ESCALA
+	var big := _noise.get_noise_2d(bx * 1.5, bz * 1.5) * 0.5 + 0.5
 	# G5: `fine` foi de x*8 (onda de 6,2 m) para x*5,5 (onda de 9,1 m). Nao e' gosto,
 	# e' AMOSTRAGEM: o quad do chao passou de 1,8 m para 2,27 m, e 6,2 m de onda em
 	# quad de 2,27 m da' 2,7 amostras por periodo — abaixo do Nyquist. O granulado
 	# parava de ser granulado e virava CHIADO por vertice, que o selftest de emenda
 	# de material pegou como salto de cor entre vizinhos. Com 9,1 m sao 4 amostras
 	# por periodo e o mesmo desenho volta a ser lido como mancha.
-	var fine := _noise.get_noise_2d(x * 5.5 + 90.0, z * 5.5 - 40.0) * 0.5 + 0.5
+	var fine := _noise.get_noise_2d(bx * 5.5 + 90.0, bz * 5.5 - 40.0) * 0.5 + 0.5
 
 	# 1) campina: verde por altitude + faixa seca no alto/exposto + fundo escuro
 	var c := COL_GRASS_HI.lerp(COL_GRASS, clampf((h - 1.0) / 10.5, 0.0, 1.0))
@@ -486,7 +587,7 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 	# tambem e' cota baixa, levava ~38% de areia por cima da lama e o resultado era
 	# um anel BEGE: o POI perdia a cara de brejo e virava outra praia. Ao quadrado,
 	# lama e praia param de disputar o mesmo pixel.
-	var beach := 4.6 + 1.4 * (_noise.get_noise_2d(x * 2.6 - 55.0, z * 2.6 + 210.0))
+	var beach := 4.6 + 1.4 * (_noise.get_noise_2d(bx * 2.6 - 55.0, bz * 2.6 + 210.0))
 	var dry := (1.0 - wmud) * (1.0 - wmud)
 	# DOIS degraus de praia, nao um. Grama e areia sao as duas cores mais distantes
 	# da paleta: com uma rampa so', por mais macia que seja, ela precisa vencer toda
@@ -516,11 +617,14 @@ func _vcolor(x: float, z: float, h: float, ny: float) -> Color:
 ## O corte da encosta usa a faixa REAL de normais do terreno (ny nunca cai de
 ## 0,73 aqui); a faixa "de manual" 0,3-0,9 nao encostaria em nada.
 func _terrain_ao(x: float, z: float, h: float, ny: float) -> float:
-	var e := 2.5
+	## AS DUAS ESCALAS CRESCEM COM O MAPA. Elas medem CRISTA e BACIA, e as duas
+	## dobram de largura quando ESCALA dobra — com offset fixo o AO passaria a
+	## medir a encosta em vez da dobra e sumiria (foi o defeito de G5, com 9 m).
+	var e := 2.5 * ESCALA
 	# G5: a escala larga foi de 9 m para 16 m. Ela existe pra pegar a BACIA, e as
 	# bacias da ilha nova (cava do lago, areal, fiorde, sope da mesa) tem o dobro
 	# do tamanho das antigas: com 9 m ela media a encosta, nao a bacia.
-	var w := 16.0
+	var w := 16.0 * ESCALA
 	var near := (height(x - e, z) + height(x + e, z) + height(x, z - e) + height(x, z + e)) * 0.25 - h
 	var wide := (height(x - w, z) + height(x + w, z) + height(x, z - w) + height(x, z + w)) * 0.25 - h
 	var cavity := clampf(1.0 - maxf(near, 0.0) * 0.45 - maxf(wide, 0.0) * 0.07, 0.66, 1.0)
@@ -685,7 +789,7 @@ func _build_forest(parent: Node3D) -> void:
 	# ~45% e a floresta vira MASSA VERDE-ESCURA, que e' como ela tem que se anunciar
 	# pra quem esta' escolhendo onde pousar. Custo: mesmo 1 draw call (MultiMesh),
 	# +4.600 tris, +92 CylinderShape no mesmo StaticBody.
-	while xf.size() < 150 and tries < 4200:
+	while xf.size() < int(150 * AREA) and tries < int(4200 * AREA):
 		tries += 1
 		var p := FOREST + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * FOREST_R
 		if p.distance_to(FOREST) > FOREST_R:
@@ -703,7 +807,7 @@ func _build_forest(parent: Node3D) -> void:
 	# arvores avulsas fora da mata fechada
 	tries = 0
 	var extra := 0
-	while extra < 26 and tries < 2600:
+	while extra < int(26 * AREA) and tries < int(2600 * AREA):
 		tries += 1
 		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		if p.length() > LAND_R * 0.84 or p.distance_to(FOREST) < FOREST_R \
@@ -888,7 +992,7 @@ func _build_marsh(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 150 and tries < 3600:
+	while xf.size() < int(150 * AREA) and tries < int(3600 * AREA):
 		tries += 1
 		var p := MARSH + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * (MARSH_R - 1.0)
 		if p.distance_to(MARSH) > MARSH_R - 1.0:
@@ -904,7 +1008,8 @@ func _build_marsh(parent: Node3D) -> void:
 		xf.append(Transform3D(b, Vector3(p.x, h - 0.05, p.y)))
 		var v := rng.randf_range(-0.22, 0.16)
 		cols.append(Color(1.0 + v * 0.6, 1.0 + v, 1.0 + v * 0.8))
-	_multimesh(parent, _reed_mesh(), xf, "Reeds", false, cols)
+	## Junco: vive so' no alagado, mas 600 deles num no' unico desenhavam sempre.
+	_multimesh_grid(parent, _reed_mesh(), xf, cols, "Reeds", int(10 * ESCALA), 80.0)
 
 
 ## Junco AFUNILADO. Antes eram dois retangulos de largura constante — no render
@@ -949,7 +1054,7 @@ func _build_rocks(parent: Node3D) -> void:
 	var body := StaticBody3D.new()
 	body.name = "RockColliders"
 	var tries := 0
-	while xf.size() < 58 and tries < 3200:
+	while xf.size() < int(58 * AREA) and tries < int(3200 * AREA):
 		tries += 1
 		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		if p.length() > LAND_R - 4.0 or p.distance_to(LAKE) < LAKE_R + 3 or p.distance_to(MARSH) < MARSH_R:
@@ -1052,7 +1157,7 @@ func _build_grass(parent: Node3D) -> void:
 	rng.seed = 61
 	var seeds: Array[Vector2] = []
 	var tries := 0
-	while seeds.size() < 1180 and tries < 16000:
+	while seeds.size() < int(1180 * AREA) and tries < int(16000 * AREA):
 		tries += 1
 		var sp := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		if _open_ground(sp) >= 0.0:
@@ -1060,7 +1165,7 @@ func _build_grass(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	tries = 0
-	while xf.size() < 30000 and tries < 150000:
+	while xf.size() < int(30000 * AREA) and tries < int(150000 * AREA):
 		tries += 1
 		var p: Vector2
 		if not seeds.is_empty() and rng.randf() < 0.88:
@@ -1085,7 +1190,10 @@ func _build_grass(parent: Node3D) -> void:
 	# 10x10 celulas (era 6x6): a celula continua com ~30 m, que e' o tamanho que
 	# faz o frustum de uma camera de 3a pessoa pegar 6-9 delas. Fatiar mais fino
 	# nao adianta (mais nos, mesmo pixel); mais grosso perde o culling.
-	_multimesh_grid(parent, _grass_mesh(), xf, cols, "Grass", 10, 80.0)
+	## A GRADE ESCALA COM O MAPA para a celula continuar com ~30 m. Sem isso, em
+	## ESCALA 2 a celula viraria 60 m e o culling de 80 m pegaria a ilha quase
+	## inteira — a grama passaria a custar 4x na tela, nao na memoria.
+	_multimesh_grid(parent, _grass_mesh(), xf, cols, "Grass", int(10 * ESCALA), 80.0)
 
 
 ## Tufo de 3 LAMINAS finas e tortas (era 2 quads largos cruzados — geometria de
@@ -1138,7 +1246,7 @@ func _build_pebbles(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 380 and tries < 11000:
+	while xf.size() < int(380 * AREA) and tries < int(11000 * AREA):
 		tries += 1
 		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		if p.length() > LAND_R or p.distance_to(LAKE) < LAKE_R - 1.0:
@@ -1153,7 +1261,10 @@ func _build_pebbles(parent: Node3D) -> void:
 		xf.append(Transform3D(b, Vector3(p.x, h + sc * 0.15, p.y)))
 		var v := rng.randf_range(-0.18, 0.18)
 		cols.append(Color(1.0 + v, 1.0 + v * 0.9, 1.0 + v * 0.7))
-	_multimesh(parent, _pebble_mesh(), xf, "Pebbles", false, cols)
+	## GRADE COM CULLING (27/08). Um seixo de 20 cm nao e' um pixel a 55 m, e antes
+	## os 380 (agora 1.520) eram UM no' que desenhava sempre, inclusive visto do
+	## castelo. O alcance sai do tamanho da coisa, nao do gosto.
+	_multimesh_grid(parent, _pebble_mesh(), xf, cols, "Pebbles", int(10 * ESCALA), 55.0)
 
 
 func _pebble_mesh() -> ArrayMesh:
@@ -1178,7 +1289,7 @@ func _build_bushes(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 260 and tries < 9000:
+	while xf.size() < int(260 * AREA) and tries < int(9000 * AREA):
 		tries += 1
 		var p: Vector2
 		if rng.randf() < 0.72:
@@ -1195,7 +1306,9 @@ func _build_bushes(parent: Node3D) -> void:
 		xf.append(Transform3D(b, Vector3(p.x, h - 0.12, p.y)))
 		var v := rng.randf_range(-0.14, 0.14)
 		cols.append(Color(1.0 - v * 0.5, 1.0 + v, 1.0 + v * 0.7))
-	_multimesh(parent, _bush_mesh(), xf, "Bushes", false, cols)
+	## Moita e' COBERTURA de combate: tem que ser vista de longe o bastante para
+	## alguem decidir correr pra ela. 95 m, quase o dobro do seixo.
+	_multimesh_grid(parent, _bush_mesh(), xf, cols, "Bushes", int(10 * ESCALA), 95.0)
 
 
 func _bush_mesh() -> ArrayMesh:
@@ -1243,7 +1356,7 @@ func _build_flowers(parent: Node3D) -> void:
 	var xf: Array[Transform3D] = []
 	var cols := PackedColorArray()
 	var tries := 0
-	while xf.size() < 480 and tries < 9000:
+	while xf.size() < int(480 * AREA) and tries < int(9000 * AREA):
 		tries += 1
 		var p := Vector2(rng.randf_range(-LAND_R, LAND_R), rng.randf_range(-LAND_R, LAND_R))
 		var near_poi: bool = p.distance_to(LAKE) < LAKE_R + 9 \
@@ -1258,7 +1371,8 @@ func _build_flowers(parent: Node3D) -> void:
 		xf.append(Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, TAU)).scaled(Vector3(s, s, s)),
 				Vector3(p.x, h - 0.03, p.y)))
 		cols.append(_lin(petals[rng.randi_range(0, petals.size() - 1)]))
-	_multimesh(parent, _flower_mesh(), xf, "Flowers", false, cols)
+	## Flor e' pixel de cor: 45 m e ela some sem que ninguem perceba.
+	_multimesh_grid(parent, _flower_mesh(), xf, cols, "Flowers", int(10 * ESCALA), 45.0)
 
 
 func _flower_mesh() -> ArrayMesh:
@@ -1379,9 +1493,16 @@ func _build_mist(parent: Node3D) -> void:
 
 # ---------------------------------------------------------------- helpers
 
+## OS 14 NASCIMENTOS. As coordenadas do Island.tscn estao em METROS-BASE (elas
+## foram escritas contra os POIs base — SpawnRuinsB e' literalmente B_RUINS), e
+## e' aqui que a escala do mapa entra nelas. Sem isto, num mapa de ESCALA 2 os
+## catorze nascimentos ficariam amontoados no miolo enquanto os POIs se afastaram
+## para o dobro da distancia: todo mundo nasceria longe de tudo.
 func _snap_spawns() -> void:
 	for c in get_children():
 		if c is Marker3D and c.is_in_group("spawn"):
+			c.position.x *= ESCALA
+			c.position.z *= ESCALA
 			c.position.y = height(c.position.x, c.position.z) + 0.3
 
 
@@ -1422,12 +1543,38 @@ func _multimesh_grid(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D],
 		bx[k].append(xforms[i])
 		if i < colors.size():
 			bc[k].append(colors[i])
+	## CADA CELULA VAI PARA O SEU LUGAR, e as instancias ficam em coordenada LOCAL.
+	##
+	## DEFEITO MEDIDO EM 27/08 — o culling desta grade nao estava funcionando na
+	## horizontal. As instancias carregavam a posicao do MUNDO e o no' da celula
+	## ficava em (0,0,0): as 100 celulas tinham a MESMA origem, e visibility_range
+	## mede a distancia da camera ate' a ORIGEM DO NO'. Ou seja o corte era
+	## tudo-ou-nada, e o unico eixo em que funcionava era o VERTICAL (na queda a
+	## camera fica longe de (0,0,0) e tudo somia; no chao a camera fica perto e
+	## tudo aparecia). Custava os 30.000 tufos inteiros em qualquer vista de chao.
+	##
+	## Ficou invisivel porque numa ilha de 132 m de raio a camera esta' sempre a
+	## menos de 80 m do centro. O defeito SO' aparece quando o mapa cresce — e foi
+	## exatamente o que a medicao de ESCALA 2 mostrou: a 119 m do centro, a grama
+	## da ilha inteira desaparecia de uma vez.
+	##
+	## Com a celula posicionada, cada uma e' cortada pela distancia ao JOGADOR, que
+	## e' o que a grade sempre quis fazer.
+	var passo := SIZE / float(cells)
 	for k in bx.size():
 		if bx[k].is_empty():
 			continue
+		var centro := Vector3(
+				(float(k % cells) + 0.5) * passo - half, 0.0,
+				(float(k / cells) + 0.5) * passo - half)
 		var tf: Array[Transform3D] = []
-		tf.assign(bx[k])
-		_multimesh(parent, mesh, tf, "%s%02d" % [nm, k], false, bc[k], vis_end)
+		tf.resize(bx[k].size())
+		for i in bx[k].size():
+			var t: Transform3D = bx[k][i]
+			t.origin -= centro
+			tf[i] = t
+		var mmi := _multimesh(parent, mesh, tf, "%s%02d" % [nm, k], false, bc[k], vis_end)
+		mmi.position = centro
 
 
 func _multimesh(parent: Node3D, mesh: Mesh, xforms: Array[Transform3D], nm: String,

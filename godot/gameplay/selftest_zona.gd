@@ -91,11 +91,14 @@ func _test_raio_do_mapa() -> void:
 	## A PROVA DE QUE A FRACAO NAO ENVELHECE: uma ilha FALSA com o dobro do raio
 	## tem que produzir circulos com o dobro do raio, sem tocar em constante
 	## nenhuma. Era exatamente isto que a regua de 180 m nao conseguia fazer.
+	## A ilha falsa e' derivada da REAL (x2), nao um numero cravado: com 264 escrito
+	## a mao este teste passou a comparar a ilha com ela mesma no dia em que a ilha
+	## real virou 264 — e o teste do dobro deixou de testar o dobro, calado.
 	var falsa_scr := GDScript.new()
 	falsa_scr.source_code = "extends Node3D
-const LAND_R := 264.0
-const SIZE := 600.0
-"
+const LAND_R := %f
+const SIZE := %f
+" 			% [r_mapa * 2.0, float(ilha.SIZE) * 2.0]
 	falsa_scr.reload()
 	var falsa: Node3D = falsa_scr.new()
 	root.add_child(falsa)

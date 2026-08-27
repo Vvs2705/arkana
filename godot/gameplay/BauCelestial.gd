@@ -44,8 +44,14 @@ const QUEDA_S := 6.0
 const ALTURA_QUEDA := 90.0   # m — de onde desce (alto o bastante p/ ver de longe)
 const CANALIZAR_S := 3.0     # s parado abrindo — KNOB: a janela de contra-ataque
 const RAIO_ABRIR := 2.6      # m — precisa CHEGAR no bau, nao so' olhar
-const RAIO_MIN := 18.0       # m do centro — campo aberto, nunca em cima do spawn
-const RAIO_MAX := 48.0       # m do centro — dentro da ilha (o loot corta em 70)
+## ONDE O BAU POUSA, como FRACAO do raio de terra da ilha. Eram 18 e 48 metros
+## cravados: num mapa de ESCALA 2 (raio 264 m) o bau lendario cairia sempre no
+## miolo, e a metade de fora do mapa nunca veria um. Fracao acompanha o mapa.
+## KNOB: aproximar do centro = bau mais disputado e menos rotacao; afastar = mais
+## viagem e mais chance de quem estiver longe chegar primeiro.
+const RAIO_MIN_F := 0.14
+const RAIO_MAX_F := 0.36
+const RAIO_TERRA_PADRAO := 132.0
 const ATRAIR_BOT_M := 55.0   # m — quem escuta o chamado do bau (ver _chamar_bots)
 
 var fase := ESPERANDO
@@ -87,9 +93,12 @@ static func agendar(parent: Node3D, island: Node, p_seed := Loot.SEED_LOOT) -> B
 ## copiada do Loot — e o teto proibia o bau no plato das ruinas (9,0 m), que e'
 ## exatamente o tipo de lugar onde um bau lendario devia poder cair.
 static func _ponto(island: Node, rng: RandomNumberGenerator) -> Vector3:
+	var raio_terra := RAIO_TERRA_PADRAO
+	if island != null and is_instance_valid(island) and island.has_method("raio_terra"):
+		raio_terra = float(island.raio_terra())
 	for _tentativa in 16:
 		var ang := rng.randf() * TAU
-		var raio := rng.randf_range(RAIO_MIN, RAIO_MAX)
+		var raio := rng.randf_range(RAIO_MIN_F, RAIO_MAX_F) * raio_terra
 		var p := Vector2(cos(ang), sin(ang)) * raio
 		var h := 1.0
 		if island != null and is_instance_valid(island) and island.has_method("height"):

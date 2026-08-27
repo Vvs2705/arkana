@@ -35,11 +35,20 @@ const EMISSAO_CORPO := 0.35
 ## testava contra uma ilha falsa e plana. Copia de dado que muda apodrece: agora
 ## se pergunta.
 const POIS := {
-	"alagado": Vector2(-70, 60),
-	"floresta": Vector2(-60, -66),
-	"lago": Vector2(75, 30),
-	"ruinas": Vector2(63, -73),
+	"alagado": {"centro": Vector2(-70, 60), "raio": 22.0},
+	"floresta": {"centro": Vector2(-60, -66), "raio": 40.0},
+	"lago": {"centro": Vector2(75, 30), "raio": 24.0},
+	"ruinas": {"centro": Vector2(63, -73), "raio": 20.0},
 }
+
+## Raio de terra de FALLBACK (sem ilha). A ilha real responde `raio_terra()`.
+const RAIO_TERRA_PADRAO := 132.0
+
+## ONDE AS VARINHAS NASCEM, como FRACAO do raio de terra. Eram 14 a 62 metros
+## cravados — numa ilha de 264 m de raio isso poe as 12 varinhas todas no miolo,
+## e a metade de fora do mapa abre sem nada. Fracao acompanha o mapa sozinha.
+const VARINHA_R_MIN := 0.11
+const VARINHA_R_MAX := 0.47
 
 ## QUANTOS NASCEM (KNOBs — a curva de poder da partida mora aqui):
 ##   varinha  comum e ESPALHADA: ninguem fica desarmado (GDD: todo mundo dropa
@@ -290,10 +299,13 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = p_seed
 	var n := 0
+	var raio_terra := RAIO_TERRA_PADRAO
+	if island != null and is_instance_valid(island) and island.has_method("raio_terra"):
+		raio_terra = float(island.raio_terra())
 	# varinhas: aneis largos cobrindo a ilha inteira — nunca ficar sem arma
 	for i in QTD_VARINHA:
 		var ang := TAU * float(i) / float(QTD_VARINHA) + rng.randf_range(-0.22, 0.22)
-		var raio := rng.randf_range(14.0, 62.0)
+		var raio := rng.randf_range(VARINHA_R_MIN, VARINHA_R_MAX) * raio_terra
 		# O ELEMENTO CICLA pelos 5 (deterministico pelo indice): a ilha inteira
 		# oferece variedade — quem quer um elemento especifico tem que ANDAR.
 		if _por(parent, island, rng, "varinha", Vector2(cos(ang), sin(ang)) * raio,
@@ -307,11 +319,16 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 		pois = island.pois()
 	var nomes: Array = pois.keys()
 	for i in mini(QTD_CAJADO, nomes.size()):
-		var c: Vector2 = pois[nomes[i]]
+		var poi: Dictionary = pois[nomes[i]]
+		var c: Vector2 = poi.centro
+		var r_poi := float(poi.raio)
 		var a := rng.randf() * TAU
+		## O ALVO e a BUSCA saem do RAIO DO POI, nao de metros cravados. O lago e o
+		## alagado sao bacias molhadas ate' ~2,2x o raio da cava, e o cajado tem
+		## que alcancar a beira SECA delas — em qualquer tamanho de mapa.
 		if _por(parent, island, rng, "cajado",
-				c + Vector2(cos(a), sin(a)) * rng.randf_range(6.0, 15.0),
-				Balance.ELEMENTS[(i + 2) % Balance.ELEMENTS.size()]):
+				c + Vector2(cos(a), sin(a)) * rng.randf_range(0.25, 0.62) * r_poi,
+				Balance.ELEMENTS[(i + 2) % Balance.ELEMENTS.size()], r_poi):
 			n += 1
 	return n
 
@@ -323,13 +340,16 @@ static func espalhar(parent: Node3D, island: Node, p_seed := SEED_LOOT) -> int:
 ## sem loot nenhum. O raio saiu de vez — `pode_pousar` ja' rejeita mar e agua, que
 ## era a unica coisa que ele protegia.
 static func _por(parent: Node3D, island: Node, rng: RandomNumberGenerator,
-		arma_id_: String, alvo: Vector2, elemento_ := "fire") -> bool:
+		arma_id_: String, alvo: Vector2, elemento_ := "fire", escopo := 24.0) -> bool:
 	## A busca ABRE a cada tentativa (4m -> 37m). Sem isso o cajado do lago e o
 	## do alagado simplesmente NAO nasciam: os dois POIs sao agua, e um jitter
 	## fixo de 9m nunca alcancava a margem. Abrindo em espiral o loot pousa na
 	## BEIRA do POI — que e' onde ele devia estar mesmo.
+	## A ESPIRAL ABRE ATE' ~2,4x O ESCOPO (o raio do POI, ou 24 m para as varinhas).
+	## Era 4 -> 37 m fixos: no mapa de ESCALA 2 a beira seca do alagado ficou a
+	## 96 m e dois loots deixaram de nascer, calados.
 	for tentativa in 12:
-		var busca := 4.0 + float(tentativa) * 3.0
+		var busca := escopo * (0.17 + 0.13 * float(tentativa))
 		var p := alvo if tentativa == 0 else alvo + Vector2(
 				rng.randf_range(-busca, busca), rng.randf_range(-busca, busca))
 		var h := 1.0

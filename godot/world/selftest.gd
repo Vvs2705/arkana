@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_scatter_budget()
 	_test_gamma()
 	_test_spawns()
+	_test_escala_do_mapa()
 	_test_determinism(packed)
 
 	if fails == 0:
@@ -714,6 +715,96 @@ func _test_spawns() -> void:
 				acima = false
 	_check(n >= 12, "ilha publica %d spawns no grupo 'spawn'" % n)
 	_check(acima, "todo spawn foi grudado ACIMA do terreno (ninguem nasce dentro do chao)")
+
+
+## ============================================================================
+## O MAPA CRESCE POR UM KNOB (27/08 — ordem do Diretor: "um mapa muito maior,
+## mais exploravel"). Quatro leis, e cada uma tem uma forma diferente de morrer
+## em silencio:
+##
+##  1. TUDO na horizontal sai de ESCALA. Se um POI, um spawn ou um raio ficar em
+##     metro cravado, ele nao acompanha — foi assim que a ilha de 26/08 cresceu de
+##     180 para 300 m deixando a Zona com um terco do mapa e o loot fora dos POIs.
+##  2. A VERTICAL NAO ESCALA. Dobrar a altura junto tornaria toda ladeira
+##     insubivel: o plato tem 9,0 m e o pico 28 m em QUALQUER tamanho de mapa.
+##  3. A DENSIDADE se mantem (coisas por metro quadrado), senao mapa maior e'
+##     campo de golfe. Medido em 27/08: crescendo so' o SIZE, 45 draw calls de
+##     decoracao DESAPARECERAM porque os scatters desistiam no limite de tentativas.
+##  4. O CULLING POR CELULA tem que ser real. As celulas ficavam todas em (0,0,0)
+##     e visibility_range mede a distancia ate' a ORIGEM DO NO': o corte era
+##     tudo-ou-nada. Invisivel numa ilha de 132 m (a camera nunca esta' a mais de
+##     80 m do centro) e fatal em qualquer mapa maior.
+func _test_escala_do_mapa() -> void:
+	print("[O mapa cresce por um knob: horizontal escala, vertical nao]")
+	var scr: GDScript = island.get_script()
+	var e := float(scr.ESCALA)
+	print("  (ESCALA = %.1f -> lado %.0f m, raio de terra %.0f m, area de terra %.1fx)"
+			% [e, float(scr.SIZE), float(scr.LAND_R), e * e])
+
+	# --- 1. a horizontal sai do knob
+	_check(is_equal_approx(float(scr.LAND_R), float(scr.B_LAND_R) * e),
+			"LAND_R = B_LAND_R x ESCALA (nenhum metro cravado)")
+	_check(is_equal_approx(float(scr.SIZE), float(scr.B_SIZE) * e),
+			"SIZE = B_SIZE x ESCALA")
+	var pois: Dictionary = island.pois()
+	var todos_escalados := true
+	for nome in pois:
+		var c: Vector2 = pois[nome].centro
+		if c.length() > float(scr.LAND_R):
+			todos_escalados = false
+	_check(todos_escalados, "os %d POIs cabem dentro do raio de terra" % pois.size())
+	_check(is_equal_approx(float(pois["lago"].centro.x), float(scr.B_LAKE.x) * e),
+			"e o centro do lago acompanhou o knob")
+
+	# --- 2. a vertical NAO escala: a fisica do jogo nao pode mudar de tamanho
+	var h_ruinas: float = island.height(float(scr.RUINS.x), float(scr.RUINS.y))
+	var h_pico: float = island.height(float(scr.PEAK.x), float(scr.PEAK.y))
+	_check(absf(h_ruinas - 9.0) < 0.35,
+			"o plato das ruinas tem %.2f m (9,0 esperado) em qualquer escala" % h_ruinas)
+	_check(h_pico > 24.0 and h_pico < 32.0,
+			"o pico tem %.1f m (~28 esperado): a encosta continua subivel" % h_pico)
+
+	# --- 3. os spawns cobrem a ilha, nao o miolo dela
+	var mais_longe := 0.0
+	var n_spawn := 0
+	for c in island.get_children():
+		if c is Marker3D and c.is_in_group("spawn"):
+			n_spawn += 1
+			mais_longe = maxf(mais_longe, Vector2(c.position.x, c.position.z).length())
+	_check(mais_longe > float(scr.LAND_R) * 0.5,
+			"o nascimento mais distante esta' a %.0f m, alem de meia-terra (%.0f m)"
+			% [mais_longe, float(scr.LAND_R) * 0.5])
+
+	# --- 3b. densidade preservada: tufos por metro quadrado, nao tufos
+	var gen := island.get_node_or_null("Generated")
+	var tufos := 0
+	var celulas := 0
+	var origens := {}
+	for c in gen.get_children():
+		if c is MultiMeshInstance3D and String(c.name).begins_with("Grass"):
+			celulas += 1
+			tufos += (c as MultiMeshInstance3D).multimesh.instance_count
+			origens["%.1f,%.1f" % [c.position.x, c.position.z]] = true
+	var area_km := PI * pow(float(scr.LAND_R), 2.0) / 1e6
+	var dens := float(tufos) / area_km
+	# A referencia e' a ilha aprovada de 26/08: 30.000 tufos em pi*132^2 = 0,0548
+	# km2 = ~548.000 por km2. Faixa larga de proposito (o scatter rejeita terreno),
+	# apertada o bastante para pegar "esqueci de escalar a contagem" (cairia 4x).
+	_check(dens > 380000.0,
+			"densidade de grama %.0f tufos/km2 (referencia 548.000): o mapa nao esvaziou"
+			% dens)
+
+	# --- 4. o culling por celula e' REAL: cada celula no SEU lugar
+	_check(celulas >= 9, "grama fatiada em %d celulas" % celulas)
+	_check(origens.size() == celulas,
+			"as %d celulas tem %d origens DISTINTAS — visibility_range mede a "
+			% [celulas, origens.size()] + "distancia ate' a origem do no', e com "
+			+ "todas em (0,0,0) o corte era tudo-ou-nada")
+	var passo := float(scr.SIZE) / float(int(10.0 * e))
+	_check(passo > 20.0 and passo < 40.0,
+			"a celula tem %.0f m: a grade escalou junto com o mapa (o corte e' 80 m)"
+			% passo)
+## ============================================================================
 
 
 func _test_determinism(packed: PackedScene) -> void:
