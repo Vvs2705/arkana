@@ -51,6 +51,152 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> COMECE POR AQUI — a leva 7: o ELENCO INTEIRO no jogo (20 de 20)
+
+**27/08, fim de tarde (leva 7).** APK:
+`godot/build/testes/arkana-2026-08-27_1434.apk` — **272 MB** (era 141; ver §4).
+Portao 12/12 verde. Branch `claude/whatsapp-video-review-799b24`. Commit `90f531a`.
+
+#### 1. O ERRO QUE ORIGINOU ESTA LEVA — leia antes de tudo
+
+Um trabalhador leu a auditoria de 25/08 (*"a `vista-3-4` e' a frontal repetida em
+12 de 12; nao existe perfil de 90 graus no lote"*) e, em cima dela, escreveu **20
+arquivos de prompt para REFAZER do zero a arte dos 18 magos**. Eu repassei isso ao
+Diretor como *"bloqueado por credito de imagem"* — **sem abrir a pasta**.
+
+A arte estava toda la' desde 24/08: `personagens/NN-slug/arte/_originais/`,
+**8 vistas por mago, 160 PNGs**. Foi o Diretor quem perguntou: *"por que isso dos
+personagens se eles existem dentro da pasta do projeto?"*.
+
+E a auditoria **nao confere como regra geral**: conferido imagem a imagem em
+27/08, o perfil da **Veu e' um 90 graus de verdade** (um olho, uma orelha, nenhum
+peito); o do **Basalto** e' mesmo um 3/4. Era **caso a caso**, e ninguem tinha
+olhado. A correcao esta' escrita na docstring de
+`concept_em_data_uri()` em `tools/meshy/meshy.py` para a frase nao circular de
+novo sem conferencia.
+
+**A licao, em uma linha:** antes de repetir um achado de auditoria, ABRIR O
+ARQUIVO. Custava um minuto e quase custou ~540 creditos e um dia de trabalho.
+
+#### 2. A ESTEIRA (que tambem ja' existia)
+
+`tools/meshy/meshy.py` le' exatamente
+`personagens/<slug>/arte/_originais/master-reference-frente.png`.
+
+MEDIDO por mago, com **um rodado de ponta a ponta antes do lote**:
+
+| passo | custo |
+|---|---|
+| malha 3D + 4 texturas PBR (`/image-to-3d`) | **30** |
+| rig, altura lida da ficha (`/rigging`) | **5** |
+| fusao dos clipes do Brok (Blender) | 0 |
+| **por mago** | **35** |
+
+**~670 creditos gastos** (18 magos + a regeracao do Ilusionista). Saldo: **2.304**.
+
+**A DESCOBERTA QUE DESTRAVOU TUDO:** o rigger da Meshy entrega o **MESMO
+esqueleto** para todos — 24 ossos, mesmos nomes, mesma ordem em `brok.glb` e nos
+18 novos (conferido lendo o JSON dos `.glb`). As acoes do Brok retargetam por
+nome de osso, **de graca**.
+
+Isso importa porque a API so' devolve `walking`/`running`, e
+`Mage.REQUIRED_ANIMS` exige **idle/run/cast**: sem os tres o Mage **REJEITA** o
+modelo externo e cai no procedural — o mago **desaparece do jogo EM SILENCIO**,
+sem uma linha no console. Seriam 35 creditos por um personagem que nunca aparece.
+Cada um dos 18 recebeu **13 clipes**: idle, run, cast, cair, planar, pegar,
+derrubado, nadar, nadar_parado, mergulho, ande_agachado, walking, run_02.
+
+Ferramentas: `tools/blender/fundir_animacoes.py` ganhou o 4o argumento
+**`manter`** (inverte o descarte — aqui quem DOA os clipes e' o Brok, nao o
+contrario); `tools/meshy/vestir.sh` e' a esteira completa (rig -> fusao ->
+instalacao), com `ORIGEM` por env var porque o atelie nao vai para o git e o
+`meshy.py` so' roda no clone principal.
+
+#### 3. O DEFEITO ACHADO OLHANDO OS 18 RENDERIZADOS
+
+O **Ilusionista** saiu com **duas figuras coladas num corpo so'** — a referencia
+frontal dele tem, de proposito, ele **E o reflexo de cristal** (*"um reflexo e' o
+original"*, na ficha). Recorte nao separa: as duas se sobrepoem. A **LATERAL**
+separa limpo, entao gerei dele (+30) e re-rigguei. Corpo unico.
+`meshy.py` agora aceita um **`frente-recorte.png`** ao lado da mestra, com
+precedencia; **a arte APROVADA nao foi tocada**.
+
+Todos os 18 foram renderizados em Blender e olhados numa folha de contato antes
+de seguir — nao se aprova modelo que nao se viu.
+
+#### 4. O PRECO: O APK DOBROU (141 -> 272 MB)
+
+MEDIDO na composicao do APK:
+
+| | |
+|---|---|
+| texturas de personagem (21 arquivos, **2048x2048**) | **129 MB** |
+| malhas de personagem (25 arquivos) | 22 MB |
+| lib nativa do Godot | 78 MB |
+| resto (ilha, som, UI, castelo...) | ~43 MB |
+
+**A decisao esta' com o Diretor** (a lei dele de 25/08: tamanho de arquivo NAO e'
+argumento para recusar qualidade). Os numeros para decidir:
+- **1024x1024** nas texturas de personagem: 129 -> ~32 MB, **APK ~175 MB**. Num
+  celular o mago ocupa ~300 px de altura; 2K sobre 300 px e' 7x mais textura do
+  que a tela consegue mostrar, e 1K ainda e' sobra.
+- **150 MB e' o teto de APK da Google Play** — acima disso exige AAB + Play Asset
+  Delivery. Para sideload de teste, 272 MB funciona.
+
+#### 5. O ELENCO ESTA' NO WORKSPACE DELE
+
+A pedido do Diretor, os 18 foram subidos ao workspace da Meshy da conta dele —
+**licenca Privado**, **"manter textura e UV originais" ligado**, nome igual ao do
+repo. **Upload nao consome credito** (saldo intacto). Cada um ja' mostra o botao
+**Rig** no viewer: ele pode riggar e mandar para a biblioteca de animacao sem
+passar pela equipe.
+A copia do workspace tem textura **JPEG** (o teto de 10 MB da ferramenta de
+upload contra `.glb` de 11-15 MB); **o repo mantem o PNG**, que e' o que entra no
+APK.
+
+#### 6. O TESTE NOVO, E O FURO QUE ELE TINHA
+
+`characters/selftest.gd`: todo mago do elenco **tem** `.glb` **E VESTE** o `.glb`.
+
+A segunda parte e' a que tem dentes, e **eu escrevi errado primeiro**: cobrar
+`has_anim("idle"/"run"/"cast")` passa **VERDE com o mago sumido**, porque quando
+o modelo e' rejeitado o procedural assume e o procedural TEM os tres. Provado:
+quebrando o alias do cast, a versao inicial do teste continuou verde. Agora ele
+cobra `Mage.get_model_source()` comecando com `"external:"`.
+
+**Vermelho provado:** alias do cast quebrado -> `1 de 20 vestem`;
+`veu.glb` + `.import` removidos -> `19 de 20 tem .glb`.
+**E uma mutacao INVALIDA registrada:** renomear so' o `.glb` NAO fica vermelho —
+`ResourceLoader.exists()` responde pelo cache de importacao. Para mutar de
+verdade, apagar o `.import` junto.
+
+---
+
+### AINDA EM ABERTO depois da leva 7
+
+**BLOQUEIO UNICO — medir FPS no celular.** Nao e' codigo, e' um cabo USB
+(`adb devices` vazio). Agora vale por tres coisas: `Island.ESCALA` 2.5/3.0 (ja'
+medidos), mais bots, e a resolucao de textura do elenco.
+
+**PENDENCIA — o gesto de disparo.** A Pyra e' a UNICA do elenco com 0 clipes
+opcionais (os 18 novos tem 6 cada, herdados do Brok). O `cast` dela e' o
+"Mage Spell Cast", que o Diretor reprovou por ser magia de chao. As 6 variantes
+gratuitas sao todas conjuracao de aura. Video de referencia preflightado em 32,5
+creditos, nao gasto. Agora que os 18 tem 13 clipes, o caminho barato mudou:
+**resolver UM gesto de disparo bom e refundir nos 20**, em vez de um por mago.
+
+**DECISOES QUE ESPERAM O DIRETOR**
+1. **Resolucao das texturas de personagem** (§4) — 272 MB ou ~175 MB.
+2. **Veto ou nao** do circulo final da Zona no plato e no pico (leva 6).
+3. **Lista dos 10 magos do lancamento**, **nome e valores da moeda**, e **quais
+   pares de fusao estreiam** (papel de 26/08, ainda em aberto).
+4. **Chunking e 20 pawns** (`docs/cenario/MAPA-GRANDE-PLANO.md` §8), depois do FPS.
+5. Os 20 arquivos de `docs/prompts/personagens/` deixam de ser pedido de geracao
+   e passam a ser **especificacao** dos magos (ficha, paleta, silhueta) — servem
+   para regerar UMA vista ruim, como a lateral do Basalto.
+
+---
+
 ### >>> COMECE POR AQUI — a leva 6: mapa 4x maior, tempestade de battle royale, nada mais fixo
 
 **27/08, tarde (leva 6).** APK do teste:
