@@ -153,6 +153,14 @@ signal queda_altura(metros: float, velocidade: float)
 ## HUD/minimapa poder desenhar a linha por onde da' para saltar.
 signal castelo_rota(inicio: Vector3, fim: Vector3, duracao: float)
 
+## zona_abertura: A TEMPESTADE AINDA NAO EXISTE e vai existir em `segundos`.
+## E' o cronometro de 1:10 que roda com o MAPA INTEIRO ABERTO, depois do pouso
+## (ordem do Diretor, 27/08). A HUD conta para tras; ninguem toma dano aqui.
+signal zona_abertura(segundos: float)
+## zona_formando: a parede esta' APARECENDO em torno do mapa, vindo de fora e
+## parando na borda. Nao tira chao de ninguem — e' o anuncio de que a fase de
+## exploracao acabou.
+signal zona_formando(raio: float, duracao: float)
 signal zona_avisou(fase: int, centro: Vector3, raio: float, segundos: float)
 ## zona_fechando: a parede COMECOU a andar, e leva `duracao` segundos ate' o
 ## `raio` novo. O anel do proximo circulo apaga aqui.

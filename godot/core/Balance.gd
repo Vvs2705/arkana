@@ -287,7 +287,17 @@ const TOUCH := {
 	"tap_max_ms": 220,       # KNOB — calibrar SEMPRE junto com a deadzone
 }
 
+## A DURACAO NAO E' O FIM DA PARTIDA — e' a rede de seguranca. O fim de verdade
+## e' ultimo em pe' (Main.gd), e a zona forca isso fechando em ZERO.
+##
+## 480 s (8:00) em 27/08, era 180. A tabela nova da Zona soma 396 s depois do
+## pouso (70 de abertura + 10 de formacao + as 5 fases com as janelas que o
+## Diretor deu: 1:00, 50, 40, 30, 15). Com 180 a partida morria por cronometro
+## no meio da fase 2 — o unico final que um battle royale nao pode ter.
+## Os ~50 s de folga cobrem a queda do castelo, que corre neste mesmo relogio.
+## KNOB: baixar reabre o risco de fim por cronometro; subir so' aumenta o tempo
+## morto depois do colapso.
 const MATCH := {
-	"duration_s": 180.0,
+	"duration_s": 480.0,
 	"bots": 6,
 }

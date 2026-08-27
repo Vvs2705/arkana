@@ -103,6 +103,8 @@ func _ready() -> void:
 	Bus.kit_cooldown.connect(_on_kit_cooldown)
 	Bus.kit_telegraph.connect(_on_kit_telegraph)
 	Bus.kit_state.connect(func(nome: String, ligado: bool) -> void: aviso.estado(nome, ligado))
+	Bus.zona_abertura.connect(_on_zona_abertura)
+	Bus.zona_formando.connect(_on_zona_formando)
 	Bus.zona_avisou.connect(_on_zona_avisou)
 	Bus.zona_fechando.connect(_on_zona_fechando)
 	Bus.zona_dano.connect(_on_zona_dano)
@@ -365,6 +367,18 @@ static func _nome_habilidade(slug: String, campo: String) -> String:
 
 
 # ---------- zona / tempestade arcana ----------
+
+## O CRONOMETRO DE 1:10 do pouso. Sem bussola de proposito: nao ha' para onde
+## correr ainda, e uma seta apontando para o centro do mapa ensinaria a coisa
+## errada. O que ele responde e' "quanto tempo eu tenho para me virar".
+func _on_zona_abertura(segundos: float) -> void:
+	_contar(HudAviso.P_ZONA, segundos, Textos.ZONA_ABERTURA, Zona.COR)
+
+
+func _on_zona_formando(_raio: float, duracao: float) -> void:
+	_contagens.erase(HudAviso.P_ZONA)
+	aviso.avisar(HudAviso.P_ZONA, Textos.ZONA_FORMANDO, Zona.COR, duracao)
+
 
 func _on_zona_avisou(_fase: int, centro: Vector3, _raio: float, segundos: float) -> void:
 	aviso.bussola("zona", centro, Zona.COR)

@@ -56,6 +56,9 @@ func _ready() -> void:
 	add_child(hud)
 	hud.restart_pressed.connect(_build_match)
 	Bus.entity_died.connect(_on_entity_died)
+	## O POUSO LIGA A TEMPESTADE (27/08). Conectado UMA vez, aqui, e nao a cada
+	## partida: reconectar por partida acumularia N conexoes no mesmo sinal.
+	Bus.queda_fase.connect(_ao_mudar_queda)
 	## Costura R19: o juice observa o Bus — entra ANTES da 1a partida para
 	## nao perder o match_started do boot. Defensivo: sem a raia, nada quebra.
 	if ResourceLoader.exists("res://juice/MatchJuice.tscn"):
@@ -127,6 +130,12 @@ func _build_match() -> void:
 	## restart) e e' DETERMINISTICA pelo proprio seed — mesma sequencia de
 	## circulos toda partida, como manda o contrato do projeto.
 	## No TREINO nao ha' zona: ninguem aprende habilidade correndo da tempestade.
+	##
+	## Ela nasce INERTE (sem parede, sem dano, sem cronometro) e SO' LIGA quando
+	## o jogador pousa — ordem do Diretor de 27/08: "mapa todo aberto ate' que
+	## todos descam". Quem liga e' _ao_pousar(), fiado no Bus.queda_fase.
+	## Sem a camada de queda o pouso nunca chega, entao a zona liga aqui mesmo
+	## (senao a partida rodaria sem tempestade nenhuma).
 	zona = null if modo_treino else Zona.criar(arena, island)
 	## A QUEDA DO CASTELO — a partida comeca no ar, nao no chao. O castelo cruza
 	## o mapa, o jogador salta quando quiser, cai, plana e pousa. Ordem do
@@ -154,6 +163,12 @@ func _build_match() -> void:
 					if n is Bot:
 						lista.append(n)
 				qs.iniciar_bots(lista, island, q.castelo)
+			else:
+				_ligar_zona()   # a queda existe mas nao subiu: nao ficar sem zona
+	elif zona != null:
+		## SEM A CAMADA DE QUEDA a partida abre no chao e o sinal de pouso nunca
+		## chega. Ligar aqui e' o que impede uma partida inteira sem tempestade.
+		_ligar_zona()
 	hud.bind_player(player)
 	hud.hide_end()
 	if modo_treino:
@@ -170,6 +185,26 @@ func _build_match() -> void:
 ## jogador nasce no chao com as TRES luvas expostas a passos do spawn, dois
 ## bonecos que regeneram para apanhar, e a suprema enchendo em 5s em vez de
 ## 40-50 (testar suprema esperando 50s nao e' treino, e' fila).
+## A TEMPESTADE COMECA A CONTAR NO CHAO, nao no ceu. Ordem do Diretor (27/08):
+## "mapa todo aberto ate' que todos descam no mapa, contamos um cronometro de
+## 1:10 para comecar o circulo se formar". Enquanto o mago cai, `zona.iniciar()`
+## nao foi chamada: sem parede, sem dano, sem cronometro.
+##
+## E' a MESMA lei que a suprema ja' segue (KitRunner: `if Queda.no_ar(pawn):
+## return`) — nada da partida conta antes do pe' no chao.
+func _ao_mudar_queda(fase: String) -> void:
+	if fase == "pousou":
+		_ligar_zona()
+
+
+## Idempotente pelos dois lados: `iniciar()` ignora chamada repetida, e aqui a
+## zona pode nem existir (treino). Isso deixa as tres portas de entrada — pouso,
+## queda ausente, queda que falhou — chamarem sem se coordenar.
+func _ligar_zona() -> void:
+	if zona != null and is_instance_valid(zona):
+		zona.iniciar()
+
+
 func _montar_treino() -> void:
 	# as tres luvas, em fila, a 3-5m do jogador (a manopla com par fixo de
 	# exemplo — no jogo real ela so' nasce no Bau Celestial)

@@ -130,6 +130,10 @@ const HUD_KIT_EM_BREVE := SEL_EM_BREVE
 const HUD_TELEGRAFO := "SUPREMA: %s"
 
 ## ZONA / TEMPESTADE ARCANA — o que salva a vida do jogador vem primeiro.
+## A ABERTURA (27/08): o mapa esta' INTEIRO aberto e a tempestade ainda nao
+## existe. O texto tem que dizer as duas coisas — que ha' tempo, e que ele acaba.
+const ZONA_ABERTURA := "MAPA ABERTO · TEMPESTADE EM %ds"
+const ZONA_FORMANDO := "A TEMPESTADE CERCA A ILHA"
 const ZONA_AVISO := "A TEMPESTADE AVANÇA EM %ds"
 const ZONA_FECHANDO := "A TEMPESTADE ESTÁ AVANÇANDO"
 const ZONA_FORA := "VOLTE PARA A ZONA"

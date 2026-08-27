@@ -30,52 +30,69 @@
 class_name Zona
 extends Node3D
 
-## Seed proprio (nao o do Loot): mexer no loot nao pode mudar os circulos.
+## Seed de FALLBACK (nao o do Loot: mexer no loot nao pode mudar os circulos).
+## USADO SO' EM TESTE. Em partida de verdade o seed e' SORTEADO — ver `criar`.
 const SEED_ZONA := 2707
 
-## Raio de partida = MEIA-ILHA. Garante que ninguem nasce fora da zona,
-## qualquer que seja o spawn.
-##
-## OS RAIOS DESTE ARQUIVO ESCALAM COM O MAPA. Eles foram calibrados contra uma
-## ilha de ILHA_REF metros de lado; quando a ilha muda de tamanho, `plano()` le'
-## o lado real e multiplica tudo. Sem isso, em 26/08 a ilha passou de 180 para
-## 300 m e o raio inicial de 90 (que era meia-ilha) virou menos de um terco:
-## 6 dos 14 pontos de nascimento ficaram FORA do primeiro circulo e tomavam
-## dano no segundo zero. O numero cravado nao acusou nada — o comentario ao
-## lado dele ja' dizia "meia-ilha" e mesmo assim envelheceu calado.
-##
-## KNOB: baixar aperta a queda desde o primeiro segundo; subir faz a fase 1 nao
-## significar nada.
-const RAIO_INICIAL := 90.0
+## RAIO DE FALLBACK do mapa, para quando nao ha' ilha (teste, mundo de
+## emergencia). Em partida quem manda e' `Island.LAND_R`.
+const RAIO_MAPA_PADRAO := 132.0
 
-## A ilha contra a qual RAIO_INICIAL e a tabela FASES foram escritos.
-## NAO e' o tamanho atual do mapa — e' a regua de calibragem. Mudar este numero
-## reinterpreta todos os raios abaixo; para mudar o MAPA, mexa em Island.SIZE.
-const ILHA_REF := 180.0
+## O CRONOMETRO DE ABERTURA — a ordem do Diretor de 27/08, e a regra de todo
+## battle royale que funciona: NA QUEDA NAO HA' LIMITE. O mapa fica INTEIRO
+## aberto ate' todos pousarem; so' depois a tempestade existe.
+##
+## 1:10 = 70 s, o numero que ele deu. E' quase exatamente o que os outros usam
+## na primeira janela (Apex 1:15, PUBG 2:00, Fortnite 2:30 — ver
+## docs/referencias/ZONA-BATTLE-ROYALE.md): tempo de pousar, achar arma e
+## decidir para onde ir, sem ninguem ainda sangrando.
+const ABERTURA_S := 70.0
 
-## AS 5 FASES. `espera` = zona parada com o proximo circulo ja' visivel;
-## `fecha` = parede andando; `raio` = onde ela para; `dps` = dano por segundo
-## de quem ficou fora DURANTE E DEPOIS de fechar.
-## Soma dos tempos = 165s dentro dos 180s de Balance.MATCH.duration_s (so'
-## LEITURA daqui — Balance e' outra raia). Os 15s que sobram sao de proposito:
-## o ultimo circulo (4m) fecha aos 165s e o duelo final acontece em cima dele.
+## Quanto a tempestade leva para SE FORMAR em torno do mapa, quando os 70 s
+## acabam. Ela vem de fora para dentro e para na linha da costa ("ele para", na
+## ordem do Diretor). Sem dano: e' anuncio, nao punicao.
+const FORMACAO_S := 10.0
+
+## AS 5 FASES DEPOIS DA ABERTURA. `espera` = zona parada com o proximo circulo
+## ja' desenhado no chao; `fecha` = parede andando; `frac` = onde ela para, como
+## FRACAO DO RAIO DO MAPA; `dps` = dano por segundo de quem ficou fora.
+##
+## POR QUE `frac` E NAO METRO (27/08): antes os raios eram metros calibrados
+## contra uma "regua" de 180 m, e um multiplicador consertava a diferenca. Duas
+## verdades sobre o mesmo numero e' como a zona ficou com um terco do mapa
+## quando a ilha cresceu em 26/08. Fracao tem UMA verdade: 0.62 e' 62% do mapa
+## em 300 m e em 2.400 m, sem regua, sem escala, sem envelhecer.
+##
+## OS TEMPOS SAO A ORDEM DO DIRETOR (27/08): 1:10 de abertura, depois 1:00, 50,
+## 40 e 30. Confere com o que os outros fazem — a janela ENCOLHE junto com o
+## circulo (Fortnite: 2:30, 1:50, 1:30, 1:00, 45, 30, 20, 10). Janela constante
+## faz a partida ter dois ritmos; janela que encolhe faz a partida ACELERAR.
+##
+## OS RAIOS seguem a razao dos outros (~0.65 por fase no comeco, 0.5 no fim —
+## PUBG divide o diametro por 2 a partir da fase 5).
+##
+## A FASE 5 FECHA EM ZERO. Ordem do Diretor: "ate' todo o mapa ser tomado pela
+## tempestade de dano para forcar finalizar a batalha". E' o que os tres
+## referenciais fazem (PUBG fase 9 -> 0 m, Apex ring 6 -> 0,05 m, Fortnite zona
+## final -> 1 jogador). Sem isso a partida podia acabar por CRONOMETRO com dois
+## vivos, que e' o unico final que um battle royale nao pode ter.
 ##
 ## KNOBs da tabela:
 ##   espera AUMENTAR = mais tempo de loot e rotacao calma, partida mais morna;
 ##          DIMINUIR = corrida constante, sem janela para procurar arma.
 ##   fecha  AUMENTAR = da' pra atravessar a parede sofrendo pouco (a zona vira
 ##          sugestao); DIMINUIR = quem estava longe morre sem chance de correr.
-##   raio   descer mais rapido = confronto mais cedo e partidas mais curtas;
+##   frac   descer mais rapido = confronto mais cedo e partidas mais curtas;
 ##          descer devagar = o mapa nunca aperta e a zona nao decide nada.
 ##   dps    AUMENTAR = a zona vira a maior causa de morte do jogo (roubo de
 ##          kill dos magos); DIMINUIR = compensa ficar fora tomando dano de
 ##          graca, que e' exatamente o que a zona existe para impedir.
 const FASES := [
-	{"espera": 25.0, "fecha": 20.0, "raio": 62.0, "dps": 1.5},
-	{"espera": 20.0, "fecha": 18.0, "raio": 42.0, "dps": 3.0},
-	{"espera": 18.0, "fecha": 16.0, "raio": 24.0, "dps": 6.0},
-	{"espera": 15.0, "fecha": 14.0, "raio": 12.0, "dps": 11.0},
-	{"espera": 10.0, "fecha":  9.0, "raio":  4.0, "dps": 18.0},
+	{"espera": 60.0, "fecha": 30.0, "frac": 0.62, "dps":  1.5},
+	{"espera": 50.0, "fecha": 26.0, "frac": 0.42, "dps":  3.0},
+	{"espera": 40.0, "fecha": 22.0, "frac": 0.26, "dps":  6.0},
+	{"espera": 30.0, "fecha": 18.0, "frac": 0.13, "dps": 11.0},
+	{"espera": 15.0, "fecha": 25.0, "frac": 0.00, "dps": 26.0},
 ]
 
 ## Quanto o centro novo pode fugir do centro velho, como fracao da folga
@@ -83,6 +100,11 @@ const FASES := [
 ## velho (rotacoes brutais, quem esta' no lado errado nao chega); 0.0 = tudo
 ## concentrico e o mapa vira funil previsivel. 0.75 mantem a rotacao viva
 ## deixando margem de fuga.
+##
+## E' a mesma lei dos outros, escrita de outro jeito: a documentacao do Zone
+## Wars da Epic manda limitar o deslocamento a 1/2 do raio anterior para garantir
+## que a zona nova nao escape da velha. Fracao da FOLGA e' mais apertado que isso
+## e garante a contencao por construcao, nao por calibragem.
 const DESLOCAMENTO := 0.75
 
 ## s por aplicacao de dano. NAO BAIXAR PARA VALOR DE FRAME: e' exatamente o bug
@@ -99,8 +121,19 @@ const COR := Color("b06cff")    # violeta arcano (paleta GDD §10: cor, nunca es
 ## caminho para a borda ele briga; passou disso, corre.
 const BOT_MARGEM := 0.85
 
+## O RELOGIO TEM 5 ESTADOS, nao 2. Antes era so' o booleano `fechando`, porque
+## a zona nascia ligada. Agora existe partida ANTES da tempestade (a abertura),
+## e "parado" deixou de significar uma coisa so'.
+enum {INERTE, ABERTURA, FORMANDO, ESPERA, FECHA}
+
 var fase := 0                   # 0 = antes da 1a fase; 1..FASES.size()
-var fechando := false           # a parede esta' andando AGORA
+var fechando := false           # a parede esta' andando AGORA (ESPELHO de _estado)
+## O seed DESTA partida. Sorteado em `criar` e guardado: o dia em que houver
+## rede, o servidor sorteia, manda este numero e todo mundo desenha os MESMOS
+## circulos sem trocar uma coordenada.
+var seed_da_partida := SEED_ZONA
+var _estado := INERTE
+var _raio_mapa := RAIO_MAPA_PADRAO
 ## Centro e raio do circulo ATUAL. Os dois sao TWEENADOS durante o fechamento
 ## e os dois tem setter: e' o setter que move/escala a parede, entao o
 ## encolhimento inteiro nao precisa de UMA linha de _process.
@@ -108,7 +141,7 @@ var centro := Vector3.ZERO:
 	set(v):
 		centro = v
 		_por_parede()
-var raio := RAIO_INICIAL:
+var raio := RAIO_MAPA_PADRAO:
 	set(v):
 		raio = v
 		_por_parede()
@@ -124,24 +157,50 @@ var _player_fora := false       # borda: so' emite zona_estado quando MUDA
 ## Cria a zona da partida. DETERMINISTICO: mesmo seed = mesma sequencia de
 ## centros e raios. `island` so' precisa responder height(x, z) — serve para
 ## nao plantar o circulo final no meio do lago; sem ela tudo funciona igual.
-## Quantas vezes o mapa atual e' maior que a regua de calibragem (ILHA_REF).
-## Le' o lado da ilha que foi ENTREGUE, e nao um preload de Island.gd: em 26/08
-## a ilha ficou com erro de sintaxe salvo em disco por um tempo, e um preload
-## teria derrubado a Zona junto. Sem ilha, devolve 1.0 e nada muda — e' o que
-## mantem o selftest da zona rodando sem mundo.
-static func escala_do_mapa(island: Node) -> float:
-	if island == null or not ("SIZE" in island):
-		return 1.0
-	var lado := float(island.SIZE)
-	if lado <= 0.0:
-		return 1.0
-	return lado / ILHA_REF
+## O RAIO DO MAPA em metros — a unica medida de que a tabela precisa, porque a
+## tabela e' toda em fracao dele. Le' a ilha ENTREGUE, e nao um preload de
+## Island.gd: em 26/08 a ilha ficou com erro de sintaxe salvo em disco por um
+## tempo, e um preload teria derrubado a Zona junto. Sem ilha, devolve o padrao
+## e nada quebra — e' o que mantem o selftest rodando sem mundo.
+##
+## Prefere LAND_R (raio de TERRA FIRME) a SIZE/2: metade do lado de um mapa
+## quadrado cai no mar. A tempestade tem que fechar sobre chao.
+static func raio_do_mapa(island: Node) -> float:
+	if island == null:
+		return RAIO_MAPA_PADRAO
+	if "LAND_R" in island and float(island.LAND_R) > 0.0:
+		return float(island.LAND_R)
+	if "SIZE" in island and float(island.SIZE) > 0.0:
+		return float(island.SIZE) * 0.5
+	return RAIO_MAPA_PADRAO
 
 
-static func criar(parent: Node3D, island: Node, p_seed := SEED_ZONA) -> Zona:
+## Cria a zona da partida. NASCE INERTE: sem parede visivel, sem relogio, sem
+## dano. Quem a liga e' `iniciar()`, chamada quando o jogador POUSA — e' assim
+## que "na queda nao ha' limite" deixa de ser promessa e passa a ser codigo.
+##
+## O SEED E' SORTEADO A CADA PARTIDA (`p_seed < 0`). Era fixo em 2707, o que
+## significava: os MESMOS cinco circulos, nos MESMOS lugares, em toda partida
+## que o jogo jamais rodou. Ordem do Diretor de 27/08 — "a ideia de nao ser fixo
+## o fechamento dos circulos e' para ninguem montar estrategias para ficar fixo
+## no mesmo lugar e sobreviver sempre como finalistas". E' tambem o que a Respawn
+## diz ter feito no Apex ("alteracoes para reduzir a previsibilidade").
+##
+## O DETERMINISMO NAO SE PERDE: o plano inteiro sai de UM seed, calculado de uma
+## vez. Passe o seed e a sequencia se repete exatamente (e' o que o selftest
+## faz). O que era determinismo ENTRE partidas virou determinismo DENTRO da
+## partida, que e' o unico que a rede e o teste precisam.
+static func criar(parent: Node3D, island: Node, p_seed := -1) -> Zona:
 	var z := Zona.new()
 	z.name = "Zona"
-	z._plano = plano(island, p_seed)
+	if p_seed < 0:
+		var sorteio := RandomNumberGenerator.new()
+		sorteio.randomize()
+		z.seed_da_partida = int(sorteio.randi())
+	else:
+		z.seed_da_partida = p_seed
+	z._raio_mapa = raio_do_mapa(island)
+	z._plano = plano(island, z.seed_da_partida)
 	parent.add_child(z)
 	return z
 
@@ -151,24 +210,22 @@ static func criar(parent: Node3D, island: Node, p_seed := SEED_ZONA) -> Zona:
 ## Lei do circulo: o novo esta' SEMPRE contido no anterior — dist(c1,c0) + r1
 ## <= r0. Sem isso existiria ponto seguro AGORA que fica fora depois de andar,
 ## e o jogador nao teria como planejar rotacao.
-## Raio com que a tempestade abre. Deriva do plano, que ja' nasce escalado.
-func _raio_de_abertura() -> float:
-	if _plano.is_empty():
-		return RAIO_INICIAL
-	# O primeiro circulo e' o DESTINO da fase 1; a abertura e' maior que ele na
-	# mesma proporcao em que RAIO_INICIAL e' maior que FASES[0].raio.
-	return float(_plano[0].raio) * (RAIO_INICIAL / float(FASES[0].raio))
+## O raio onde a tempestade PARA quando termina de se formar: a borda do mapa.
+## E' o "em torno do mapa" da ordem do Diretor — a parede aparece na linha da
+## costa, sem tirar um metro de chao de ninguem, e SO' DEPOIS comeca a apertar.
+func _raio_da_borda() -> float:
+	return _raio_mapa
 
 
 static func plano(island: Node, p_seed := SEED_ZONA) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = p_seed
-	var esc := escala_do_mapa(island)
+	var mapa := raio_do_mapa(island)
 	var c := Vector3.ZERO
-	var r := RAIO_INICIAL * esc
+	var r := mapa
 	var out: Array = []
 	for f in FASES:
-		var novo_r := float(f.raio) * esc
+		var novo_r := float(f.frac) * mapa
 		var folga: float = maxf(r - novo_r, 0.0) * DESLOCAMENTO
 		c = _sortear_centro(island, rng, c, folga)
 		r = novo_r
@@ -203,22 +260,46 @@ func _ready() -> void:
 	if _plano.is_empty():
 		_plano = plano(null)
 	_montar_visual()
-	# O raio de abertura sai da MESMA conta que gerou o plano (ja' escalado pelo
-	# mapa). Ler a constante crua aqui era o que deixava a parede nascer com o
-	# tamanho da ilha antiga mesmo com o plano correto.
-	raio = _raio_de_abertura()     # dispara o setter: parede na escala certa
+	## NASCE NA BORDA E INVISIVEL. O raio ja' e' o do mapa para que qualquer
+	## consulta a `dentro()` durante a queda responda "sim" — ninguem esta' fora
+	## de uma tempestade que ainda nao existe.
+	raio = _raio_da_borda()
+	_parede.visible = false
 	_timer = Timer.new()
 	_timer.one_shot = true
 	_timer.timeout.connect(_no_tempo)
 	add_child(_timer)
 	## O dano tem relogio PROPRIO, separado do das fases: nenhum pawn ganha
 	## _process por causa da zona (6 bots + player = 7 varreduras por segundo).
+	## Roda desde o boot, mas `dps_atual()` devolve 0 enquanto fase == 0 — o
+	## tique existe e nao doi, que e' o que a abertura precisa.
 	_tick = Timer.new()
 	_tick.wait_time = TICK_S
 	_tick.timeout.connect(_tique)
 	add_child(_tick)
 	_tick.start()
-	_avisar()
+
+
+## LIGA A TEMPESTADE. Chamada por gameplay/Main quando o jogador POUSA (e na
+## hora do boot quando nao ha' queda). Ate' aqui o mapa esta' INTEIRO aberto:
+## sem parede, sem dano, sem cronometro — a ordem do Diretor de 27/08.
+##
+## Idempotente de proposito: `Main` pode fiar isto no sinal de pouso sem se
+## preocupar com sinal repetido, e o selftest pode chamar duas vezes.
+func iniciar() -> void:
+	if _estado != INERTE:
+		return
+	_estado = ABERTURA
+	Bus.zona_abertura.emit(ABERTURA_S)
+	_timer.start(ABERTURA_S)
+
+
+## Segundos que faltam no cronometro corrente (abertura, espera ou fechamento).
+## A HUD desenha isto; sem este acessor ela teria que espelhar o Timer.
+func restante() -> float:
+	if _estado == INERTE or _timer == null:
+		return 0.0
+	return _timer.time_left
 
 
 # ------------------------------------------------------------- as duas metades
@@ -227,12 +308,27 @@ func _ready() -> void:
 ## A HUD observa zona_avisou e poe o circulo na bussola/minimapa.
 func _avisar() -> void:
 	if fase >= _plano.size():
-		return  # ultimo circulo fechado: a tempestade nao avanca mais
+		_estado = ESPERA
+		return  # ultimo circulo fechado: a tempestade tomou o mapa
+	_estado = ESPERA
 	var alvo: Dictionary = _plano[fase]
 	var espera := float(FASES[fase].espera)
 	_desenhar_anel(alvo.centro, float(alvo.raio))
 	Bus.zona_avisou.emit(fase + 1, alvo.centro, float(alvo.raio), espera)
 	_timer.start(espera)
+
+
+## A TEMPESTADE SE FORMA. Os 70 s acabaram: a parede vem de fora e para na borda
+## do mapa. Nao tira chao de ninguem e nao doi — e' o "ele para" do Diretor, o
+## anuncio de que a partida deixou de ser exploracao.
+func _formar() -> void:
+	_estado = FORMANDO
+	_parede.visible = true
+	raio = _raio_da_borda() * 1.6      # comeca fora do mapa e entra
+	var tw := create_tween()
+	tw.tween_property(self, "raio", _raio_da_borda(), FORMACAO_S)
+	Bus.zona_formando.emit(_raio_da_borda(), FORMACAO_S)
+	_timer.start(FORMACAO_S)
 
 
 ## FECHA — a parede anda. Centro e raio caminham JUNTOS no mesmo Tween, na
@@ -242,6 +338,7 @@ func _fechar() -> void:
 	var alvo: Dictionary = _plano[fase]
 	fase += 1
 	fechando = true
+	_estado = FECHA
 	var dur := float(FASES[fase - 1].fecha)
 	var tw := create_tween().set_parallel()
 	tw.tween_property(self, "raio", float(alvo.raio), dur)
@@ -251,16 +348,22 @@ func _fechar() -> void:
 
 
 func _no_tempo() -> void:
-	if fechando:
-		_chegou()
-	else:
-		_fechar()
+	match _estado:
+		ABERTURA:
+			_formar()
+		FORMANDO:
+			_avisar()
+		FECHA:
+			_chegou()
+		_:
+			_fechar()
 
 
 ## A parede chegou. Crava os valores exatos (o Tween pode parar em 61.9998) e
 ## chama a proxima espera.
 func _chegou() -> void:
 	fechando = false
+	_estado = ESPERA
 	var alvo: Dictionary = _plano[fase - 1]
 	centro = alvo.centro
 	raio = float(alvo.raio)
@@ -271,7 +374,12 @@ func _chegou() -> void:
 func _por_parede() -> void:
 	if not is_instance_valid(_parede):
 		return
-	_parede.scale = Vector3(raio, 1.0, raio)
+	## PISO DE ESCALA. A fase 5 fecha em raio ZERO (o mapa inteiro vira
+	## tempestade) e uma escala 0 num MeshInstance3D e' transformada degenerada:
+	## o Godot reclama e a normal do cilindro vira NaN. 5 cm nao se ve' e nao
+	## degenera. O `raio` de verdade continua 0 — quem responde `dentro()` e'
+	## ele, nao a escala, entao o colapso mata do mesmo jeito.
+	_parede.scale = Vector3(maxf(raio, 0.05), 1.0, maxf(raio, 0.05))
 	_parede.position = Vector3(centro.x, ALTURA_PAREDE * 0.5, centro.z)
 
 
@@ -317,6 +425,13 @@ func dps_atual() -> float:
 	if fase <= 0:
 		return 0.0
 	return float(FASES[mini(fase, FASES.size()) - 1].dps)
+
+
+## A TEMPESTADE JA' EXISTE? Falso durante a queda e durante os 70 s de abertura.
+## Quem pergunta: a HUD (nao desenhar bussola para uma zona que nao ha') e o
+## bot (nao rotacionar por causa de parede que nao existe).
+func ativa() -> bool:
+	return _estado != INERTE and _estado != ABERTURA
 
 
 func dentro(pos: Vector3) -> bool:
