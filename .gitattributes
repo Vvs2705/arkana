@@ -1,11 +1,11 @@
 # Game-ready character assets. Keep this scoped so existing concept art PNGs
 # are not silently migrated to LFS by future edits.
-godot/characters/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
-godot/characters/modelos/*.GLB filter=lfs diff=lfs merge=lfs -text
-godot/characters/modelos/*.png filter=lfs diff=lfs merge=lfs -text
-godot/characters/modelos/*.PNG filter=lfs diff=lfs merge=lfs -text
-godot/characters/modelos/*.ktx2 filter=lfs diff=lfs merge=lfs -text
-godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.GLB filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.png filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.PNG filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.ktx2 filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text
 
 # Concept art dos 20 magos (8 vistas cada, 306 MB). Decisao do Diretor em
 # 26/08/2026: elas passam a viver NO repositorio, via LFS. Antes existiam em UM
@@ -16,22 +16,31 @@ godot/characters/modelos/*.KTX2 filter=lfs diff=lfs merge=lfs -text
 # num clone limpo. A cota gratuita do GitHub e' 1 GB de armazenamento e 1 GB de
 # banda por mes — cabe, mas sao ~3 clones limpos por mes antes de estourar a
 # banda. Se estourar, a saida e' comprar data pack ou mover para storage externo.
-personagens/**/arte/_originais/*.png filter=lfs diff=lfs merge=lfs -text
-personagens/**/arte/_originais/*.PNG filter=lfs diff=lfs merge=lfs -text
+arte/personagens/**/_originais/*.png filter=lfs diff=lfs merge=lfs -text
+arte/personagens/**/_originais/*.PNG filter=lfs diff=lfs merge=lfs -text
 
 # Concept art de CENARIO aprovada em 26/08 (55 pecas: castelo, luvas, bau,
 # ruinas, torre, altar) — mesma decisao das 160 referencias de personagens:
 # arte versionada no LFS. Novo total de LFS ~470 MB; a cota gratis (1 GB de
 # armazenamento / 1 GB de banda por mes) passa a render ~2 clones limpos por
 # mes. Estourou: data pack ou storage externo (nao ha' terceira saida).
-cenario/**/arte/*.png filter=lfs diff=lfs merge=lfs -text
-cenario/**/arte/*.PNG filter=lfs diff=lfs merge=lfs -text
+arte/cenario/**/*.png filter=lfs diff=lfs merge=lfs -text
+arte/cenario/**/*.PNG filter=lfs diff=lfs merge=lfs -text
 
 # Modelos de JOGO do cenario (decimados do Meshy pelo Blender, 26/08): estes
 # ENTRAM no APK e no git via LFS. ~46 MB no total com texturas 2K embutidas.
-godot/world/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
-godot/gameplay/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/world/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/gameplay/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
 
 # Kit esculpido do cenario (Meshy -> Blender). Mesmo motivo dos personagens:
 # binario grande, e o que precisa sobreviver e' o codigo que planta, nao o .glb.
-godot/world/modelos/**/*.glb filter=lfs diff=lfs merge=lfs -text
+mobile-godot/godot/world/modelos/**/*.glb filter=lfs diff=lfs merge=lfs -text
+
+# REORGANIZACAO DE 27/08/2026: a raiz passou a separar DECISAO (design/),
+# MATERIA-PRIMA (arte/) e as tres implementacoes (pc-unreal/, mobile-godot/,
+# roblox/). Os padroes acima acompanharam os caminhos novos. Se um binario
+# grande aparecer fora deles, ele entra no git como blob e NAO tem volta barata.
+arte/**/*.glb filter=lfs diff=lfs merge=lfs -text
+arte/**/*.GLB filter=lfs diff=lfs merge=lfs -text
+pc-unreal/**/*.uasset filter=lfs diff=lfs merge=lfs -text
+pc-unreal/**/*.umap filter=lfs diff=lfs merge=lfs -text
