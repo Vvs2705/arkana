@@ -31,3 +31,7 @@ cenario/**/arte/*.PNG filter=lfs diff=lfs merge=lfs -text
 # ENTRAM no APK e no git via LFS. ~46 MB no total com texturas 2K embutidas.
 godot/world/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
 godot/gameplay/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
+
+# Kit esculpido do cenario (Meshy -> Blender). Mesmo motivo dos personagens:
+# binario grande, e o que precisa sobreviver e' o codigo que planta, nao o .glb.
+godot/world/modelos/**/*.glb filter=lfs diff=lfs merge=lfs -text

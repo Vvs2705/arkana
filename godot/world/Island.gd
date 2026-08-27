@@ -312,6 +312,14 @@ func _build() -> void:
 	_build_motes(gen)
 	_build_mist(gen)
 	_snap_spawns()
+	## O KIT ESCULPIDO (27/08). Vem DEPOIS de _snap_spawns porque planta pelos POIs
+	## e pelo relevo, e precisa que a ilha esteja inteira. Defensivo: sem os .glb
+	## do kit ele nao planta nada e a ilha continua de pe' — o mesmo padrao do
+	## modelo externo do Mage.
+	if ResourceLoader.exists("res://world/KitCenario.gd"):
+		var kit: GDScript = load("res://world/KitCenario.gd")
+		if kit != null:
+			kit.plantar(gen, self)
 
 
 # ---------------------------------------------------------------- relevo
