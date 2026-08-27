@@ -51,7 +51,47 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 2º vídeo avaliado, 3 defeitos mortos, dossiê Spellbreak, clipes Meshy no meio
+### >>> COMECE POR AQUI — Brok animado de verdade, abertura com o castelo VOANDO, 3 defeitos mortos
+
+**26/08, noite (leva 2 — atualiza o bloco abaixo).** Tudo na branch
+`claude/whatsapp-video-review-799b24`, portão 12/12 em cada passo:
+
+1. **O Brok tem os 13 clipes** (`888567f`). Da biblioteca Meshy (grátis):
+   `cair` (falling_down), `nadar`, `nadar_parado`, `pegar` (agachar-pegar),
+   `derrubado` (gemido no chão), `ande_agachado`. Por **Texto para Motion**
+   (20 créditos, autorizados): `planar` (barriga, pose de paraquedismo — saiu
+   ÓTIMO no retarget) e `mergulho` (de cabeça — guardado para o mergulhar da
+   água). Fusão via `tools/blender/fundir_animacoes.py` (novo, headless,
+   reutilizável): **o export "Todos Adicionados" da Meshy OMITIU o
+   `mage_soell_cast`** — por isso NUNCA substituir o glb do repo pelo download;
+   sempre fundir. Esqueletos conferidos idênticos (24 ossos). Aliases exatos:
+   o `Mage.gd` adota sozinho, com laço automático em cair/planar/derrubado.
+2. **A abertura agora é o castelo VOANDO** (`a04ec09`, ordem dele por texto):
+   no trajeto, o pivô da câmera larga o ombro (o mago viaja pendurado SOB a
+   rocha — era ESSA a causa do breu) e vai ao coração do castelo com o braço
+   a 90 m e sem colisão; o arrastar de olhar orbita a ilha voadora. No salto,
+   volta ao ombro. Provado no selftest da queda.
+3. Os 3 defeitos do vídeo (kill feed batizado, BOTS 0 na vitória, pausa na
+   tela) — ver leva 1 abaixo. **Saldo Meshy: 3.004.**
+
+**Próximo (em ordem):**
+- **APK novo para o Diretor testar** (build disparado no fecho desta leva —
+  conferir `godot/build/`): abertura do castelo, queda/planar do Brok, pausa,
+  kill feed com nome, BOTS 0.
+- **Pyra: mesma receita do Brok** — ela NÃO está na galeria do site (página 1;
+  provavelmente veio da API). Caminho: Carregar o `pyra.glb` do repo no
+  webapp → Animar → mesmos clipes da biblioteca + os 2 Movimentos de IA já
+  PAGOS na conta ("Planar horizontal v2" e "Planar (glide)" aplicam em
+  qualquer modelo) → download → `fundir_animacoes.py`. ~15 min de navegador.
+- **Código novo que os clipes destravam**: contrato `nadar`/`nadar_parado` no
+  Pawn/Mage (a água hoje não troca animação), `mergulho` (botão novo, GDD),
+  `ande_agachado` no agachar, e o gesto do baú sustentado com o `pegar` real.
+- O quadro geral da leva 1 (respostas do teste, dossiê, fila visual) está no
+  bloco logo abaixo — continua valendo.
+
+---
+
+### (26/08, noite — leva 1: 2º vídeo avaliado, dossiê Spellbreak, histórico)
 
 **26/08, noite.** O Diretor testou o APK 16:50 (o primeiro com os modelos Meshy
 dentro) e mandou vídeo de **partida completa** (130 s, VITÓRIA). Branch desta
