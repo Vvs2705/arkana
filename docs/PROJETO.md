@@ -51,7 +51,65 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — as 5 peças-herói existem em 3D, na conta do Diretor
+### >>> COMECE POR AQUI — 2º vídeo avaliado, 3 defeitos mortos, dossiê Spellbreak, clipes Meshy no meio
+
+**26/08, noite.** O Diretor testou o APK 16:50 (o primeiro com os modelos Meshy
+dentro) e mandou vídeo de **partida completa** (130 s, VITÓRIA). Branch desta
+leva: `claude/whatsapp-video-review-799b24` (commits `4fa9755` + `522ba4d`).
+
+**As 3 respostas que a fase anterior pediu, tiradas do vídeo:**
+- **Castelo na abertura: metade.** Os ~1,5 s iniciais são a rocha DELE em sombra
+  ocupando a tela inteira (quase preto); olhando de baixo funciona como
+  silhueta dramática e o brilho dourado central lê bem. Conserto sugerido:
+  câmera nascer enquadrando o castelo contra o CÉU + luz de preenchimento/
+  emissiva (clima com COR, nunca falta de luz).
+- **Luvas no chão: de perto leem MUITO bem** (a manopla é a melhor peça do
+  lote); **de longe viram vulto preto** — quem lê à distância é o feixe e o
+  rótulo. E o rótulo lê longe DEMAIS (sem corte por distância, gruda na borda).
+- **A queda "estranha" — dívida paga:** ela cai em pose de idle/corrida a queda
+  inteira (os .glb não têm clipe de cair/planar; os aliases de `Mage.gd`
+  esperam), câmera 90° para baixo (sem horizonte = sem velocidade), personagem
+  em contra-luz. Correção por custo: clipes Meshy → inclinar câmera → vento/FOV.
+
+**3 defeitos do vídeo consertados com prova em vermelho (12/12 no portão):**
+1. Kill feed vazava `@CharacterBody3D@1718` → bots batizados com nome de mago
+   no spawn (`Main.gd`, `Kits.de(slug).nome`).
+2. VITÓRIA com "BOTS 1" congelado → `_end_match` leva o placar final à HUD.
+3. **Botão de PAUSA nascia 58 dp ABAIXO da tela** (o `_canto` ancora tudo no
+   rodapé e o `_layout` contava o topo do topo) → re-ancorado; o teste agora
+   cobra o RETÂNGULO na tela (o `visible=true` era assert decorativo).
+
+**Dossiê Spellbreak** em `docs/referencias/SPELLBREAK.md` (pedido do Diretor):
+mecânicas, combos (referência da Sintonia: combo = FORMA de um elemento +
+PALETA do outro), VFX toon com ramp + partículas 12–15 fps (resposta para
+muros chapados), **loot emissivo/auto-iluminado (resolve o vulto preto)**, a
+queda deles freia com a própria levitação, 4 lições do fracasso (retenção,
+MMR de novato, exclusividade, dono do IP). Community Version oficial no
+itch.io é referência jogável legal; extrair asset é proibido.
+
+**Meshy (webapp, conta dele) — clipes de animação NO MEIO:**
+- **"Caindo" foi ADICIONADO ao Brok de jogo** (o riggado de 15.424 faces).
+- Já localizados na biblioteca (grátis): "Nadar Parado", "Nadar para frente",
+  "Agachar-se, Pegar", "Pular para Pegar e Cair", "Cair", "Tiro e Cair p/
+  Frente". **PLANAR NÃO EXISTE na biblioteca** → o Diretor autorizou gerar por
+  "Texto para Motion" pagando créditos.
+- **INTERROMPIDO no meio:** a janela do Chrome encolheu (Diretor na máquina).
+  Retomar: janela restaurada → meshy.ai/workspace → Animar → Brok já fica
+  selecionado. Saldo intacto: **2.984**. Depois de baixar: fundir clipes nos
+  .glb (os aliases adotam por nome) e repetir para a Pyra (conferir se a Pyra
+  está na conta do site — pode ser só da API, aí é Carregar o FBX riggado).
+- Atenção ao baixar: apareceu um selo "+50" junto do botão de exportar no
+  viewer — conferir O QUE custa 50 antes de clicar (a regra era rig/animação
+  grátis no webapp).
+
+**O vídeo também re-confirmou a fila visual (§10):** muro de terra caixote,
+muralha de brasas chapada, volumes amarelos do baú, Pyra escura em contra-luz
+(candidata a rim/fill light), horizonte lendo como prédios, e os ~3 s iniciais
+quase pretos da queda.
+
+---
+
+### (26/08, fim de tarde — as 5 peças-herói em 3D, histórico)
 
 **26/08, fim de tarde.** A fila inteira da DIREÇÃO §10 virou modelo: Castelo,
 Luva Comum, Luva de Conjurador, Manopla e Baú — todos pelo SITE, visíveis na
