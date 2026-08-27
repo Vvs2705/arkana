@@ -51,7 +51,49 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — Brok animado de verdade, abertura com o castelo VOANDO, 3 defeitos mortos
+### >>> COMECE POR AQUI — a leva Spellbreak aplicada: 4 raias, fila visual atacada, Pyra em rig no site
+
+**26/08, madrugada (leva 4 — 4 raias em paralelo, todas com vermelho provado
+e portão 12/12).** APK do teste: `godot/build/testes/arkana-2026-08-26_2249.apk`
+(141 MB — modelos + tudo desta noite).
+
+1. **NADAR tem animação própria** (`b7bf4fb`): a locomoção consulta a água na
+   fonte (`locomotion_anim`) — bracada = `nadar`, boiar = `nadar_parado`;
+   contrato completo no Mage com fallback `run` (quem não tem o clipe fica
+   como era; o Brok já tem). E o **treino agora diz "TREINO"** no canto, não
+   "3:00/BOTS 0" (pendência do 1º vídeo).
+2. **O loot ACENDE** (`926dcbc`, receita Spellbreak): corpo do item emissivo
+   na cor do elemento, POR INSTÂNCIA — a luva na mão nasce limpa (contra-prova
+   no selftest). Achado: o glb Meshy vem com `emission_enabled=true` e emissão
+   PRETA — "já é emissivo" era falso-positivo. Knob: `Loot.EMISSAO_CORPO 0.35`
+   (se ainda ler escuro no aparelho, sobe o knob, não mexe em mais nada).
+3. **Muralha de Brasas virou FOGO** (`8c8c096`): cunha emissiva com gradiente
+   vermelho→amarelo, ≤48 partículas, flicker em PASSOS de 0,08 s (a lição dos
+   12–15 fps), OmniLight removida. Gameplay intocado.
+4. **Muro de Terra virou PEDRA** (`4404168`): ArrayMesh único compartilhado
+   (noise determinístico seed 907, topo irregular, facetado como as rochas da
+   ilha) + albedo NoiseTexture2D — zero binário. Colisão EXATA.
+
+**Pyra no site (em andamento):** upload do `pyra.glb` (texturas mantidas,
+licença PRIVADO) → **rig Humanoide rodando na conta dele** (altura corrigida
+para 1,78; marcador de virilha reposicionado abaixo do cinto — o vestido pune
+peso de perna errado). Próximo ao terminar: Animar → mesmos clipes do Brok
+(biblioteca grátis: Caindo, Nadar ×2, Agachar-se Pegar, Gemido) + os 2
+Movimentos de IA JÁ PAGOS da conta (Planar horizontal v2 = o planar bom;
+Planar glide = mergulho) + **Mage Spell Cast da biblioteca** (o export omite
+o cast — no upload dela os 3 clipes originais foram descartados pelo site,
+então o cast PRECISA vir da biblioteca) → download rigged+todos+arquivo
+único → como o esqueleto NOVO ≠ o do repo, é SUBSTITUIÇÃO INTEIRA do
+`pyra.glb` (não fusão) → conferir 1,78 m no characters/selftest + clipes no
+motor. O Diretor autorizou recriar do zero no site se o upload falhar.
+
+**Perguntas abertas ao Diretor:** (a) os rótulos de bússola ("Manopla · ÁGUA
++ RAIO") lendo do outro lado do mapa são wayfinding proposital ou poluição?
+(b) manopla emissiva sai na cor do 1º elemento do par — quer a cor do par?
+
+---
+
+### (26/08, noite — leva 3: Brok animado, castelo voando, 3 defeitos, histórico)
 
 **26/08, noite (leva 2 — atualiza o bloco abaixo).** Tudo na branch
 `claude/whatsapp-video-review-799b24`, portão 12/12 em cada passo:
