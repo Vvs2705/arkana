@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1880" height="1254" viewBox="0 0 1880 1254">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#05070F" flood-opacity="0.9"/>
+    </filter>
+    <style>
+      .title { font: 700 35px 'DejaVu Sans', sans-serif; fill: #F0C75E; letter-spacing: 1px; }
+      .subtitle { font: 400 18px 'DejaVu Sans', sans-serif; fill: #C8D0E7; }
+      .poi { font: 700 17px 'DejaVu Sans', sans-serif; fill: #FFFFFF; }
+      .small { font: 400 15px 'DejaVu Sans', sans-serif; fill: #D6DCEE; }
+      .legend { font: 600 17px 'DejaVu Sans', sans-serif; fill: #E9EDF8; }
+      .num { font: 700 15px 'DejaVu Sans', sans-serif; fill: #05070F; text-anchor: middle; dominant-baseline: central; }
+    </style>
+  </defs>
+
+  <rect width="1880" height="1254" fill="#05070F"/>
+  <image href="03-mapa-topografico-sem-texto.png" x="0" y="0" width="1254" height="1254" preserveAspectRatio="xMidYMid meet"/>
+  <rect x="0" y="0" width="1254" height="1254" fill="#05070F" opacity="0.10"/>
+
+  <!-- Anel intermediário e cinco rotas radiais -->
+  <path d="M225 392 C145 535 170 770 318 930 C470 1090 770 1114 975 958 C1134 838 1162 568 1045 390 C899 180 404 188 225 392 Z"
+        fill="none" stroke="#F0C75E" stroke-width="7" opacity="0.55" stroke-dasharray="20 14"/>
+  <path d="M627 638 L298 876" stroke="#FF5A2A" stroke-width="6" opacity="0.62" stroke-dasharray="16 12"/>
+  <path d="M627 638 L933 886" stroke="#2AA7FF" stroke-width="6" opacity="0.62" stroke-dasharray="16 12"/>
+  <path d="M627 638 L282 386" stroke="#A8763E" stroke-width="6" opacity="0.72" stroke-dasharray="16 12"/>
+  <path d="M627 638 L958 374" stroke="#8FE8C9" stroke-width="6" opacity="0.68" stroke-dasharray="16 12"/>
+  <path d="M627 638 L650 173" stroke="#F5D90A" stroke-width="6" opacity="0.60" stroke-dasharray="16 12"/>
+  <path d="M265 430 C180 618 315 872 522 935 C720 995 886 934 980 820"
+        fill="none" stroke="#8FE8C9" stroke-width="5" opacity="0.58" stroke-dasharray="5 14"/>
+
+  <!-- POIs principais -->
+  <g filter="url(#shadow)">
+    <g transform="translate(627 638)"><circle r="22" fill="#F0C75E"/><text class="num">1</text></g>
+    <g transform="translate(478 510)"><circle r="22" fill="#F0C75E"/><text class="num">2</text></g>
+    <g transform="translate(650 173)"><circle r="22" fill="#F0C75E"/><text class="num">3</text></g>
+    <g transform="translate(298 876)"><circle r="22" fill="#F0C75E"/><text class="num">4</text></g>
+    <g transform="translate(235 748)"><circle r="22" fill="#F0C75E"/><text class="num">5</text></g>
+    <g transform="translate(895 792)"><circle r="22" fill="#F0C75E"/><text class="num">6</text></g>
+    <g transform="translate(994 1000)"><circle r="22" fill="#F0C75E"/><text class="num">7</text></g>
+    <g transform="translate(282 386)"><circle r="22" fill="#F0C75E"/><text class="num">8</text></g>
+    <g transform="translate(958 374)"><circle r="22" fill="#F0C75E"/><text class="num">9</text></g>
+    <g transform="translate(748 235)"><circle r="22" fill="#F0C75E"/><text class="num">10</text></g>
+  </g>
+
+  <!-- Dez zonas menores de pouso -->
+  <g fill="#0E1430" stroke="#FFFFFF" stroke-width="4" filter="url(#shadow)">
+    <circle cx="386" cy="724" r="14"/><circle cx="186" cy="600" r="14"/><circle cx="394" cy="1010" r="14"/>
+    <circle cx="792" cy="1000" r="14"/><circle cx="1072" cy="808" r="14"/><circle cx="1035" cy="540" r="14"/>
+    <circle cx="842" cy="482" r="14"/><circle cx="514" cy="292" r="14"/><circle cx="364" cy="492" r="14"/>
+    <circle cx="720" cy="420" r="14"/>
+  </g>
+
+  <!-- Painel lateral -->
+  <rect x="1254" y="0" width="626" height="1254" fill="#0B1026"/>
+  <rect x="1254" y="0" width="8" height="1254" fill="#F0C75E"/>
+  <text x="1300" y="66" class="title">ILHA FRATURADA</text>
+  <text x="1300" y="98" class="subtitle">Mapa tático de aprovação · 20 jogadores</text>
+
+  <text x="1300" y="155" class="legend" fill="#F0C75E">POIs PRINCIPAIS</text>
+  <g class="small">
+    <text x="1300" y="193">1  Vale da Convergência</text>
+    <text x="1300" y="225">2  Cemitério dos Primeiros Conjuradores</text>
+    <text x="1300" y="257">3  Torre Arcana</text>
+    <text x="1300" y="289">4  Caldeira de Cineris</text>
+    <text x="1300" y="321">5  Forja Sepultada</text>
+    <text x="1300" y="353">6  Terraços de Nymara</text>
+    <text x="1300" y="385">7  Porto Afogado</text>
+    <text x="1300" y="417">8  Pedreira dos Colossos</text>
+    <text x="1300" y="449">9  Bosque Suspenso de Aeris</text>
+    <text x="1300" y="481">10 Santuário da Tempestade</text>
+  </g>
+
+  <text x="1300" y="542" class="legend" fill="#F0C75E">ROTAS</text>
+  <g class="small">
+    <line x1="1300" y1="577" x2="1365" y2="577" stroke="#F0C75E" stroke-width="7" stroke-dasharray="20 14"/><text x="1383" y="583">Anel intermediário</text>
+    <line x1="1300" y1="615" x2="1365" y2="615" stroke="#8FE8C9" stroke-width="5" stroke-dasharray="5 14"/><text x="1383" y="621">Rede subterrânea parcial</text>
+    <line x1="1300" y1="653" x2="1365" y2="653" stroke="#FF5A2A" stroke-width="6" stroke-dasharray="16 12"/><text x="1383" y="659">Rota radial elemental</text>
+    <circle cx="1323" cy="696" r="14" fill="#0E1430" stroke="#FFFFFF" stroke-width="4"/><text x="1352" y="702">Zona menor de pouso/loot</text>
+  </g>
+
+  <text x="1300" y="768" class="legend" fill="#F0C75E">ESCALA E RITMO</text>
+  <g class="small">
+    <text x="1300" y="805">Envelope: 2,4 × 2,2 km</text>
+    <text x="1300" y="837">Área terrestre: aproximadamente 3,4 km²</text>
+    <text x="1300" y="869">Altitudes: nível do mar até 240 m</text>
+    <text x="1300" y="901">Preparação periférica: 60–90 segundos</text>
+    <text x="1300" y="933">Travessia direta: 4–5 minutos</text>
+    <text x="1300" y="965">Partida de referência: 13–16 minutos</text>
+  </g>
+
+  <text x="1300" y="1030" class="legend" fill="#F0C75E">LEGENDA ELEMENTAL</text>
+  <g class="small">
+    <circle cx="1310" cy="1068" r="8" fill="#FF5A2A"/><text x="1330" y="1074">Fogo</text>
+    <circle cx="1425" cy="1068" r="8" fill="#2AA7FF"/><text x="1445" y="1074">Água</text>
+    <circle cx="1540" cy="1068" r="8" fill="#A8763E"/><text x="1560" y="1074">Terra</text>
+    <circle cx="1655" cy="1068" r="8" fill="#8FE8C9"/><text x="1675" y="1074">Vento</text>
+    <circle cx="1770" cy="1068" r="8" fill="#F5D90A"/><text x="1790" y="1074">Raio</text>
+  </g>
+
+  <rect x="1300" y="1120" width="520" height="88" rx="16" fill="#0E1430" stroke="#8A7336" stroke-width="2"/>
+  <text x="1322" y="1153" class="small">Direção: mapa natural assimétrico com organização</text>
+  <text x="1322" y="1182" class="small">elemental pentagonal oculta na geografia.</text>
+</svg>
