@@ -299,5 +299,22 @@ const TOUCH := {
 ## morto depois do colapso.
 const MATCH := {
 	"duration_s": 480.0,
-	"bots": 6,
+	## 6 -> 12 EM 27/08, junto com a ilha que quadruplicou de area. Nao e' gosto:
+	## quadruplicar o mapa sem mexer na populacao divide a densidade de encontro por
+	## 4, e mapa vazio e' pior que mapa lento ("desempenho se otimiza, tedio nao").
+	##
+	## MEDIDO headless em 27/08 — CPU de fisica por passo, teto de 60 fps = 16,67 ms:
+	##    6 bots  1,684 ms (10%)   |   20 bots  4,207 ms (25%)
+	##   12 bots  2,592 ms (16%)   |   30 bots  7,630 ms (46%)
+	## Custo marginal ~0,25 ms por bot. Dobrar a populacao custa 0,9 ms, 5% do
+	## orcamento — barato. Ir a 20 ou 30 e' possivel e esta' medido, mas isto e'
+	## DESKTOP: a fisica do celular e' varias vezes mais lenta e o FPS no aparelho
+	## continua sem ser medido, entao 12 e' o passo que se paga sem apostar.
+	##
+	## E 12 E' O TETO ESTRUTURAL DE HOJE: o Island.tscn publica 14 nascimentos e o
+	## Main pede 1 + bots pontos distintos. Passar de 13 faz `_spawn_points` repetir
+	## ponto (`_spawns[i % size]`) e dois magos nascem em cima um do outro.
+	## KNOB: para subir de verdade, primeiro medir FPS no celular E acrescentar
+	## nascimentos ao Island.tscn.
+	"bots": 12,
 }

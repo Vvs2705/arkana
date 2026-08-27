@@ -51,6 +51,147 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> COMECE POR AQUI — a leva 6: mapa 4x maior, tempestade de battle royale, nada mais fixo
+
+**27/08, tarde (leva 6).** APK do teste:
+`godot/build/testes/arkana-2026-08-27_1245.apk` (141 MB) — **tem a ilha nova**.
+Portao 12/12 em cada passo, com vermelho provado.
+Branch `claude/whatsapp-video-review-799b24`.
+
+#### 1. A ILHA QUADRUPLICOU DE AREA — e ficou 27% mais BARATA na tela (`99bb7d8`)
+
+300 -> **600 m de lado**, raio de terra 132 -> **264 m**. Um knob so':
+`Island.ESCALA` (2.0). A escala e' **HORIZONTAL**: o relevo nao e' novo, e' a
+MESMA ilha amostrada com metade da frequencia — colinas 2x mais largas, e a
+malha de 132x132 quads continua acima do Nyquist (quad 2,27 -> 4,55 m; detalhe
+mais fino 12 -> 24 m). Colisao: **exatamente as mesmas 34.848 faces**.
+
+MEDIDO headless em 27/08 (nao estimado):
+
+| escala | lado | area | build | colisao | tris NA TELA | draws NA TELA |
+|---|---|---|---|---|---|---|
+| 1.0 | 300 m | 1x | 610 ms | 34.848 | 137.432 | 67 |
+| **2.0** | **600 m** | **4x** | **1403 ms** | **34.848** | **184.967** | **67** |
+| 2.5 | 750 m | 6,2x | 2028 ms | 34.848 | 194.216 | 67 |
+| 3.0 | 900 m | 9x | 2876 ms | 34.848 | 237.086 | 67 |
+
+O APK anterior desenhava **253.562** tris por quadro. A ilha nova, com 4x a
+area, desenha **184.967**. **2.5 e 3.0 estao medidos e a um caractere de
+distancia** — o que segura nao e' o quadro, e' carga e memoria.
+
+**O defeito que apareceu no caminho e valia por si so':** o culling por celula
+da grama **nao funcionava na horizontal**. As celulas tinham a transformada do
+mundo assada nas instancias e o NO' ficava em (0,0,0) — `visibility_range` mede
+a distancia da camera ate' a ORIGEM DO NO'. O corte era tudo-ou-nada e o unico
+eixo em que funcionava era o vertical. Invisivel numa ilha de 132 m (a camera
+nunca fica a mais de 80 m do centro), fatal em qualquer mapa maior. Corrigido:
+cada celula no seu lugar, instancias em coordenada local. Seixo, moita, flor e
+junco entraram na mesma grade.
+
+**A licao paga pela 4a vez nesta fase:** metro cravado envelhece calado.
+Viraram fracao — as varinhas do loot, a espiral de busca do loot (fracao do
+raio do POI: no mapa novo a beira seca do brejo foi para 96 m e **dois loots
+deixaram de nascer, calados**), o anel do Bau Celestial e os 14 nascimentos do
+`Island.tscn`. `Island.pois()` agora entrega **centro E raio**.
+
+#### 2. A TEMPESTADE VIROU BATTLE ROYALE DE VERDADE (`1643168`)
+
+Ordem do Diretor, e cada numero conferido contra PUBG, Apex e Fortnite antes de
+entrar — o estudo esta' em **`docs/referencias/ZONA-BATTLE-ROYALE.md`** (as
+tres tabelas reais, as seis leis que os tres compartilham, e o que ainda falta).
+
+- **NA QUEDA NAO HA' LIMITE.** A zona nascia LIGADA no `_ready`: com o mago
+  ainda no castelo, a fase 1 ja' contava. Agora nasce **inerte** (parede
+  invisivel, nenhum cronometro, dps zero) e **liga no sinal de pouso**. Mesma
+  lei que a suprema ja' seguia.
+- **1:10 de mapa aberto**, a tempestade **se forma** em torno da ilha e para na
+  costa, e so' entao comecam as janelas **1:00, 50, 40, 30**. A janela ENCOLHE
+  de fase em fase — e' o que faz a partida acelerar (Fortnite faz igual).
+- **OS CIRCULOS DEIXARAM DE SER OS MESMOS.** `SEED_ZONA` era fixo em 2707:
+  toda partida da historia do jogo teve os mesmos cinco circulos nos mesmos
+  lugares. **A rota do castelo tinha o mesmo defeito** (`SEED_ROTA := 3103`).
+  Os dois sorteiam por partida agora. O determinismo mudou de escopo: era entre
+  partidas, virou DENTRO da partida (um seed gera o plano inteiro de uma vez, e
+  fica guardado em `Zona.seed_da_partida` / `Castelo.seed_da_rota` para a rede
+  transmitir).
+- **A ULTIMA FASE FECHA EM ZERO.** Antes parava em 4 m: existia refugio
+  permanente e a partida podia acabar por cronometro com dois vivos.
+- Os raios viraram **fracao do raio do mapa** e a regua morreu (`RAIO_INICIAL`,
+  `ILHA_REF` e `escala_do_mapa()` sairam; entrou `raio_do_mapa()`, que le'
+  `Island.LAND_R`). **0,62 e' 62% do mapa em 300 m e em 2.400 m.**
+- `Balance.MATCH.duration_s`: 180 -> **480 s** (a tabela soma 396 s depois do
+  pouso; com 180 a partida morria no meio da fase 2).
+
+#### 3. A POPULACAO DOBROU, com a conta na mesa (`Balance.MATCH.bots` 6 -> 12)
+
+Quadruplicar o mapa sem mexer na populacao divide a densidade de encontro por 4.
+MEDIDO headless — CPU de fisica por passo, teto de 60 fps = 16,67 ms:
+**6 bots 1,684 ms · 12 bots 2,592 ms · 20 bots 4,207 ms · 30 bots 7,630 ms**
+(marginal ~0,25 ms/bot). Dobrar custa 0,9 ms = 5% do orcamento.
+**12 tambem e' o teto estrutural de hoje:** o `Island.tscn` publica 14
+nascimentos e o Main pede `1 + bots` pontos DISTINTOS; passar de 13 faz dois
+magos nascerem um dentro do outro. Ha' teste vermelho provado para isso.
+
+#### 4. O CAJADO VOLTOU PARA O SEU POI (`a96d8e6`) — tres defeitos vivos no APK
+
+Achados ao planejar o mapa grande, e medidos com a ilha real:
+- `Loot.POIS` era **copia congelada** dos POIs da ilha de 180 m: o cajado das
+  ruinas nascia a **46 m** do centro de um plato de 20 m de raio, ou seja FORA
+  dele. O contrato "1 cajado por POI" (GDD 14) estava quebrado.
+- Um corte de raio cravado em **70 m** num mapa de raio 132 deixava **47% da
+  ilha sem loot nenhum**.
+- A janela de altura `1,4 a 8,5` estava cravada em TRES arquivos (Loot, Zona,
+  BauCelestial), cada um comentando "mesmo corte do outro" — e as tres erravam
+  identico: o teto proibia o **plato das ruinas (9,0 m exatos)** e o **topo do
+  pico (28 m)**. Os dois unicos POIs com altura de verdade eram os dois onde
+  nada podia nascer: nem loot, nem bau, nem circulo final.
+Correcao: **`Island.pode_pousar(x, z)`** — chao seco acima da praia, DERIVADO
+de `agua_y()`. Sem teto de altura, de proposito.
+**Por que o teste nao pegou:** testava contra uma ilha FALSA E PLANA
+(`height()` = 3,0 sempre). O teste novo instancia `world/Island.gd`.
+
+---
+
+### O QUE FALTA — em ordem de quem esta' bloqueando
+
+**BLOQUEIO 1 — medir FPS no celular.** Nao e' codigo, e' um cabo USB
+(`adb devices` vazio). E' o portao que este projeto deve desde 25/08 e o que
+libera: `Island.ESCALA` 2.5/3.0 (ja' medidos), mais bots, e as ondas 3 e 4 do
+`docs/cenario/MAPA-GRANDE-PLANO.md` (chunking ate' 2,4 km).
+
+**BLOQUEIO 2 — creditos de imagem.** Os 18 prompts de personagem estao prontos
+(`docs/prompts/personagens/`, 20 arquivos) e a fila e' Veu -> Tessa ->
+Ceifadora -> ... A geracao 2D esta' **travada: a plataforma de imagem esta' sem
+creditos** (saldo 0,07; ~2 creditos por vista, 3 vistas por mago = ~108 para os
+18). Os ~2.964 creditos da Meshy sao de OUTRA conta e servem para 3D, nao para
+as vistas. Caminhos: recarregar a plataforma de imagem, gerar as vistas no
+Firefly (o Diretor tem acesso) ou ir direto de Texto-para-3D na Meshy (mais
+barato em passos, pior em qualidade e contra o pipeline aprovado).
+
+**PENDENCIA — o gesto de disparo da Pyra.** Continua o unico item aberto dela
+(detalhe na leva 5, abaixo). As 6 variantes gratuitas de "Mage Spell Cast" sao
+todas conjuracao de aura com bracos para cima — o diagnostico do Diretor esta'
+certo. Melhor candidato pela biomecanica: **"Soco para Frente com Ambas as
+Maos"**, aplicado mas nao julgado (a camera do viewer travou num angulo que nao
+deixa avaliar a pose, e nao se aprova animacao que nao se viu). Video de
+referencia preflightado em **32,5 creditos**, nao gasto. Prompt para o Firefly
+entregue ao Diretor.
+
+**DECISOES QUE ESPERAM O DIRETOR**
+1. **Veto ou nao** do circulo final no plato e no pico (o teto de 8,5 m que
+   proibia caiu; achei melhor liberar — final em terreno alto e' padrao do
+   genero, mas e' decisao dele).
+2. **Direcao de arte dos 18** (`docs/prompts/personagens/00-FILA.md`): a escolha
+   por evidencia foi escultura 3D "stylized premium" — o grupo do Brok
+   APROVADO; a Pyra REPROVADA estava no grupo de pintura. Um martelo so' libera
+   as 18 geracoes.
+3. **Chunking e 20 pawns** (`docs/cenario/MAPA-GRANDE-PLANO.md` §8), depois do
+   BLOQUEIO 1.
+4. Do papel de 26/08, ainda em aberto: **lista dos 10 magos do lancamento**,
+   **nome e valores da moeda**, e **quais pares de fusao estreiam**.
+
+---
+
 ### >>> COMECE POR AQUI — as 5 ordens do Diretor viraram codigo e papel
 
 **27/08, madrugada (leva 5).** APK do teste:

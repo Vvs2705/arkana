@@ -1,6 +1,6 @@
 ## CENA PRINCIPAL — a partida jogavel de 3 min (G1: jogo, nao sandbox).
 ## COMO A PARTIDA ACABA (revisto ao entrar a Zona): o fim de verdade e' ULTIMO
-## EM PE — o player morre (derrota) ou os 6 bots morrem (vitoria). O cronometro
+## EM PE — o player morre (derrota) ou os bots morrem (vitoria). O cronometro
 ## de Balance.MATCH.duration_s (180s) deixou de ser "o fim" e virou REDE DE
 ## SEGURANCA: a zona fecha o ultimo circulo aos 165s com 18 dps em quem estiver
 ## fora, entao em condicoes normais alguem cai antes dos 180s. Se ninguem cair,

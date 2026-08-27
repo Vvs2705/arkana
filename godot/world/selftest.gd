@@ -716,6 +716,29 @@ func _test_spawns() -> void:
 	_check(n >= 12, "ilha publica %d spawns no grupo 'spawn'" % n)
 	_check(acima, "todo spawn foi grudado ACIMA do terreno (ninguem nasce dentro do chao)")
 
+	## O TETO ESTRUTURAL DA POPULACAO. gameplay/Main pede 1 + Balance.MATCH.bots
+	## pontos DISTINTOS; `_spawn_points` repete com `_spawns[i % size]` quando
+	## faltam, e dois magos nascem um dentro do outro. Em 27/08 a populacao subiu de
+	## 6 para 12 junto com o mapa 4x maior — com 14 nascimentos isso couber foi
+	## sorte, e sorte nao e' contrato. VERMELHO PROVADO: subindo bots para 20.
+	var precisa := 1 + int(Balance.MATCH.bots)
+	_check(n >= precisa,
+			"os %d nascimentos cobrem 1 jogador + %d bots (precisa de %d distintos)"
+			% [n, int(Balance.MATCH.bots), precisa])
+
+	## E ELES ESTAO ESPALHADOS: dois nascimentos em cima um do outro sao dois
+	## nascimentos que valem um. 12 m e' mais que o alcance de contato.
+	var perto := 1e9
+	var lista: Array[Vector2] = []
+	for c in island.get_children():
+		if c is Marker3D and c.is_in_group("spawn"):
+			lista.append(Vector2(c.position.x, c.position.z))
+	for i in lista.size():
+		for j in range(i + 1, lista.size()):
+			perto = minf(perto, lista[i].distance_to(lista[j]))
+	_check(perto > 12.0,
+			"os dois nascimentos mais proximos estao a %.0f m (minimo 12)" % perto)
+
 
 ## ============================================================================
 ## O MAPA CRESCE POR UM KNOB (27/08 — ordem do Diretor: "um mapa muito maior,
