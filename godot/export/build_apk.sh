@@ -99,7 +99,25 @@ fi
 
 # Copia datada para o Diretor levar ao aparelho, DENTRO do projeto: nada de
 # Downloads nem Area de Trabalho (ordem dele, 25/08).
+#
+# SEMPRE NA PASTA DO CLONE PRINCIPAL, nunca na da worktree (ordem dele, 27/08:
+# "todos os arquivos de teste devem ser criados na mesma pasta, sem necessidade
+# de criar outra pasta porque trocou a worktree").
+#
+# O DEFEITO QUE ISTO CORRIGE: `dirname "$OUT"` seguia o diretorio de QUEM RODA o
+# script. Rodando de uma worktree, ele criava uma segunda pasta `testes/` la
+# dentro — e em 26-27/08 oito APKs foram para lá enquanto o Diretor procurava na
+# pasta dele, que tem o historico e o 00-LEIA.md. Ele instala do disco: duas
+# pastas com o mesmo nome e metades do historico e' pior que nenhuma.
+#
+# `git rev-parse --git-common-dir` responde o .git do clone PRINCIPAL mesmo
+# chamado de dentro de uma worktree (o --git-dir aponta para .git/worktrees/<n>).
+# Fora de um repo git, cai no comportamento antigo e nada quebra.
 TESTES="$(dirname "$OUT")/testes"
+if COMUM="$(git -C "$PROJ" rev-parse --git-common-dir 2>/dev/null)"; then
+	PRINCIPAL="$(cd "$(dirname "$COMUM")" && pwd)"
+	TESTES="$PRINCIPAL/godot/build/testes"
+fi
 mkdir -p "$TESTES"
 CARIMBO="$(date +%Y-%m-%d_%H%M)"
 cp "$OUT" "$TESTES/arkana-$CARIMBO.apk"
