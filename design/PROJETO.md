@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 25/08/2026 (higienizacao pos-R20.1)
+> **Atualizado em:** 27/08/2026 (virada de plataforma: PC / Steam / Unreal 5)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,55 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — o jogo mudou de plataforma: PC / Steam, Unreal 5
+
+**27/08/2026, noite.** Ordem do Diretor: *"mesmo que tenha que começar tudo do
+zero... se godot não for o recomendado quero que mude e faça do zero se
+precisar. para com espirito de pobre e querer manter tudo sem necessidade"*.
+
+O porquê, em uma linha cada — o desenvolvimento está em
+`design/referencias/PC-STEAM-ANALISE.md`:
+
+| | |
+|---|---|
+| **Rede** | as ferramentas do Godot servem a 2–8 jogadores; a ARKANA precisa de predição, 40+ por partida e servidor dedicado |
+| **Anti-cheat** | EAC é produto da Epic, nativo no Unreal; em Godot não há caso público de EAC funcionando |
+| **Nanite** | as peças do Meshy têm 3 M de faces e rodam quase cruas — toda a esteira de decimação some |
+| **Lyra** | shooter multiplayer completo da Epic, com EOS e servidor dedicado prontos |
+
+#### O que já está NA MÁQUINA (medido, não estimado)
+
+| | |
+|---|---|
+| **Unreal Engine 5.8.2** | instalado, 29,5 GiB |
+| **Quixel Bridge + Fab UE Plugin** | instalados |
+| **Lyra Starter Game** | `C:\Users\VINICIUS\Documents\Unreal Projects\LyraStarterGame`, 5,0 GB |
+| **Binários do Lyra** | vieram **prontos** — `BuildId 55116800`, igual ao do motor. **Não precisou compilar C++** |
+| **Alvos de rede que já vêm no Lyra** | `LyraGameSteam`, `LyraGameEOS`, `LyraServer`, `LyraServerSteamEOS` |
+| **Visual Studio** | Build Tools 2022, MSVC 14.44.35207, SDK 10.0.26100 — sem IDE |
+| **Disco** | 60 GB livres depois de tudo |
+
+#### A ordem daqui para a frente
+
+Está em `pc-unreal/00-LEIA.md` §4. O passo **0** é o portão de agora: pôr uma
+peça do Meshy de 3 M de faces com Nanite sobre um terreno e **o Diretor olhar e
+aprovar o teto visual**. As 10 peças cruas estão em
+`arte/cenario/ilha-fraturada/_originais-3d/` (1,1 GB, fora do git).
+
+#### O que NÃO muda com a virada
+
+- **O elenco continua a ser refeito no SITE da Meshy, um por um.** A causa e a
+  receita estão logo abaixo, na seção da leva 7 — ela continua válida, só que o
+  destino agora é o Unreal.
+- `design/` e `arte/` alimentam as três bases; as bases **nunca cruzam código**.
+- `mobile-godot/` está **congelado** com 12/12 autotestes verdes. Serve de
+  referência de jogabilidade e de orçamento medido — não recebe feature nova.
+- **Rede continua não existindo.** É o item mais caro e ainda não começou.
+- Antes de tudo e fora da lista: **a página da Steam**, porque a receita do
+  primeiro mês é função da wishlist no dia do lançamento.
+
+---
 
 ### >>> COMECE POR AQUI — a leva 7 FOI DESFEITA: o elenco volta a ser feito no SITE
 

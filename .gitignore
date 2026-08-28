@@ -58,3 +58,7 @@ keystore.properties
 godot/characters/modelos/*/
 !godot/characters/modelos/*.glb
 cenario/*/origem/
+
+# Peças 3D originais do Meshy (3 M de faces, 1,1 GB). Materia-prima pesada e
+# rebaixavel do workspace da Meshy; o git guarda a versao de jogo, nao esta.
+arte/cenario/ilha-fraturada/_originais-3d/*.glb

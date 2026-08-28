@@ -58,35 +58,29 @@ teremos que aprender, se isso for o melhor para o futuro vamos seguir"*.
 
 ---
 
-## 3. ⚠️ BLOQUEIO ATUAL: disco
+## 3. O que está instalado na máquina (medido em 27/08/2026, noite)
 
-**Medido em 27/08/2026:** a máquina tem **um único disco (C:)** com **28,3 GB
-livres** de 477 GB.
+O bloqueio de disco que morava aqui **foi resolvido**: ~30 GB liberados de
+temporários, Windows antigo e APKs de teste.
 
-| Precisa | Tamanho |
-|---|---|
-| Unreal Engine 5 (instalação básica) | ~18 GB |
-| Lyra Starter Game | ~30 GB |
-| **Mínimo** | **~48 GB** |
-| Derived Data Cache + projeto compilado | cresce muito além disso |
+| | Estado | Tamanho |
+|---|---|---|
+| **Unreal Engine 5.8.2** | `C:\Program Files\Epic Games\UE_5.8` | 29,5 GiB |
+| **Quixel Bridge (UE 5.8)** | instalado | — |
+| **Fab UE Plugin (UE 5.8)** | instalado | — |
+| **Lyra Starter Game** | `C:\Users\VINICIUS\Documents\Unreal Projects\LyraStarterGame` | 5,0 GB |
+| **Visual Studio** | Build Tools 2022, MSVC 14.44.35207, SDK 10.0.26100 — **sem IDE** | — |
 
-**Não cabe.** Antes de instalar qualquer coisa é preciso liberar espaço ou somar
-um disco. Não é problema de código e não tem contorno técnico.
+**Atenção ao disco:** sobraram **14 GB livres** depois do Lyra. O DDC (cache de
+shaders) do primeiro `open` do Lyra come muitos GB. Se apertar, o que dá para
+apagar sem perder nada é o cache de download da Fab (`.../Launcher/VaultCache`,
+~5 GB — cópia do que já foi extraído).
 
-O que dá para liberar sem perder nada:
-- `mobile-godot/godot/build/testes/` — 16 APKs de teste, ~1,6 GB. O próprio
-  `00-LEIA.md` de lá diz que são descartáveis
-- caches de importação do Godot (`.godot/`), regeneráveis com um comando
-
-Isso soma ~2 GB. **Falta muito mais**, e a decisão é do Diretor.
-
----
-
-## 4. A ordem, quando o disco permitir
+## 4. A ordem
 
 | Passo | O quê | Portão |
 |---|---|---|
-| **0** | instalar UE5 + Lyra; pôr uma peça do Meshy em 3 M de faces com Nanite sobre um terreno | o Diretor olha e aprova o teto visual |
+| **0** ✅ | UE5 + Lyra instalados; 4 peças do Meshy com Nanite sobre terreno — **medido abaixo** | falta só o Diretor olhar e aprovar o teto visual |
 | **1** | terreno da Ilha Fraturada com o kit esculpido | mapa navegável |
 | **2** | movimento, câmera e um disparo — no Lyra, servidor autoritativo | dois clientes na mesma partida |
 | **3** | Zona, loot, queda — reimplementados a partir de `design/` | partida completa |
@@ -96,3 +90,39 @@ Isso soma ~2 GB. **Falta muito mais**, e a decisão é do Diretor.
 **Fora desta lista e antes de tudo:** a página da Steam. A receita do primeiro mês
 é função da wishlist no dia do lançamento, e a página é o que constrói wishlist.
 Ver a análise, §1.2.
+
+---
+
+## 5. Passo 0 — o que foi medido (28/08/2026, 00h20)
+
+Nível `/Game/ARKANA/L_TesteNanite` (Mundo Aberto), com 4 peças importadas
+**cruas**, sem passar por Blender e sem decimação:
+
+| Peça | Triângulos Nanite | Fallback | Disco compactado |
+|---|---|---|---|
+| `19-arco-calcario-nymara` | **3.122.424** | 16.334 | 26,1 MB |
+| + `17-rocha-basalto-modular`, `21-pilar-condutor-fulgar`, `29-arvore-folhas-douradas` | mesma ordem de grandeza | | |
+
+**Custo em tela, medido com `stat unit` / `stat rhi`:**
+
+| | |
+|---|---|
+| Quadro | **19,77 ms (~50 FPS)** |
+| Draw (thread de render) | 16,15 ms — **é o gargalo** |
+| GPU | 15,51 ms |
+| Draw calls | 1.030 |
+| Primitivas | 5,3 milhões |
+| VRAM | 3,45 de 5,11 GB |
+
+**Como ler isso.** É o **editor**, que carrega painéis, gizmos e seleção — jogo
+empacotado corta boa parte do Draw. O gargalo estar no Draw e não na GPU diz que
+o Nanite **não** é o problema: 5,3 M de primitivas custaram 15,5 ms de GPU.
+
+**A comparação que importa:** no `mobile-godot/` esta mesma peça precisava ser
+decimada de 3 M para **2–8 mil faces** para caber no orçamento do celular. Aqui
+ela roda inteira. Toda a esteira `decimar.py` deixa de existir no PC.
+
+**O que ainda NÃO foi feito neste nível:** material do terreno (é o cinza padrão
+do Mundo Aberto), iluminação (é a padrão, estourada no horizonte) e colisão das
+peças. Nada disso é a arte — é o nível de teste do portão.
+
