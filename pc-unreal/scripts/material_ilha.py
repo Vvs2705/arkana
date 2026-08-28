@@ -70,6 +70,28 @@ TERRA_DE = 16.0
 LADO_CM = 240000.0          # 2.400 m de lado
 Z_MAR_CM = 0.0              # ver posicionar_a_ilha, item 2
 
+# LUZ. Os dois KNOBS da cena, e sao os UNICOS — ver exposicao_travada().
+# SOL_LUX: 10 (o padrao do Mixer) e' crepusculo. Dia claro fica na casa de 10^5.
+# EV100: quanto mais alto, mais ESCURA a imagem. Sobe se estourar, desce se
+# apagar. Estes dois se ajustam OLHANDO, e o valor certo e' o que faz o chao
+# iluminado bater com a Cor de base.
+# 75.000 lux + EV100 15 dava imagem certa mas o Lumen reclamava: "cached
+# lighting is going to be clipped". A pre-exposicao do GI dele e' calibrada para
+# uma faixa modesta, e cravar sol de dia real a joga para fora. Voltando ao par
+# do proprio motor (10 lux) e travando a exposicao no EV equivalente, a imagem
+# fica igual e o aviso some. LICAO: exposicao TRAVADA e' o que resolve; o valor
+# absoluto do sol e' so' uma escala, e vale mais ficar na faixa que o Lumen espera.
+SOL_LUX = 10.0
+EV100 = 3.0
+
+# TEXTURA DE DETALHE — o remedio contra o chao de plastico.
+# Ver arte/cenario/texturas/00-LEIA.md. Projecao PLANAR em XY do mundo: o terreno
+# e' quase deitado, entao esticamento so' aparece em penhasco, e la' quem manda e'
+# a silhueta da rocha. LADRILHO_CM e' o KNOB: menor = gramatura mais fina.
+TEXTURAS = "/Game/ARKANA/Texturas"
+LADRILHO_CM = 600.0
+DETALHE_FORCA = 0.30
+
 ME = unreal.MaterialEditingLibrary
 
 
@@ -87,6 +109,86 @@ def _const(mat, v, x, y):
     n = _no(mat, unreal.MaterialExpressionConstant, x, y)
     n.set_editor_property("r", v)
     return n
+
+
+def importar_texturas():
+    """Traz os PNG de gramatura de `arte/` para dentro do projeto.
+
+    A arte NAO e' copiada para o pc-unreal a mao: ela vive em `arte/` e o projeto
+    IMPORTA de la'. No dia em que a textura for regerada, muda num lugar so'.
+
+    `srgb = False` nao e' detalhe: estas imagens sao MASCARA, nao cor. Importadas
+    como sRGB, a curva de gama distorce a modulacao e a gramatura sai com
+    contraste errado.
+    """
+    origem = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "..", "..", "arte", "cenario", "texturas"))
+    tarefas = []
+    for nome in ("detalhe-chao", "detalhe-rocha"):
+        if unreal.EditorAssetLibrary.does_asset_exist("%s/%s" % (TEXTURAS, nome)):
+            continue
+        caminho = os.path.join(origem, nome + ".png")
+        if not os.path.exists(caminho):
+            diz("AVISO: nao achei %s" % caminho)
+            continue
+        t = unreal.AssetImportTask()
+        t.filename = caminho
+        t.destination_path = TEXTURAS
+        t.automated = True
+        t.save = True
+        t.replace_existing = True
+        tarefas.append(t)
+    if tarefas:
+        unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tarefas)
+    for nome in ("detalhe-chao", "detalhe-rocha"):
+        a = unreal.EditorAssetLibrary.load_asset("%s/%s" % (TEXTURAS, nome))
+        if a is not None:
+            a.set_editor_property("srgb", False)
+            unreal.EditorAssetLibrary.save_loaded_asset(a)
+    diz("TEXTURAS: %s" % [unreal.EditorAssetLibrary.does_asset_exist("%s/%s" % (TEXTURAS, n))
+                          for n in ("detalhe-chao", "detalhe-rocha")])
+
+
+def _textura_detalhe(mat, pos):
+    """O ramo de gramatura: mundo XY -> ladrilho -> amostra -> em torno de 1,0.
+
+    Devolve None se a textura nao estiver importada — o material continua valido,
+    so' que sem gramatura. Um material que se recusa a compilar por falta de PNG
+    seria pior do que um chao liso.
+    """
+    tex = unreal.EditorAssetLibrary.load_asset("%s/detalhe-chao" % TEXTURAS)
+    if tex is None:
+        diz("AVISO: %s/detalhe-chao nao existe — chao sem gramatura" % TEXTURAS)
+        return None
+
+    xy = _no(mat, unreal.MaterialExpressionComponentMask, -700, 480)
+    xy.set_editor_property("r", True)
+    xy.set_editor_property("g", True)
+    xy.set_editor_property("b", False)
+    xy.set_editor_property("a", False)
+    ME.connect_material_expressions(pos, "", xy, "")
+
+    esc = _const(mat, 1.0 / LADRILHO_CM, -700, 580)
+    uv = _no(mat, unreal.MaterialExpressionMultiply, -540, 480)
+    ME.connect_material_expressions(xy, "", uv, "A")
+    ME.connect_material_expressions(esc, "", uv, "B")
+
+    amostra = _no(mat, unreal.MaterialExpressionTextureSample, -380, 480)
+    amostra.set_editor_property("texture", tex)
+    ME.connect_material_expressions(uv, "", amostra, "UVs")
+
+    # 0..1 -> (1-forca)..(1+forca)
+    centrado = _no(mat, unreal.MaterialExpressionSubtract, -160, 480)
+    ME.connect_material_expressions(amostra, "R", centrado, "A")
+    ME.connect_material_expressions(_const(mat, 0.5, -160, 580), "", centrado, "B")
+    ganho = _no(mat, unreal.MaterialExpressionMultiply, 0, 480)
+    ME.connect_material_expressions(centrado, "", ganho, "A")
+    ME.connect_material_expressions(_const(mat, 2.0 * DETALHE_FORCA, 0, 580), "", ganho, "B")
+    perto = _no(mat, unreal.MaterialExpressionAdd, 160, 480)
+    ME.connect_material_expressions(ganho, "", perto, "A")
+    ME.connect_material_expressions(_const(mat, 1.0, 160, 580), "", perto, "B")
+    diz("GRAMATURA: ladrilho de %.0f cm, forca %.2f" % (LADRILHO_CM, DETALHE_FORCA))
+    return perto
 
 
 def construir():
@@ -157,9 +259,21 @@ def construir():
     ME.connect_material_expressions(c_rocha, "", cor, "B")
     ME.connect_material_expressions(rocha_a, "", cor, "Alpha")
 
-    final = _no(mat, unreal.MaterialExpressionMultiply, 200, -40)
-    ME.connect_material_expressions(cor, "", final, "A")
-    ME.connect_material_expressions(ruido, "", final, "B")
+    manchado = _no(mat, unreal.MaterialExpressionMultiply, 200, -40)
+    ME.connect_material_expressions(cor, "", manchado, "A")
+    ME.connect_material_expressions(ruido, "", manchado, "B")
+
+    # --- gramatura de perto -------------------------------------------------
+    # Sem isto o chao e' massinha a dois metros do olho, por mais certo que
+    # estejam relevo e cor. Detalhe em 0..1 vira (1-forca)..(1+forca) e
+    # MULTIPLICA a cor — modulacao, nao pintura: a leitura de praia/campo/rocha
+    # continua sendo a do bloco de cima.
+    det = _textura_detalhe(mat, pos)
+    final = manchado
+    if det is not None:
+        final = _no(mat, unreal.MaterialExpressionMultiply, 380, -40)
+        ME.connect_material_expressions(manchado, "", final, "A")
+        ME.connect_material_expressions(det, "", final, "B")
     ME.connect_material_property(final, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     # Chao de battle royale nao brilha: aspereza alta e zero metal. E' a mesma
@@ -195,6 +309,81 @@ def mar():
         ME.recompile_material(m)
         unreal.EditorAssetLibrary.save_loaded_asset(m)
     return unreal.EditorAssetLibrary.load_asset("%s/%s" % (PASTA, nome))
+
+
+def _nunca_espacial(ator):
+    """Tira o ator do streaming do World Partition.
+
+    DUAS RAZOES, e as duas sao de peso:
+
+    1. CORRETUDE. O mar e o volume de exposicao valem no MAPA INTEIRO. Ator
+       global que faz streaming e' ator que some quando o jogador anda para
+       longe — o mar sumiria do horizonte.
+
+    2. O DEFEITO QUE ISTO CONSERTA (medido em 28/08). `get_all_level_actors()`
+       num commandlet **so' devolve os atores NAO-espaciais**, porque nenhuma
+       regiao esta' carregada. A guarda "ja' existe um Mar?" nunca via o mar
+       anterior, e cada rodada do script empilhava mais um plano de mar em cima
+       do outro. Nao-espacial, a guarda passa a enxergar e a rodada vira
+       idempotente — que e' o que um script de montagem tem que ser.
+    """
+    ator.set_editor_property("is_spatially_loaded", False)
+
+
+def exposicao_travada(atores_sub):
+    """Trava a exposicao da cena e poe o sol num valor de dia claro.
+
+    POR QUE ISTO EXISTE, e a medicao que provou: em 28/08 a ilha aparecia
+    BRANCA na visao iluminada. O primeiro palpite seria material errado. Ligando
+    a **Cor de base** (o buffer que ignora luz), a ilha estava certa — verde no
+    miolo, areia na costa, rocha cinza no pico. Ou seja: o material nunca esteve
+    errado, quem mentia era a EXPOSICAO AUTOMATICA.
+
+    A causa: a cena e' dominada por mar escuro, entao o auto-exposure abre para
+    compensar e estoura toda a terra. Isso nao e' bug do Unreal — e' o que
+    auto-exposure faz. Jogo publicado nao deixa a exposicao livre num mapa
+    aberto justamente por isso: a mesma encosta mudaria de cor conforme o
+    jogador olhasse para o mar ou para o morro.
+
+    A trava: min = max de brilho automatico e' o jeito documentado de fixar
+    exposicao sem mexer em camera. `EV100` fica como o KNOB unico da cena.
+    """
+    for a in atores_sub.get_all_level_actors():
+        if isinstance(a, unreal.DirectionalLight):
+            # 10 lux e' o padrao do Mixer e e' luz de CREPUSCULO. Dia claro com
+            # SkyAtmosphere pede duas ordens de grandeza a mais.
+            a.light_component.set_editor_property("intensity", SOL_LUX)
+            a.set_actor_rotation(unreal.Rotator(0.0, -42.0, 30.0), False)
+            diz("SOL: %.0f lux, inclinacao -42 graus" % SOL_LUX)
+
+    # ACHAR OU CRIAR, e depois SEMPRE aplicar. A primeira versao daqui pulava o
+    # bloco quando o volume ja' existia — e com isso mudar EV100 no topo do
+    # arquivo nao mudava nada na cena. Knob que nao muda nada e' knob que mente,
+    # e e' pior do que knob nenhum: leva horas a procurar defeito no lugar errado.
+    ppv = None
+    for a in atores_sub.get_all_level_actors():
+        if a.get_actor_label() == "Exposicao":
+            ppv = a
+            break
+    if ppv is None:
+        ppv = atores_sub.spawn_actor_from_class(unreal.PostProcessVolume,
+                                               unreal.Vector(0, 0, 0))
+        ppv.set_actor_label("Exposicao")
+        diz("EXPOSICAO: volume criado")
+    else:
+        diz("EXPOSICAO: volume existente, reajustando")
+    ppv.set_editor_property("unbound", True)   # vale no mapa inteiro
+    s = ppv.get_editor_property("settings")
+    # Travar e' pôr MIN = MAX: o automatico continua ligado mas nao tem para onde
+    # correr. E' o jeito de fixar exposicao sem depender das contas de camera
+    # (ISO/obturador/diafragma) do modo Manual, que sao mais um lugar para errar.
+    s.set_editor_property("override_auto_exposure_min_brightness", True)
+    s.set_editor_property("auto_exposure_min_brightness", EV100)
+    s.set_editor_property("override_auto_exposure_max_brightness", True)
+    s.set_editor_property("auto_exposure_max_brightness", EV100)
+    ppv.set_editor_property("settings", s)
+    _nunca_espacial(ppv)
+    diz("EXPOSICAO: travada em EV100=%.1f" % EV100)
 
 
 def posicionar_a_ilha(mat):
@@ -255,7 +444,10 @@ def posicionar_a_ilha(mat):
             # direcoes, senao aparece a borda do plano no horizonte.
             k = (LADO_CM * 2.5) / 100.0
             ator.set_actor_scale3d(unreal.Vector(k, k, 1.0))
+            _nunca_espacial(ator)
             diz("MAR CRIADO: %s escala=%.1f" % (ator.get_actor_label(), k))
+
+    exposicao_travada(atores_sub)
 
     diz("save_current_level -> %s" % sub.save_current_level())
     diz("save_dirty_packages -> %s" % unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True))
@@ -265,6 +457,7 @@ def posicionar_a_ilha(mat):
 
 
 try:
+    importar_texturas()
     m = construir()
     ok = posicionar_a_ilha(m)
     diz("FIM ok=%s" % ok)
