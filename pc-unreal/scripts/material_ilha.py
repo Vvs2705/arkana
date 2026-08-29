@@ -52,6 +52,16 @@ NIVEL = "/Game/ARKANA/L_IlhaFraturada"
 AREIA = (0.76, 0.68, 0.50)
 GRAMA = (0.33, 0.44, 0.24)
 ROCHA = (0.40, 0.38, 0.36)
+# A AGUA E' PINTADA PELO TERRENO, nao e' um plano.
+# POR QUE: a primeira versao punha um plano de 6 km em Z=0. Medido em 28/08 —
+# ator em Z=0, componente relativo em Z=0, malha Plane, UM unico ator — e mesmo
+# assim ele desenhava POR CIMA de terreno que esta' a 10 e a 25 m de cota. Gastei
+# horas atras desse defeito de profundidade e nao o expliquei.
+# A saida nao foi contornar: foi TIRAR A CAUSA. O terreno da ilha ja' desce a
+# -25 m em volta da costa, entao a agua nao precisa de geometria nenhuma — ela e'
+# a faixa do material abaixo do nivel do mar. Sem plano, sem profundidade para
+# errar, e de graca: nenhum triangulo novo.
+AGUA = (0.015, 0.075, 0.13)
 
 # KNOBS da inclinacao, em normal-Z (1,0 = chao plano, 0,0 = parede).
 # Subir ROCHA_ATE espalha pedra por encosta mais mansa; descer confina a pedra
@@ -269,16 +279,33 @@ def construir():
     # MULTIPLICA a cor — modulacao, nao pintura: a leitura de praia/campo/rocha
     # continua sendo a do bloco de cima.
     det = _textura_detalhe(mat, pos)
+    # --- agua: tudo abaixo do nivel do mar ---------------------------------
+    fora_dagua = _no(mat, unreal.MaterialExpressionSmoothStep, -420, 200)
+    fora_dagua.set_editor_property("const_min", -1.5)
+    fora_dagua.set_editor_property("const_max", 0.5)
+    ME.connect_material_expressions(metros, "", fora_dagua, "Value")
+
     final = manchado
     if det is not None:
         final = _no(mat, unreal.MaterialExpressionMultiply, 380, -40)
         ME.connect_material_expressions(manchado, "", final, "A")
         ME.connect_material_expressions(det, "", final, "B")
-    ME.connect_material_property(final, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # a agua entra POR CIMA de tudo, inclusive da gramatura: agua nao tem grao.
+    c_agua = _const3(mat, AGUA, 380, 200)
+    com_agua = _no(mat, unreal.MaterialExpressionLinearInterpolate, 520, 60)
+    ME.connect_material_expressions(c_agua, "", com_agua, "A")
+    ME.connect_material_expressions(final, "", com_agua, "B")
+    ME.connect_material_expressions(fora_dagua, "", com_agua, "Alpha")
+    ME.connect_material_property(com_agua, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     # Chao de battle royale nao brilha: aspereza alta e zero metal. E' a mesma
     # `Pbr.domar` do mobile, so' que aqui e' uma constante e nao um conserto.
-    aspero = _const(mat, 0.92, 200, 80)
+    # A AGUA e' a excecao: agua parada espelha, entao a aspereza dela e' baixa —
+    # e e' esse contraste de brilho que faz o olho ler "molhado" sem plano nenhum.
+    aspero = _no(mat, unreal.MaterialExpressionLinearInterpolate, 520, 200)
+    ME.connect_material_expressions(_const(mat, 0.06, 380, 260), "", aspero, "A")
+    ME.connect_material_expressions(_const(mat, 0.92, 380, 320), "", aspero, "B")
+    ME.connect_material_expressions(fora_dagua, "", aspero, "Alpha")
     ME.connect_material_property(aspero, "", unreal.MaterialProperty.MP_ROUGHNESS)
     metal = _const(mat, 0.0, 200, 140)
     ME.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
@@ -290,11 +317,13 @@ def construir():
 
 
 def mar():
-    """Um plano azul em Z=0. Nao e' agua de verdade e nao pretende ser.
+    """OBSOLETA. Ficou como registro do que NAO fazer.
 
-    O que ele resolve e' a SILHUETA: sem mar, a ilha nao tem contorno e a costa
-    vira uma bacia de areia que nao termina. Agua com onda, refracao e espuma e'
-    o plugin Water e entra depois — este plano custa uma malha e um material.
+    Era um plano de 6 km em Z=0. Medido em 28/08: ator em Z=0, componente
+    relativo em Z=0, malha `Plane`, um unico ator no nivel — e mesmo assim ele
+    desenhava por cima de terreno a 10 e a 25 m de cota. O defeito de
+    profundidade nao foi explicado, e a solucao foi tirar a causa: a agua virou
+    faixa do MATERIAL do terreno abaixo do nivel do mar. Ver `AGUA` no topo.
     """
     nome = "M_MarChapado"
     if not unreal.EditorAssetLibrary.does_asset_exist("%s/%s" % (PASTA, nome)):
@@ -421,31 +450,13 @@ def posicionar_a_ilha(mat):
         diz("ERRO: NENHUMA Landscape no nivel")
         return False
 
-    # o mar, uma vez so'
-    rotulos = [a.get_actor_label() for a in atores_sub.get_all_level_actors()]
-    diz("ATORES ANTES DO MAR (%d): %s" % (len(rotulos), rotulos))
-    ja_tem = "Mar" in rotulos
-    if not ja_tem:
-        plano = unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Plane.Plane")
-        if plano is None:
-            diz("ERRO MAR: /Engine/BasicShapes/Plane nao carregou")
-        else:
-            # spawn pela CLASSE, nao pelo objeto: spawn_actor_from_object devolveu
-            # None aqui e o erro so' aparece uma chamada depois, como AttributeError
-            # em NoneType. Pela classe o ator vem garantido e a malha entra depois.
-            ator = atores_sub.spawn_actor_from_class(
-                    unreal.StaticMeshActor, unreal.Vector(0, 0, 0))
-            ator.set_actor_label("Mar")
-            comp = ator.static_mesh_component
-            comp.set_editor_property("mobility", unreal.ComponentMobility.STATIC)
-            comp.set_static_mesh(plano)
-            comp.set_material(0, mar())
-            # o Plane do motor tem 100 cm; o mar precisa passar da costa em todas as
-            # direcoes, senao aparece a borda do plano no horizonte.
-            k = (LADO_CM * 2.5) / 100.0
-            ator.set_actor_scale3d(unreal.Vector(k, k, 1.0))
-            _nunca_espacial(ator)
-            diz("MAR CRIADO: %s escala=%.1f" % (ator.get_actor_label(), k))
+    # O MAR DEIXOU DE SER ATOR — ver o comentario de AGUA no topo. Se sobrou um
+    # plano de mar de versao anterior, ele sai daqui: um plano gigante em Z=0
+    # desenhando por cima do terreno e' pior do que mar nenhum.
+    for a in atores_sub.get_all_level_actors():
+        if a.get_actor_label() == "Mar":
+            atores_sub.destroy_actor(a)
+            diz("MAR (plano) APAGADO — a agua agora e' do material")
 
     exposicao_travada(atores_sub)
 
