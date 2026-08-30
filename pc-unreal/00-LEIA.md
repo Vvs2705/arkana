@@ -80,49 +80,50 @@ apagar sem perder nada é o cache de download da Fab (`.../Launcher/VaultCache`,
 
 | Passo | O quê | Portão |
 |---|---|---|
-| **0** ✅ | UE5 + Lyra instalados; 4 peças do Meshy com Nanite sobre terreno — **medido abaixo** | falta só o Diretor olhar e aprovar o teto visual |
-| **1** | terreno da Ilha Fraturada com o kit esculpido | mapa navegável |
+| **0** ✅ | UE5 + Lyra; peça do Meshy com Nanite sobre terreno | teto visual aprovado |
+| **1** ✅ | **Ilha Fraturada jogável**: terreno, material, água, kit assentado, pontos de partida | **o pawn nasce no chão e anda** |
 | **2** | movimento, câmera e um disparo — no Lyra, servidor autoritativo | dois clientes na mesma partida |
 | **3** | Zona, loot, queda — reimplementados a partir de `design/` | partida completa |
 | **4** | elenco, kits, VFX, áudio | jogo bonito de ver em vídeo |
 | **5** | EOS, matchmaking, EAC | competitivo honesto |
 
-**Fora desta lista e antes de tudo:** a página da Steam. A receita do primeiro mês
-é função da wishlist no dia do lançamento, e a página é o que constrói wishlist.
-Ver a análise, §1.2.
+**Fora desta lista e antes de tudo:** a página da Steam.
 
 ---
 
-## 5. Passo 0 — o que foi medido (28/08/2026, 00h20)
+## 5. A ilha, medida (30/08/2026)
 
-Nível `/Game/ARKANA/L_TesteNanite` (Mundo Aberto), com 4 peças importadas
-**cruas**, sem passar por Blender e sem decimação:
-
-| Peça | Triângulos Nanite | Fallback | Disco compactado |
-|---|---|---|---|
-| `19-arco-calcario-nymara` | **3.122.424** | 16.334 | 26,1 MB |
-| + `17-rocha-basalto-modular`, `21-pilar-condutor-fulgar`, `29-arvore-folhas-douradas` | mesma ordem de grandeza | | |
-
-**Custo em tela, medido com `stat unit` / `stat rhi`:**
+`/Game/ARKANA/L_IlhaFraturada` — 2.400 m de lado, centrada na **origem**.
 
 | | |
 |---|---|
-| Quadro | **19,77 ms (~50 FPS)** |
-| Draw (thread de render) | 16,15 ms — **é o gargalo** |
-| GPU | 15,51 ms |
-| Draw calls | 1.030 |
-| Primitivas | 5,3 milhões |
-| VRAM | 3,45 de 5,11 GB |
+| Envelope | −120.000 a +120.000 cm nos dois eixos, **medido por 58.081 traços** |
+| Pico | 11.983 cm (120 m) |
+| Fundo | −2.480 cm |
+| Acima do mar | 52,4% (o heightmap dizia 52,5%) |
+| Peças plantadas | **1.276 assentadas no chão medido**, 1 descartada |
+| Pontos de partida | 5 (lago e alagado ficam de fora: o centro deles é água) |
+| Quadro | 21,82 ms (~46 FPS), GPU 19,08 ms, 412 draw calls |
 
-**Como ler isso.** É o **editor**, que carrega painéis, gizmos e seleção — jogo
-empacotado corta boa parte do Draw. O gargalo estar no Draw e não na GPU diz que
-o Nanite **não** é o problema: 5,3 M de primitivas custaram 15,5 ms de GPU.
+### A REGRA QUE ESTA FASE DEIXOU, e ela custou horas
 
-**A comparação que importa:** no `mobile-godot/` esta mesma peça precisava ser
-decimada de 3 M para **2–8 mil faces** para caber no orçamento do celular. Aqui
-ela roda inteira. Toda a esteira `decimar.py` deixa de existir no PC.
+> **O arquivo que entra não é o mundo que sai, e medida de ontem não mede o
+> mundo de hoje.** Quem responde onde o chão está é o COLISOR, traçado AGORA.
 
-**O que ainda NÃO foi feito neste nível:** material do terreno (é o cinza padrão
-do Mundo Aberto), iluminação (é a padrão, estourada no horizonte) e colisão das
-peças. Nada disso é a arte — é o nível de teste do portão.
+Eu tinha cravado o centro da ilha em (−1.200, −1.200) m, lido dos LIMITES dos
+proxies. Aquilo era a paisagem ANTIGA, de antes de eu refazer o nível. Medida
+velha guardada em variável nova é o defeito mais traiçoeiro que existe: não
+parece chute, parece medição. Com 1.200 m de deslocamento, metade das peças caía
+no mar e o POI do "pico" apontava para um morro de 18,8 m.
+
+### O que a ilha AINDA não tem
+
+- **O kit tem 11 peças das 24 do design.** Faltam as famílias de parede/cânion,
+  os cristais elementais e a estátua dos colossos. Nenhuma delas existe na
+  oficina da Meshy — conferido peça por peça em 30/08.
+- **Lago e alagado não têm marco.** Os POIs existem no terreno; falta vesti-los.
+- **Sem nomes de área legíveis da queda** — pedido do Diretor, ainda não feito.
+- **Sem loot, sem zona, sem queda.** Isso é o passo 3.
+
+---
 
