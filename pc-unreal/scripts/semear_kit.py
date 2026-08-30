@@ -45,20 +45,25 @@ SEMENTE = 7          # a mesma do ruido da ilha, por simetria de leitura
 LADO = 2017
 MAPA_M = 2400.0
 MEIA_FAIXA_GODOT_M = 30.0788
-ESCALA_VS_GODOT = 4.0        # 2400 m / 600 m
+ESCALA_VS_GODOT = 4.0        # a ALTURA continua 4x (pico medido: 120,3 m)
 
 PASSO_CM = MAPA_M * 100.0 / (LADO - 1)
 
-# ONDE A ILHA REALMENTE ESTA, medido pelos limites dos proxies em 28/08:
-# X e Y vao de -240.000 a 0 cm. Ou seja, o Landscape cresce no sentido NEGATIVO
-# a partir da sua posicao (-120.000, -120.000) — o centro da ilha NAO e' a
-# origem do mundo, e' (-1.200, -1.200) m.
+# ONDE A ILHA REALMENTE ESTA — e aqui esta' a lição mais cara deste dia.
 #
-# Isto foi MEDIDO, nao suposto, e a conferencia foi o PICO: `Island.gd` poe o
-# pico em (12, 84) do espaco-base, o que dá (-110.400, -52.800) cm neste
-# referencial; o proxy mais alto do terreno esta' centrado em (-105.000,
-# -45.000) cm, dentro do mesmo pedaco de 300 m. Bate.
-CENTRO_ILHA_M = (-1200.0, -1200.0)
+# MEDIDO em 30/08 por 58.081 tracos contra o colisor: o envelope da paisagem vai
+# de -120.000 a +120.000 cm nos dois eixos. Ou seja: **2.400 m, centrada na
+# ORIGEM**. 52,4% do terreno acima do mar; o meu heightmap diz 52,5%. Pico
+# medido 11.983 cm, o meu diz 12.031. Batem.
+#
+# O QUE ME FEZ ERRAR: horas antes eu li os LIMITES dos proxies e obtive
+# [-240.000, 0] — e cravei o centro em (-1.200, -1.200). Aquilo era a paisagem
+# ANTIGA, de antes de eu refazer o nivel. Medida velha em variavel nova e' o
+# defeito mais traicoeiro que existe: ela nao parece chute, parece medicao.
+#
+# A REGRA QUE FICA: quem responde onde o mundo esta' e' o COLISOR, tracado AGORA.
+# Nao o arquivo que eu mandei, nao o limite declarado, nao a medida de ontem.
+CENTRO_ILHA_M = (0.0, 0.0)
 CANTO_CM = (CENTRO_ILHA_M[0] - MAPA_M * 0.5) * 100.0
 FAIXA_M = 2.0 * MEIA_FAIXA_GODOT_M * ESCALA_VS_GODOT   # 240,63 m de amplitude
 
@@ -84,6 +89,12 @@ POIS = {
     "dunas":    _poi( 10, -98, 32),
 }
 
+# O afastamento entre pecas escala com o MAPA: numa ilha de 1.200 m as regioes
+# tem metade do raio, e manter o afastamento de uma ilha de 2.400 m fazia a
+# floresta parar em 116 arvores de 150 e os juncos em 181 de 450 — a regra ficava
+# sem lugar para sortear. Este fator sai de um numero medido, nao de gosto.
+AFASTA = MAPA_M / 2400.0
+
 # --- O KIT, e o que cada peca quer -------------------------------------------
 # altura_m: quanto a peca deve MEDIR no mundo. E' o unico numero de escala.
 # quantos: instancias. onde: 'ilha' | nome de POI | lista de POIs.
@@ -96,9 +107,12 @@ KIT = [
     {"slug": "18-rocha-vulcanica-cobertura",  "altura_m": 6.5,  "quantos": 200,
      "onde": "ilha",     "cota": (2.0, 130.0), "inclin": (0.05, 0.60), "afasta_m": 30.0,
      "escala_var": (0.8, 1.6)},
+    # O arco fica na BEIRA do lago, nao dentro dele: a cota comeca em 2 m (a
+    # margem seca) e o afastamento cede, senao so' cabe um. Medido: com cota
+    # 4-40 m e 70 m de afastamento, saiam 1 de 7.
     {"slug": "19-arco-calcario-nymara",       "altura_m": 24.0, "quantos": 7,
-     "onde": "lago",     "cota": (4.0, 40.0),  "inclin": (0.0, 0.22),  "afasta_m": 70.0,
-     "escala_var": (0.9, 1.25)},
+     "onde": ["lago", "alagado"], "cota": (2.0, 60.0), "inclin": (0.0, 0.30),
+     "afasta_m": 45.0, "escala_var": (0.9, 1.25)},
     # DEITADA: mede-se pelo COMPRIMENTO, nao pela altura. A caixa Z dela tem
     # 39,6 cm; pedir 20 m de ALTURA daria escala 50 e uma ponte de 95 m de vao.
     {"slug": "20-ponte-raiz-aeris",           "altura_m": 30.0, "eixo": 0, "quantos": 6,
@@ -203,7 +217,7 @@ def semear(terreno, medidas, rng):
 
         regioes = _regioes(peca["onde"])
         postos = []
-        afasta2 = peca["afasta_m"] ** 2
+        afasta2 = (peca["afasta_m"] * AFASTA) ** 2
         cota_min, cota_max = peca["cota"]
         inc_min, inc_max = peca["inclin"]
         tentativas = 0
