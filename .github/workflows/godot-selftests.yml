@@ -1,7 +1,7 @@
 # Portao automatico do jogo 3D: roda os MESMOS 12 autotestes que rodam na
 # maquina de quem desenvolve, pelo MESMO script. Se o CI e o local divergirem,
 # um dos dois passa a mentir — por isso aqui nao ha' lista de testes: ha' uma
-# chamada a godot/tests/run_all.sh.
+# chamada a mobile-godot/godot/tests/run_all.sh.
 #
 # O export Android NAO entra aqui de proposito: depende de SDK, JDK, templates e
 # keystore. Ele ganha workflow proprio quando existir politica de release.
@@ -23,15 +23,15 @@ jobs:
       - name: Baixar o repositorio (com LFS)
         uses: actions/checkout@v4
         with:
-          # Os modelos .glb da Pyra e do Brok vivem em LFS. Sem isto o checkout
-          # traz ponteiros de 132 bytes e characters/selftest.gd reprova por
-          # "modelo ausente" — vermelho pelo motivo errado.
+          # Os .glb do mundo vivem em LFS. Sem isto o checkout traz ponteiros
+          # de 132 bytes e os selftests reprovam por "modelo ausente" —
+          # vermelho pelo motivo errado.
           lfs: true
 
       - name: Conferir que o LFS materializou
         run: |
           git lfs ls-files
-          ls -l godot/characters/modelos/pyra.glb godot/characters/modelos/brok.glb
+          ls -l mobile-godot/godot/world/modelos/castelo.glb
 
       - name: Instalar o Godot 4.4.1 (release oficial, versao fixa)
         env:
@@ -50,4 +50,4 @@ jobs:
           ./godot --version
 
       - name: Rodar os 12 selftests
-        run: GODOT_BIN="$RUNNER_TEMP/godot/godot" bash godot/tests/run_all.sh
+        run: GODOT_BIN="$RUNNER_TEMP/godot/godot" bash mobile-godot/godot/tests/run_all.sh
