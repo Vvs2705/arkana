@@ -101,9 +101,11 @@ apagar sem perder nada é o cache de download da Fab (`.../Launcher/VaultCache`,
 | Pico | 11.983 cm (120 m) |
 | Fundo | −2.480 cm |
 | Acima do mar | 52,4% (o heightmap dizia 52,5%) |
-| Peças plantadas | **1.276 assentadas no chão medido**, 1 descartada |
+| Peças plantadas | **1.396 assentadas no chão medido**, 13 descartadas |
+| Das quais, muralhas | 132 rochas em fila — cobertura e corredor |
+| Nomes de área no chão | 6, legíveis da queda |
 | Pontos de partida | 5 (lago e alagado ficam de fora: o centro deles é água) |
-| Quadro | 21,82 ms (~46 FPS), GPU 19,08 ms, 412 draw calls |
+| Quadro | 21,81 ms (~46 FPS), GPU 19,34 ms, 411 draw calls |
 
 ### A REGRA QUE ESTA FASE DEIXOU, e ela custou horas
 
@@ -116,14 +118,30 @@ velha guardada em variável nova é o defeito mais traiçoeiro que existe: não
 parece chute, parece medição. Com 1.200 m de deslocamento, metade das peças caía
 no mar e o POI do "pico" apontava para um morro de 18,8 m.
 
+### A COBERTURA veio de composição, não de peça nova
+
+O design pede uma família inteira de **parede/cânion** — parede reta, canto de
+90°, coluna isolada, topo de crista — e **nenhuma das quatro existe na oficina da
+Meshy** (conferido peça por peça em 30/08). Sem elas o mapa não tem cobertura nem
+corredor, que num battle royale é onde o tiroteio acontece.
+
+A saída não foi esperar peça nova: foi **compor com o que existe**. Uma fila de
+rochas de basalto encostadas lê como crista de pedra — a mesma silhueta que a
+peça "topo de crista" daria, feita com a peça de maior reuso do kit. Custo
+medido: 132 rochas a mais e **um** draw call a menos (411 contra 412), porque o
+Nanite e o streaming não sentem.
+
+Quando as peças de parede existirem, o gerador troca de malha e a regra continua.
+
 ### O que a ilha AINDA não tem
 
-- **O kit tem 11 peças das 24 do design.** Faltam as famílias de parede/cânion,
-  os cristais elementais e a estátua dos colossos. Nenhuma delas existe na
-  oficina da Meshy — conferido peça por peça em 30/08.
-- **Lago e alagado não têm marco.** Os POIs existem no terreno; falta vesti-los.
-- **Sem nomes de área legíveis da queda** — pedido do Diretor, ainda não feito.
+- **O kit tem 11 peças das 24 do design.** Faltam parede/cânion (composta por
+  ora), os cristais elementais e a estátua dos colossos. Nenhuma existe na
+  oficina da Meshy — precisam ser geradas no site.
+- **Lago e alagado não têm marco.**
 - **Sem loot, sem zona, sem queda.** Isso é o passo 3.
+- **O streaming do editor não acompanha a câmera** de forma confiável; no Play
+  ele funciona. É incômodo de inspeção, não defeito do nível.
 
 ---
 

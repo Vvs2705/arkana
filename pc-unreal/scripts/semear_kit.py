@@ -37,7 +37,7 @@ import struct
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.abspath(os.path.join(AQUI, "..", ".."))
-HEIGHTMAP = os.path.join(RAIZ, "pc-unreal", "heightmap", "ilha-fraturada-2017.r16")
+TERRENO = os.path.join(AQUI, "terreno-medido.json")
 MEDIDO = os.path.join(AQUI, "kit-medido.json")
 SAIDA = os.path.join(AQUI, "kit-plantado.json")
 
@@ -144,44 +144,48 @@ KIT = [
 ]
 
 
-def carregar_alturas():
-    """O .r16 inteiro em memoria, ja' convertido para METROS acima do mar."""
-    dados = io.open(HEIGHTMAP, "rb").read()
-    esperado = LADO * LADO * 2
-    if len(dados) != esperado:
-        raise SystemExit("heightmap com %d bytes, esperava %d" % (len(dados), esperado))
-    crus = struct.unpack("<%dH" % (LADO * LADO), dados)
-    return [(v / 65535.0 - 0.5) * FAIXA_M for v in crus]
+def carregar_terreno():
+    """Le' o terreno MEDIDO POR TRACO, e nao o `.r16` que eu mandei ao Unreal.
+
+    A DIFERENCA NAO E' ACADEMICA. Em 30/08 eu semeava lendo o arquivo de entrada
+    e metade das pecas caiu no mar, porque **o arquivo que entra nao e' o mundo
+    que sai**: o Unreal reamostra, reposiciona e escala. `sondar_terreno.py`
+    dispara 58.081 raios contra o colisor e grava o que o mundo REALMENTE tem —
+    e' essa a fonte daqui para a frente.
+
+    De brinde, some a dependencia do `.r16`, que era arquivo derivado de 8 MB
+    fora do git e se perdeu junto com uma worktree apagada.
+    """
+    if not os.path.exists(TERRENO):
+        raise SystemExit("falta %s — rode sondar_terreno.py no Unreal" % TERRENO)
+    return json.load(io.open(TERRENO, encoding="utf-8"))
 
 
 class Terreno(object):
-    def __init__(self, alturas):
-        self.h = alturas
+    """A grade medida, em METROS de cota, com busca pelo no' mais proximo."""
 
-    def _idx(self, i, j):
-        i = 0 if i < 0 else (LADO - 1 if i > LADO - 1 else i)
-        j = 0 if j < 0 else (LADO - 1 if j > LADO - 1 else j)
-        return j * LADO + i
+    def __init__(self, dados):
+        self.lado = dados["lado"]
+        self.canto = dados["canto_cm"]
+        self.passo = dados["passo_cm"]
+        self.h = dados["alturas_cm"]
 
     def em_metros(self, xm, ym):
-        """Altura no ponto (metros de mundo), pelo vizinho mais proximo.
-
-        Vizinho mais proximo basta: o passo da grade e' 1,19 m e as pecas medem
-        de 3 a 26 m. Interpolar aqui seria precisao que ninguem enxerga.
-        """
-        i = int(round((xm * 100.0 - CANTO_CM) / PASSO_CM))
-        j = int(round((ym * 100.0 - CANTO_CM) / PASSO_CM))
-        return self.h[self._idx(i, j)]
+        i = int(round((xm * 100.0 - self.canto[0]) / self.passo[0]))
+        j = int(round((ym * 100.0 - self.canto[1]) / self.passo[1]))
+        if i < 0 or j < 0 or i >= self.lado or j >= self.lado:
+            return -999.0
+        z = self.h[j][i]
+        return -999.0 if z is None else z / 100.0
 
     def inclinacao(self, xm, ym):
-        """Inclinacao adimensional (subida/andado) numa janela de ~5 m.
+        """Inclinacao adimensional numa janela de ~2 nos da grade.
 
-        JANELA LARGA, e nao vizinho imediato: a licao esta' em `Island.gd`, onde
-        medir inclinacao vertice a vertice fez a rocha nunca aparecer. O que
-        importa para plantar peca de 9 m nao e' a rugosidade de 1 m, e' se a
-        ENCOSTA sobe.
+        JANELA LARGA, e nao no' vizinho: a licao esta' em `Island.gd`, onde medir
+        inclinacao vertice a vertice fez a rocha nunca aparecer. Para plantar
+        peca de 9 m o que importa e' se a ENCOSTA sobe, nao a rugosidade de 1 m.
         """
-        d = 5.0
+        d = max(self.passo[0], self.passo[1]) * 2.0 / 100.0
         hx = abs(self.em_metros(xm + d, ym) - self.em_metros(xm - d, ym))
         hy = abs(self.em_metros(xm, ym + d) - self.em_metros(xm, ym - d))
         return max(hx, hy) / (2.0 * d)
@@ -280,14 +284,81 @@ def semear(terreno, medidas, rng):
     return plantado, resumo
 
 
+def muralhas(terreno, medidas, rng, plantado):
+    """Compoe MURALHAS com a rocha de basalto, em linha.
+
+    POR QUE EXISTE: o kit do design tem uma familia inteira de PAREDE/CANION —
+    parede reta, canto de 90 graus, coluna isolada, topo de crista — e nenhuma
+    dessas quatro pecas existe na oficina da Meshy (conferido peca por peca em
+    30/08). Sem elas o mapa nao tem COBERTURA nem CORREDOR, que num battle royale
+    nao e' decoracao: e' onde o tiroteio acontece.
+
+    A saida nao foi esperar peca nova, foi COMPOR com o que existe. Uma fila de
+    rochas de basalto encostadas uma na outra le' como crista de pedra — a mesma
+    silhueta que a peca "topo de crista" daria, feita com a peca de maior reuso
+    do kit. Nao e' improviso: e' o principio de instanciamento do proprio design
+    (MAPA-GRANDE-PLANO §4.3), usado para formar massa em vez de pontilhado.
+
+    Quando as pecas de parede existirem, este gerador troca de malha e a regra
+    continua valendo.
+    """
+    slug = "17-rocha-basalto-modular"
+    med = medidas.get("pecas", {}).get(slug)
+    if med is None or slug not in plantado:
+        return 0
+    escala_base = (9.0 * 100.0) / med["caixa_cm"][2]
+    base_z_cm = med["base_z_cm"]
+    largura_m = med["caixa_cm"][0] * escala_base / 100.0   # largura de uma rocha
+
+    novas = []
+    for reg in (POIS["ruinas"], POIS["floresta"], POIS["lago"], POIS["dunas"],
+                POIS["pico"]):
+        for _ in range(3):                       # 3 muralhas por regiao
+            for tentativa in range(60):
+                ang = rng.uniform(0.0, 2.0 * math.pi)
+                raio = math.sqrt(rng.random()) * reg["r"] * 0.8
+                x0 = reg["c"][0] + math.cos(ang) * raio
+                y0 = reg["c"][1] + math.sin(ang) * raio
+                if terreno.em_metros(x0, y0) < 6.0:
+                    continue
+                dir_ang = rng.uniform(0.0, 2.0 * math.pi)
+                dx, dy = math.cos(dir_ang), math.sin(dir_ang)
+                # passo = 70% da largura: as rochas se ENCOSTAM e viram massa.
+                passo = largura_m * 0.7
+                quantas = rng.randint(8, 14)
+                pontos = []
+                for k in range(quantas):
+                    xm = x0 + dx * passo * k
+                    ym = y0 + dy * passo * k
+                    h = terreno.em_metros(xm, ym)
+                    if h < 4.0:
+                        break
+                    pontos.append((xm, ym, h))
+                if len(pontos) < 6:              # muralha curta demais nao serve
+                    continue
+                for xm, ym, h in pontos:
+                    e = escala_base * rng.uniform(0.9, 1.45)
+                    novas.append({
+                        "loc": [round(xm * 100.0, 1), round(ym * 100.0, 1),
+                                round(h * 100.0 - base_z_cm * e - 0.06 * 900.0, 1)],
+                        "yaw": round(rng.uniform(0.0, 360.0), 1),
+                        "escala": round(e, 5),
+                    })
+                break
+    plantado[slug]["instancias"].extend(novas)
+    return len(novas)
+
+
 def main():
     if not os.path.exists(MEDIDO):
         raise SystemExit("falta %s — rode importar_kit.py primeiro" % MEDIDO)
     medidas = json.load(io.open(MEDIDO, encoding="utf-8"))
-    terreno = Terreno(carregar_alturas())
+    terreno = Terreno(carregar_terreno())
     rng = random.Random(SEMENTE)
     plantado, resumo = semear(terreno, medidas, rng)
 
+    n_mur = muralhas(terreno, medidas, rng, plantado)
+    resumo.append("MURALHAS: +%d rochas em fila (cobertura e corredor)" % n_mur)
     total = sum(len(v["instancias"]) for v in plantado.values())
     io.open(SAIDA, "w", encoding="utf-8").write(
             json.dumps({"semente": SEMENTE, "pecas": plantado},
