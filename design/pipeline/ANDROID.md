@@ -1,45 +1,43 @@
-# ANDROID - estado atual
+# ANDROID — estado atual
 
-O produto Android atual e o jogo 3D em Godot 4.4. O pipeline antigo baseado em
-Capacitor foi encerrado e removido.
+O produto Android é o jogo em **Unity 6** (`mobile-unity/`). O pipeline Godot
+foi encerrado em 09/09/2026 e o Capacitor antes dele, em 20/08.
 
 ## Identidade do aplicativo
 
 | Campo | Valor |
 |---|---|
-| Engine | Godot 4.4.1 |
-| Projeto | `godot/project.godot` |
-| Preset | `godot/export_presets.cfg` |
-| Package ID | `br.com.vstack.arkana3d` |
-| Arquitetura de debug | ARM64 |
-| Saida local | `godot/build/arkana3d.apk` |
+| Engine | Unity 6000.3.23f1 (URP) |
+| Package ID | `br.com.vstack.arkana` |
+| Arquitetura | ARM64 |
+| API mínima | Android 8.0 (API 26) |
+| Aparelho de teste | Poco F4 (Snapdragon 870, Adreno 650, 120 Hz) |
 
-## Gerar APK de debug
+## Gerar APK de desenvolvimento
 
-Verificacao de 21/08/2026: **todas as dependencias estao presentes** (Godot
-4.4.1, templates 4.4.1.stable, Android SDK, JDK 21 e keystore de debug). O
-bloqueio anotado em 20/08 nao existe mais — o export roda de ponta a ponta. O
-estado completo esta em `godot/export/SETUP.md`.
+O Unity está instalado com o módulo Android (SDK, NDK e JDK próprios). O build
+sai por linha de comando, sem abrir o editor:
 
 ```bash
-bash godot/export/build_apk.sh
+"/c/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe" -batchmode -nographics -quit \
+  -projectPath mobile-unity -executeMethod Build.Android -logFile mobile-unity/Logs/build.log
 ```
 
-Com o ambiente restaurado, o script importa o projeto, exporta o APK e verifica
-se o pacote contem o runtime Android e os assets do jogo. APKs e AABs sao
-artefatos locais e ficam fora do Git.
+O método `Build.Android` é escrito no passo 0 (`Assets/Editor/Build.cs`). APKs
+são artefato local e ficam fora do git; o APK datado vai sempre para a mesma
+pasta do clone principal, venha de worktree ou não (ordem do Diretor, 27/08).
 
-## Estado de publicacao
+## Estado de publicação
 
-O APK atual serve para desenvolvimento e teste em aparelho. Publicacao na Play
-Store continua fora do escopo de G3 e exige, no minimo:
+O APK serve para desenvolvimento e teste em aparelho. Publicação na Play Store
+exige, no mínimo:
 
 - keystore de release com backup externo;
-- politica de `versionCode` e `versionName`;
-- AAB assinado e verificavel;
-- politica de privacidade e canal de suporte;
-- ficha da loja, capturas e classificacao IARC;
+- política de `versionCode` e `versionName`;
+- AAB assinado e verificável;
+- política de privacidade e canal de suporte;
+- ficha da loja, capturas e classificação IARC;
 - teste fechado conforme a regra vigente da Play Store.
 
-Esses itens entram em G6. Nenhuma conta, assinatura ou gasto deve ser criado
-antes da autorizacao do Diretor.
+Nenhuma conta, assinatura ou gasto deve ser criado antes da autorização do
+Diretor.

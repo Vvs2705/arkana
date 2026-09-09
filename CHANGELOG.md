@@ -3,6 +3,19 @@
 Este arquivo registra os marcos das frentes que continuam ativas. O historico
 detalhado do prototipo 2D encerrado permanece disponivel nos commits anteriores.
 
+## Nao publicado - 2026-09-09 - o produto e' Unity; o desvio Steam/Unreal foi desfeito
+
+- **Decisao do Diretor:** o ARKANA volta a ser jogo de celular e passa a ser
+  feito em **Unity 6**, a mesma engine do outro jogo (Limiar). Uma pessoa, uma
+  engine. *"Nao pretendo mudar mais."*
+- **Apagado:** `pc-unreal/` (scripts do editor, ilha de 1.396 pecas medida a
+  46 FPS), a analise de mercado PC/Steam, o exportador de heightmap do Godot
+  para o Unreal, o CI do Godot. Fora do repositorio: Unreal Engine 5.8, Lyra,
+  Godot 4.4.1 e seus templates.
+- **Mantido:** `design/` e `arte/` inteiros; `mobile-godot/` como referencia
+  de leitura para a reescrita, ate' o Unity alcancar a paridade.
+- **Licoes do desvio** registradas em `design/PROJETO.md`.
+
 ## Nao publicado - 2026-08-26 - a partida comeca no ar
 
 - **A QUEDA**: castelo voador com rota deterministica, salto, queda livre,

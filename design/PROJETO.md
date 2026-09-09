@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 27/08/2026 (virada de plataforma: PC / Steam / Unreal 5)
+> **Atualizado em:** 09/09/2026 (o produto é celular em Unity 6; o desvio Steam/Unreal foi desfeito)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,56 +51,142 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o jogo mudou de plataforma: PC / Steam, Unreal 5
+### >>> COMECE POR AQUI — o produto é CELULAR, em UNITY 6 (09/09/2026)
 
-**27/08/2026, noite.** Ordem do Diretor: *"mesmo que tenha que começar tudo do
-zero... se godot não for o recomendado quero que mude e faça do zero se
-precisar. para com espirito de pobre e querer manter tudo sem necessidade"*.
+**09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
+Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
+ser feito com o Unity, porque se ele faz os dois projetos ao mesmo tempo não faz
+sentido manter vários projetos... não pretendo mudar mais agora com o
+conhecimento do Unity e como ele funciona. O que tiver que ser refeito ou
+criamos do zero faz parte, são processos."*
 
-O porquê, em uma linha cada — o desenvolvimento está em
-`design/referencias/PC-STEAM-ANALISE.md`:
+Uma pessoa, dois jogos (este e o Limiar), **uma engine**. Esta é a última troca
+de engine do projeto.
 
-| | |
-|---|---|
-| **Rede** | as ferramentas do Godot servem a 2–8 jogadores; a ARKANA precisa de predição, 40+ por partida e servidor dedicado |
-| **Anti-cheat** | EAC é produto da Epic, nativo no Unreal; em Godot não há caso público de EAC funcionando |
-| **Nanite** | as peças do Meshy têm 3 M de faces e rodam quase cruas — toda a esteira de decimação some |
-| **Lyra** | shooter multiplayer completo da Epic, com EOS e servidor dedicado prontos |
-
-#### O que já está NA MÁQUINA (medido, não estimado)
+#### O que está NA MÁQUINA (medido em 09/09)
 
 | | |
 |---|---|
-| **Unreal Engine 5.8.2** | instalado, 29,5 GiB |
-| **Quixel Bridge + Fab UE Plugin** | instalados |
-| **Lyra Starter Game** | `C:\Users\VINICIUS\Documents\Unreal Projects\LyraStarterGame`, 5,0 GB |
-| **Binários do Lyra** | vieram **prontos** — `BuildId 55116800`, igual ao do motor. **Não precisou compilar C++** |
-| **Alvos de rede que já vêm no Lyra** | `LyraGameSteam`, `LyraGameEOS`, `LyraServer`, `LyraServerSteamEOS` |
-| **Visual Studio** | Build Tools 2022, MSVC 14.44.35207, SDK 10.0.26100 — sem IDE |
-| **Disco** | 60 GB livres depois de tudo |
+| **Unity 6000.3.23f1** | `C:\Program Files\Unity\Hub\Editor\6000.3.23f1`, com os módulos **Android** (SDK, NDK, JDK próprios) e Windows |
+| **.NET 10 SDK** | instalado em 07/09 para o Limiar |
+| **Toolchain provada** | o Limiar já gerou APK por `-batchmode -executeMethod` em 08/09; a receita está em `Agentes/_memoria/LICOES.md` |
+| **Aparelho de teste** | Poco F4 (Snapdragon 870, Adreno 650, 120 Hz) |
+| **Apagado nesta data** | Unreal Engine 5.8 (30,6 GB), Lyra (12,4 GB), caches do Epic, Godot 4.4.1 e templates. ~48 GB liberados |
 
-#### A ordem daqui para a frente
+#### O que FICOU e o que SAIU do repositório
 
-Está em `pc-unreal/00-LEIA.md` §4. O passo **0** é o portão de agora: pôr uma
-peça do Meshy de 3 M de faces com Nanite sobre um terreno e **o Diretor olhar e
-aprovar o teto visual**. As 10 peças cruas estão em
-`arte/cenario/ilha-fraturada/_originais-3d/` (1,1 GB, fora do git).
+| Fica | Por quê |
+|---|---|
+| `design/` inteiro | decisão não tem engine |
+| `arte/` inteiro, incluindo os originais de 3 M de faces fora do git | matéria-prima; a versão de celular se deriva no Blender |
+| `mobile-godot/` | **referência de leitura** para a reescrita: cada sistema ali foi jogado e medido. Sai quando o Unity o alcançar |
+| `roblox/` | intocado, como sempre |
+
+| Saiu | Por quê |
+|---|---|
+| `pc-unreal/` (scripts do editor, ilha de 1.396 peças) | produto abandonado |
+| `design/referencias/PC-STEAM-ANALISE.md` | análise de uma plataforma que não existe mais; o que valia atravessou para a seção de lições abaixo |
+| exportador de heightmap Godot→Unreal, CI do Godot | alimentavam o que saiu |
+
+#### A ORDEM daqui para a frente
+
+Cada passo tem um portão, e o portão é **no aparelho**, nunca na estimativa.
+
+| Passo | O quê | Portão |
+|---|---|---|
+| **0** | Criar `mobile-unity/` (template URP 3D Mobile, Force Text + Visible Meta, pacotes Input System, glTFast e Test Framework), `Assets/Editor/Build.cs` com `Build.Android`, primeiro APK vazio no Poco F4 | **FPS medido no aparelho** — a dívida que o projeto carrega desde 25/08 |
+| **1** | Núcleo sem cena: `Balance`, `Kits`, `Combat` (dano num ponto só, NaN barrado), velocidade como produto único, `Bus` de eventos — reescritos a partir de `design/`, olhando `mobile-godot/godot/core/` | testes EditMode cobrando os **mesmos invariantes** dos 12 selftests do Godot |
+| **2** | Ilha procedural de 600 m (o relevo de `Island.gd` é a fonte), mago em terceira pessoa, joystick + gesto único de disparo, Fogo | anda e atira no aparelho, FPS medido |
+| **3** | A partida: queda do castelo, Zona (fração do raio, nasce inerte, liga no pouso), luvas/loot/Baú, 12 bots com percepção, derrubado | partida completa contra bots no aparelho |
+| **4** | Kits, terreno reativo, HUD, menu e seleção dos 20, áudio | paridade com o Godot: o APK antigo deixa de ser referência |
+| **5** | Elenco: os 20 magos refeitos no SITE da Meshy, exportados em **FBX** e importados como Humanoid (retarget pelo Mecanim) | jogo bonito de ver em vídeo |
+| **6** | Rede: **não existe e continua sendo o item mais caro.** Caminho quando chegar: Netcode for GameObjects + servidor dedicado, sem amarrar a fornecedor (o Multiplay da Unity fechou em 2026) | dois celulares na mesma partida |
+
+**Antes da rede, o jogo solo contra bots vale por si** — foi a decisão de gênero
+que sobreviveu ao desvio (ver lições). Modelo de receita fica com o Diretor.
 
 #### O que NÃO muda com a virada
 
 - **O elenco continua a ser refeito no SITE da Meshy, um por um.** A causa e a
-  receita estão logo abaixo, na seção da leva 7 — ela continua válida, só que o
-  destino agora é o Unreal.
-- `design/` e `arte/` alimentam as três bases; as bases **nunca cruzam código**.
-- `mobile-godot/` está **congelado** com 12/12 autotestes verdes. Serve de
-  referência de jogabilidade e de orçamento medido — não recebe feature nova.
-- **Rede continua não existindo.** É o item mais caro e ainda não começou.
-- Antes de tudo e fora da lista: **a página da Steam**, porque a receita do
-  primeiro mês é função da wishlist no dia do lançamento.
+  receita estão na seção da leva 7, logo abaixo. Só o destino mudou: FBX para
+  o Unity, não `.glb` para o Godot.
+- `design/` e `arte/` alimentam as implementações; as implementações **nunca
+  cruzam código**. GDScript não se traduz: se relê a decisão e se escreve em C#.
+- **FPS se mede, não se estima.** Nunca foi medido neste projeto. É o passo 0.
+- **Teste provado em vermelho, portão verde antes de entregar.** *"Sem
+  atropelar as coisas."*
+
+#### Decisões que esperam o Diretor
+
+1. **Package ID** do app: proposto `br.com.vstack.arkana` (o Godot usava
+   `br.com.vstack.arkana3d`). Confirmar antes do passo 0.
+2. Do papel de 26/08, ainda em aberto: **lista dos 10 magos do lançamento**,
+   **nome e valores da moeda**, **quais pares de fusão estreiam**
+   (`design/gdd/DESBLOQUEIO-ELENCO.md`, `MANOPLAS-FUSAO.md`).
+3. **Veto ou não** do círculo final no platô e no pico (o teto de altura caiu na
+   leva 6; final em terreno alto é padrão do gênero, mas é decisão dele).
+4. **A tabela de fases da Zona é proposta, não spec** — calibrada contra PUBG,
+   Apex e Fortnite (`design/referencias/ZONA-BATTLE-ROYALE.md`), nunca
+   sancionada por escrito.
 
 ---
 
-### >>> COMECE POR AQUI — a leva 7 FOI DESFEITA: o elenco volta a ser feito no SITE
+## LIÇÕES DO DESVIO STEAM / UNREAL (27/08 → 09/09/2026)
+
+Registrado para não repetir. **O que erramos, como consertamos, o que atravessou.**
+
+### O que erramos
+
+- **Decidimos pela feature mais distante.** Os argumentos de 27/08 (rede
+  competitiva para 40+, anti-cheat nativo, Nanite) eram tecnicamente
+  verdadeiros, mas rede não existia em nenhuma base e continua não existindo.
+  Trocamos engine e plataforma por causa de um item que está a meses de
+  distância, enquanto o item de hoje (FPS no aparelho) seguia sem medição.
+- **Mudamos antes de fechar o jogo.** O Godot tinha 12/12 autotestes verdes e
+  partida completa; o Unreal chegou a ter uma ilha bonita e nenhuma partida.
+  Treze dias e ~45 GB de instalação para um mapa sem jogo.
+- **Uma pessoa, duas engines.** O custo real não era a curva do Unreal: era
+  manter dois jogos em ferramentas diferentes. Foi isso que decidiu a volta.
+
+### Como consertamos
+
+- Uma engine para os dois jogos (Unity), decidida em 09/09 com a frase *"não
+  pretendo mudar mais"*. Tudo do Unreal apagado da máquina e do repositório.
+- A regra "bases nunca cruzam código" foi mantida: o Unity não herda GDScript
+  nem Blueprint. Herda decisão, arte e número medido.
+- O portão do passo 0 é a medição que faltava desde 25/08. Nenhuma decisão de
+  escopo (mapa maior, mais bots, mais peças) antes de FPS no aparelho.
+
+### O que atravessou do Unreal e vale no Unity
+
+1. **"O arquivo que entra não é o mundo que sai, e medida de ontem não mede o
+   mundo de hoje."** Quem responde onde o chão está é o colisor, traçado
+   AGORA. Um centro de ilha lido de uma paisagem antiga deslocou 1.200 m e
+   afogou metade das peças no mar. Medida velha guardada em variável nova não
+   parece chute, parece medição — é o defeito mais traiçoeiro que existe.
+2. **Cobertura por composição.** As peças de parede/cânion não existem na
+   oficina da Meshy. Uma fila de rochas de basalto encostadas lê como crista
+   de pedra, com a peça de maior reuso do kit e custo de draw call zero. Quando
+   a peça de parede existir, troca-se a malha e a regra continua.
+3. **O mapa grande.** 2.400 m de lado, 1.396 peças assentadas no chão medido,
+   6 nomes de área legíveis da queda, 5 pontos de partida (lago e alagado fora:
+   o centro deles é água). O plano está em `design/cenario/MAPA-GRANDE-PLANO.md`
+   e vale para o Unity — com o teto do celular medido antes.
+4. **As sete peças novas** geradas no site em 04/09 (215 créditos) continuam na
+   oficina da Meshy: `arte/cenario/ilha-fraturada/_originais-3d/00-LEIA.md`.
+5. **Gênero, da análise de mercado:** battle royale de 60 com matchmaking global
+   é a aposta mais arriscada possível para um projeto sem base. Lobby de 16 a
+   20, **bots por padrão sempre** (a partida nunca espera) e **modo solo/PvE
+   valendo por si** — o jogo pode lançar sem rede, e a rede entra depois,
+   financiada. O Spellbreak provou que combate excelente não segura um BR sem
+   base; retenção, não aquisição, foi o que o matou.
+6. **Dois fornecedores de servidor dedicado fecharam em 2026** (Hathora e o
+   Multiplay da Unity). Quando a rede vier: build headless em contêiner, sem
+   amarrar a fornecedor.
+
+---
+
+### A leva 7 FOI DESFEITA: o elenco se faz no SITE (27/08, continua valendo)
 
 **27/08, noite.** Esta secao substitui a que existia aqui e dizia "o elenco
 inteiro no jogo (20 de 20)". Aquilo foi **apagado por ordem do Diretor**, e o que
@@ -172,8 +258,8 @@ falhar mais caro do pipeline.
    -> **conferir a marcacao das articulacoes** -> Confirmar
 3. aplicar os clipes da **biblioteca** (andar, correr, parado, cair, planar,
    nadar, pegar, derrubado e o **gesto de disparo**)
-4. exportar **rigged + todos + arquivo unico** e instalar como
-   `godot/characters/modelos/<nome>.glb`
+4. exportar **rigged + todos + arquivo unico**, em **FBX**, e importar no
+   `mobile-unity/` como rig Humanoid (o Mecanim retargeta)
 5. **conferir no motor** que os clipes sao DISTINTOS (nao repetir o erro da fusao)
 
 ⚠️ **O Ilusionista** precisa do `frente-recorte.png` (a mestra dele tem duas
@@ -188,7 +274,14 @@ registrado. Saldo: **~2.264**.
 
 ---
 
-### >>> COMECE POR AQUI — a leva 6: mapa 4x maior, tempestade de battle royale, nada mais fixo
+## HISTÓRICO DO GODOT (19/08 → 04/09/2026) — referência para a reescrita
+
+O que segue é o registro das levas em Godot: o que foi feito, como e por quê,
+com os defeitos medidos e as regras que nasceram de cada um. **Não é lista de
+tarefas** — é o mapa do que o Unity precisa alcançar e das armadilhas já pagas.
+Os caminhos `godot/...` apontam para `mobile-godot/godot/`.
+
+### (leva 6, 27/08 — histórico do Godot) mapa 4x maior, tempestade de battle royale, nada mais fixo
 
 **27/08, tarde (leva 6).** APK do teste:
 `godot/build/testes/arkana-2026-08-27_1245.apk` (141 MB) — **tem a ilha nova**.
@@ -329,7 +422,7 @@ entregue ao Diretor.
 
 ---
 
-### >>> COMECE POR AQUI — as 5 ordens do Diretor viraram codigo e papel
+### (leva 5, 27/08 — histórico do Godot: as 5 ordens do Diretor viraram codigo e papel)
 
 **27/08, madrugada (leva 5).** APK do teste:
 `godot/build/testes/arkana-2026-08-27_0836.apk` (141 MB). Portao 12/12 em cada
@@ -405,7 +498,7 @@ remesh finalmente abriu.
 
 ---
 
-### >>> COMECE POR AQUI — a leva Spellbreak aplicada: 4 raias, fila visual atacada, Pyra em rig no site
+### (leva 4, 26/08 — histórico do Godot: a leva Spellbreak aplicada; 4 raias, fila visual atacada, Pyra em rig no site
 
 **26/08, madrugada (leva 4 — 4 raias em paralelo, todas com vermelho provado
 e portão 12/12).** APK do teste: `godot/build/testes/arkana-2026-08-26_2249.apk`
@@ -829,7 +922,7 @@ funciona; foi a régua consertada que permitiu acertar.
 
 ---
 
-### >>> 26/08/2026 (dia)
+### (26/08/2026, dia — histórico)
 
 **Duas decisões suas foram tomadas e executadas hoje:**
 1. **PR #2 mesclado na `main`** (`f03f97e`). O CI rodou de verdade e passou —
@@ -1064,248 +1157,66 @@ antiga, protecao da main e contas de publicacao.
 
 ---
 
-## 1. O produto
-
-Arkana é um **battle royale de magos** em terceira pessoa, para Android. Dois
-pilares de identidade:
-
-1. **Sintonia** — dois jogadores combinam elementos numa magia conjunta.
-2. **Terreno reativo** — fogo, água, gelo, raio, terra e vento mudam rotas,
-   cobertura e risco durante a partida.
-
-O [GDD](GDD.md) é a **fonte da verdade de produto**: toda decisão de design entra
-nele antes de virar código. Os números de jogo vivem em `godot/core/Balance.gd`
-(combate, terreno, movimento) e `godot/core/Kits.gd` (habilidades).
 
 ---
 
-## 2. Onde o projeto está HOJE
+## O que o Godot já provou (resumo do que o Unity tem que alcançar)
 
-O jogo **é jogável de ponta a ponta** num celular Android: menu → seleção de
-personagem → partida com bots → fim de partida. O APK de debug sai em
-`godot/build/arkana3d.apk`.
+O jogo era **jogável de ponta a ponta no Android**: menu, seleção de mago,
+queda do castelo, partida contra 12 bots, zona que fecha, luvas e loot, Baú
+Celestial, habilidades, escudo, derrubado e reerguer, terreno reativo com 6
+reações, água que se nada, HUD completa, pausa, treino, áudio sintetizado.
+Modelos 3D reais do castelo, das 3 luvas e do baú (decimados, em LFS). Os 20
+magos rodavam o mago procedural — o elenco 3D é refeito no site.
 
-### Funcionando e testado
+A tabela de sistemas e onde cada um está: `mobile-godot/00-LEIA.md`. Os
+contratos e as armadilhas de teste: `mobile-godot/godot/ARQUITETURA.md`.
 
-| Sistema | Estado |
-|---|---|
-| Ilha 3D, terceira pessoa, partida contra 6 bots | ✅ |
-| Controles de toque (joystick, mira por gesto, esquiva) | ✅ |
-| 5 elementos + terreno reativo | ✅ |
-| **Zona que fecha** (5 fases, 90m → 4m em 165s) | ✅ |
-| **Habilidades**: passiva/tática/suprema | ✅ sistema + 3 kits (Pyra, Véu, Tessa) |
-| **Escudo de Magia Evolutivo** (GDD §5) | ✅ |
-| **Estado derrubado + reerguer** | ✅ |
-| **Armas arcanas** (varinha, cajado, manopla) + loot no mapa | ✅ |
-| **Baú Celestial** (única fonte da manopla) | ✅ |
-| Efeitos elementais no alvo + 6 reações | ✅ |
-| HUD completa (cooldowns, escudo, zona, baú, derrubado, dano) | ✅ |
-| Menu, Configurações (GDD §12), seleção dos 20 magos | ✅ |
-| Áudio sintetizado (48 timbres, zero arquivo de áudio) | ✅ |
-| **Pyra em 3D** (15.492 tris, PBR, riggada, 3 animações) | ✅ |
-| **Brok em 3D** (15.424 tris, 1 malha, 1 material, 24 ossos, 5 animações) | ✅ |
-
-### Verificação
-
-Cada pasta tem seu `selftest.gd`. Rodar todos antes de qualquer entrega:
-
-```bash
-bash godot/export/build_apk.sh
-```
-
-Self-tests individuais:
-```bash
-"$LOCALAPPDATA/Programs/godot/Godot_v4.4.1-stable_win64.exe" --headless --path godot --script res://gameplay/selftest.gd
-```
-Existem: `gameplay`, `gameplay/selftest_kits`, `gameplay/selftest_zona`,
-`gameplay/selftest_derrubado`, `ui`, `menu`, `characters`, `world`, `terrain`,
-`audio`, `juice`.
+**As regras duras não são estilo, são cicatrizes de defeitos medidos:**
+dano passa por UM lugar e NaN se barra com `not (x > 0)`; velocidade é produto
+único (base × terreno × status); número que o dedo sente vive em dp, do mundo
+em metros; cancelar é estado de primeira classe; cor + FORMA sempre, clima com
+COR e nunca com falta de luz; fogo propaga por ORÇAMENTO, nunca chance por
+tique; metro cravado envelhece calado — raio, altura e distância viram fração
+do mapa; a Zona nasce inerte e liga no pouso; todo teste novo se prova
+reintroduzindo o defeito.
 
 ---
 
-## 3. O que FALTA (em ordem de importância)
-
-### Bloqueiam a experiência
-1. **17 dos 20 magos não têm kit.** O sistema está pronto e cadastrar um mago são
-   3 passos (`core/Kits.gd` → `gameplay/habilidades/<nome>.gd` → registrar em
-   `KitRunner.IMPL`). Hoje quem não tem kit joga sem tática nem suprema.
-2. **A Sintonia não existe** (GDD §9) — é um dos dois pilares de identidade do
-   jogo e não há uma linha dela em código.
-3. **Só Pyra e Brok tem modelo 3D.** Os outros 18 usam o mago procedural.
-   Pipeline pronto em `tools/meshy/` (ver [MESHY.md](MESHY.md)).
-   ⚠️ **As vistas da concept art tem defeito de angulo** (nao ha perfil de 90
-   graus; o "3/4" e' a frontal repetida), entao o fluxo multi-imagem da Meshy
-   perde a espessura lateral do corpo. Corrigir antes de escalar o elenco —
-   ver `personagens/00-LEIA.md`.
-
-### Qualidade e conteúdo
-4. **Vozes**: 560 falas escritas em `audio/vozes/`, **nenhum áudio gerado**
-   (conferido: `grep -hcE '^[0-9]+ \[' audio/vozes/*.txt` — 20 magos x 28). O
-   fluxo está no `00-LEIA.txt` de lá (ElevenLabs).
-5. **Arte de UI**: 68 prompts prontos em `docs/prompts-arte/`, nada gerado.
-   ⚠️ **Bloqueante para publicar**: o APK ainda usa o **ícone padrão do Godot** —
-   faltam o ícone do app e a splash (peças L6/L7 e M2 dos prompts).
-6. **Runas de aprimoramento** (GDD §16.3): estrutura declarada, não implementada.
-7. **Espírito Errante** (§18.6), **Presságios** (§18.4), **Grimório** (§18.3):
-   ideias aprovadas, nada em código.
-
-### Dívidas técnicas conhecidas
-8. `Bus.damage_dealt` está **sem consumidor de produção** (áudio e HUD migraram
-   para `damage_applied`). Pode ser removido junto com `Combat._emitir_legado`.
-9. `weapon_equipped` e `bau_canalizando` **não dizem de quem são** — a HUD filtra
-   por gambiarra comparando com o slot do player.
-10. `Balance.PLAYER.jump` é KNOB **órfão**: nenhum código usa. Ou entra um botão
-    de pulo, ou o número sai.
-11. Falta animação `"derrubado"`; hoje o caído usa a de locomoção mais lenta.
-12. **A patinação dos pés: duas causas corrigidas, uma por medir.** Corrigidos
-    a meia-volta do modelo (corria de costas) e o laço ausente da animação
-    importada (tocava três passos e congelava). Falta medir se o casamento entre
-    cadência da animação e velocidade real (`Pawn._sync_anim_speed`) é limitado
-    por um teto em `Balance.ANIM`. O Brok tem 1,40 m e usa um clipe de corrida
-    da biblioteca da Meshy provavelmente feito para ~1,70 m: se a razão
-    necessária estourar o teto, a correção satura e a patinação volta. **Medir
-    com o Diretor no aparelho antes de mexer no número.**
-13. **Não há física de corpo ainda** (observação do Diretor, 25/08): parte do
-    que parece defeito de animação pode ser o corpo escorregando no terreno.
-
----
-
-## 3.5 Decisão de sequência: FUNCIONALIDADE antes de ARTE DE CENÁRIO
-
-**Decidido pelo Diretor em 25/08/2026**, com estas palavras: *"depois de
-validarmos funcionalidades, seria interessante começar a desenvolver mais em 3D
-a ilha, árvores, mais ambientes, deixar mais bonito assim como estamos
-melhorando os personagens"*.
-
-**A ordem, portanto:** primeiro o jogo funciona (queda, interação, kits,
-Sintonia); só depois o cenário ganha modelagem 3D de verdade.
-
-**Por que isso não é adiar por preguiça** — os quatro custos foram levantados
-antes da decisão:
-
-1. **Desenhos por quadro.** As 158 árvores custam praticamente UM desenho hoje,
-   porque compartilham a mesma malha procedural via MultiMesh. Modelo importado
-   traz material próprio e quebra isso. É o risco número um no celular.
-2. ~~**Tamanho do pacote.**~~ **ARGUMENTO DERRUBADO PELO DIRETOR em 25/08.**
-   Palavras dele: *"o tamanho do APK não importa hoje... o importante é validar
-   com o que é real... eu tenho mais de 20 GB disponíveis"*. **Não use peso de
-   pacote como motivo para recusar qualidade enquanto o jogo está em
-   desenvolvimento.** Compressão e formato de publicação viram tema quando as
-   projeções fecharem, não antes.
-   O fato técnico continua verdadeiro (a ilha é zero binário; foi por isso que
-   o APK ficou em 54 MB) — o que mudou é que ele **não decide nada agora**.
-3. **O fogo depende das árvores atuais.** `tree_count()/tree_pos()/
-   set_tree_burned()` são o que permite queimar a floresta e abrir caminho —
-   pilar do GDD §14. Trocar a árvore obriga a refazer essa fiação.
-4. **Coerência.** O elenco já tem três linguagens visuais (auditoria de 25/08).
-   Um cenário esculpido ao lado de terreno cel-shaded arrisca criar a quarta.
-
-**Quando chegar a hora, o plano é UMA FAMÍLIA POR VEZ, começando pelas
-RUÍNAS** — não pelas árvores. As ruínas dão o maior salto de "parece jogo
-publicado" por crédito e **não estão presas a sistema nenhum**: são cobertura e
-cenário, e se derem errado joga-se fora sem quebrar nada. Árvore é o oposto:
-maior impacto visual, mas é a peça que o fogo usa.
-
-**Antes de gastar crédito, olhar o Discover CC0** — o próprio pacote de
-pipeline manda (`docs/pipeline-arte/MESHY/01-DISCOVER_CURADORIA.md`) e já lista
-URLs de ruínas, muro de pedra e cristal arcano em CC0. Custo zero.
-
-**Meshy NÃO gera terreno.** Forma da ilha, alturas, biomas e cores são código
-procedural e continuam sendo. Meshy faz os OBJETOS que vestem o terreno.
-
-**O teste que decide, sempre:** uma família, dentro do jogo, no celular do
-Diretor, medindo desenhos por quadro e tamanho do pacote antes e depois.
-
----
-
-## 4. Decisões que precisam do Diretor
-
-1. **A tabela de fases da zona é PROPOSTA, não spec.** O GDD *pressupõe* a zona
-   em três lugares (roadmap, kit do Vidente, resgate de espírito) mas nunca a
-   especificou. Os números em `gameplay/Zona.gd` foram projetados pela equipe.
-2. **Fim de partida**: com a zona, o timer de 180s virou rede de segurança e o
-   fim de verdade é "último em pé". O que acontece ao esgotar o tempo (empate?
-   vitória por sobrevivência?) continua não decidido.
-3. **Fidelidade dos modelos 3D**: a geração por IA acertou o corpo da Pyra mas
-   **perdeu a manopla de bronze**, que é a assinatura dela. Ver
-   [PASSOS_GRAFICOS.md](PASSOS_GRAFICOS.md) §9 para os três caminhos possíveis.
-4. **A direção de arte dos personagens.** O Diretor pediu sair do "muito
-   realismo" para um "3D mais detalhado de alto padrão". A auditoria de 25/08
-   mediu que o elenco tem **três linguagens** (7 escultura 3D, 7 pintura
-   semi-realista, 6 anime) e que **o eixo não é realismo**: o rosto do Brok,
-   que ele aprovou, é mais realista que o da Pyra, que ele rejeitou. O eixo
-   real é superfície pintada × esculpida, sombra de contato e proporção
-   exagerada. **Perigo:** pedir "menos realismo" a um gerador empurra para
-   anime, que já é o grupo que mais quebra o elenco. Evidência completa em
-   `personagens/00-LEIA.md` e `docs/ART.md`. **Nada foi decidido.**
-
----
-
-## 5. Como o repositório está organizado
-
-```
-godot/          o jogo (produto principal, Godot 4.4.1 → Android)
-  core/         contratos e números: Balance, Kits, Bus, Textos
-  gameplay/     partida, combate, zona, loot, baú, derrubado, habilidades/
-  characters/   o mago (procedural + modelo externo .glb)
-  world/        a ilha procedural e os shaders
-  ui/           HUD, botões de toque, área segura
-  menu/         menu, configurações, seleção de personagem
-  audio/        SFX sintetizados
-  export/       build_apk.sh e o setup de máquina
-roblox/         "Campo de Provas" — frente ativa de validação humana
-personagens/    as 20 fichas + o ateliê de arte de cada um
-docs/           GDD (fonte da verdade) e os estudos
-  pipeline-arte/  o pacote de pipeline Meshy (concept -> 3D), material de apoio
-audio/vozes/    as 560 falas para gerar no ElevenLabs (20 magos x 28)
-tools/meshy/    pipeline concept art → personagem 3D riggado
-infra/          planejamento de servidores, custos e distribuição
-```
-
-### O que NÃO é versionado (e por quê)
-- `personagens/*/arte/_originais/` — o **ateliê de arte**: 8 vistas por mago,
-  307 MB. É matéria-prima da modelagem, não produto. O produto versionado é o
-  retrato de 512px em `godot/menu/art/NN.png`, que entra no APK.
-- `godot/build/` — APKs, artefato gerado.
-- `godot/characters/modelos/<slug>/` — a **oficina 3D** (malha crua, FBX,
-  texturas soltas, animações separadas). São ~102 MB por personagem e
-  **regeneráveis** com dois comandos do `tools/meshy/`. Só o `<nome>.glb` que o
-  jogo carrega é versionado.
-- `tools/meshy/.env` — a chave da API Meshy. **Nunca commitar.**
-
----
-
-## 6. Frente paralela: Roblox
+## Frente paralela: Roblox
 
 `roblox/` é o **Campo de Provas**: o ambiente multiplayer para testar com pessoas
 o que bots não validam — Sintonia, TTK, leitura do terreno, equilíbrio dos
 elementos e vontade de jogar de novo. Tem servidor autoritativo, duplas, terreno
 reativo, os dez combos de Sintonia, loop de BR, bots, acessibilidade e telemetria.
-
-**O bloqueio não é técnico:** falta executar o playtest humano descrito em
-[ROBLOX.md](ROBLOX.md).
-
----
-
-## 7. O que foi encerrado
-
-O protótipo 2D em Phaser/TypeScript/Capacitor foi descontinuado em 19/08/2026.
-Validou as primeiras mecânicas e o toque, mas não é frente de produto e não
-recebe manutenção. Continua recuperável pelo histórico do Git.
+51/51 nos testes. **O bloqueio não é técnico:** falta o playtest humano, e login
+e publicação são ato do Diretor. Intocado desde 19/08.
 
 ---
 
-## 8. Linha do tempo
+## O que foi encerrado
+
+| Quando | O quê | Por quê |
+|---|---|---|
+| 19/08/2026 | Protótipo 2D (Phaser/TypeScript/Capacitor) | validou toque e mecânica; não era produto |
+| 27/08/2026 | Godot 4.4.1 como produto | congelado quando o projeto foi para PC; hoje é referência da reescrita |
+| 09/09/2026 | PC / Steam / Unreal 5 | desvio desfeito pelo Diretor — ver LIÇÕES DO DESVIO |
+
+Tudo continua recuperável pelo histórico do git.
+
+---
+
+## Linha do tempo
 
 | Data | Marco |
 |---|---|
 | 17/08 | Do zero ao protótipo jogável (2D), com 4 raias em paralelo |
-| 19/08 | 2D encerrado; elenco cresce para 20 magos |
+| 19/08 | 2D encerrado; elenco cresce para 20 magos; pivô para Godot 3D |
 | 20/08 | Consolidação em Godot 3D + Roblox; concept art dos 20 |
-| **21/08** | **R20/R20.1** — elenco descolado do Apex com marcas mágicas próprias; Pyra em 3D pela Meshy; zona, habilidades, escudo, derrubado, armas arcanas, baú e HUD completa; área segura corrigida; estudo de dano |
-
+| 21/08 | R20: zona, habilidades, escudo, derrubado, armas arcanas, baú, HUD; Pyra em 3D |
 | 24/08 | Novo lote de concept art dos 20 magos (8 vistas cada) |
-| **25/08** | **A QUEDA**: castelo voador, salto, planeio e pouso · ilha 180 -> 300 m com 7 POIs e leitura aerea · gesto de pegar item e abrir bau · fim da patinacao · zona e terreno passam a ESCALAR com o mapa |
-| **25/08** | **Brok em 3D pela Meshy** (multi-imagem + rig + 5 animações), APK de 106 MB → 54 MB ao excluir o ateliê da exportação; **higienização**: -398 MB em duplicatas e material superseded; ateliê de arte fora do git; pipeline Meshy achatado em `docs/pipeline-arte/`; `meshy.py` consertado; auditoria visual dos 20 e da validade do pacote de pipeline |
-
-Detalhe de cada mudança: `git log` e o [CHANGELOG](../CHANGELOG.md).
+| 25/08 | A QUEDA (castelo, salto, planeio, pouso); ilha 180 → 300 m; Brok em 3D; higienização |
+| 26/08 | A DIREÇÃO (20 respostas do Diretor viram código); castelo, luvas e baú em 3D; vídeos avaliados; Spellbreak aplicado |
+| 27/08 | Ilha 600 m, tempestade de BR de verdade, 12 bots; leva 7 desfeita (elenco no site); **virada para PC/Steam/Unreal** |
+| 28/08 → 04/09 | Ilha Fraturada no Unreal: 2.400 m, 1.396 peças, 46 FPS; sete peças novas no site da Meshy |
+| **09/09** | **Desvio desfeito. O produto é celular em Unity 6.** Unreal, Lyra e Godot apagados; `pc-unreal/` removido |

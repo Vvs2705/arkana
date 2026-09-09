@@ -1,34 +1,59 @@
-# mobile-godot — CONGELADO
+# mobile-godot — REFERÊNCIA para a reescrita em Unity
 
-O jogo de celular, em Godot 4.4.1. **12/12 autotestes verdes.**
+O jogo de celular como ficou em Godot 4.4.1. **12/12 autotestes verdes** na
+última execução (04/09/2026). Não roda mais nesta máquina: o Godot foi
+desinstalado em 09/09, quando o Diretor decidiu que o produto é Unity.
 
-## A diretriz: congelado, não morto
+## Para que esta pasta serve
 
-Em 27/08/2026 o Diretor decidiu migrar o projeto para PC/Steam. Esta pasta
-**para de receber feature nova**, mas continua valendo por três motivos:
+**É o que o Unity tem que alcançar.** Cada sistema aqui foi jogado no aparelho
+do Diretor e ajustado por vídeo; os números foram medidos, não chutados. Quem
+for reescrever um sistema em C# lê a decisão em `design/`, abre o `.gd`
+correspondente aqui para ver como foi resolvido, e escreve de novo.
 
-1. **É gameplay que funciona.** Zona, queda do castelo, loot, kits, terreno
-   procedural, 20 magos — tudo rodando, com portão de 12 autotestes.
-2. **É orçamento MEDIDO.** Os números daqui são a única referência real de custo
-   que o projeto tem: ilha de 600 m em 184.967 tris e 67 draw calls, kit em
-   201.203 e 98, bots a ~0,25 ms cada, colisao em 34.848 faces.
-3. **É a exportação mobile futura.** Se um dia voltar, volta daqui.
+Comece por `godot/ARQUITETURA.md` (quem é dono do quê, contratos entre raias,
+armadilhas de teste) e por `godot/core/` (Balance, Kits, Bus, Textos: os
+números e os contratos).
+
+| Sistema | Onde está |
+|---|---|
+| Números de jogo | `core/Balance.gd`, `core/Kits.gd` |
+| Queda do castelo, planar, pouso | `gameplay/Queda.gd`, `world/Castelo.gd` |
+| Zona que fecha (5 fases, fração do raio do mapa) | `gameplay/Zona.gd` |
+| Dano num ponto só (NaN barrado com `not (x > 0)`) | `gameplay/Combat.gd` |
+| Luvas, loot, Baú Celestial | `gameplay/Arma.gd`, `ArmaSlot.gd`, `Loot.gd`, `BauCelestial.gd` |
+| Kits (passiva/tática/suprema) | `gameplay/KitRunner.gd`, `gameplay/habilidades/` |
+| Bots com percepção (visto/ouvido/disparo/revide) | `gameplay/Bot.gd` |
+| Derrubado e reerguer | `gameplay/Derrubado.gd` |
+| Terreno reativo (fogo por orçamento, água, gelo, raio, terra, vento) | `terrain/` |
+| Ilha procedural, água, sol, culling da grama | `world/` |
+| Mago procedural + modelo externo `.glb` com aliases de clipe | `characters/Mage.gd` |
+| HUD, gesto único de disparo, área segura | `ui/`, `gameplay/FireGesture.gd` |
+| Menu, seleção dos 20, configurações | `menu/` |
+| Áudio sintetizado (48 timbres) | `audio/Sfx.gd` |
+
+## Orçamento MEDIDO (a única referência real de custo do projeto)
+
+| | |
+|---|---|
+| Ilha de 600 m | 184.967 tris e 67 draw calls na tela |
+| Colisão da ilha | 34.848 faces |
+| Kit de cenário | 201.203 tris, 98 draw calls |
+| Bots | ~0,25 ms de física por bot por passo (12 bots = 2,6 ms) |
+| APK | 141 MB com os 5 modelos hero em 2K |
+
+**FPS no aparelho nunca foi medido.** Nenhum aparelho apareceu em `adb devices`
+em três semanas. É a primeira medição que o Unity deve fazer.
 
 ## O que NÃO fazer
 
-- **Não portar este código para o `pc-unreal/`.** Toda a lógica roda no CLIENTE:
-  dano, mana, posição, loot, zona. Levar isso para um jogo em rede é levar o
-  defeito que inviabiliza competitivo. O que atravessa é o `design/`.
-- **Não mexer aqui para "aproveitar".** Se algo tem que mudar no design, muda em
-  `design/` e as duas bases leem de lá.
+- **Não traduzir GDScript para C#.** A reescrita lê `design/` e reimplementa.
+  O que atravessa é a decisão, o número e o teste (o que cada selftest cobra).
+- **Não mexer aqui.** Se algo tem que mudar no design, muda em `design/`.
 
-## Como rodar
+## Os modelos que estão aqui e servem ao Unity
 
-```bash
-bash mobile-godot/godot/tests/run_all.sh      # os 12 autotestes
-bash mobile-godot/godot/export/build_apk.sh   # APK de teste
-```
-
-O APK datado vai sempre para a MESMA pasta do clone principal
-(`mobile-godot/godot/build/testes/`), venha de worktree ou não — ordem do
-Diretor de 27/08, e o script resolve isso por `git rev-parse --git-common-dir`.
+`world/modelos/*.glb` (castelo, kit da ilha) e `gameplay/modelos/*.glb` (luvas,
+baú) são as versões **decimadas para celular** (800 a 30 mil tris) das peças do
+Meshy. O Unity mobile usa exatamente estas. Quando `mobile-unity/` as importar,
+elas mudam de pasta para `arte/` e esta pasta pode ir embora.

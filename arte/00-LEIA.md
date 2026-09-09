@@ -1,7 +1,8 @@
 # arte — a matéria-prima
 
 Concepts, modelos, áudio e as ferramentas que os produzem. **Nada aqui é
-específico de engine**, e é por isso que esta pasta alimenta as três bases.
+específico de engine**, e é por isso que esta pasta sobreviveu ao Godot, ao
+Unreal e alimenta o Unity.
 
 | Pasta | O que é |
 |---|---|
@@ -9,7 +10,7 @@ específico de engine**, e é por isso que esta pasta alimenta as três bases.
 | `cenario/` | concepts e `.glb` do castelo, luvas, manopla, baú, ruínas, torre, altar, e o pacote da Ilha Fraturada |
 | `audio/` | vozes |
 | `prompts/` | prompts de geração |
-| `tools/` | `meshy/` (API) e `blender/` (fusão, otimização) |
+| `tools/` | `meshy/` (API, só para props) e `blender/` (fusão, decimação) |
 
 ## Diretrizes
 
@@ -17,9 +18,15 @@ específico de engine**, e é por isso que esta pasta alimenta as três bases.
 cenário; a equipe usa a partir dali.
 
 **Guardar o ORIGINAL, sempre.** As peças do Meshy vêm com ~3 milhões de faces e
-textura 2K. O mobile precisou decimar para 800–4.000 faces e 512 — mas o que se
-guarda aqui é o original, porque o Unreal com Nanite usa quase cru. Versão
-reduzida é derivada, e derivada se refaz.
+textura 2K. Celular precisa de 800 a 30 mil faces: a decimação é feita no
+Blender (`tools/blender/otimizar.py`) e a versão reduzida é **derivada**.
+Derivada se refaz; original não. Os originais ficam em
+`cenario/ilha-fraturada/_originais-3d/` (fora do git, 1,1 GB).
+
+**Para o Unity, baixe FBX do Meshy quando houver esqueleto.** O Unity importa
+FBX nativamente e retargeta animação pelo rig Humanoid. Para `.glb` sem
+esqueleto (props, cenário) o pacote glTFast resolve, mas FBX é o caminho de
+menor atrito para personagem animado.
 
 **Antes de mandar gerar de novo, ABRIR O ARQUIVO.** Em 27/08 a equipe escreveu 20
 prompts para refazer do zero uma arte que existia desde 24/08, porque repetiu um

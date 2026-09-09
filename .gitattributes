@@ -36,11 +36,23 @@ mobile-godot/godot/gameplay/modelos/*.glb filter=lfs diff=lfs merge=lfs -text
 # binario grande, e o que precisa sobreviver e' o codigo que planta, nao o .glb.
 mobile-godot/godot/world/modelos/**/*.glb filter=lfs diff=lfs merge=lfs -text
 
-# REORGANIZACAO DE 27/08/2026: a raiz passou a separar DECISAO (design/),
-# MATERIA-PRIMA (arte/) e as tres implementacoes (pc-unreal/, mobile-godot/,
-# roblox/). Os padroes acima acompanharam os caminhos novos. Se um binario
-# grande aparecer fora deles, ele entra no git como blob e NAO tem volta barata.
+# A raiz separa DECISAO (design/), MATERIA-PRIMA (arte/) e as implementacoes
+# (mobile-unity/, mobile-godot/, roblox/). Se um binario grande aparecer fora
+# destes padroes, ele entra no git como blob e NAO tem volta barata.
 arte/**/*.glb filter=lfs diff=lfs merge=lfs -text
 arte/**/*.GLB filter=lfs diff=lfs merge=lfs -text
-pc-unreal/**/*.uasset filter=lfs diff=lfs merge=lfs -text
-pc-unreal/**/*.umap filter=lfs diff=lfs merge=lfs -text
+arte/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+arte/**/*.FBX filter=lfs diff=lfs merge=lfs -text
+
+# Unity: binarios de asset em LFS; .meta, cenas, prefabs e materiais em TEXTO
+# (Force Text no editor) para o diff e o merge funcionarem.
+mobile-unity/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.glb filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.png filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.wav filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.unity text eol=lf
+mobile-unity/**/*.prefab text eol=lf
+mobile-unity/**/*.asset text eol=lf
+mobile-unity/**/*.mat text eol=lf
+mobile-unity/**/*.meta text eol=lf
