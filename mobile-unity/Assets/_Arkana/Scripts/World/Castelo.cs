@@ -1,0 +1,228 @@
+using System;
+using UnityEngine;
+using Arkana.Core;
+
+namespace Arkana.World
+{
+    /// <summary>
+    /// A rota do castelo voador, PURA: um seed gera a travessia inteira (inicio, fim, duracao)
+    /// de uma vez. Determinismo DENTRO da partida — o seed e' sorteado por partida e guardado
+    /// (`Seed`) para a rede transmitir; passe-o a mao e a rota se repete.
+    /// Porte de mobile-godot/godot/world/Castelo.gd.
+    /// </summary>
+    public sealed class RotaDoCastelo
+    {
+        /// <summary>Altura de voo (m sobre o mar). E' o TETO da queda: ~9,5 s de ar.</summary>
+        public const float Altura = 320f;
+        /// <summary>Janela de decisao, em segundos. NAO escala com o mapa: mapa maior = castelo mais rapido.</summary>
+        public const float Duracao = 22f;
+        /// <summary>Ponta da rota como fracao do lado: entra de fora da ilha e sai pelo outro lado.</summary>
+        public const float Margem = 0.62f;
+        /// <summary>Desvio lateral maximo (fracao do lado). Sem ele toda rota cruzaria o centro.</summary>
+        public const float Desvio = 0.18f;
+        /// <summary>Seed de FALLBACK, so' para teste e cena solta. Em partida, sorteia-se.</summary>
+        public const int SeedPadrao = 3103;
+
+        public readonly int Seed;
+        public readonly float Lado;
+        public readonly Vector3 Inicio;
+        public readonly Vector3 Fim;
+
+        public RotaDoCastelo(int seed, Relevo relevo)
+        {
+            Seed = seed;
+            // Fiacao defensiva: sem ilha, a ilha padrao (Escala 2 = 600 m).
+            Lado = relevo != null ? relevo.Lado : Relevo.BaseLado * 2f;
+            var rng = new Sorteio(seed);
+            float ang = rng.Float() * Mathf.PI * 2f;
+            var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+            Vector3 lat = new Vector3(-dir.z, 0f, dir.x) * (rng.Faixa(-Desvio, Desvio) * Lado);
+            float alcance = Lado * Margem;
+            var alto = new Vector3(0f, Altura, 0f);
+            Inicio = lat - dir * alcance + alto;
+            Fim = lat + dir * alcance + alto;
+        }
+
+        public Vector3 PosicaoEm(float t01) => Vector3.Lerp(Inicio, Fim, t01);
+
+        public Vector3 Direcao => (Fim - Inicio).normalized;
+
+        /// <summary>m/s. A 600 m de lado: 372 x 2 / 22 = ~34 m/s.</summary>
+        public float Velocidade => (Fim - Inicio).magnitude / Duracao;
+
+        /// <summary>Distancia horizontal do centro do mapa ao ponto mais proximo da rota.</summary>
+        public float DistanciaAoCentro
+        {
+            get
+            {
+                Vector2 a = new Vector2(Inicio.x, Inicio.z), b = new Vector2(Fim.x, Fim.z);
+                Vector2 ab = b - a;
+                float t = Mathf.Clamp01(Vector2.Dot(-a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-6f));
+                return (a + ab * t).magnitude;
+            }
+        }
+
+        // ---- espelho DOCUMENTAL das constantes de gameplay/queda/Queda.gd. A queda de verdade e'
+        // da raia GAMEPLAY; estes numeros so' existem para a rota provar que a duracao e a altura
+        // produzem um alcance de salto compativel (~185 m em ~9,5 s de ar, com chao a 5 m). ----
+        const float VelQueda = 55f, AcelQueda = 40f, VelQuedaHoriz = 22f;
+        const float AlturaPlaneio = 60f, VelPlaneio = 12f, VelPlaneioHoriz = 16f, FreioPlaneio = 90f;
+
+        /// <summary>
+        /// Alcance HORIZONTAL do salto (m) a partir da rota, e o tempo no ar, para um pouso a
+        /// `alturaDoChao` m. Acelera a 40 m/s2 ate' 55 m/s, cai reto, freia a 90 m/s2 ao entrar
+        /// no planeio (60 m sobre o chao) e plana a 12 m/s descendo / 16 m/s andando.
+        /// </summary>
+        public static float AlcanceHorizontalDaQueda(float alturaDoChao, out float segundosNoAr)
+        {
+            float t1 = VelQueda / AcelQueda;
+            float d1 = 0.5f * AcelQueda * t1 * t1;
+            float livre = Mathf.Max(0f, Altura - alturaDoChao - AlturaPlaneio - d1);
+            float t2 = livre / VelQueda;
+            float tb = (VelQueda - VelPlaneio) / FreioPlaneio;
+            float db = 0.5f * (VelQueda + VelPlaneio) * tb;
+            float t3 = Mathf.Max(0f, AlturaPlaneio - db) / VelPlaneio;
+            segundosNoAr = t1 + t2 + tb + t3;
+            return VelQuedaHoriz * (t1 + t2) + 0.5f * (VelQuedaHoriz + VelPlaneioHoriz) * tb + VelPlaneioHoriz * t3;
+        }
+    }
+
+    /// <summary>
+    /// O castelo voador que abre a partida: anda pela rota, emite Bus.CasteloRota UMA vez, some
+    /// no fim. Decisao nº 14 (26/08): o castelo viaja SEM bonecos — o corpo embarcado fica
+    /// invisivel e SURGE no portao no instante de `Saltar()`.
+    /// </summary>
+    public sealed class Castelo : MonoBehaviour
+    {
+        /// <summary>Onde o mago viaja: pendurado SOB o portao (a camera fica atras e acima).</summary>
+        public static readonly Vector3 Portao = new Vector3(0f, -6f, 0f);
+
+        public RotaDoCastelo Rota { get; private set; }
+        public int SeedDaRota => Rota != null ? Rota.Seed : RotaDoCastelo.SeedPadrao;
+        /// <summary>0..1 ao longo da rota.</summary>
+        public float Progresso { get; private set; }
+        public bool Saltou { get; private set; }
+        public Vector3 PosicaoDoPortao => transform.position + Portao;
+
+        GameObject passageiro;
+        Renderer[] passageiroRenderers;
+        bool anunciado;
+
+        /// <summary>Poe um castelo em rota. seed &lt; 0 = sorteia por partida (o seed fica em SeedDaRota).</summary>
+        public static Castelo Criar(Transform parent, Relevo relevo, int seed = -1)
+        {
+            var go = new GameObject("Castelo");
+            if (parent != null) go.transform.SetParent(parent, false);
+            var c = go.AddComponent<Castelo>();
+            if (seed < 0) seed = new System.Random().Next();
+            c.Definir(new RotaDoCastelo(seed, relevo));
+            return c;
+        }
+
+        public void Definir(RotaDoCastelo rota)
+        {
+            Rota = rota;
+            Progresso = 0f;
+            transform.position = rota.Inicio;
+            if ((rota.Fim - rota.Inicio).sqrMagnitude > 1e-6f)
+                transform.rotation = Quaternion.LookRotation(rota.Direcao, Vector3.up);   // a proa aponta pra rota
+        }
+
+        void Start()
+        {
+            if (Rota == null)
+                Definir(new RotaDoCastelo(RotaDoCastelo.SeedPadrao, Ilha.Atual != null ? Ilha.Atual.Relevo : null));
+            if (transform.childCount == 0) MontarVisual();
+            if (!anunciado)
+            {
+                anunciado = true;
+                // A HUD/minimapa desenham a linha por onde da' pra saltar. UI OBSERVA.
+                Bus.EmitCasteloRota(Rota.Inicio, Rota.Fim, RotaDoCastelo.Duracao);
+            }
+        }
+
+        void Update()
+        {
+            if (Rota == null) return;
+            Progresso += Time.deltaTime / RotaDoCastelo.Duracao;
+            transform.position = Rota.PosicaoEm(Progresso);
+            if (passageiro != null) passageiro.transform.position = PosicaoDoPortao;
+            if (Progresso >= 1f)
+            {
+                // Quem nao saltou e' EMPURRADO: ninguem fica preso num castelo que saiu do mapa.
+                if (passageiro != null) Saltar();
+                Destroy(gameObject);
+            }
+        }
+
+        /// <summary>Embarca um corpo: invisivel e grudado no portao ate' Saltar().</summary>
+        public void Embarcar(GameObject corpo)
+        {
+            passageiro = corpo;
+            Saltou = false;
+            passageiroRenderers = corpo != null ? corpo.GetComponentsInChildren<Renderer>(true) : null;
+            MostrarPassageiro(false);
+            if (corpo != null) corpo.transform.position = PosicaoDoPortao;
+        }
+
+        /// <summary>Salta: o corpo SURGE no portao. Devolve a posicao de onde a queda comeca. Na BORDA: repetir nao faz nada.</summary>
+        public Vector3 Saltar()
+        {
+            Vector3 p = PosicaoDoPortao;
+            if (Saltou) return p;
+            Saltou = true;
+            MostrarPassageiro(true);
+            passageiro = null;
+            passageiroRenderers = null;
+            return p;
+        }
+
+        void MostrarPassageiro(bool visivel)
+        {
+            if (passageiroRenderers == null) return;
+            for (int i = 0; i < passageiroRenderers.Length; i++)
+                if (passageiroRenderers[i] != null) passageiroRenderers[i].enabled = visivel;
+        }
+
+        // ------------------------------------------------------------------ visual
+
+        /// <summary>Modelo de arte em Resources/castelo (prefab); ausente, primitivas — fiacao defensiva.</summary>
+        void MontarVisual()
+        {
+            var prefab = Resources.Load<GameObject>("castelo");
+            if (prefab != null)
+            {
+                var m = Instantiate(prefab, transform);
+                m.name = "ModeloCastelo";
+                m.transform.localPosition = new Vector3(0f, -26f, 0f);   // pe' em y=0 no export; o miolo fica no eixo da rota
+                return;
+            }
+            MontarFallback();
+        }
+
+        /// <summary>Visto a 300 m por ~30 s: 5 malhas sem sombra leem "castelo" na silhueta.</summary>
+        void MontarFallback()
+        {
+            Color pedra = new Color(0.42f, 0.40f, 0.47f);
+            Color telhado = Relevo.Hex(0xb06cff);   // violeta arcano (paleta GDD §10)
+            var b = new MalhaProc.Construtor();
+            // rocha flutuante: larga em cima, em bico embaixo
+            b.Tronco(new Vector3(0f, -14f, 0f), 4f, 15f, 14f, 8, pedra, Relevo.Escurecer(pedra, 0.25f));
+            b.Caixa(new Vector3(0f, 2.5f, 0f), new Vector3(13f, 2.5f, 9f), pedra);
+            // tres torres — a silhueta que faz o jogador reconhecer o castelo de longe
+            Vector3[] torres = { new Vector3(-9f, 5f, -6f), new Vector3(9f, 5f, -6f), new Vector3(0f, 5f, 6f) };
+            for (int i = 0; i < torres.Length; i++)
+            {
+                b.Tronco(torres[i], 3f, 3f, 13f, 10, pedra);
+                b.Tronco(torres[i] + new Vector3(0f, 13f, 0f), 4.2f, 0f, 6f, 10, telhado);
+            }
+            var go = new GameObject("CasteloProcedural");
+            go.transform.SetParent(transform, false);
+            var mf = go.AddComponent<MeshFilter>();
+            mf.sharedMesh = b.ParaMesh("Castelo");
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = Ilha.MaterialPadrao();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+    }
+}

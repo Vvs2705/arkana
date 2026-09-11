@@ -1,0 +1,151 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Arkana.Core
+{
+    /// <summary>
+    /// PONTO UNICO de dano (regra provada do projeto). Ninguem toca Hp nem Escudo fora daqui; UI/telemetria
+    /// OBSERVAM pelo Bus. A ORDEM (GDD §5 + DANO.md §3.2): 1) escudo absorve com o fator Esc do elemento;
+    /// 2) o excedente do MESMO tiro TRANSBORDA para a vida com o fator Vida; 3) DoT pula o passo 1.
+    /// </summary>
+    public static class Combat
+    {
+        /// <summary>
+        /// DERRUBADO (Gameplay.Derrubado): quem tem esquadrao CAI em vez de morrer. Devolve true = interceptou
+        /// (nao emite EntityDied). null = morre mesmo. Gameplay instala; Reset() limpa.
+        /// </summary>
+        public static Func<IEntidade, IEntidade, bool> InterceptarMorte;
+
+        /// <summary>Janela de DoT por alvo: quanto ja' foi aplicado neste tique (o teto somado mora aqui).</summary>
+        private sealed class JanelaDot { public float Tempo; public float Aplicado; }
+        // Alvo morto sai do dicionario — sem isso vaza uma entrada por bot por partida (cicatriz do Godot).
+        private static readonly Dictionary<IEntidade, JanelaDot> _dot = new Dictionary<IEntidade, JanelaDot>();
+
+        /// <summary>
+        /// Devolve o dano EFETIVO (escudo + vida); 0 = nao passou e NADA foi emitido. `fonte` null = terreno/ambiente.
+        /// `forte` e' o acerto forte do terreno (Bus.TerrainHit) — o Combat nao escala por ele; quem usa e' o chamador.
+        /// </summary>
+        public static float AplicarDano(IEntidade alvo, float dano, Elemento el, IEntidade fonte, bool forte = false, bool ignoraEscudo = false)
+        {
+            if (alvo == null || alvo.Vital == null) return 0f;
+            if (!(dano > 0f)) return 0f;            // barra NaN, zero e negativo de uma vez so'
+            Vitalidade v = alvo.Vital;
+            if (!v.Viva) return 0f;                 // ja' morto: nada de dano nem sinal duplicado
+
+            Balance.PerfilElemento p = Balance.Perfil(el);
+            float noEscudo = 0f;
+            float restante = dano;
+            bool pula = ignoraEscudo && Balance.Dot.IgnoraEscudo;
+            if (!pula && v.Escudo > 0f)
+            {
+                float pedido = dano * p.Esc;        // quanto ESTE elemento morde
+                noEscudo = Mathf.Min(pedido, v.Escudo);
+                v.Escudo -= noEscudo;
+                // TRANSBORDO: a sobra volta a dano CRU antes de virar vida.
+                restante = Balance.Escudo.Transbordo ? (pedido - noEscudo) / Mathf.Max(p.Esc, 0.001f) : 0f;
+                if (v.Escudo <= 0f)
+                {
+                    v.Escudo = 0f;
+                    Bus.EmitShieldBroken(alvo);
+                }
+                Bus.EmitShieldChanged(alvo, v.Escudo, v.EscudoMax, v.Nivel);
+            }
+            float naVida = 0f;
+            if (restante > 0f)
+            {
+                // Sem inflar overkill: o efetivo e' o que a barra perdeu de verdade
+                // (senao um tiro de 200 numa vida de 10 creditaria 200 para a evolucao).
+                naVida = Mathf.Min(restante * p.Vida, v.Hp);
+                v.Hp -= naVida;
+            }
+            float efetivo = noEscudo + naVida;
+            if (!(efetivo > 0f)) return 0f;
+
+            Creditar(fonte, alvo, efetivo);
+            Bus.EmitDamageApplied(alvo, efetivo, el, fonte, noEscudo > 0f);
+            if (naVida > 0f && alvo.EhPlayer) Bus.EmitHealthChanged(v.Hp, v.HpMax);
+            if (v.Hp <= 0f)
+            {
+                v.Hp = 0f;
+                _dot.Remove(alvo);
+                bool intercepta = InterceptarMorte != null && InterceptarMorte(alvo, fonte);
+                if (!intercepta) Bus.EmitEntityDied(alvo);
+            }
+            return efetivo;
+        }
+
+        /// <summary>
+        /// DoT (queimadura, terreno, nevoa): direto na VIDA e com TETO SOMADO por alvo (DANO.md §3.5).
+        /// O orcamento da janela e' TetoDps x Tick; a janela fecha em TickDot(dt), que o dono do loop
+        /// (Gameplay) chama UMA vez por frame. Sem TickDot o orcamento nunca renova e o DoT para — de proposito
+        /// barulhento, nao silencioso. `tipo` ("burn"|"electric"|...) so' escolhe o elemento do evento.
+        /// </summary>
+        public static float AplicarDot(IEntidade alvo, float dps, float dt, string tipo, IEntidade fonte)
+        {
+            if (alvo == null || alvo.Vital == null || !alvo.Vital.Viva) return 0f;
+            if (!(dps > 0f) || !(dt > 0f)) return 0f;
+            JanelaDot j;
+            if (!_dot.TryGetValue(alvo, out j))
+            {
+                j = new JanelaDot();
+                _dot[alvo] = j;
+            }
+            // dt maior que o tique (teste, engasgo) alarga o orcamento na mesma proporcao.
+            float teto = Balance.Dot.TetoDps * Mathf.Max(Balance.Dot.Tick, dt);
+            float dano = Mathf.Min(dps * dt, teto - j.Aplicado);
+            if (!(dano > 0f)) return 0f;
+            float efetivo = AplicarDano(alvo, dano, ElementoDoDot(tipo), fonte, false, true);
+            j.Aplicado += efetivo;
+            return efetivo;
+        }
+
+        /// <summary>Relogio das janelas de DoT. Chamar UMA vez por frame (o dono do loop de partida).</summary>
+        public static void TickDot(float dt)
+        {
+            if (!(dt > 0f)) return;
+            foreach (KeyValuePair<IEntidade, JanelaDot> kv in _dot)
+            {
+                JanelaDot j = kv.Value;
+                j.Tempo += dt;
+                if (j.Tempo >= Balance.Dot.Tick)
+                {
+                    j.Tempo = 0f;
+                    j.Aplicado = 0f;
+                }
+            }
+        }
+
+        /// <summary>m/s do empurrao deste elemento (Combate.Knockback x Perfil.Empurrao).</summary>
+        public static float Empurrao(Elemento el) => Balance.Combate.Knockback * Balance.Perfil(el).Empurrao;
+
+        /// <summary>Zera janelas de DoT e o interceptador. Chamar no SetUp de teste e ao trocar de cena.</summary>
+        public static void Reset()
+        {
+            _dot.Clear();
+            InterceptarMorte = null;
+        }
+
+        private static Elemento ElementoDoDot(string tipo)
+        {
+            Elemento el;
+            if (Elementos.TryParse(tipo, out el)) return el;
+            return tipo == "electric" ? Elemento.Raio : Elemento.Fogo;
+        }
+
+        /// <summary>
+        /// ANTI-FARM (GDD §5 + DANO.md §3.9): so' conta dano em MAGO INIMIGO. Fora: dano proprio e dano em
+        /// aliado. Estrutura (muro, torreta, totem) nao e' IEntidade, entao nem chega aqui — checagem estrutural,
+        /// sem lista de excecoes para manter.
+        /// </summary>
+        private static void Creditar(IEntidade fonte, IEntidade alvo, float dano)
+        {
+            if (fonte == null || fonte == alvo || fonte.Vital == null) return;
+            // Time: hoje o unico esquadrao e' o do player. Duplas/trios entram AQUI, num lugar so'.
+            if (fonte.EhPlayer && alvo.EhPlayer) return;
+            Vitalidade fv = fonte.Vital;
+            fv.DanoCausado += dano;
+            if (fv.Evoluir()) Bus.EmitShieldChanged(fonte, fv.Escudo, fv.EscudoMax, fv.Nivel);
+        }
+    }
+}

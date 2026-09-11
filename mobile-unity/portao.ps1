@@ -4,6 +4,16 @@
 $ErrorActionPreference = "Stop"
 $Unity = "C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe"
 $Proj = $PSScriptRoot
+
+# LICENCA: a Personal e' resolvida online pelo cliente de licenca que o Unity HUB sobe. Com o Hub
+# fechado o batchmode morre com "No valid Unity Editor license found" (exit 198) — medido em
+# 09/09 e 11/09/2026. Entao: Hub fechado -> abre e espera o cliente subir.
+if (-not (Get-Process "Unity Hub" -ErrorAction SilentlyContinue)) {
+    # NUNCA por "unityhub://": sem caminho o Hub entende "instalar editor" e abre o aviso
+    # "Nao e' possivel instalar / versao do Editor arquivado" (visto pelo Diretor em 11/09/2026).
+    Start-Process "shell:AppsFolder\UnityTechnologies.UnityHub_2vrhnee42bhxm!UnityHub"
+    Start-Sleep -Seconds 25
+}
 $Logs = Join-Path $Proj "Logs"
 New-Item -ItemType Directory -Force $Logs | Out-Null
 $Log = Join-Path $Logs "portao.log"

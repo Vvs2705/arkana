@@ -10,6 +10,13 @@ $Log = Join-Path $Builds "build.log"
 $Apk = Join-Path $Builds "arkana.apk"
 New-Item -ItemType Directory -Force $Builds | Out-Null
 
+# LICENCA: sem o Unity Hub aberto o batchmode sai com 198 (ver portao.ps1).
+if (-not (Get-Process "Unity Hub" -ErrorAction SilentlyContinue)) {
+    # NUNCA por "unityhub://": sem caminho o Hub entende "instalar editor" (ver portao.ps1).
+    Start-Process "shell:AppsFolder\UnityTechnologies.UnityHub_2vrhnee42bhxm!UnityHub"
+    Start-Sleep -Seconds 25
+}
+
 $UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"", "-buildTarget", "Android",
                "-executeMethod", "Arkana.EditorTools.Build.Android", "-logFile", "`"$Log`"", "-quit")
 $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
