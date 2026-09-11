@@ -48,8 +48,46 @@ namespace Arkana.EditorTools
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
+            IncluirShadersDoCodigo();
             AssetDatabase.SaveAssets();
             Debug.Log("Arkana.Build: settings aplicados (URP, Android IL2CPP/ARM64, minSdk 26, landscape).");
+        }
+
+        /// <summary>
+        /// Shaders que o codigo pede por NOME (Shader.Find). No build o Unity so' leva shader REFERENCIADO por algum asset:
+        /// material criado em runtime nao conta, e Shader.Find devolve null no aparelho — o mago sai rosa ou invisivel.
+        /// Quem acrescentar um Shader.Find novo acrescenta o nome AQUI. Os shaders proprios (Arkana/*) moram em
+        /// Resources/ e ja' entram por la'.
+        /// </summary>
+        public static readonly string[] ShadersDoCodigo =
+        {
+            "Universal Render Pipeline/Lit",
+            "Universal Render Pipeline/Simple Lit",
+            "Universal Render Pipeline/Unlit",
+            "Universal Render Pipeline/Particles/Lit",
+            "Universal Render Pipeline/Particles/Simple Lit",
+            "Universal Render Pipeline/Particles/Unlit",
+        };
+
+        public static void IncluirShadersDoCodigo()
+        {
+            var gs = AssetDatabase.LoadAssetAtPath<Object>("ProjectSettings/GraphicsSettings.asset");
+            if (gs == null) return;
+            var so = new SerializedObject(gs);
+            SerializedProperty lista = so.FindProperty("m_AlwaysIncludedShaders");
+            if (lista == null) return;
+            foreach (string nome in ShadersDoCodigo)
+            {
+                Shader sh = Shader.Find(nome);
+                if (sh == null) { Debug.LogWarning("Arkana.Build: shader nao encontrado no editor: " + nome); continue; }
+                bool ja = false;
+                for (int i = 0; i < lista.arraySize; i++)
+                    if (lista.GetArrayElementAtIndex(i).objectReferenceValue == sh) { ja = true; break; }
+                if (ja) continue;
+                lista.InsertArrayElementAtIndex(lista.arraySize);
+                lista.GetArrayElementAtIndex(lista.arraySize - 1).objectReferenceValue = sh;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         [MenuItem("Arkana/Build Android")]

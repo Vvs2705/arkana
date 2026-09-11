@@ -7,6 +7,7 @@ using Arkana.Audio;
 using Arkana.Core;
 using Arkana.Gameplay;
 using Arkana.UI;
+using Arkana.Terrain;
 using Arkana.World;
 using ArkMenu = Arkana.Menu.Menu;
 using ArkSelecao = Arkana.Menu.SelecaoPersonagem;
@@ -253,7 +254,9 @@ namespace Arkana
             if (Partida.Treino) Hud.ModoTreino(); else Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
             Player.Ligar(Hud);
             Sfx.PosOuvinte = PosDoJogador;
-            // TODO kits/terreno: KitRunner do player (tatica/suprema na HUD) e TerrenoReativoBehaviour sob a Arena com Alvos = Partida.Arena.
+            // O TERRENO REATIVO (GDD §14). Ate' 11/09 ele so' existia nos testes: nenhuma cena o criava, e fogo/gelo/muro
+            // nunca aconteciam na partida. Nasce sob a arena (morre com ela); a Partida ticka pelo TerrenoReativoBehaviour.Atual.
+            _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
         }
 
         void Desmontar()
