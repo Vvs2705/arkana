@@ -480,6 +480,10 @@ namespace Arkana.UI
             Carrossel.Visivel(false);
             Pegar.gameObject.SetActive(false);
             _armaRotulo.text = "";
+            // O KitBound sai no Pawn.Montar, que pode acontecer ANTES desta HUD existir (ordem da cena).
+            // Sem isto os botoes de tatica/suprema ficariam apagados para sempre — costura de 11/09/2026.
+            var pawn = jogador as Arkana.Gameplay.Pawn;
+            if (pawn != null && pawn.Runner != null) OnKitBound(pawn.Runner.Slug, pawn.Runner.Impl != null);
             _escudoVal = 0f; _escudoMax = 0f; _escudoNivel = 0;
             _linhaEscudo.gameObject.SetActive(false);
             _hp.fillAmount = 1f; _mana.fillAmount = 1f;

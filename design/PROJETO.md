@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 09/09/2026 (o produto é celular em Unity 6; o desvio Steam/Unreal foi desfeito)
+> **Atualizado em:** 11/09/2026 (o Unity alcançou o Godot em código: 232 testes verdes; falta ver no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,83 +51,128 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o produto é CELULAR, em UNITY 6 (09/09/2026)
+### >>> COMECE POR AQUI — o Unity alcançou o Godot EM CÓDIGO; o que falta é o APARELHO (11/09/2026)
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
 Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
 ser feito com o Unity, porque se ele faz os dois projetos ao mesmo tempo não faz
 sentido manter vários projetos... não pretendo mudar mais agora com o
 conhecimento do Unity e como ele funciona. O que tiver que ser refeito ou
-criamos do zero faz parte, são processos."*
+criamos do zero faz parte, são processos."* E em seguida: *"deixe para montar
+um novo APK mais para frente quando fizermos mais coisas... avançar tanto
+quanto avançamos no Godot."*
 
 Uma pessoa, dois jogos (este e o Limiar), **uma engine**. Esta é a última troca
 de engine do projeto.
 
-#### O que está NA MÁQUINA (medido em 09/09)
+#### O QUE FOI FEITO (09/09 → 11/09): `mobile-unity/` existe e passa no portão
 
 | | |
 |---|---|
-| **Unity 6000.3.23f1** | `C:\Program Files\Unity\Hub\Editor\6000.3.23f1`, com os módulos **Android** (SDK, NDK, JDK próprios) e Windows |
-| **.NET 10 SDK** | instalado em 07/09 para o Limiar |
-| **Toolchain provada** | o Limiar já gerou APK por `-batchmode -executeMethod` em 08/09; a receita está em `Agentes/_memoria/LICOES.md` |
-| **Aparelho de teste** | Poco F4 (Snapdragon 870, Adreno 650, 120 Hz) |
-| **Apagado nesta data** | Unreal Engine 5.8 (30,6 GB), Lyra (12,4 GB), caches do Epic, Godot 4.4.1 e templates. ~48 GB liberados |
+| **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **232 testes, 0 falhas** (229 EditMode sobre classes puras + 3 PlayMode que montam a arena inteira e rodam 3 s sem um log sequer) |
+| **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
+| **APK** | **ainda NÃO gerado** — ordem do Diretor: "mais para frente". `build_apk.ps1` está pronto |
 
-#### O que FICOU e o que SAIU do repositório
+**Como foi feito.** Sete raias em paralelo (Core, Mundo, Gameplay, UI; depois
+Personagem, Pawn, Kits+Terreno; depois Cena e a costura), cada uma dona de uma
+pasta, codificando contra um contrato escrito antes
+(`mobile-unity/ARQUITETURA.md`) e lendo o `.gd` correspondente como referência
+de COMO — nunca traduzindo. Como só cabe **um Unity por vez** no projeto, as
+raias validaram com o Roslyn do próprio Unity fora do editor (`csc.dll` via
+`NetCoreRuntime\dotnet.exe`) e rodaram os testes num mini-runner sobre o Mono; o
+portão oficial foi sempre do coordenador. Toda lógica em classe pura com
+`Tick(dt)`; `MonoBehaviour` só como casca — é isso que deixa 229 testes rodarem
+headless em três minutos.
+
+**Por quê assim.** O Godot deixou 21 mil linhas e 12 autotestes que diziam O QUE
+se cobra; o Unity herdou os invariantes, não o código. Cada teste novo se provou
+reintroduzindo o defeito (o próprio reporte das raias registra: "sem a guarda
+de estado, o teste fica vermelho").
+
+#### O que o Unity AINDA NÃO TEM em relação ao Godot (registro honesto)
+
+Tudo acima **passa no teste e nunca foi visto na tela**. E faltam, em ordem
+de quem o jogador nota primeiro:
+
+1. **Nada foi visto no aparelho.** FPS continua sem medição desde 25/08.
+2. **Loot no chão sem visual** — a HUD mostra "PEGAR", mas não há o que ver.
+3. **VFX dos kits e do terreno não são desenhados**: `KitRunner.Visuais`
+   (muralha, fio, poça, eco, tear) e `TerrenoReativo.Visiveis` (fogo, gelo,
+   muro, lama) existem como dados; ninguém os renderiza ainda.
+4. **Chão em URP Lit com cor de vértice**, sem o toon shader nem as texturas
+   de detalhe (`arte/cenario/texturas/`). Sem grama, flores, ruínas, bruma.
+5. **Retratos do menu** (`mobile-godot/godot/menu/art/NN.png`) ainda não
+   importados em `Resources/Retratos/` — o menu mostra quadrados na cor do mago.
+6. **Modelo externo** só entra como `Animation` legado; FBX Humanoid com
+   `Animator` precisa de um adaptador (passo E).
+7. Muro do terreno **não bloqueia tiro** no `Partida.Acerto`; "intangível" não
+   muda a colisão; bots não usam kit (como no Godot).
+8. O gesto de disparo é o do GDD §19.3 (pressionar-arrastar-soltar, cancelar
+   voltando ao centro). O Godot R17 tinha "tocar dispara + segurar auto-fogo".
+   **Qual dos dois fica é do Diretor.**
+
+#### O que está NA MÁQUINA (11/09)
+
+| | |
+|---|---|
+| **Unity 6000.3.23f1 + Hub 3.21** | `C:\Program Files\Unity\Hub\Editor\6000.3.23f1`, módulos Android e Windows |
+| **Licença** | Personal, resolvida online: **o Hub precisa estar aberto** ou o batchmode morre com 198. Os scripts abrem o Hub sozinhos — pelo AppID, **nunca por `unityhub://`** (sem caminho, o Hub entende "instalar editor" e mostra "versão do Editor arquivado") |
+| **Aparelho de teste** | Poco F4 (Snapdragon 870, Adreno 650, 120 Hz) |
+| **Apagado em 09/09** | Unreal 5.8, Lyra, caches do Epic, Godot 4.4.1 (~48 GB liberados) |
+
+#### O que FICOU e o que SAIU do repositório (09/09)
 
 | Fica | Por quê |
 |---|---|
 | `design/` inteiro | decisão não tem engine |
 | `arte/` inteiro, incluindo os originais de 3 M de faces fora do git | matéria-prima; a versão de celular se deriva no Blender |
-| `mobile-godot/` | **referência de leitura** para a reescrita: cada sistema ali foi jogado e medido. Sai quando o Unity o alcançar |
+| `mobile-godot/` | **referência de leitura**: cada sistema ali foi jogado e medido. Sai quando o Unity for visto no aparelho fazendo o mesmo |
 | `roblox/` | intocado, como sempre |
 
 | Saiu | Por quê |
 |---|---|
-| `pc-unreal/` (scripts do editor, ilha de 1.396 peças) | produto abandonado |
-| `design/referencias/PC-STEAM-ANALISE.md` | análise de uma plataforma que não existe mais; o que valia atravessou para a seção de lições abaixo |
-| exportador de heightmap Godot→Unreal, CI do Godot | alimentavam o que saiu |
+| `pc-unreal/`, `design/referencias/PC-STEAM-ANALISE.md`, exportador de heightmap, CI do Godot | produto abandonado; o que valia atravessou para as lições abaixo |
 
 #### A ORDEM daqui para a frente
 
-Cada passo tem um portão, e o portão é **no aparelho**, nunca na estimativa.
-
 | Passo | O quê | Portão |
 |---|---|---|
-| **0** | Criar `mobile-unity/` (template URP 3D Mobile, Force Text + Visible Meta, pacotes Input System, glTFast e Test Framework), `Assets/Editor/Build.cs` com `Build.Android`, primeiro APK vazio no Poco F4 | **FPS medido no aparelho** — a dívida que o projeto carrega desde 25/08 |
-| **1** | Núcleo sem cena: `Balance`, `Kits`, `Combat` (dano num ponto só, NaN barrado), velocidade como produto único, `Bus` de eventos — reescritos a partir de `design/`, olhando `mobile-godot/godot/core/` | testes EditMode cobrando os **mesmos invariantes** dos 12 selftests do Godot |
-| **2** | Ilha procedural de 600 m (o relevo de `Island.gd` é a fonte), mago em terceira pessoa, joystick + gesto único de disparo, Fogo | anda e atira no aparelho, FPS medido |
-| **3** | A partida: queda do castelo, Zona (fração do raio, nasce inerte, liga no pouso), luvas/loot/Baú, 12 bots com percepção, derrubado | partida completa contra bots no aparelho |
-| **4** | Kits, terreno reativo, HUD, menu e seleção dos 20, áudio | paridade com o Godot: o APK antigo deixa de ser referência |
-| **5** | Elenco: os 20 magos refeitos no SITE da Meshy, exportados em **FBX** e importados como Humanoid (retarget pelo Mecanim) | jogo bonito de ver em vídeo |
-| **6** | Rede: **não existe e continua sendo o item mais caro.** Caminho quando chegar: Netcode for GameObjects + servidor dedicado, sem amarrar a fornecedor (o Multiplay da Unity fechou em 2026) | dois celulares na mesma partida |
+| **A** | `build_apk.ps1` → instalar no Poco F4 → **jogar uma partida** e **medir FPS** | o número que falta desde 25/08 |
+| **B** | O que o aparelho mostrar de errado (é a primeira vez que alguém VÊ este código) | partida completa contra bots, no aparelho |
+| **C** | Visual do loot; VFX de kits e terreno a partir dos dados que já existem; retratos em `Resources` | o jogo mostra na tela o que a HUD anuncia |
+| **D** | Toon shader + texturas de detalhe; grama/ruínas/bruma da ilha (dados do `Island.gd`) | a ilha do Godot, no Unity, com FPS medido |
+| **E** | Elenco: os 20 magos refeitos no SITE da Meshy, em FBX Humanoid + adaptador de `Animator` no `Mago` | jogo bonito de ver em vídeo |
+| **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
 
-**Antes da rede, o jogo solo contra bots vale por si** — foi a decisão de gênero
+**Antes da rede, o jogo solo contra bots vale por si** — a decisão de gênero
 que sobreviveu ao desvio (ver lições). Modelo de receita fica com o Diretor.
 
-#### O que NÃO muda com a virada
+#### O que NÃO muda
 
 - **O elenco continua a ser refeito no SITE da Meshy, um por um.** A causa e a
-  receita estão na seção da leva 7, logo abaixo. Só o destino mudou: FBX para
-  o Unity, não `.glb` para o Godot.
+  receita estão na seção da leva 7, abaixo. Destino: FBX para o Unity.
 - `design/` e `arte/` alimentam as implementações; as implementações **nunca
   cruzam código**. GDScript não se traduz: se relê a decisão e se escreve em C#.
-- **FPS se mede, não se estima.** Nunca foi medido neste projeto. É o passo 0.
+- **FPS se mede, não se estima.** Passo A.
 - **Teste provado em vermelho, portão verde antes de entregar.** *"Sem
   atropelar as coisas."*
 
 #### Decisões que esperam o Diretor
 
-1. **Package ID** do app: proposto `br.com.vstack.arkana` (o Godot usava
-   `br.com.vstack.arkana3d`). Confirmar antes do passo 0.
-2. Do papel de 26/08, ainda em aberto: **lista dos 10 magos do lançamento**,
-   **nome e valores da moeda**, **quais pares de fusão estreiam**
-   (`design/gdd/DESBLOQUEIO-ELENCO.md`, `MANOPLAS-FUSAO.md`).
-3. **Veto ou não** do círculo final no platô e no pico (o teto de altura caiu na
-   leva 6; final em terreno alto é padrão do gênero, mas é decisão dele).
-4. **A tabela de fases da Zona é proposta, não spec** — calibrada contra PUBG,
-   Apex e Fortnite (`design/referencias/ZONA-BATTLE-ROYALE.md`), nunca
-   sancionada por escrito.
+1. **Gesto de disparo**: GDD §19.3 (o que está no Unity) ou R17 do Godot
+   (tocar dispara + segurar auto-fogo). É uma classe só (`GestoLogica`).
+2. **Bots com kit?** Hoje não (como no Godot). Ligar é uma linha no `KitRunner`.
+3. **Baú Celestial**: dano ao canalizador NÃO cancela (só sair do raio, cair ou
+   morrer) — herdado do `.gd`, nunca carimbado. Hora fixa (45 s) vs sorteada.
+4. **A tabela de fases da Zona é proposta, não spec** (70 s de abertura, 10 s
+   de formação, 5 fases 60/50/40/30/15 s, frações .62/.42/.26/.13/0), calibrada
+   contra PUBG/Apex/Fortnite, nunca sancionada por escrito.
+5. Do papel de 26/08: **lista dos 10 magos do lançamento**, **nome e valores da
+   moeda**, **quais pares de fusão estreiam**; e o **círculo final no platô e no
+   pico** (o teto de altura caiu; final em terreno alto é padrão do gênero).
+6. Package ID `br.com.vstack.arkana` está em uso; mudar é uma linha em
+   `Editor/Build.cs` e no `ProjectSettings`.
 
 ---
 

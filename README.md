@@ -11,7 +11,7 @@ ARKANA/
 ├── design/        ← A DECISÃO. Não tem engine, não tem código.
 ├── arte/          ← A MATÉRIA-PRIMA. .glb, .png, .wav e as ferramentas que produzem.
 │
-├── mobile-unity/  ← O PRODUTO (Unity 6, Android). Nasce no passo 0 do CONTINUAR DAQUI.
+├── mobile-unity/  ← O PRODUTO (Unity 6, Android). Ver mobile-unity/00-LEIA.md.
 ├── mobile-godot/  ← REFERÊNCIA. O jogo que funcionou em Godot; a fonte da reescrita. Sai quando o Unity o alcançar.
 └── roblox/        ← O projeto-mãe. Intocado.
 ```
@@ -56,13 +56,13 @@ sobrou daquele desvio está registrado em `design/PROJETO.md` como lição.
 CONTINUAR DAQUI sempre no topo. É o único arquivo que precisa ser lido para saber
 onde as coisas estão.
 
-## Estado (09/09/2026)
+## Estado (11/09/2026)
 
 | | |
 |---|---|
 | **Plataforma alvo** | Android (aparelho de teste: Poco F4) |
 | **Engine** | Unity 6000.3.23f1, instalado com o módulo Android |
-| **mobile-unity** | ainda não existe: é o passo 0 |
+| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu e áudio reescritos; portão headless (EditMode + PlayMode) verde. APK ainda não gerado |
 | **mobile-godot** | referência, 12/12 autotestes verdes na última execução (04/09) |
 | **Rede** | **não existe.** É o item mais caro e ainda não começou |
 | **Elenco** | 20 fichas e 160 vistas de concept prontas; modelos 3D a refazer no site da Meshy, um por um |

@@ -16,28 +16,36 @@ if (-not (Get-Process "Unity Hub" -ErrorAction SilentlyContinue)) {
 }
 $Logs = Join-Path $Proj "Logs"
 New-Item -ItemType Directory -Force $Logs | Out-Null
-$Log = Join-Path $Logs "portao.log"
-$Xml = Join-Path $Logs "portao-resultados.xml"
-if (Test-Path $Xml) { Remove-Item $Xml }
 
-$UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"",
-               "-runTests", "-testPlatform", "EditMode",
-               "-testResults", "`"$Xml`"", "-logFile", "`"$Log`"")
-$P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
+# Uma passada = um Unity (a trava de instancia obriga a serie): EditMode primeiro (rapido, prova a logica pura),
+# PlayMode depois (BootTests: monta a arena inteira em cena). Os totais somam na linha final.
+function Passada([string]$Plataforma, [string]$Log, [string]$Xml) {
+    if (Test-Path $Xml) { Remove-Item $Xml }
+    $UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"",
+                   "-runTests", "-testPlatform", $Plataforma,
+                   "-testResults", "`"$Xml`"", "-logFile", "`"$Log`"")
+    $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
 
-if (-not (Test-Path $Xml)) {
-    "PORTAO VERMELHO: nao houve resultado de teste (compilou?). Unity exit $($P.ExitCode). Erros do log:"
-    Select-String -Path $Log -Pattern "error CS|Exception|Error:" | Select-Object -First 30 | ForEach-Object { $_.Line }
-    exit 1
+    if (-not (Test-Path $Xml)) {
+        Write-Host "PORTAO VERMELHO ($Plataforma): nao houve resultado de teste (compilou?). Unity exit $($P.ExitCode). Erros do log:"
+        Select-String -Path $Log -Pattern "error CS|Exception|Error:" | Select-Object -First 30 | ForEach-Object { Write-Host $_.Line }
+        exit 1
+    }
+    [xml]$R = Get-Content $Xml
+    $Run = $R.'test-run'
+    $R.SelectNodes("//test-case[@result='Failed']") | ForEach-Object {
+        Write-Host "FALHOU ($Plataforma): $($_.fullname)"
+        Write-Host ($_.failure.message.'#cdata-section')
+    }
+    # Write-Host de proposito: dentro de function, string solta vira valor de RETORNO e some da tela.
+    Write-Host "  $Plataforma`: $([int]$Run.total) testes, $([int]$Run.failed) falhas (Unity exit $($P.ExitCode))"
+    return @([int]$Run.total, [int]$Run.failed)
 }
-[xml]$R = Get-Content $Xml
-$Run = $R.'test-run'
-$Falhas = [int]$Run.failed
-$Total = [int]$Run.total
-$R.SelectNodes("//test-case[@result='Failed']") | ForEach-Object {
-    "FALHOU: $($_.fullname)"
-    $_.failure.message.'#cdata-section'
-}
-"ARKANA: $Total testes, $Falhas falhas (Unity exit $($P.ExitCode))"
+
+$Edit = Passada "EditMode" (Join-Path $Logs "portao.log") (Join-Path $Logs "portao-resultados.xml")
+$Play = Passada "PlayMode" (Join-Path $Logs "portao-playmode.log") (Join-Path $Logs "portao-playmode-resultados.xml")
+$Total = $Edit[-2] + $Play[-2]
+$Falhas = $Edit[-1] + $Play[-1]
+"ARKANA: $Total testes, $Falhas falhas"
 if ($Falhas -gt 0 -or $Total -eq 0) { exit 1 }
 exit 0

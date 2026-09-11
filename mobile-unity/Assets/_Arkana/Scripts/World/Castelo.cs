@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Arkana.Core;
 
@@ -101,11 +102,16 @@ namespace Arkana.World
         public int SeedDaRota => Rota != null ? Rota.Seed : RotaDoCastelo.SeedPadrao;
         /// <summary>0..1 ao longo da rota.</summary>
         public float Progresso { get; private set; }
-        public bool Saltou { get; private set; }
+        /// <summary>Todos que embarcaram ja' saltaram (ou foram empurrados no fim da rota).</summary>
+        public bool Saltou => embarcouAlguem && passageiros.Count == 0;
+        public int Passageiros => passageiros.Count;
         public Vector3 PosicaoDoPortao => transform.position + Portao;
 
-        GameObject passageiro;
-        Renderer[] passageiroRenderers;
+        // N passageiros (11/09/2026): o jogador E os 12 bots caem do MESMO castelo, cada um no seu
+        // instante. Com um passageiro so', o primeiro bot a saltar derrubava o jogador junto.
+        readonly List<GameObject> passageiros = new List<GameObject>();
+        readonly Dictionary<GameObject, Renderer[]> renderers = new Dictionary<GameObject, Renderer[]>();
+        bool embarcouAlguem;
         bool anunciado;
 
         /// <summary>Poe um castelo em rota. seed &lt; 0 = sorteia por partida (o seed fica em SeedDaRota).</summary>
@@ -146,42 +152,53 @@ namespace Arkana.World
             if (Rota == null) return;
             Progresso += Time.deltaTime / RotaDoCastelo.Duracao;
             transform.position = Rota.PosicaoEm(Progresso);
-            if (passageiro != null) passageiro.transform.position = PosicaoDoPortao;
+            for (int i = 0; i < passageiros.Count; i++)
+                if (passageiros[i] != null) passageiros[i].transform.position = PosicaoDoPortao;
             if (Progresso >= 1f)
             {
                 // Quem nao saltou e' EMPURRADO: ninguem fica preso num castelo que saiu do mapa.
-                if (passageiro != null) Saltar();
+                SaltarTodos();
                 Destroy(gameObject);
             }
         }
 
-        /// <summary>Embarca um corpo: invisivel e grudado no portao ate' Saltar().</summary>
+        /// <summary>Embarca um corpo: invisivel e grudado no portao ate' Saltar(corpo).</summary>
         public void Embarcar(GameObject corpo)
         {
-            passageiro = corpo;
-            Saltou = false;
-            passageiroRenderers = corpo != null ? corpo.GetComponentsInChildren<Renderer>(true) : null;
-            MostrarPassageiro(false);
-            if (corpo != null) corpo.transform.position = PosicaoDoPortao;
+            if (corpo == null || passageiros.Contains(corpo)) return;
+            embarcouAlguem = true;
+            passageiros.Add(corpo);
+            renderers[corpo] = corpo.GetComponentsInChildren<Renderer>(true);
+            Mostrar(corpo, false);
+            corpo.transform.position = PosicaoDoPortao;
         }
 
-        /// <summary>Salta: o corpo SURGE no portao. Devolve a posicao de onde a queda comeca. Na BORDA: repetir nao faz nada.</summary>
-        public Vector3 Saltar()
+        public bool Embarcado(GameObject corpo) => corpo != null && passageiros.Contains(corpo);
+
+        /// <summary>Salta UM corpo: ele SURGE no portao. Devolve onde a queda comeca. Na BORDA: repetir nao faz nada.</summary>
+        public Vector3 Saltar(GameObject corpo)
         {
             Vector3 p = PosicaoDoPortao;
-            if (Saltou) return p;
-            Saltou = true;
-            MostrarPassageiro(true);
-            passageiro = null;
-            passageiroRenderers = null;
+            if (corpo == null || !passageiros.Remove(corpo)) return p;
+            Mostrar(corpo, true);
+            renderers.Remove(corpo);
             return p;
         }
 
-        void MostrarPassageiro(bool visivel)
+        /// <summary>Compatibilidade: salta o passageiro mais antigo (o Godot tinha um so').</summary>
+        public Vector3 Saltar() => passageiros.Count > 0 ? Saltar(passageiros[0]) : PosicaoDoPortao;
+
+        public void SaltarTodos()
         {
-            if (passageiroRenderers == null) return;
-            for (int i = 0; i < passageiroRenderers.Length; i++)
-                if (passageiroRenderers[i] != null) passageiroRenderers[i].enabled = visivel;
+            while (passageiros.Count > 0) Saltar(passageiros[0]);
+        }
+
+        void Mostrar(GameObject corpo, bool visivel)
+        {
+            Renderer[] rs;
+            if (!renderers.TryGetValue(corpo, out rs) || rs == null) return;
+            for (int i = 0; i < rs.Length; i++)
+                if (rs[i] != null) rs[i].enabled = visivel;
         }
 
         // ------------------------------------------------------------------ visual
