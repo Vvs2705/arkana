@@ -94,6 +94,21 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void NumeroPulaNoGolpeEAssenta()
+        {
+            bool novo;
+            var n = _h.RegistrarDano(7, 10f, Elemento.Fogo, false, out novo);
+            Assert.AreEqual(HudLogica.PuloPico, HudLogica.Pulo(n, _h.Agora), 1e-4f, "nasce no pico");
+            _h.Tick(HudLogica.PuloS);
+            Assert.AreEqual(1f, HudLogica.Pulo(n, _h.Agora), 1e-4f, "assenta em 1");
+            Assert.IsFalse(HudLogica.Grande(n));
+            _h.RegistrarDano(7, 20f, Elemento.Fogo, false, out novo);   // dentro do merge: soma 30
+            Assert.IsFalse(novo);
+            Assert.IsTrue(HudLogica.Grande(n), "a soma passou do limiar: golpe grande");
+            Assert.AreEqual(HudLogica.PuloPicoGrande, HudLogica.Pulo(n, _h.Agora), 1e-4f, "o golpe somado pula de novo, e o grande pula mais");
+        }
+
+        [Test]
         public void HitmarkerEsvaece()
         {
             _h.Acertei();

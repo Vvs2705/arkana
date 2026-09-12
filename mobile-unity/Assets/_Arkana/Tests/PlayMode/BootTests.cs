@@ -73,6 +73,7 @@ namespace Arkana.Tests
             Assert.IsNotNull(Arkana.Terrain.TerrenoReativoBehaviour.Atual, "o terreno reativo existe na partida");
             Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDaPartida>(), "loot, bau e tempestade tem quem desenhe");
             Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDosKits>(), "os kits tem quem desenhe");
+            Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDoImpacto>(), "o acerto tem quem desenhe");
             Assert.IsNotNull(Object.FindFirstObjectByType<Arkana.Terrain.VisualDoTerreno>(), "o terreno tem quem desenhe");
             LogAssert.NoUnexpectedReceived();
         }

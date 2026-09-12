@@ -319,6 +319,7 @@ namespace Arkana
             _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
             VisualDoTerreno.Criar(_arena);            // fogo, carvao, gelo, eletrico, lama, muro
             VisualDosKits.Criar(_arena, Partida);     // muralha, fio, poca, eco, tear + o aviso da suprema no chao
+            VisualDoImpacto.Criar(_arena, Partida);   // o PESO do acerto: estouro onde o tiro para, piscada no corpo, bolha no escudo
         }
 
         void Desmontar()

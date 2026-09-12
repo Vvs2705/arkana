@@ -553,5 +553,49 @@ namespace Arkana.Tests
             yield return Esperar(0.8f);
             Foto(main.Player.Camera.Cam, "22-fim-vitoria", true);
         }
+
+        /// <summary>
+        /// O PESO do acerto: um raio do jogador no boneco (escudo N1 -> bolha, numero de dano na HUD, estouro onde o tiro
+        /// para) e os cinco estouros lado a lado no chao, na ordem do enum. Foto sem Esperar depois do acerto: a piscada
+        /// dura 0,08 s.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Combate_Impacto()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+
+            var alvo = (Gameplay.Pawn)main.Partida.Bonecos[0];
+            Vector3 d = alvo.Pos - main.Player.Pawn.Pos; d.y = 0f;
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(d.x, d.z);
+            yield return Esperar(0.3f);
+            main.Partida.Registrar(Gameplay.Projetil.Lancar(main.Player.Pawn, alvo.Pos + Vector3.up * 1.1f - d.normalized * 1.5f, d.normalized, Elemento.Raio));
+            float t = 0f;
+            while (main.Partida.Projeteis.Count > 0 && t < 3f) { yield return null; t += Time.deltaTime; }
+            yield return null;
+            Foto(main.Player.Camera.Cam, "24-impacto", true);
+
+            var vi = Object.FindFirstObjectByType<Gameplay.VisualDoImpacto>();
+            Assert.IsNotNull(vi, "o acerto tem quem desenhe");
+            float yaw = main.Player.Camera.Logica.Yaw;
+            Vector3 frente = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), lado = new Vector3(frente.z, 0f, -frente.x);
+            for (int i = 0; i < 5; i++)
+            {
+                Vector3 p = main.Player.Pawn.Pos + frente * 6f + lado * ((i - 2) * 1.8f);
+                p.y = Arkana.World.Ilha.AlturaDoChao(p.x, p.z) + 0.3f;
+                vi.Estourar((Elemento)i, p);
+            }
+            yield return Esperar(0.12f);   // abriu: a 0,05 s os cinco ainda eram cinco pontos brancos
+            Foto(main.Player.Camera.Cam, "25-estouros", true);
+            int n = 0;
+            foreach (var ps in vi.GetComponentsInChildren<ParticleSystem>()) n += ps.particleCount;
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), "25-estouros: particulas vivas=" + n + "\n");
+            Assert.Greater(n, 0, "os estouros nascem");
+        }
     }
 }

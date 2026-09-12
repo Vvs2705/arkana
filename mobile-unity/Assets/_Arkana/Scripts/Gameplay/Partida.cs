@@ -178,6 +178,11 @@ namespace Arkana.Gameplay
                 Projetil p = Projeteis[i];
                 bool voa = p.Tick(dt, acerto, Arena);
                 if (voa && terreno != null && NoMuro(terreno, p.Pos)) { p.Impacto(null); voa = false; }
+                // O CHAO PARA O TIRO (GDD §14): sem isto ele varava morro e o terreno reativo so' via o tiro que acertava
+                // corpo. Agora o erro acende a mata, faz lama, congela/eletrifica o lago (a celula e' x,z; o fundo conta).
+                // ponytail: o fundo e nao a lamina — quem nada atira com a mao abaixo da agua e nao pode matar o proprio tiro.
+                if (voa && Arkana.World.Ilha.Atual != null && p.Pos.y < Arkana.World.Ilha.AlturaDoChao(p.Pos.x, p.Pos.z))
+                { p.Impacto(null); voa = false; }
                 if (!voa) Projeteis.RemoveAt(i);
             }
             if (Acabou) return;   // um projetil pode ter fechado a partida

@@ -21,8 +21,13 @@ namespace Arkana.UI
         public const float KillFeedS = 4f;
         public const int KillFeedMax = 4;   // a casca tem uma linha fixa por abate: mudar aqui muda as duas
         public const float HitmarkerS = 0.16f;
+        /// <summary>Soma que conta como GOLPE GRANDE (cajado de terra, conducao, rajada somada): pula mais e esquenta para o branco.</summary>
+        public const float NumeroGrande = 25f;
+        /// <summary>O PULO do numero: nasce na escala de pico a cada golpe somado e assenta em 1 em PuloS. KNOB por foto.</summary>
+        public const float PuloS = 0.12f, PuloPico = 1.45f, PuloPicoGrande = 1.8f;
 
-        public sealed class Numero { public float Total; public float Nasceu; public float Ate; public bool EmEscudo; public Elemento Elemento; }
+        /// <summary>`Golpe` = Agora do ultimo dano somado (o pulo recomeca nele).</summary>
+        public sealed class Numero { public float Total; public float Nasceu; public float Ate; public float Golpe; public bool EmEscudo; public Elemento Elemento; }
         public sealed class Abate { public string Nome; public float Ate; }
 
         public string ArmaRotulo { get; private set; } = "";
@@ -36,9 +41,11 @@ namespace Arkana.UI
 
         float _armaT = -1f;   // < 0 = sem rotulo na tela
         readonly Dictionary<int, Numero> _numeros = new Dictionary<int, Numero>();
+        readonly List<int> _mortos = new List<int>();   // reusadas no Tick: zero lixo por quadro
+        readonly Predicate<Abate> _expirou;
         readonly float _mergeS, _vidaS;
 
-        public HudLogica(float numMergeS, float numLifeS) { _mergeS = numMergeS; _vidaS = numLifeS; }
+        public HudLogica(float numMergeS, float numLifeS) { _mergeS = numMergeS; _vidaS = numLifeS; _expirou = a => Agora >= a.Ate; }
 
         /// <summary>Partida nova: maos nuas, sem elemento, sem rotulo, sem feed.</summary>
         public void MaosNuas()
@@ -95,12 +102,13 @@ namespace Arkana.UI
             {
                 n.Total += dano;
                 n.Ate = Agora + _mergeS;
+                n.Golpe = Agora;
                 n.EmEscudo = emEscudo;
                 n.Elemento = el;
                 novo = false;
                 return n;
             }
-            n = new Numero { Total = dano, Nasceu = Agora, Ate = Agora + _mergeS, EmEscudo = emEscudo, Elemento = el };
+            n = new Numero { Total = dano, Nasceu = Agora, Ate = Agora + _mergeS, Golpe = Agora, EmEscudo = emEscudo, Elemento = el };
             _numeros[alvoId] = n;
             novo = true;
             return n;
@@ -109,6 +117,16 @@ namespace Arkana.UI
         /// <summary>0..1 de vida do numero (1 = acabou de nascer, 0 = morreu).</summary>
         public float VidaDoNumero(Numero n) => Mathf.Clamp01(1f - (Agora - n.Nasceu) / Mathf.Max(_vidaS, 0.01f));
         public int NumerosVivos => _numeros.Count;
+
+        public static bool Grande(Numero n) => n.Total >= NumeroGrande;
+
+        /// <summary>Escala do numero em `agora`: o pico no golpe, assenta em 1 em PuloS (saida quadratica: estala e pousa).</summary>
+        public static float Pulo(Numero n, float agora)
+        {
+            float f = Mathf.Clamp01((agora - n.Golpe) / PuloS);
+            float pico = Grande(n) ? PuloPicoGrande : PuloPico;
+            return 1f + (pico - 1f) * (1f - f) * (1f - f);
+        }
 
         public static string TextoRelogio(float restanteS, bool treino, string rotuloTreino)
         {
@@ -126,10 +144,10 @@ namespace Arkana.UI
                 if (_armaT > ArmaRotuloS + ArmaFadeS) _armaT = -1f;
             }
             if (Hitmarker > 0f) Hitmarker = Mathf.Max(Hitmarker - dt, 0f);
-            KillFeed.RemoveAll(a => Agora >= a.Ate);
-            var mortos = new List<int>();
-            foreach (var kv in _numeros) if (VidaDoNumero(kv.Value) <= 0f) mortos.Add(kv.Key);
-            foreach (int k in mortos) _numeros.Remove(k);
+            KillFeed.RemoveAll(_expirou);
+            _mortos.Clear();
+            foreach (var kv in _numeros) if (VidaDoNumero(kv.Value) <= 0f) _mortos.Add(kv.Key);
+            foreach (int k in _mortos) _numeros.Remove(k);
         }
     }
 
@@ -259,6 +277,10 @@ namespace Arkana.UI
         Image[] _hitmarker;
         RectTransform _numeros;
         readonly Dictionary<HudLogica.Numero, Text> _labels = new Dictionary<HudLogica.Numero, Text>();
+        readonly Stack<Text> _numerosLivres = new Stack<Text>();   // rotulo de dano que morreu volta aqui (nada de Destroy por golpe)
+        readonly List<HudLogica.Numero> _numerosMortos = new List<HudLogica.Numero>();
+        /// <summary>dp que o numero sobe na vida inteira (freando) e a fracao FINAL da vida em que ele some.</summary>
+        const float NumSobeDp = 34f, NumSomeFrac = 0.4f;
         RectTransform _fim, _fimPlaca, _fimChipColocacao, _fimChipAbates;
         CanvasGroup _fimGrupo;
         Image _fimFio, _fimBrilho, _fimLosango;
@@ -344,8 +366,10 @@ namespace Arkana.UI
             _aviso.RotuloEstado = s => { string r; return Estados.TryGetValue(s, out r) ? r : s; };
             _aviso.TituloDerrubado = Textos.DerrubadoVoce; _aviso.TituloAliado = Textos.DerrubadoAliado;
             _aviso.TextoEsvaecendo = Textos.DerrubadoEsvaecendo; _aviso.TextoReerguendo = Textos.DerrubadoReerguendo;
+            // TELA CHEIA, nao area segura: o numero ancora no ponto de viewport da camera (o recuo do entalhe o deslocava)
             _numeros = Formas.No(_raiz, "Numeros");
-            AreaSegura.Esticar(_numeros);
+            _numeros.anchorMin = Vector2.zero; _numeros.anchorMax = Vector2.one;
+            _numeros.offsetMin = Vector2.zero; _numeros.offsetMax = Vector2.zero;
 
             // altimetro (queda): a placa, seta de queda a esquerda e os metros em negrito (era retangulo chapado na foto 07)
             _altimetroBox = Formas.No(_raiz, "Altimetro");
@@ -947,22 +971,43 @@ namespace Arkana.UI
             var cam = Camera.main;
             if (cam == null) return;
             Vector3 mundo = alvo.Pos + Vector3.up * 1.7f;
-            Vector3 sp = cam.WorldToScreenPoint(mundo);
-            if (sp.z < 0f) return;   // atras da camera projetaria no lugar errado
-            lbl = Formas.Texto(_numeros, "Num", "", 18f, Color.white);
-            lbl.rectTransform.anchorMin = Vector2.zero; lbl.rectTransform.anchorMax = Vector2.zero;
-            lbl.rectTransform.sizeDelta = new Vector2(Dp.Px(80f), Dp.Px(24f));
-            lbl.rectTransform.anchoredPosition = new Vector2(sp.x, sp.y);
+            Vector3 vp = cam.WorldToViewportPoint(mundo);
+            if (vp.z < 0f) return;   // atras da camera projetaria no lugar errado
+            lbl = _numerosLivres.Count > 0 ? _numerosLivres.Pop() : NovoNumero();
+            lbl.gameObject.SetActive(true);
+            lbl.canvasRenderer.SetAlpha(1f);
+            lbl.rectTransform.localScale = Vector3.one;
+            // ANCORA no viewport, nao pixel de tela: vale em qualquer resolucao (a foto de 2400x1080 sobre a tela de 640x480
+            // do teste jogava o numero no joystick); a subida anda no anchoredPosition a partir daqui
+            lbl.rectTransform.anchorMin = lbl.rectTransform.anchorMax = new Vector2(vp.x, vp.y);
+            lbl.rectTransform.anchoredPosition = Vector2.zero;
             _labels[n] = lbl;
             PintarNumero(lbl, n);
         }
 
+        /// <summary>Rotulo de dano novo (o pool devolve os velhos): NEGRITO, contorno escuro de 1,4 dp e sombra de 2 dp — o
+        /// Shadow de 1 px do Formas.Texto some a 395 ppi, e o numero colorido se perdia no ceu, no fogo e no escudo branco.</summary>
+        Text NovoNumero()
+        {
+            Text lbl = Formas.Texto(_numeros, "Num", "", 18f, Color.white);
+            lbl.fontStyle = FontStyle.Bold;
+            lbl.rectTransform.anchorMin = Vector2.zero; lbl.rectTransform.anchorMax = Vector2.zero;
+            lbl.rectTransform.sizeDelta = new Vector2(Dp.Px(80f), Dp.Px(24f));
+            lbl.GetComponent<Shadow>().effectDistance = new Vector2(Dp.Px(2f), -Dp.Px(2f));   // ANTES do Outline (que tambem e' Shadow)
+            var o = lbl.gameObject.AddComponent<Outline>();
+            o.effectColor = Formas.ComAlfa(Estilo.NoiteFunda, 0.9f);
+            o.effectDistance = new Vector2(Dp.Px(1.4f), -Dp.Px(1.4f));
+            return lbl;
+        }
+
+        /// <summary>Texto, tamanho (Balance) e cor (elemento; escudo = branco-azulado). O golpe GRANDE esquenta para o branco.</summary>
         void PintarNumero(Text lbl, HudLogica.Numero n)
         {
             float escala = Mathf.Min((float)Balance.Feedback.NumScaleBase + (float)Balance.Feedback.NumScaleGain * n.Total / 25f, (float)Balance.Feedback.NumScaleMax);
             lbl.text = Mathf.RoundToInt(n.Total).ToString();
             lbl.fontSize = Mathf.Max(Mathf.RoundToInt(Dp.Px(18f) * escala), 11);
-            lbl.color = n.EmEscudo ? Formas.Cor(Balance.Feedback.CorEscudo) : Estilo.CorElemento(n.Elemento);
+            Color c = n.EmEscudo ? Formas.Cor(Balance.Feedback.CorEscudo) : Estilo.CorElemento(n.Elemento);
+            lbl.color = HudLogica.Grande(n) ? Color.Lerp(c, Color.white, 0.35f) : c;
         }
 
         void OnEscudo(IEntidade e, float escudo, float max, int nivel)
@@ -1191,16 +1236,28 @@ namespace Arkana.UI
             // kill feed: linhas fixas, o texto so' e' refeito quando o abate da linha muda (era um StringBuilder por frame)
             float feedMax = _killFeed.sizeDelta.x;
             for (int i = 0; i < _abates.Length; i++) _abates[i].Pintar(i < Logica.KillFeed.Count ? Logica.KillFeed[i] : null, Logica.Agora, feedMax);
-            // numeros de dano: sobem e somem
-            var mortos = new List<HudLogica.Numero>();
+            // numeros de dano: PULAM a cada golpe (HudLogica.Pulo), sobem FREANDO (rapido no nascimento, param no fim) e so'
+            // somem na fracao final. Alfa pelo CanvasRenderer e pulo pela escala: nao refaz a malha do texto + contorno por quadro.
+            float vidaS = Mathf.Max((float)Balance.Feedback.NumLifeS, 0.01f);
+            _numerosMortos.Clear();
             foreach (var kv in _labels)
             {
                 float vida = Logica.VidaDoNumero(kv.Key);
-                if (vida <= 0f || kv.Value == null) { mortos.Add(kv.Key); continue; }
-                kv.Value.color = Formas.ComAlfa(kv.Value.color, vida);
-                kv.Value.rectTransform.anchoredPosition += new Vector2(0, Dp.Px(34f) * dt / Mathf.Max((float)Balance.Feedback.NumLifeS, 0.01f));
+                Text lbl = kv.Value;
+                if (vida <= 0f || lbl == null) { _numerosMortos.Add(kv.Key); continue; }
+                float pulo = HudLogica.Pulo(kv.Key, Logica.Agora);
+                lbl.rectTransform.localScale = new Vector3(pulo, pulo, 1f);
+                lbl.canvasRenderer.SetAlpha(Mathf.Clamp01(vida / NumSomeFrac));
+                lbl.rectTransform.anchoredPosition += new Vector2(0f, Dp.Px(NumSobeDp) * 2f * vida * dt / vidaS);   // integral de 2*vida = 1
             }
-            foreach (var n in mortos) { if (_labels[n] != null) Destroy(_labels[n].gameObject); _labels.Remove(n); }
+            foreach (var n in _numerosMortos)
+            {
+                Text lbl = _labels[n];
+                _labels.Remove(n);
+                if (lbl == null) continue;
+                lbl.gameObject.SetActive(false);
+                _numerosLivres.Push(lbl);
+            }
         }
 
         /// <summary>Leitura defensiva do Kits: slug fora do elenco nao quebra o botao.</summary>
