@@ -253,6 +253,50 @@ namespace Arkana.Tests
             foreach (GameObject g in magos) Object.Destroy(g);
         }
 
+        /// <summary>As pecas da OFICINA no lugar delas: o Altar de Sintonia no vale, o anel das ruinas, a torre arcana.</summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_AltarRuinasTorre()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Assert.IsNotNull(ilha.Kit, "sem kit");
+            // o corte por distancia mede a camera do JOGADOR (no pico): liga tudo para a camera da foto
+            foreach (Renderer r in ilha.Kit.GetComponentsInChildren<Renderer>(true)) r.enabled = true;
+            var sb = new System.Text.StringBuilder();
+
+            GameObject bras = GameObject.Find("27-braseiro-elemental");
+            Assert.IsNotNull(bras, "o altar nao nasceu");
+            Vector3 c = bras.transform.position;
+            sb.AppendLine("13-altar: braseiro=" + c.ToString("F1") + " obeliscos=" + ilha.Kit.Contar("33-obelisco") + " plataformas=" + ilha.Kit.Contar("34-plataforma-sintonia"));
+            Camera cam = CameraTemporaria("CamFotoAltar", c + new Vector3(6.5f, 3.4f, -7.5f), c + Vector3.up * 0.6f, Color.gray);
+            Foto(cam, "13-altar", false);
+            Object.Destroy(cam.gameObject);
+
+            Vector2 ru = ilha.Relevo.Ruinas;
+            float rr = ilha.Relevo.RuinasR;
+            Vector3 centro = new Vector3(ru.x, Arkana.World.Ilha.AlturaDoChao(ru.x, ru.y), ru.y);
+            sb.AppendLine("14-ruinas: centro=" + centro.ToString("F1") + " arcos=" + ilha.Kit.Contar("22-arco-partido") + " colunas=" + ilha.Kit.Contar("23-coluna-braseiro") + " estatuas=" + ilha.Kit.Contar("24-estatua-vigia"));
+            cam = CameraTemporaria("CamFotoRuinas", centro + new Vector3(-rr * 1.1f, 16f, rr * 1.1f), centro + Vector3.up * 2f, Color.gray);
+            Foto(cam, "14-ruinas", false);
+            Object.Destroy(cam.gameObject);
+
+            GameObject torre = GameObject.Find("26-torre-arcana");
+            Assert.IsNotNull(torre, "a torre nao nasceu");
+            Vector3 t = torre.transform.position;
+            sb.AppendLine("15-torre: pos=" + t.ToString("F1") + " torres=" + ilha.Kit.Contar("26-torre-arcana"));
+            cam = CameraTemporaria("CamFotoTorre", t + new Vector3(20f, 5f, -20f), t + Vector3.up * 9f, Color.gray);
+            Foto(cam, "15-torre", false);
+            Object.Destroy(cam.gameObject);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
         [UnityTest]
         public IEnumerator Foto_Elenco_ClipesDoMago([ValueSource(nameof(SlugsExternos))] string slug)
         {

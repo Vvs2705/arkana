@@ -128,7 +128,7 @@ namespace Arkana.World
                 Ruinas.Montar(Relevo, MaterialPedra());
                 // o kit vem por ultimo: planta pelos POIs e foge do que as ruinas ja' ocupam
                 Kit = Filho<KitCenario>(gen.transform, "KitCenario");
-                Kit.Montar(Relevo);
+                Kit.Montar(Relevo, Ruinas.Pegadas);
             }
         }
 

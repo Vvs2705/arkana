@@ -23,9 +23,12 @@ namespace Arkana.World
         public int Colunas { get; private set; }
         public int Blocos { get; private set; }
         public int Rochedos { get; private set; }
+        /// <summary>O chao que as ruinas ocupam (x, z, raio em w), por coluna e bloco: o KitCenario nao planta em cima da muralha.</summary>
+        public readonly List<Vector4> Pegadas = new List<Vector4>();
 
         public void Montar(Relevo relevo, Material pedra)
         {
+            Pegadas.Clear();
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 GameObject c = transform.GetChild(i).gameObject;
@@ -63,8 +66,10 @@ namespace Arkana.World
                     var q = Quaternion.LookRotation(fora, Vector3.up) * Quaternion.Euler(84.6f, 0f, 0f);
                     var pos = new Vector3(p.x + fora.x * 2.1f, h + 0.8f, p.y + fora.z * 2.1f);
                     b.Adicionar(colProto, Matrix4x4.TRS(pos, q, Vector3.one), tinta);
+                    Pegadas.Add(new Vector4(pos.x + fora.x * AltColuna * 0.5f, pos.z + fora.z * AltColuna * 0.5f, 0f, AltColuna * 0.55f));
                     continue;
                 }
+                Pegadas.Add(new Vector4(p.x, p.y, 0f, 0.9f));
                 float sy = rng.Faixa(0.35f, 1.05f);
                 b.Adicionar(colProto, Matrix4x4.TRS(new Vector3(p.x, h, p.y),
                     Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f), new Vector3(1f, sy, 1f)), tinta);
@@ -92,6 +97,7 @@ namespace Arkana.World
                             Desgaste(rng, -0.16f, 0.08f));
                         Blocos++;
                     }
+                    Pegadas.Add(new Vector4(p.x, p.y, 0f, 1.3f));
                 }
             }
 
@@ -113,7 +119,7 @@ namespace Arkana.World
         {
             var rng = new Sorteio(111);
             var proto = new MalhaProc.Construtor();
-            proto.Blob(Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorRocha, new Sorteio(13), 0.3f);
+            proto.Blob(Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorPedregulho, new Sorteio(13), 0.3f);
             var b = new MalhaProc.Construtor();
             const int n = 22;
             for (int i = 0; i < n; i++)

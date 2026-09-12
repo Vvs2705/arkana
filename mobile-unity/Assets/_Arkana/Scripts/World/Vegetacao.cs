@@ -242,7 +242,7 @@ namespace Arkana.World
             for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
             protoArvore = ProtoArvore();
             protoToco = ProtoToco();
-            protoRocha = ProtoBlob(13, Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorRocha, 0.3f);
+            protoRocha = ProtoBlob(13, Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorPedregulho, 0.3f);
             protoMoita = ProtoMoita();
             arvPos.Clear(); arvM.Clear(); arvTinta.Clear(); arvQueimada.Clear(); arvColisor.Clear();
             rocM.Clear(); moiM.Clear(); moiTinta.Clear();

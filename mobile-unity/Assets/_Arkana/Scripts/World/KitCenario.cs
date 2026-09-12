@@ -18,6 +18,8 @@ namespace Arkana.World
         Alto,
         /// <summary>Dentro de um POI qualquer.</summary>
         Poi,
+        /// <summary>No ANEL das ruinas (0,75 a 1,35 do raio, fora do miolo de Ruinas.cs), DE FRENTE para o centro: as estatuas em circulo do prompts/06.</summary>
+        Ruinas,
     }
 
     /// <summary>Uma peca esculpida na Meshy. Os numeros de design sao do KitCenario.gd.</summary>
@@ -28,7 +30,8 @@ namespace Arkana.World
         public readonly float AlturaM;
         /// <summary>Copias na ilha de REFERENCIA (raio 132 m). Planta x AREA.</summary>
         public readonly int N;
-        /// <summary>O corpo bate? Arco e piso de runa nao (o arco e' passagem: colisor nele viraria parede).</summary>
+        /// <summary>O corpo bate? O arco de calcario e o piso de runa nao (a CAIXA de colisao viraria parede no vao). O arco partido
+        /// colide: com a malha real (12/09) as pernas batem e o vao passa.</summary>
         public readonly bool Colide;
         public readonly OndeNasce Onde;
         /// <summary>Variacao de escala por copia (+-).</summary>
@@ -45,12 +48,14 @@ namespace Arkana.World
         public bool Marco => AlturaM >= 3f;
     }
 
-    /// <summary>Uma copia plantada: onde (o pe' da peca ja' na cota), giro em Y (graus) e fator de escala (1 +- var).</summary>
+    /// <summary>Uma copia plantada: onde (o pe' da peca ja' na cota), giro em Y (graus) e fator de escala (1 +- var).
+    /// TomboGraus != 0 = DEITADA (giro em X depois do Y: o topo aponta para onde o giro olha); a Pos vira o centro dela no chao.</summary>
     public struct Plantio
     {
         public Vector3 Pos;
         public float GiroGraus;
         public float Escala;
+        public float TomboGraus;
     }
 
     /// <summary>
@@ -78,7 +83,85 @@ namespace Arkana.World
             new PecaDoKit("28-pedestal-de-arma", 2.6f, 5, true, OndeNasce.Poi, 0f, 1.1f),
             new PecaDoKit("30-arvore-carbonizada-renascendo", 12f, 12, true, OndeNasce.Aberto, 0.30f, 4.2f),
             new PecaDoKit("32-piso-runa-reativa", 0.6f, 7, false, OndeNasce.Poi, 0f, 3.3f),
+            // as sete da oficina (geradas 04/09, remesh 10K do site 12/09); alturas das fichas de arte/prompts/06 e 07
+            new PecaDoKit("22-arco-partido", 5f, 1, true, OndeNasce.Ruinas, 0.10f, 2.2f),
+            new PecaDoKit("23-coluna-braseiro", 2.05f, 2, true, OndeNasce.Ruinas, 0.10f, 0.4f),
+            new PecaDoKit("24-estatua-vigia", 4.1f, 1, true, OndeNasce.Ruinas, 0.05f, 1.05f),
+            new PecaDoKit("26-torre-arcana", 22f, 1, true, OndeNasce.Poi, 0f, 4.5f),
         };
+
+        /// <summary>O ALTAR DE SINTONIA (arte/prompts/08), fora do plantio solto: braseiro-fonte, obelisco, plataforma de pegadas.</summary>
+        public static readonly PecaDoKit[] PecasDoAltar =
+        {
+            new PecaDoKit("27-braseiro-elemental", 1.35f, 1, true, OndeNasce.Poi, 0f, 0.55f),
+            new PecaDoKit("33-obelisco", 2.85f, 5, true, OndeNasce.Poi, 0f, 0.6f),
+            new PecaDoKit("34-plataforma-sintonia", 1.2f, 2, true, OndeNasce.Poi, 0f, 0.97f),
+        };
+        /// <summary>Raio do pentagono dos obeliscos (m): o circulo de 9 m da ficha.</summary>
+        public const float RaioDoAltar = 4.5f;
+        /// <summary>Distancia de cada plataforma ao braseiro (m): frente a frente, dentro do circulo.</summary>
+        public const float RaioDasPlataformas = 2.4f;
+        /// <summary>Os obeliscos MORTOS, tombados para fora (pontas do pentagono): "o mundo esqueceu a Sintonia".</summary>
+        static readonly int[] ObeliscosTombados = { 1, 3 };
+
+        /// <summary>
+        /// O ALTAR montado como a ficha pede: braseiro no centro, obeliscos nas 5 pontas do pentagono (dois deitados, caidos
+        /// para fora) e as duas plataformas frente a frente. UM por ilha, no VALE (o centro que o relevo ja' cava): o primeiro
+        /// chao pousavel e plano de uma espiral a partir do centro, longe dos nascimentos e do que ja' foi plantado.
+        /// Uma lista por peca, na ordem de PecasDoAltar (todas vazias se nao coube); reserva o chao em `ocupados`.
+        /// </summary>
+        public static List<Plantio>[] Altar(Relevo relevo, List<Vector4> ocupados)
+        {
+            var saida = new[] { new List<Plantio>(), new List<Plantio>(), new List<Plantio>() };
+            if (relevo == null) return saida;
+            float h0 = PecasDoAltar[1].AlturaM;
+            float raio = RaioDoAltar + h0;   // o obelisco tombado para fora ainda cabe
+            for (int i = 0; i < 600; i++)
+            {
+                float a = i * 0.52f;
+                var c = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (i * 0.6f);   // espiral: ~1 volta a cada 12 passos
+                if (!CabeAltar(relevo, c, raio, ocupados)) continue;
+
+                saida[0].Add(new Plantio { Pos = new Vector3(c.x, BaseNoChao(relevo, c, PecasDoAltar[0].RaioM) - 0.05f, c.y), Escala = 1f });
+                for (int k = 0; k < 5; k++)
+                {
+                    float ang = Mathf.PI * 0.5f + k * Mathf.PI * 0.4f;
+                    var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                    float fora = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
+                    bool tombado = System.Array.IndexOf(ObeliscosTombados, k) >= 0;
+                    // de pe': a gema olha o braseiro. Tombado: o pe' ficou na ponta e o corpo deitou alem dela (gema no chao)
+                    Vector2 p = c + dir * (RaioDoAltar + (tombado ? h0 * 0.5f : 0f));
+                    float h = BaseNoChao(relevo, p, tombado ? h0 * 0.5f : PecasDoAltar[1].RaioM) - 0.1f;
+                    saida[1].Add(new Plantio { Pos = new Vector3(p.x, h, p.y), GiroGraus = tombado ? fora : fora + 180f, Escala = 1f, TomboGraus = tombado ? 90f : 0f });
+                }
+                for (int k = 0; k < 2; k++)
+                {
+                    var dir = k == 0 ? Vector2.right : Vector2.left;
+                    Vector2 p = c + dir * RaioDasPlataformas;
+                    float h = BaseNoChao(relevo, p, PecasDoAltar[2].RaioM) - 0.05f;
+                    saida[2].Add(new Plantio { Pos = new Vector3(p.x, h, p.y), GiroGraus = Mathf.Atan2(-dir.x, -dir.y) * Mathf.Rad2Deg, Escala = 1f });
+                }
+                if (ocupados != null) ocupados.Add(new Vector4(c.x, c.y, 0f, raio));
+                return saida;
+            }
+            return saida;
+        }
+
+        static bool CabeAltar(Relevo relevo, Vector2 c, float raio, List<Vector4> ocupados)
+        {
+            if (PertoDeNascimento(relevo, c, FolgaDoNascimento + raio)) return false;
+            if (ocupados != null && Invade(ocupados, c, raio)) return false;
+            float hMin = 1e9f, hMax = -1e9f;
+            for (int k = 0; k <= 8; k++)
+            {
+                Vector2 p = k == 8 ? c : c + new Vector2(Mathf.Cos(k * Mathf.PI * 0.25f), Mathf.Sin(k * Mathf.PI * 0.25f)) * raio;
+                if (!relevo.PodePousar(p.x, p.y)) return false;
+                float h = relevo.Altura(p.x, p.y);
+                hMin = Mathf.Min(hMin, h);
+                hMax = Mathf.Max(hMax, h);
+            }
+            return hMax - hMin < 1.2f;   // KNOB: altar em encosta vira escada
+        }
 
         /// <summary>Quantas copias a peca PEDE nesta ilha: N x (raio / raio de referencia)^2. Mapa 2x maior, 4x pecas.</summary>
         public static int Alvo(Relevo relevo, PecaDoKit peca)
@@ -112,6 +195,8 @@ namespace Arkana.World
                 // o sorteio de escala e giro sai SEMPRE: a sequencia do rng nao depende de quem foi recusado antes
                 float e = 1f + rng.Faixa(-1f, 1f) * peca.EscalaVar;
                 float giro = rng.Float() * 360f;
+                if (peca.Onde == OndeNasce.Ruinas)   // de frente para o centro: a estatua vigia o circulo, o arco abre para ele
+                    giro = Mathf.Atan2(relevo.Ruinas.x - p.x, relevo.Ruinas.y - p.y) * Mathf.Rad2Deg;
                 if (!relevo.PodePousar(p.x, p.y)) continue;
                 if (PertoDeNascimento(relevo, p, livre)) continue;
                 if (PertoDaLista(lista, p, espaco)) continue;
@@ -140,6 +225,8 @@ namespace Arkana.World
                     return relevo.Floresta + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (u * relevo.FlorestaR);
                 case OndeNasce.Agua:
                     return relevo.Lago + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (u * relevo.LagoR * 1.5f);
+                case OndeNasce.Ruinas:
+                    return relevo.Ruinas + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * (relevo.RuinasR * Mathf.Lerp(0.75f, 1.35f, u));
                 case OndeNasce.Alto:
                 {
                     Vector2 melhor = Vector2.zero;
@@ -238,7 +325,8 @@ namespace Arkana.World
         public int Total { get; private set; }
         public int Contar(string id) => porPeca.TryGetValue(id, out int n) ? n : 0;
 
-        public void Montar(Relevo relevo, int seed = PlantioDoKit.SeedKit)
+        /// <param name="reservados">o que ja' esta' no chao e o kit nao pode invadir (x, z, raio em w): as pegadas de Ruinas.cs.</param>
+        public void Montar(Relevo relevo, IList<Vector4> reservados = null, int seed = PlantioDoKit.SeedKit)
         {
             celulas.Clear();
             porPeca.Clear();
@@ -247,71 +335,90 @@ namespace Arkana.World
             var ocupados = new List<Vector4>();
             // o miolo das ruinas (colunas e muros, Ruinas.cs) fica de fora; a folga dos nascimentos o plantio ja' guarda
             ocupados.Add(new Vector4(relevo.Ruinas.x, relevo.Ruinas.y, 0f, relevo.RuinasR * 0.7f));
+            if (reservados != null) ocupados.AddRange(reservados);
             bool legivel = true;
+            // o ALTAR primeiro: e' um so' e tem lugar marcado (o vale); as pecas soltas desviam dele
+            List<Plantio>[] altar = PlantioDoKit.Altar(relevo, ocupados);
+            for (int i = 0; i < PlantioDoKit.PecasDoAltar.Length; i++) Plantar(PlantioDoKit.PecasDoAltar[i], altar[i], ref legivel);
             foreach (PecaDoKit peca in PlantioDoKit.Pecas)
             {
-                GameObject prefab = Resources.Load<GameObject>(peca.Id);
-                if (prefab == null) continue;
-                List<Plantio> pontos = PlantioDoKit.Posicoes(relevo, seed, peca, ocupados);
-                if (pontos.Count == 0) continue;
-                if (!Medir(prefab, out float alturaMalha, out float peMalha)) continue;
-                float escalaBase = peca.AlturaM / alturaMalha;
-                Material domado = null;
-                int n = 0;
-                for (int i = 0; i < pontos.Count; i++)
-                {
-                    Plantio pl = pontos[i];
-                    float s = escalaBase * pl.Escala;
-                    // o pe' da malha (bounds.min.y) vai pra cota do plantio
-                    Vector3 pos = pl.Pos - Vector3.up * (peMalha * s);
-                    GameObject go = Instantiate(prefab, pos, Quaternion.Euler(0f, pl.GiroGraus, 0f), transform);
-                    go.name = peca.Id;
-                    go.transform.localScale = go.transform.localScale * s;
-                    Renderer[] rs = go.GetComponentsInChildren<Renderer>();
-                    for (int r = 0; r < rs.Length; r++)
-                    {
-                        // ponytail: um material por peca (a Meshy entrega um); peca multi-material pediria um domado por slot
-                        if (domado == null && rs[r].sharedMaterial != null) domado = Domado(rs[r].sharedMaterial);
-                        if (domado != null) rs[r].sharedMaterial = domado;
-                        rs[r].shadowCastingMode = ShadowCastingMode.Off;   // kit nao paga sombra (Godot)
-                        Registrar(rs[r], pos, peca.Marco);
-                    }
-                    MeshFilter[] mfs = go.GetComponentsInChildren<MeshFilter>();
-                    for (int m = 0; m < mfs.Length; m++)
-                    {
-                        Mesh malha = mfs[m].sharedMesh;
-                        if (malha == null) continue;
-                        if (!malha.isReadable) legivel = false;
-                        if (!peca.Colide) continue;
-                        // A FORMA REAL quando a malha e' legivel. A caixa encolhida (e o cilindro do Godot, ainda menor)
-                        // deixava corpo e CAMERA entrarem na sobra da malha: a foto de 11/09 (seed 3103) pousou o jogador
-                        // dentro de uma arvore carbonizada e a tela virou o avesso da peca. Malha estatica no PhysX e'
-                        // barata; o custo que o Godot temia era da fisica dele. Sem malha legivel (build), a caixa INTEIRA:
-                        // parede invisivel na borda da rocha e' melhor que camera dentro dela.
-                        if (malha.isReadable)
-                        {
-                            // A MALHA REAL (12/09). O casco convexo existia porque a malha DECIMADA tinha triangulo com a
-                            // volta trocada e o raio da Queda atravessava o topo (diag de 11/09). O kit agora vem do REMESH
-                            // do site (fechado, volta coerente) e a sonda da Queda acerta o verso de qualquer jeito
-                            // (queriesHitBackfaces). E o casco de 10K triangulos estoura o limite de 255 faces do PhysX
-                            // ("partial hull", aviso que reprova o BootTests). Ganho de brinde: a ponte-raiz tem vao.
-                            var mc = mfs[m].gameObject.AddComponent<MeshCollider>();
-                            mc.sharedMesh = malha;
-                            continue;
-                        }
-                        Bounds b = malha.bounds;   // espaco da malha: a caixa gira e escala com a peca
-                        BoxCollider bc = mfs[m].gameObject.AddComponent<BoxCollider>();
-                        bc.center = b.center;
-                        bc.size = b.size;
-                    }
-                    n++;
-                }
-                porPeca[peca.Id] = n;
-                Total += n;
+                if (Resources.Load<GameObject>(peca.Id) == null) continue;   // sem o .glb a peca nao reserva chao
+                Plantar(peca, PlantioDoKit.Posicoes(relevo, seed, peca, ocupados), ref legivel);
             }
-            // Um lote por material: 8 materiais, as copias viram poucos draw calls. Malha nao legivel nao
+            // Um lote por material: 15 materiais, as copias viram poucos draw calls. Malha nao legivel nao
             // combina (o Unity reclamaria no log): a peca desenha solta, mas desenha.
             if (Total > 0 && legivel) StaticBatchingUtility.Combine(gameObject);
+        }
+
+        void Plantar(PecaDoKit peca, List<Plantio> pontos, ref bool legivel)
+        {
+            if (pontos.Count == 0) return;
+            GameObject prefab = Resources.Load<GameObject>(peca.Id);
+            if (prefab == null) return;
+            if (!Medir(prefab, out float alturaMalha, out float peMalha)) return;
+            float escalaBase = peca.AlturaM / alturaMalha;
+            Material domado = null;
+            int n = 0;
+            for (int i = 0; i < pontos.Count; i++)
+            {
+                Plantio pl = pontos[i];
+                float s = escalaBase * pl.Escala;
+                // o pe' da malha (bounds.min.y) vai pra cota do plantio
+                Vector3 pos = pl.Pos - Vector3.up * (peMalha * s);
+                Quaternion giro = Quaternion.Euler(0f, pl.GiroGraus, 0f) * Quaternion.Euler(pl.TomboGraus, 0f, 0f);
+                GameObject go = Instantiate(prefab, pos, giro, transform);
+                go.name = peca.Id;
+                go.transform.localScale = go.transform.localScale * s;
+                Renderer[] rs = go.GetComponentsInChildren<Renderer>();
+                if (pl.TomboGraus != 0f && rs.Length > 0)
+                {
+                    // deitada, o pe' da malha nao e' mais o chao: assenta pelos limites reais (centro no ponto, base na cota)
+                    Bounds lim = rs[0].bounds;
+                    for (int r = 1; r < rs.Length; r++) lim.Encapsulate(rs[r].bounds);
+                    go.transform.position += new Vector3(pl.Pos.x - lim.center.x, pl.Pos.y - lim.min.y, pl.Pos.z - lim.center.z);
+                    pos = go.transform.position;
+                }
+                for (int r = 0; r < rs.Length; r++)
+                {
+                    // ponytail: um material por peca (a Meshy entrega um); peca multi-material pediria um domado por slot
+                    if (domado == null && rs[r].sharedMaterial != null) domado = Domado(rs[r].sharedMaterial);
+                    if (domado != null) rs[r].sharedMaterial = domado;
+                    rs[r].shadowCastingMode = ShadowCastingMode.Off;   // kit nao paga sombra (Godot)
+                    Registrar(rs[r], pos, peca.Marco);
+                }
+                MeshFilter[] mfs = go.GetComponentsInChildren<MeshFilter>();
+                for (int m = 0; m < mfs.Length; m++)
+                {
+                    Mesh malha = mfs[m].sharedMesh;
+                    if (malha == null) continue;
+                    if (!malha.isReadable) legivel = false;
+                    if (!peca.Colide) continue;
+                    // A FORMA REAL quando a malha e' legivel. A caixa encolhida (e o cilindro do Godot, ainda menor)
+                    // deixava corpo e CAMERA entrarem na sobra da malha: a foto de 11/09 (seed 3103) pousou o jogador
+                    // dentro de uma arvore carbonizada e a tela virou o avesso da peca. Malha estatica no PhysX e'
+                    // barata; o custo que o Godot temia era da fisica dele. Sem malha legivel, a caixa INTEIRA:
+                    // parede invisivel na borda da rocha e' melhor que camera dentro dela.
+                    if (malha.isReadable)
+                    {
+                        // A MALHA REAL (12/09). O casco convexo existia porque a malha DECIMADA tinha triangulo com a
+                        // volta trocada e o raio da Queda atravessava o topo (diag de 11/09). O kit agora vem do REMESH
+                        // do site (fechado, volta coerente) e a sonda da Queda acerta o verso de qualquer jeito
+                        // (queriesHitBackfaces). E o casco de 10K triangulos estoura o limite de 255 faces do PhysX
+                        // ("partial hull", aviso que reprova o BootTests). Ganho de brinde: a ponte-raiz tem vao.
+                        // No APK tambem: o glTFast sobe a malha com UploadMeshData(false), legivel.
+                        var mc = mfs[m].gameObject.AddComponent<MeshCollider>();
+                        mc.sharedMesh = malha;
+                        continue;
+                    }
+                    Bounds b = malha.bounds;   // espaco da malha: a caixa gira e escala com a peca
+                    BoxCollider bc = mfs[m].gameObject.AddComponent<BoxCollider>();
+                    bc.center = b.center;
+                    bc.size = b.size;
+                }
+                n++;
+            }
+            porPeca[peca.Id] = n;
+            Total += n;
         }
 
         /// <summary>Instancia na origem, sem giro, e le' a altura e o pe' pelos Renderer.bounds (o que o glb traz de hierarquia conta junto).</summary>

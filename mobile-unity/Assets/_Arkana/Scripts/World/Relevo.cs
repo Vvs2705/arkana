@@ -123,6 +123,9 @@ namespace Arkana.World
         public static readonly Color CorGramaClara = Hex(0x7ed687);
         public static readonly Color CorAreia = Hex(0xdcc9a0);
         public static readonly Color CorRocha = Hex(0x8e97ad);
+        /// <summary>Pedra SOLTA (rocha da vegetacao, rochedo do mar): da familia do basalto do kit da Meshy. O lilas do CorRocha e'
+        /// cor de CHAO; no pedregulho facetado, ao lado da rocha texturizada, lia como bloco de gelo (foto 03 de 12/09). KNOB: por foto.</summary>
+        public static readonly Color CorPedregulho = Hex(0x6a615a);
         public static readonly Color CorLama = Hex(0xa8763e);
         public static readonly Color CorTronco = Hex(0x8a7259);
         public static readonly Color CorFolhaA = Hex(0x3fa85c);

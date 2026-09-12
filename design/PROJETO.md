@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 12/09/2026, manhã (os 20 magos reais e o kit sem buracos no jogo; falta medir no aparelho)
+> **Atualizado em:** 12/09/2026, manhã (os 20 magos reais, o kit sem buracos com as 7 peças da oficina e o Altar de Sintonia no jogo; falta medir no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,12 +51,14 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — os 20 magos REAIS e o kit sem buracos estão no jogo (foto); falta jogar no aparelho (12/09/2026, manhã)
+### >>> COMECE POR AQUI — os 20 magos REAIS, o kit sem buracos e o Altar estão no jogo (foto); falta jogar no aparelho (12/09/2026, manhã)
 
 **Próximo passo, na ordem:** instalar o APK novo no Poco F4 e medir FPS com o
-elenco real (`--es arkana_auto partida`); se cair, o primeiro corte é o LOD dos
-magos distantes. Depois: castelo/baú/luvas pela receita do kit (leva 4), luz e
-pós (passo D). A seção "LEVA 4", depois do passo A, tem a receita inteira do site.
+elenco real e as 15 peças do kit (`--es arkana_auto partida`); se cair, o
+primeiro corte é o LOD dos magos distantes. Depois: baú/luvas pela receita do
+kit, os pedregulhos procedurais (hoje recoloridos; a troca boa é um remesh de 1K
+da rocha do kit, grátis no site), luz e pós (passo D). A seção "LEVA 4", depois
+do passo A, tem a receita inteira do site.
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
 Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
@@ -75,7 +77,7 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **309 testes, 0 falhas** (282 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 27 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **312 testes, 0 falhas** (284 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 28 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
 | **Fotos** | `powershell -File mobile-unity\foto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
@@ -230,6 +232,26 @@ Sanctuary → 17, Emberstone Outcrop → 18, Verdant Rune Arch → 19, Mossroot
 Arch → 20, Stormspire Nexus → 21, Arcane Celestial Altar → 28, Emberbloom
 Tree → 30, Ancient Keystone Slab → 32.
 
+**As sete da oficina entraram (12/09, manhã).** As peças geradas em 04/09
+passaram pela mesma receita (Remesh 10K no site, 0 crédito → glb →
+`otimizar.py` com textura 1K). O glb do remesh fica em
+`arte/cenario/ilha-fraturada/_originais-3d/NN-*-remesh10k.glb` (fora do git).
+Onde cada uma nasce vem das fichas de `arte/prompts/06`, `07` e `08`:
+
+| Peça (nome na Meshy) | Onde | Altura |
+|---|---|---|
+| 22 arco partido (Runes of the Broken Arch) | anel das Ruínas, de frente para o centro; colide (as pernas batem, o vão passa) | 5 m |
+| 23 coluna-braseiro (Emerald Flame Reliquary) | anel das Ruínas | 2,05 m |
+| 24 estátua-vigia (The Veiled Warden) | anel das Ruínas, vigiando o centro | 4,1 m |
+| 26 torre arcana (Astral Spire) | POIs, 4 no mapa | 22 m |
+| 27 braseiro (Elemental Crucible) · 33 obelisco (Crimson Obelisk) · 34 plataforma (Stonefoot Shrine) | **o Altar de Sintonia, montado como a ficha**: braseiro no centro, 5 obeliscos no pentágono de 9 m (**dois tombados**, gema no chão), as duas plataformas frente a frente. Um só, no vale | 1,35 · 2,85 · 1,2 m |
+
+O kit agora recebe as **pegadas das Ruínas** (colunas e blocos da muralha) e não
+planta em cima delas. **Decisão que volta ao Diretor:** o validador propôs "Altar
+só depois do playtest" porque o Altar encosta na Sintonia. Ele entrou só como
+CENÁRIO, sem sistema nenhum; se for para esperar, é tirar uma linha do
+`KitCenario.Montar`.
+
 #### O que o Unity AINDA NÃO TEM (registro honesto, 12/09)
 
 Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
@@ -278,7 +300,7 @@ Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 |---|---|---|
 | **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
 | **B ✅ (foto)** | **Elenco real**: os 20 magos do SITE da Meshy no jogo, 11 clipes cada (leva 4). **Falta o aparelho** | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
-| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅. Faltam castelo/baú/luvas pela mesma receita e as 7 peças novas da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana, obelisco, plataforma, braseiro) | a rocha de perto lê como rocha; FPS mantido |
+| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Faltam baú/luvas pela mesma receita e os pedregulhos procedurais (hoje só recoloridos) | a rocha de perto lê como rocha; FPS mantido |
 | **D** | **VFX de assinatura e pós**: braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
 | **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
 | **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |

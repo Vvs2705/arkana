@@ -92,6 +92,53 @@ namespace Arkana.Tests
             Assert.Greater(total, 100, "o kit planta de verdade na ilha de 600 m");
         }
 
+        [Test]
+        public void Kit_Altar_ComoAFicha_BraseiroNoCentro_PentagonoComDoisTombados_PlataformasFrenteAFrente()
+        {
+            // defeitos: plantar o altar pelo sorteio solto (o pentagono some); nenhum obelisco tombado (a historia "o mundo
+            // esqueceu a Sintonia" some); plataformas do mesmo lado; altar fora do vale ou dentro d'agua
+            var ocupados = new List<Vector4>();
+            List<Plantio>[] a = PlantioDoKit.Altar(Relevo2, ocupados);
+            Assert.AreEqual(1, a[0].Count, "um braseiro");
+            Assert.AreEqual(5, a[1].Count, "cinco obeliscos");
+            Assert.AreEqual(2, a[2].Count, "duas plataformas");
+            Vector3 c = a[0][0].Pos;
+            int tombados = 0;
+            foreach (Plantio o in a[1])
+            {
+                if (o.TomboGraus != 0f) { tombados++; Assert.Greater(DistH(o.Pos, c), PlantioDoKit.RaioDoAltar + 0.5f, "tombado cai para FORA"); }
+                else Assert.AreEqual(PlantioDoKit.RaioDoAltar, DistH(o.Pos, c), 0.01f, "de pe' na ponta do pentagono");
+            }
+            Assert.AreEqual(2, tombados, "dois obeliscos mortos");
+            Vector3 u = a[2][0].Pos - c, v = a[2][1].Pos - c;
+            Assert.AreEqual(DistH(a[2][0].Pos, c), DistH(a[2][1].Pos, c), 0.01f);
+            Assert.Less(u.x * v.x + u.z * v.z, 0f, "frente a frente, o braseiro no meio");
+            foreach (List<Plantio> l in a)
+                foreach (Plantio p in l) Assert.IsTrue(Relevo2.PodePousar(p.Pos.x, p.Pos.z), "altar fora do chao pousavel em " + p.Pos);
+            Assert.Less(new Vector2(c.x, c.z).magnitude, Relevo2.RaioTerra * 0.25f, "no VALE, perto do centro: " + c);
+            Assert.AreEqual(1, ocupados.Count, "o altar reserva o chao dele para o plantio solto");
+        }
+
+        [Test]
+        public void Kit_PecasDasRuinas_NoAnelDoPlato_DeFrenteParaOCentro()
+        {
+            // defeitos: sortear as pecas das ruinas no mapa inteiro (a estatua-vigia no meio da duna); giro sorteado
+            // (a estatua de costas para o circulo que ela vigia)
+            int n = 0;
+            foreach (PecaDoKit peca in PlantioDoKit.Pecas)
+            {
+                if (peca.Onde != OndeNasce.Ruinas) continue;
+                foreach (Plantio pl in PlantioDoKit.Posicoes(Relevo2, PlantioDoKit.SeedKit, peca))
+                {
+                    n++;
+                    Vector2 d = Relevo2.Ruinas - new Vector2(pl.Pos.x, pl.Pos.z);
+                    Assert.That(d.magnitude, Is.InRange(Relevo2.RuinasR * 0.74f, Relevo2.RuinasR * 1.36f), peca.Id);
+                    Assert.AreEqual(0f, Mathf.DeltaAngle(Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg, pl.GiroGraus), 0.01f, peca.Id + " de costas para o centro");
+                }
+            }
+            Assert.Greater(n, 8, "arcos, colunas-braseiro e estatuas nas ruinas");
+        }
+
         // ---------------------------------------------------------------- grama
 
         [Test]
