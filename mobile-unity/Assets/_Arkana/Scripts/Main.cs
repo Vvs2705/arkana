@@ -121,6 +121,9 @@ namespace Arkana
         public const string NomeArena = "Arena";
         public const int Bonecos = 2;
 
+        /// <summary>0 = sorteia a cada partida (o jogo). > 0 = partida repetivel (foto.ps1 e testes). Nunca ligado no APK.</summary>
+        public static int SeedForcado = 0;
+
         public FluxoDeJogo Fluxo { get; private set; }
         public Partida Partida { get; private set; }
         public Player Player { get; private set; }
@@ -210,7 +213,9 @@ namespace Arkana
             }
 
             _arena = new GameObject(NomeArena).transform;
-            int seed = new System.Random().Next(1, int.MaxValue);   // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede
+            // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede. SeedForcado > 0 so' para foto/teste:
+            // sem ele cada foto pousa num lugar diferente e duas rodadas nao se comparam.
+            int seed = SeedForcado > 0 ? SeedForcado : new System.Random().Next(1, int.MaxValue);
             bool treino = ArkMenu.PedidoDeTreino;                    // lido ANTES: Partida.Iniciar consome e zera
             Vector3[] nasc = Nascimentos(relevo, seed);
 
@@ -224,6 +229,7 @@ namespace Arkana
             Partida = new Partida(relevo);
             Partida.Iniciar(seed, Balance.Match.Bots, treino, nasc[0]);
             Partida.Registrar(Player.Pawn, Player.Pawn.Slot);
+            VisualDaPartida.Criar(_arena, Partida);   // loot, bau e tempestade na tela (a HUD so' anunciava)
 
             if (Partida.Treino)
             {
@@ -257,6 +263,8 @@ namespace Arkana
             // O TERRENO REATIVO (GDD §14). Ate' 11/09 ele so' existia nos testes: nenhuma cena o criava, e fogo/gelo/muro
             // nunca aconteciam na partida. Nasce sob a arena (morre com ela); a Partida ticka pelo TerrenoReativoBehaviour.Atual.
             _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
+            VisualDoTerreno.Criar(_arena);            // fogo, carvao, gelo, eletrico, lama, muro
+            VisualDosKits.Criar(_arena, Partida);     // muralha, fio, poca, eco, tear + o aviso da suprema no chao
         }
 
         void Desmontar()

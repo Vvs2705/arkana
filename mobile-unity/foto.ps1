@@ -15,6 +15,7 @@ $Logs = Join-Path $Proj "Logs"
 $Fotos = Join-Path $Logs "fotos"
 New-Item -ItemType Directory -Force $Fotos | Out-Null
 Get-ChildItem $Fotos -Filter *.png -ErrorAction SilentlyContinue | Remove-Item
+Remove-Item (Join-Path $Fotos "diag.txt") -ErrorAction SilentlyContinue
 $Log = Join-Path $Logs "foto.log"
 $Xml = Join-Path $Logs "foto-resultados.xml"
 if (Test-Path $Xml) { Remove-Item $Xml }

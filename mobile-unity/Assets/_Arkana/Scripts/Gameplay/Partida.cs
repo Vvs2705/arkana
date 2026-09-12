@@ -168,8 +168,18 @@ namespace Arkana.Gameplay
                 if (v == null) continue;
                 if (!v.Viva) v.Reset(); else v.Curar(BONECO_REGEN * dt);   // apanhar sem culpa e' o servico deles
             }
+            // MURO E' COBERTURA (GDD §14): o tiro que entra no muro PARA ali — o corpo atras nem e' consultado. O muro
+            // apanha pelo caminho que ja' existe: Impacto -> TerrainHit na posicao do tiro -> TerrenoReativo.Reagir (hp x Estrutura).
+            // ponytail: testa o ponto de cada passo; passo > CellSize (Raio abaixo de ~12 fps) atravessa — sub-passo se medir isso.
+            Func<Vector3, IEntidade> acerto = Acerto;
+            if (terreno != null) acerto = pos => NoMuro(terreno, pos) ? null : Acerto(pos);
             for (int i = Projeteis.Count - 1; i >= 0; i--)
-                if (!Projeteis[i].Tick(dt, Acerto, Arena)) Projeteis.RemoveAt(i);
+            {
+                Projetil p = Projeteis[i];
+                bool voa = p.Tick(dt, acerto, Arena);
+                if (voa && terreno != null && NoMuro(terreno, p.Pos)) { p.Impacto(null); voa = false; }
+                if (!voa) Projeteis.RemoveAt(i);
+            }
             if (Acabou) return;   // um projetil pode ter fechado a partida
             if (!Treino)
             {
@@ -195,6 +205,10 @@ namespace Arkana.Gameplay
             }
             return null;
         }
+
+        /// <summary>Celula de muro E abaixo do topo dele: cobertura tem ALTURA (tiro por cima do muro segue voando).</summary>
+        private static bool NoMuro(TerrenoReativo t, Vector3 pos) =>
+            t.BloqueiaTiro(pos) && pos.y <= t.Centro(t.CelulaEm(pos)).y + Balance.Terrain.WallHeight;
 
         private void AoMudarQueda(string fase)
         {

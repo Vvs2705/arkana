@@ -35,6 +35,8 @@ namespace Arkana.EditorTools
                 QualitySettings.SetQualityLevel(current, false);
             }
 
+            // LINEAR, como o Godot 4 (os numeros de cor e luz foram calibrados la'). Em Gamma o toon saia saturado e plastico.
+            PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.companyName = "V-STACK";
             PlayerSettings.productName = "Arkana";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "br.com.vstack.arkana");

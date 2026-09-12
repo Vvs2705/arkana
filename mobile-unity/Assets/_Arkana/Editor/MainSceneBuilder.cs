@@ -29,8 +29,14 @@ namespace Arkana.EditorTools
             var luz = new GameObject("Directional Light").AddComponent<Light>();
             luz.type = LightType.Directional;
             luz.shadows = LightShadows.Soft;
-            luz.transform.rotation = Quaternion.Euler(52f, -28f, 0f);   // entardecer (Sol.Awake respeita rotacao ja' posta)
+            luz.transform.rotation = Quaternion.Euler(30f, -28f, 0f);   // 30 graus como o Godot (Sol.Awake respeita rotacao ja' posta)
             luz.gameObject.AddComponent<Sol>();
+
+            // NEVOA LIGADA NA CENA SALVA. Com Fog Modes em Automatic o build so' leva a variante de nevoa que alguma cena
+            // usa; a Ilha liga a nevoa em runtime, tarde demais — sem isto o APK sairia sem nevoa nenhuma, inclusive na
+            // emenda mar-ceu (achado da raia MUNDO-VISUAL, 11/09). A cor e as distancias de verdade vem da Ilha.
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";

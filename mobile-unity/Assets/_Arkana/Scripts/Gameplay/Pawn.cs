@@ -140,7 +140,8 @@ namespace Arkana.Gameplay
             Loc = new Locomocao();
             IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
             Agua = new Agua(relevo);
-            Queda = new Queda(relevo, transform.position, ehPlayer);
+            // a Queda enxerga o topo das pedras/arvores/ruinas, nao so' o terreno (senao pousa DENTRO delas — foto de 11/09)
+            Queda = new Queda(relevo != null ? new ChaoComObstaculos(relevo) : null, transform.position, ehPlayer);
             // o kit nasce com o corpo: KitBound sai daqui (so' player) — a HUD precisa existir ANTES do Pawn
             Runner = new KitRunner(Slug, this) { Slot = Slot, AoLancar = RegistrarProjetil, ProjeteisVivos = ProjeteisDaArena };
             Visual = Mago.Criar(transform, Slug);   // fiacao defensiva mora no Mago (modelo ausente -> procedural)

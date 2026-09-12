@@ -203,15 +203,38 @@ namespace Arkana.World
 
         // ------------------------------------------------------------------ visual
 
+        /// <summary>
+        /// Ponta a ponta do castelo que o Godot desenhava (m): o castelo.glb decimado a 30k tris, sem escala
+        /// nenhuma la' — 35,8 m de envergadura, 52 m de altura. E' o numero que manda aqui, venha o modelo
+        /// do tamanho que vier (um .glb normalizado pela Meshy chega com ~1,9 unidade).
+        /// </summary>
+        public const float Envergadura = 35.8f;
+
+        /// <summary>Fator que leva o modelo a' envergadura do Godot. Tamanho invalido (zero, NaN) = 1: nunca some nem explode.</summary>
+        public static float EscalaDoModelo(Vector3 tamanho)
+        {
+            float maior = Mathf.Max(tamanho.x, tamanho.z);
+            return maior > 0.01f ? Envergadura / maior : 1f;
+        }
+
         /// <summary>Modelo de arte em Resources/castelo (prefab); ausente, primitivas — fiacao defensiva.</summary>
         void MontarVisual()
         {
             var prefab = Resources.Load<GameObject>("castelo");
             if (prefab != null)
             {
-                var m = Instantiate(prefab, transform);
+                // mede NA ORIGEM e sem giro (o castelo ja' esta' rodado pra rota): bounds do mundo = do modelo
+                GameObject m = Instantiate(prefab, Vector3.zero, Quaternion.identity);
                 m.name = "ModeloCastelo";
-                m.transform.localPosition = new Vector3(0f, -26f, 0f);   // pe' em y=0 no export; o miolo fica no eixo da rota
+                Renderer[] rs = m.GetComponentsInChildren<Renderer>();
+                Bounds b = rs.Length > 0 ? rs[0].bounds : new Bounds(m.transform.position, Vector3.zero);
+                for (int i = 1; i < rs.Length; i++) b.Encapsulate(rs[i].bounds);
+                float k = EscalaDoModelo(b.size);
+                Vector3 raiz = m.transform.position;
+                m.transform.localScale = m.transform.localScale * k;
+                m.transform.SetParent(transform, false);
+                // o MIOLO do castelo no eixo da rota (no Godot: pe' em y=0 no export, descido meio corpo)
+                m.transform.localPosition = -(b.center - raiz) * k;
                 return;
             }
             MontarFallback();

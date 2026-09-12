@@ -68,6 +68,29 @@ namespace Arkana.Tests
 
         // ------------------------------------------------ 1b. na queda nao ha' limite
 
+        /// <summary>
+        /// Visto na FOTO de 11/09: quem pousa no mar, fora do raio da ilha, recebia "VOLTE PARA A ZONA" nos 70 s de
+        /// abertura — de uma tempestade que ainda nao existe (o Godot tinha o mesmo defeito). A HUD nao avisa de
+        /// zona que nao ha'; quando ela se FORMA, o aviso vem, na borda.
+        /// </summary>
+        [Test]
+        public void Abertura_ForaDoMapaNaoEAvisadoDeTempestadeQueNaoExiste()
+        {
+            var z = new Zona(null, 4242);
+            var player = new FakeEntidade("p", new Vector3(200f, 0f, 0f), true);   // no mar, alem do raio do mapa
+            var alvos = new List<IEntidade> { player };
+            z.LigarNoPouso();
+
+            for (int i = 0; i < 60; i++) z.Tick(1f, alvos);   // 60 dos 70 s de abertura
+            Assert.IsFalse(z.Ativa, "ainda na abertura");
+            CollectionAssert.DoesNotContain(_zestado, false, "sem tempestade, ninguem esta' FORA dela");
+
+            for (int i = 0; i < 12; i++) z.Tick(1f, alvos);   // a abertura acaba: a parede se forma
+            Assert.IsTrue(z.Ativa, "a tempestade existe");
+            Assert.Contains(false, _zestado, "agora sim: fora da zona, o aviso vem");
+            Assert.AreEqual(1, _zestado.FindAll(d => !d).Count, "na BORDA, uma vez");
+        }
+
         [Test]
         public void Inerte_AteOPousoNaoHaCronometroNemDanoNemParede()
         {

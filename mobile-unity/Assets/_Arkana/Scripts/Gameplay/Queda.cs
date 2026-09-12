@@ -7,7 +7,7 @@ namespace Arkana.Gameplay
     /// A QUEDA — a abertura de todo battle royale: castelo, salto, queda livre, planeio, pouso.
     /// Ordem do Diretor: durante a queda NAO existe magia, so' o corpo (`PodeConjurar => !NoAr`).
     /// Sem fisica de colisao: a posicao e' escrita direto e a verdade do chao e' `relevo.Altura` — a ilha e'
-    /// procedural; quem supoe y = 0 pousa dentro do morro. ponytail: pouso sempre no terreno (sem telhado).
+    /// procedural; quem supoe y = 0 pousa dentro do morro. O Pawn entrega um ChaoComObstaculos: pousa no TOPO da pedra.
     ///
     /// OS NUMEROS (documentados, KNOBs): do castelo a ~120 m do chao, mergulho a ate' 55 m/s (rampa de 40 m/s²)
     /// ate' 90 m acima do solo, depois planeio a 10 m/s de descida e 19 m/s de deriva. Resultado: ~9,4 s de ar

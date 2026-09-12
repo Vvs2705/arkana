@@ -250,11 +250,14 @@ namespace Arkana.Gameplay
             if (alvos == null) return;
             float dps = DpsAtual;
             bool playerFora = false;
+            // Na abertura a tempestade NAO EXISTE: ninguem esta' "fora" dela. Sem isto, quem pousava no mar alem do
+            // raio da ilha via "VOLTE PARA A ZONA" por 70 s (visto na foto de 11/09; o Godot fazia igual).
+            bool existe = Ativa;
             for (int i = 0; i < alvos.Count; i++)
             {
                 IEntidade p = alvos[i];
                 if (p == null || p.Vital == null || !p.Vital.Viva) continue;
-                if (Dentro(p.Pos)) continue;
+                if (!existe || Dentro(p.Pos)) continue;
                 if (p.EhPlayer) playerFora = true;
                 float dano = dps * TICK_S;
                 if (dano <= 0f) continue;

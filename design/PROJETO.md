@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 11/09/2026 (o Unity alcançou o Godot em código: 232 testes verdes; falta ver no aparelho)
+> **Atualizado em:** 11/09/2026, noite (o Unity alcançou o Godot em código e em tela: 268 testes e 10 fotos; falta o aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,7 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o Unity alcançou o Godot EM CÓDIGO; o que falta é o APARELHO (11/09/2026)
+### >>> COMECE POR AQUI — o Unity alcançou o Godot em código E em tela; o que falta é o APARELHO (11/09/2026)
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
 Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
@@ -70,9 +70,11 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **232 testes, 0 falhas** (229 EditMode sobre classes puras + 3 PlayMode que montam a arena inteira e rodam 3 s sem um log sequer) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **268 testes, 0 falhas** (262 EditMode sobre classes puras + 6 PlayMode que montam a arena inteira e rodam 3 s sem um log sequer) |
+| **Fotos** | `powershell -File mobile-unityoto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **ainda NÃO gerado** — ordem do Diretor: "mais para frente". `build_apk.ps1` está pronto |
+| **Visual** | seis shaders próprios (toon do chão com textura de detalhe, grama instanciada, água com ondas e espuma, céu de entardecer, bruma, toon do mago), grama/flores/juncos por célula, as 8 peças do kit plantadas, ruínas, mar até o horizonte, castelo e luvas `.glb` do Godot via glTFast, 20 retratos, loot/baú/tempestade/kits/terreno desenhados, sol do Godot, espaço de cor Linear |
 
 **Como foi feito.** Sete raias em paralelo (Core, Mundo, Gameplay, UI; depois
 Personagem, Pawn, Kits+Terreno; depois Cena e a costura), cada uma dona de uma
@@ -90,27 +92,60 @@ se cobra; o Unity herdou os invariantes, não o código. Cada teste novo se prov
 reintroduzindo o defeito (o próprio reporte das raias registra: "sem a guarda
 de estado, o teste fica vermelho").
 
-#### O que o Unity AINDA NÃO TEM em relação ao Godot (registro honesto)
+#### LEVA 3 (11/09): o que se VÊ — e a regra nova de olhar a foto
 
-Tudo acima **passa no teste e nunca foi visto na tela**. E faltam, em ordem
-de quem o jogador nota primeiro:
+**A regra que esta leva deixou:** teste verde não diz se o mago saiu rosa, se a
+ilha ficou preta ou se a HUD saiu da tela. `powershell -File mobile-unity\foto.ps1`
+sobe o jogo com GPU e grava PNGs em `mobile-unity/Logs/fotos/` (menu, treino,
+mago de perto, ilha do alto, chão rasante, castelo, queda, pouso, zona do alto,
+jogador na zona), na proporção e na densidade de tela do Poco F4. **Toda leva
+visual termina olhando as fotos.** Foi assim que o Godot fazia (`_shot.gd`), e
+foi assim que esta leva achou onze defeitos que nenhum dos 257 testes pegava
+(cada um virou teste, provado em vermelho, e o `diag.txt` nasceu porque dois
+palpites sobre um quadro estranho erraram antes de o dado chegar):
+
+| Defeito visto na foto | Causa | Conserto |
+|---|---|---|
+| Fogo, gelo e muro nunca aconteciam na partida | o terreno reativo só existia nos testes: nenhuma cena o criava | `Main.Montar` cria o `TerrenoReativoBehaviour` |
+| Loot, baú e tempestade invisíveis | só existiam como dado; ninguém desenhava | `VisualDaPartida` (luvas `.glb`, coluna de luz por raridade, baú caindo com rastro, parede da tempestade, anel do próximo círculo) |
+| Kits e terreno invisíveis | idem | `VisualDosKits` e `VisualDoTerreno` (e o muro virou cobertura: segura tiro de verdade) |
+| Duas faixas escuras de borda dura cortando o mundo | a "grade de leitura" da HUD era retângulo chapado (o Godot fazia igual) | degradê suave |
+| "VOLTE PARA A ZONA" logo após o pouso | a Zona contava "fora" durante os 70 s de abertura, quando a tempestade não existe (o Godot fazia igual) | só conta com a tempestade ativa; teste provado em vermelho |
+| Mar acabava num vazio cinza | plano finito | mar de 6 km que segue a câmera; céu sem chão cinza |
+| Ilha lavada de névoa vista do alto | névoa linear fixa — a lição G5 do Godot tinha se perdido | névoa acompanha a altura de cada câmera que desenha |
+| Câmera colada na torre do castelo; na queda olhando o horizonte | braço de 26 m num castelo de 35,8 m; 7° de inclinação | 70 m e 43° no castelo; 9 m e 32° na queda (KNOB, calibrar no aparelho) |
+| Peças do kit estilhaçadas, chão aparecendo por dentro | a malha decimada da Meshy tem triângulo com a volta trocada e o glTFast só desenha um lado | material URP Lit com os dois lados |
+| Mago pousava DENTRO de uma rocha | a Queda só conhecia o terreno ("pouso sempre no terreno, sem telhado") | `ChaoComObstaculos`: a Queda vê o topo do que estiver no caminho; peças do kit com casco convexo (a malha crua deixava o raio atravessar o topo) |
+| Câmera dentro da rocha com o mago encostado nela | o ombro da câmera (0,78 m ao lado) entrava na parede e o cast que começa dentro não a reporta como parede | colisão em três camadas + **câmera em canto sobe e olha de cima** (a saída clássica de toda 3ª pessoa) |
+
+**O que entrou além disso:** seis shaders próprios em `Resources/` (toon do
+terreno com textura de detalhe, grama instanciada, água com ondas e espuma de
+margem, céu de entardecer com nuvens, bruma, toon do mago); grama, flores,
+juncos e seixos por célula; as 8 peças do kit de cenário plantadas pelo mapa;
+ruínas e rochedos no mar; o castelo e as luvas `.glb` do Godot (glTFast 6.20);
+os 20 retratos do menu; o sol quente do Godot; projeto em espaço de cor Linear
+(o Godot é Linear; em Gamma o toon saía saturado).
+
+#### O que o Unity AINDA NÃO TEM (registro honesto, 11/09 à noite)
+
+Tudo acima **passa no teste e foi visto em foto** — nunca no aparelho. Faltam:
 
 1. **Nada foi visto no aparelho.** FPS continua sem medição desde 25/08.
-2. **Loot no chão sem visual** — a HUD mostra "PEGAR", mas não há o que ver.
-3. **VFX dos kits e do terreno não são desenhados**: `KitRunner.Visuais`
-   (muralha, fio, poça, eco, tear) e `TerrenoReativo.Visiveis` (fogo, gelo,
-   muro, lama) existem como dados; ninguém os renderiza ainda.
-4. **Chão em URP Lit com cor de vértice**, sem o toon shader nem as texturas
-   de detalhe (`arte/cenario/texturas/`). Sem grama, flores, ruínas, bruma.
-5. **Retratos do menu** (`mobile-godot/godot/menu/art/NN.png`) ainda não
-   importados em `Resources/Retratos/` — o menu mostra quadrados na cor do mago.
-6. **Modelo externo** só entra como `Animation` legado; FBX Humanoid com
+2. **As peças do kit têm BURACOS de perto**: a malha decimada a 6.000 faces
+   deixa frestas onde o chão aparece por dentro (foto `08-pouso`). É asset,
+   não código: re-derivar do original de 3 M de faces no Blender com "fechar
+   buracos", ou usar o original com LOD. Os originais estão em
+   `arte/cenario/*/origem/`.
+3. **A ponte-raiz virou bloco**: o casco convexo fecha o vão embaixo dela.
+   Trocar por casco composto (ou malha crua com a volta corrigida no Blender).
+4. **Modelo externo** só entra como `Animation` legado; FBX Humanoid com
    `Animator` precisa de um adaptador (passo E).
-7. Muro do terreno **não bloqueia tiro** no `Partida.Acerto`; "intangível" não
-   muda a colisão; bots não usam kit (como no Godot).
-8. O gesto de disparo é o do GDD §19.3 (pressionar-arrastar-soltar, cancelar
+5. "Intangível" não muda a colisão; bots não usam kit (como no Godot).
+6. O gesto de disparo é o do GDD §19.3 (pressionar-arrastar-soltar, cancelar
    voltando ao centro). O Godot R17 tinha "tocar dispara + segurar auto-fogo".
    **Qual dos dois fica é do Diretor.**
+7. **Sombra da grama** e o **toon** ainda são de primeira versão: ajustar cor
+   ambiente, faixas e alcance da sombra olhando as fotos no aparelho.
 
 #### O que está NA MÁQUINA (11/09)
 
@@ -139,11 +174,10 @@ de quem o jogador nota primeiro:
 | Passo | O quê | Portão |
 |---|---|---|
 | **A** | `build_apk.ps1` → instalar no Poco F4 → **jogar uma partida** e **medir FPS** | o número que falta desde 25/08 |
-| **B** | O que o aparelho mostrar de errado (é a primeira vez que alguém VÊ este código) | partida completa contra bots, no aparelho |
-| **C** | Visual do loot; VFX de kits e terreno a partir dos dados que já existem; retratos em `Resources` | o jogo mostra na tela o que a HUD anuncia |
-| **D** | Toon shader + texturas de detalhe; grama/ruínas/bruma da ilha (dados do `Island.gd`) | a ilha do Godot, no Unity, com FPS medido |
-| **E** | Elenco: os 20 magos refeitos no SITE da Meshy, em FBX Humanoid + adaptador de `Animator` no `Mago` | jogo bonito de ver em vídeo |
-| **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
+| **B** | O que o aparelho mostrar de errado (é a primeira vez que alguém JOGA este código) | partida completa contra bots, no aparelho, com FPS |
+| **C** | Peças do kit sem buracos (re-derivar do original no Blender); ponte-raiz com vão; ajuste de toon/ambiente/sombra pelas fotos | a ilha do Godot, no Unity, com FPS medido |
+| **D** | Elenco: os 20 magos refeitos no SITE da Meshy, em FBX Humanoid + adaptador de `Animator` no `Mago` | jogo bonito de ver em vídeo |
+| **E** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
 
 **Antes da rede, o jogo solo contra bots vale por si** — a decisão de gênero
 que sobreviveu ao desvio (ver lições). Modelo de receita fica com o Diretor.

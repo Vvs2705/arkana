@@ -42,8 +42,12 @@ namespace Arkana.World
             var luz = GetComponent<Light>();
             luz.type = LightType.Directional;
             luz.shadows = LightShadows.Soft;
+            // O sol do Godot (Island.tscn, no "Sun"): quente, forte, sombra quase cheia. Sem ele o toon fica frio e chapado.
+            luz.color = new Color(1f, 0.86f, 0.63f);
+            luz.intensity = 1.55f;
+            luz.shadowStrength = 0.92f;
             if (transform.rotation == Quaternion.identity)
-                transform.rotation = Quaternion.Euler(52f, -28f, 0f);   // entardecer: sombra longa, relevo legivel
+                transform.rotation = Quaternion.Euler(30f, -28f, 0f);   // 30 graus como no Godot: sombra longa, relevo legivel
         }
 
         void OnEnable()

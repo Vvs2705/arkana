@@ -263,10 +263,13 @@ namespace Arkana.UI
             Logica = new HudLogica((float)Balance.Feedback.NumMergeS, (float)Balance.Feedback.NumLifeS);
             Aviso = new AvisoLogica((float)Balance.Feedback.VignetteMinS, (float)Balance.Feedback.ArcDurS, (int)Balance.Feedback.ArcMax, Estados.Keys);
 
-            // grade de tela: escurece topo e rodape (leitura), o meio fica livre
-            var gTopo = Formas.Imagem(_raiz, "GradeTopo", null, new Color(0.02f, 0.025f, 0.04f, 0.22f));
+            // grade de tela: escurece topo e rodape (leitura), o meio fica livre. EM DEGRADE: o retangulo chapado do
+            // Godot deixava duas faixas de borda dura cortando o mundo (foto de 11/09). Pico maior, media parecida.
+            var gTopo = Formas.Imagem(_raiz, "GradeTopo", Formas.Degrade(true), new Color(0.02f, 0.025f, 0.04f, 0.34f));
+            gTopo.raycastTarget = false;
             gTopo.rectTransform.anchorMin = new Vector2(0, 0.81f); gTopo.rectTransform.anchorMax = Vector2.one; gTopo.rectTransform.offsetMin = Vector2.zero; gTopo.rectTransform.offsetMax = Vector2.zero;
-            var gBaixo = Formas.Imagem(_raiz, "GradeBaixo", null, new Color(0.02f, 0.025f, 0.04f, 0.16f));
+            var gBaixo = Formas.Imagem(_raiz, "GradeBaixo", Formas.Degrade(false), new Color(0.02f, 0.025f, 0.04f, 0.26f));
+            gBaixo.raycastTarget = false;
             gBaixo.rectTransform.anchorMin = Vector2.zero; gBaixo.rectTransform.anchorMax = new Vector2(1, 0.28f); gBaixo.rectTransform.offsetMin = Vector2.zero; gBaixo.rectTransform.offsetMax = Vector2.zero;
 
             // olhar livre: metade direita, ATRAS dos botoes (irmao anterior = raycast por baixo)
@@ -394,10 +397,21 @@ namespace Arkana.UI
             _fim.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// O que a HUD cobre. No aparelho (Overlay) e' a tela. Na FOTO (foto.ps1: ScreenSpaceCamera num RenderTexture)
+        /// e' o alvo da camera — sem isto a HUD saia montada para a janela do editor (640x480) e amontoada num canto.
+        /// </summary>
+        Vector2 TamanhoDaTela()
+        {
+            if (_canvas != null && _canvas.renderMode == RenderMode.ScreenSpaceCamera && _canvas.worldCamera != null)
+                return _canvas.worldCamera.pixelRect.size;
+            return new Vector2(Screen.width, Screen.height);
+        }
+
         /// <summary>TODA margem de borda mora aqui (area segura). Refeito quando a tela muda (rotacao, dobravel).</summary>
         public void Layout()
         {
-            Vector2 tela = new Vector2(Screen.width, Screen.height);
+            Vector2 tela = TamanhoDaTela();
             _telaAtual = tela;
             Margens m = AreaSegura.Atual();
             HudLayout l = HudLayout.Calcular(tela, m, Dp.Px(1f));

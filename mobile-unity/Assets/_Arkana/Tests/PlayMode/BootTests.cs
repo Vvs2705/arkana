@@ -65,6 +65,12 @@ namespace Arkana.Tests
             Assert.AreEqual(Balance.Match.Bots, main.Partida.BotsVivos);
             Assert.IsNotNull(main.Hud);
             Assert.IsNotNull(Camera.main, "a camera do jogador e' a MainCamera");
+            // A LICAO DE 11/09: o terreno reativo tinha 25 testes verdes e NENHUMA cena o criava. Sistema testado nao
+            // prova sistema ligado — o boot cobra que a partida monta cada peca que o jogador precisa ver.
+            Assert.IsNotNull(Arkana.Terrain.TerrenoReativoBehaviour.Atual, "o terreno reativo existe na partida");
+            Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDaPartida>(), "loot, bau e tempestade tem quem desenhe");
+            Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDosKits>(), "os kits tem quem desenhe");
+            Assert.IsNotNull(Object.FindFirstObjectByType<Arkana.Terrain.VisualDoTerreno>(), "o terreno tem quem desenhe");
             LogAssert.NoUnexpectedReceived();
         }
 

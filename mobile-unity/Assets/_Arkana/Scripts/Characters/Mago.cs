@@ -6,7 +6,8 @@ using Arkana.Core;
 namespace Arkana.Characters
 {
     /// <summary>
-    /// Materiais do personagem por codigo (zero asset). URP Lit; sem URP cai no Standard.
+    /// Materiais do personagem por codigo (zero asset). Arkana/Mago (toon de personagem: faixas + rim +
+    /// emissao, em Resources/); sem ele, URP Lit; sem URP, Standard — calado, cadeia de reserva.
     /// METAL DOMADO (Godot 26/08): sem reflection probe o metal vira silhueta preta no mobile —
     /// metallic &lt;= 0.2 e smoothness &lt;= 0.55 em TUDO que veste um mago, inclusive o .glb importado.
     /// </summary>
@@ -17,6 +18,12 @@ namespace Arkana.Characters
 
         static Shader Achar()
         {
+            if (_shader == null)
+            {
+                Shader toon = Resources.Load<Shader>("ArkanaMago");
+                if (toon == null) toon = UnityEngine.Shader.Find("Arkana/Mago");
+                if (toon != null && toon.isSupported) _shader = toon;
+            }
             if (_shader == null) _shader = UnityEngine.Shader.Find("Universal Render Pipeline/Lit");
             if (_shader == null) _shader = UnityEngine.Shader.Find("Standard");
             return _shader;

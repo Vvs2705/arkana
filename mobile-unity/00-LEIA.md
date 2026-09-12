@@ -8,8 +8,13 @@ Framework). Reescrito a partir de `design/` e do que o `mobile-godot/` provou �
 
 ```
 powershell -File mobile-unity\portao.ps1      # O PORTAO: compila + testes EditMode + PlayMode
+powershell -File mobile-unity\foto.ps1        # FOTOS do jogo rodando (com GPU) em Logs/fotos/ + diag.txt
 powershell -File mobile-unity\build_apk.ps1   # APK de teste (datado, em mobile-unity/Builds/testes/)
 ```
+
+**Toda leva visual termina olhando as fotos.** Teste verde não diz se o mago
+saiu rosa ou se a câmera entrou na pedra; a foto diz — e o `diag.txt` diz o que
+a câmera e o corpo estão tocando, para não virar palpite.
 
 Sucesso do portão é a linha `ARKANA: N testes, 0 falhas`. Os dois scripts abrem
 o Unity Hub sozinhos se ele estiver fechado (a licença Personal só resolve com

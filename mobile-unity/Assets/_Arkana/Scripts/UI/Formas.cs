@@ -62,6 +62,35 @@ namespace Arkana.UI
             return false;
         }
 
+        /// <summary>
+        /// Degrade vertical de ALFA (branco; a cor vem da Image). `escuroEmCima`: alfa cheio na borda de cima.
+        /// Existe para a grade de leitura da HUD: retangulo chapado deixava FAIXA de borda dura atravessando o
+        /// mundo (vista na foto de 11/09). Smoothstep para nao sobrar degrau.
+        /// </summary>
+        public static Sprite Degrade(bool escuroEmCima)
+        {
+            string chave = escuroEmCima ? "degrade-cima" : "degrade-baixo";
+            Sprite s;
+            if (_cache.TryGetValue(chave, out s) && s != null) return s;
+            const int H = 64;
+            var tex = new Texture2D(4, H, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var px = new Color32[4 * H];
+            for (int y = 0; y < H; y++)
+            {
+                float t = y / (float)(H - 1);                 // 0 embaixo, 1 em cima
+                float a = escuroEmCima ? t : 1f - t;
+                a = a * a * (3f - 2f * a);
+                byte b = (byte)Mathf.RoundToInt(a * 255f);
+                for (int x = 0; x < 4; x++) px[y * 4 + x] = new Color32(255, 255, 255, b);
+            }
+            tex.SetPixels32(px);
+            tex.Apply();
+            s = Sprite.Create(tex, new Rect(0, 0, 4, H), new Vector2(0.5f, 0.5f), 100f);
+            _cache[chave] = s;
+            return s;
+        }
+
         static Sprite Get(string chave, Func<float, float, bool> f)
         {
             Sprite s;

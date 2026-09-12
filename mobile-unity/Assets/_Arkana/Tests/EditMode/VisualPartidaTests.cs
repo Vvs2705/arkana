@@ -78,17 +78,22 @@ namespace Arkana.Tests
         [Test]
         public void Loot_TodoArmaIdDoRegistro_TemModelo_EOArquivoExiste()
         {
+            Assert.AreEqual(LootVisual.ModeloDe(Arma.VARINHA), LootVisual.ModeloDe("inexistente"),
+                "id desconhecido cai na luva comum, o mesmo fallback de Arma.Dados");
+            Assert.AreEqual(LootVisual.ModeloDe(Arma.VARINHA), LootVisual.ModeloDe(null));
             var nomes = new HashSet<string>();
             foreach (string id in Arma.ARMAS.Keys)
             {
                 string nome = LootVisual.ModeloDe(id);
                 Assert.IsFalse(string.IsNullOrEmpty(nome), id);
                 Assert.IsTrue(nomes.Add(nome), "cada luva tem o SEU modelo: " + nome);
+            }
+            // o nome tem que bater com um arquivo de Resources: nome errado vira primitiva CALADA na partida
+            foreach (string nome in nomes)
+            {
                 string arq = Path.Combine(Application.dataPath, "_Arkana", "Resources", nome + ".glb");
                 Assert.IsTrue(File.Exists(arq), "Resources.Load(\"" + nome + "\") nao acharia nada: " + arq);
             }
-            Assert.AreEqual(LootVisual.ModeloDe(Arma.VARINHA), LootVisual.ModeloDe("inexistente"),
-                "id desconhecido cai na luva comum, o mesmo fallback de Arma.Dados");
         }
 
         [Test]
