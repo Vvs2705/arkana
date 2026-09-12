@@ -119,8 +119,10 @@ namespace Arkana.World
         public const float SeparacaoNascimentos = 12f;
 
         // ---- paleta GDD §10 (sRGB; quem grava no vertice converte para linear) ----
-        public static readonly Color CorGrama = Hex(0x58bd6d);
-        public static readonly Color CorGramaClara = Hex(0x7ed687);
+        /// <summary>Grama da campina. O #58bd6d/#7ed687 de antes, sob o sol quente do entardecer, saia VERDE-LIMAO chapado (fotos 10
+        /// e 28 de 12/09): mais fundo e mais frio aqui, e as manchas quente/fria sao do shader (_Chao). KNOB: por foto.</summary>
+        public static readonly Color CorGrama = Hex(0x559e67);
+        public static readonly Color CorGramaClara = Hex(0x76b87f);
         public static readonly Color CorAreia = Hex(0xdcc9a0);
         public static readonly Color CorRocha = Hex(0x8e97ad);
         /// <summary>Pedra SOLTA (rocha da vegetacao, rochedo do mar): da familia do basalto do kit da Meshy. O lilas do CorRocha e'
@@ -134,9 +136,10 @@ namespace Arkana.World
         public static readonly Color CorFolhaA = Hex(0x3fa85c);
         public static readonly Color CorFolhaB = Hex(0x6fd177);
         public static readonly Color CorPedra = Hex(0xb3bccf);
-        public static readonly Color CorGramaSeca = Hex(0xa9c268);
-        public static readonly Color CorGramaFunda = Hex(0x2f8a55);
-        public static readonly Color CorChaoDeMata = Hex(0x5f7742);
+        public static readonly Color CorGramaSeca = Hex(0x8ab26e);
+        public static readonly Color CorGramaFunda = Hex(0x2f7a52);
+        /// <summary>Chao sob a copa: mais escuro e musgoso que a campina (o #5f7742 de antes lia como a mesma grama, so' suja).</summary>
+        public static readonly Color CorChaoDeMata = Hex(0x4a5c35);
         public static readonly Color CorMusgo = Hex(0x74a06a);
         public static readonly Color CorSeixo = Hex(0x8d8a84);
         /// <summary>Cume do pico: pedra clara QUENTE, nao neve. O #dfe3ee de antes (branco-lilas) saia liso e o Diretor leu
@@ -386,26 +389,65 @@ namespace Arkana.World
         /// fronteira dura. O alfa carrega o PESO DE ROCHA para o shader trocar a textura de
         /// detalhe (detalhe-chao -> detalhe-rocha) pela mesma conta que pintou o vertice.
         /// </summary>
-        public Color Cor(float x, float z, float h)
+        public Color Cor(float x, float z, float h) => Cor(x, z, h, out _);
+
+        /// <summary>
+        /// A COMPOSICAO do chao em (x, z) — o que o shader pinta de perto fora da pedra (_Chao, onda 7B). A Ilha grava no UV0:
+        /// r = chao de MATA, g = AREIA (praia e duna), b = PISADO (terra batida e trilha: miolo dos nascimentos e anel das
+        /// ruinas; o shader so' aplica na grama e na mata), a = GRAMA da campina. Sai da MESMA conta da cor: cada camada que
+        /// pinta por cima cobre as de baixo na mesma fracao, entao r + g + a nunca passa de 1.
+        /// </summary>
+        public Color Solo(float x, float z, float h)
+        {
+            Cor(x, z, h, out Color s);
+            return s;
+        }
+
+        /// <summary>A camada nova cobre `t` do que ja' estava pintado (b, o pisado, e' posicional: sai fora da conta).</summary>
+        static void Cobrir(ref Color k, float t)
+        {
+            float f = 1f - t;
+            k.r *= f; k.g *= f; k.a *= f;
+        }
+
+        /// <summary>O quanto o chao em (x, z) e' PISADO: o miolo de cada nascimento (onde se nasce e se luta) e o anel de chegada
+        /// das ruinas. KNOB: os raios, por foto.</summary>
+        float Gasto(float x, float z)
+        {
+            float g = 1f - Suave(RuinasR * 0.7f, RuinasR + 30f, Dist(x, z, Ruinas));
+            for (int i = 0; i < Nascimentos.Length; i++)
+                g = Mathf.Max(g, 1f - Suave(5f, 40f, Dist(x, z, new Vector2(Nascimentos[i].x, Nascimentos[i].z))));
+            return g;
+        }
+
+        public Color Cor(float x, float z, float h, out Color solo)
         {
             Pesos w = PesosEm(x, z, h);
             float big = w.Grande, fine = w.Fino;
+            var k = new Color(0f, 0f, 0f, 1f);   // a composicao: r mata, g areia, b pisado, a grama
             // 1) campina: verde por altitude + faixa seca + fundo escuro
             Color c = Color.Lerp(CorGramaClara, CorGrama, Mathf.Clamp01((h - 1f) / 10.5f));
             c = Color.Lerp(c, CorGramaSeca, Suave(0.50f, 0.72f, big) * 0.7f);
             c = Color.Lerp(c, CorGramaFunda, Suave(0.50f, 0.28f, big) * 0.6f);
             c = Color.Lerp(c, Escurecer(c, 0.14f), fine * 0.5f);
-            // 2) floresta: chao de mata escuro e terroso
+            // 2) floresta: chao de mata escuro e terroso. Na composicao conta a REGIAO inteira (a cor mistura ate' 76%)
             c = Color.Lerp(c, CorChaoDeMata, w.Floresta * (0.42f + 0.34f * fine));
+            Cobrir(ref k, w.Floresta);
+            k.r += w.Floresta;
             // 3) ruinas: piso de pedra frio tomado por musgo
             c = Color.Lerp(c, Color.Lerp(CorRocha, CorMusgo, 0.05f + 0.32f * fine), w.Ruinas * 0.95f);
+            Cobrir(ref k, w.Ruinas * 0.95f);
             // 4) alagado: lama so' na cota baixa
             c = Color.Lerp(c, Escurecer(CorLama, 0.2f), w.Lama);
-            // 4b) dunas: areal palido com capim ralo
-            c = Color.Lerp(c, Color.Lerp(CorDuna, CorGramaSeca, 0.14f + 0.3f * fine), w.Dunas * 0.92f);
+            Cobrir(ref k, w.Lama);
+            // 4b) dunas: areal palido com capim ralo (menos capim que antes: o capim seco novo e' mais verde, e duna e' CLARA)
+            c = Color.Lerp(c, Color.Lerp(CorDuna, CorGramaSeca, 0.08f + 0.2f * fine), w.Dunas * 0.92f);
+            Cobrir(ref k, w.Dunas * 0.92f);
+            k.g += w.Dunas * 0.92f;
             // 5) rocha por inclinacao ampla e por altitude, com veio
             float wrk = w.Rocha;
             c = Color.Lerp(c, CorRocha, wrk * 0.92f);
+            Cobrir(ref k, wrk * 0.92f);
             if (wrk > 0.02f)
             {
                 c = Color.Lerp(c, Escurecer(c, 0.46f), wrk * big * 0.70f);
@@ -420,16 +462,26 @@ namespace Arkana.World
             // parte da tampa para terra quente: variacao que se le' do alto. A de perto (pedra
             // gasta, liquen, fissura, estrato) e' do shader (_Chao), por cima desta.
             Color tampa = Color.Lerp(CorPico, CorLama, Suave(0.40f, 0.75f, fine) * 0.25f);
-            c = Color.Lerp(c, tampa, Suave(PicoH + 4f, PicoH + 8f, h) * 0.78f);
-            // 6) praia em dois degraus, limiar puxado por ruido; a lama (ao quadrado) suprime
+            float tt = Suave(PicoH + 4f, PicoH + 8f, h) * 0.78f;
+            c = Color.Lerp(c, tampa, tt);
+            Cobrir(ref k, tt);
+            // 6) praia em dois degraus, limiar puxado por ruido; a lama (ao quadrado) suprime.
+            //    O degrau 1 vai ao MEIO (55% areia): so' essa fracao entra como areia.
             float beach = 4.6f + 1.4f * ruido.Amostra(x * invEscala * 2.6f - 55f, z * invEscala * 2.6f + 210f);
             float dry = (1f - w.Lama) * (1f - w.Lama);
             Color meio = Color.Lerp(CorAreia, c, 0.45f);
-            c = Color.Lerp(c, meio, Suave(beach, 0.9f, h) * dry);
-            c = Color.Lerp(c, CorAreia, Suave(2.5f, 0.15f, h) * dry);
-            // 7) faixa molhada na linha d'agua
+            float p1 = Suave(beach, 0.9f, h) * dry, p2 = Suave(2.5f, 0.15f, h) * dry;
+            c = Color.Lerp(c, meio, p1);
+            Cobrir(ref k, p1 * 0.55f);
+            k.g += p1 * 0.55f;
+            c = Color.Lerp(c, CorAreia, p2);
+            Cobrir(ref k, p2);
+            k.g += p2;
+            // 7) faixa molhada na linha d'agua (larga, do vertice; a borda NITIDA da areia molhada e' do shader, por pixel)
             c = Color.Lerp(c, Escurecer(c, 0.28f), Suave(1.7f, 0f, h));
             c.a = Mathf.Clamp01(wrk);
+            k.b = Gasto(x, z);
+            solo = k;
             return c;
         }
 

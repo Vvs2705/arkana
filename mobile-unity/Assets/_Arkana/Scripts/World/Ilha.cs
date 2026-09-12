@@ -160,6 +160,7 @@ namespace Arkana.World
             var verts = new Vector3[n1 * n1];
             var norms = new Vector3[n1 * n1];
             var cols = new Color[n1 * n1];
+            var solo = new Vector4[n1 * n1];
             float lado = Relevo.Lado;
             for (int iz = 0; iz < n1; iz++)
             {
@@ -175,11 +176,13 @@ namespace Arkana.World
                     // A paleta e' sRGB; a cor de vertice chega no shader SEM conversao. Em espaco
                     // linear, gravar o hex cru deixa tudo claro e lavado (o defeito mais caro que o
                     // mundo Godot teve). O AO multiplica em LINEAR. O alfa e' o peso de rocha.
-                    Color c = Relevo.Cor(x, z, h);
+                    // O UV0 leva a COMPOSICAO do chao (mata, areia, pisado, grama): dado, nao cor — nada de .linear.
+                    Color c = Relevo.Cor(x, z, h, out Color s);
                     float a = c.a;
                     if (linear) c = c.linear;
                     float ao = Relevo.Ao(x, z, h, nrm.y);
                     cols[i] = new Color(c.r * ao, c.g * ao, c.b * ao, a);
+                    solo[i] = new Vector4(s.r, s.g, s.b, s.a);
                 }
             }
             var tris = new int[Quads * Quads * 6];
@@ -199,6 +202,7 @@ namespace Arkana.World
             mesh.vertices = verts;
             mesh.normals = norms;
             mesh.colors = cols;
+            mesh.SetUVs(0, solo);   // o _Chao do ArkanaToon le' como TEXCOORD0 (float4)
             mesh.triangles = tris;
             mesh.RecalculateBounds();
             MalhaDoTerreno = mesh;
@@ -505,9 +509,12 @@ namespace Arkana.World
         /// Chao: mais bandas e mais macias (superficie enorme e continua), mancha grande + oitava de perto e
         /// as duas texturas de detalhe a 0,55 — a textura QUEBRA a superficie, nao pinta o chao: a cor
         /// continua vindo do vertice, e e' ela que garante praia, lama, musgo e cume legiveis de 200 m.
-        /// _Chao liga a PEDRA DO CHAO do shader (so' aqui: arvore e ruina usam o mesmo shader e nao viram pedra):
+        /// _Chao liga o CHAO VIVO do shader (so' aqui: arvore e ruina usam o mesmo shader e nao viram chao):
         /// onde o alfa do vertice diz rocha, manchas de pedra gasta/terra/liquen, estrato na encosta, fissura e
-        /// seixo de perto. KNOBs (tons, escalas, _Fissura) nos defaults do ArkanaToon.shader; _Fissura 0 corta o custo.
+        /// seixo de perto (onda 5A); no resto, pela composicao do UV0 (Relevo.Solo), manchas fria/quente na campina,
+        /// humus e musgo na mata, areia molhada e duna clara, terra batida e trilha nos nascimentos e nas ruinas,
+        /// trevo e flor de perto (onda 7B). KNOBs (tons, _Fissura, _Pintado) nos defaults do ArkanaToon.shader;
+        /// _Fissura 0 e _Pintado 0 cortam o custo.
         /// </summary>
         public static Material MaterialTerreno()
         {
@@ -517,7 +524,8 @@ namespace Arkana.World
             var m = new Material(s) { name = "ArkanaTerreno" };
             m.SetFloat("_Faixas", 4f);
             m.SetFloat("_FaixaMacia", 0.22f);
-            m.SetFloat("_Mancha", 0.17f);
+            // a mancha de 5 m puxa pro capim seco (amarelo): a 0,17 somava limao por cima das manchas novas da campina
+            m.SetFloat("_Mancha", 0.10f);
             m.SetFloat("_EscalaMancha", 0.19f);
             m.SetFloat("_Grao", 0.085f);
             m.SetFloat("_EscalaGrao", 0.65f);

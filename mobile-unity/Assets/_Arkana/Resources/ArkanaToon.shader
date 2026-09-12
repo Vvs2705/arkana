@@ -29,8 +29,8 @@ Shader "Arkana/Toon"
         [NoScaleOffset] _TexRocha("Detalhe da rocha (cinza)", 2D) = "white" {}
         _ForcaTextura("Forca da textura", Range(0, 1)) = 0
         _EscalaTextura("Escala da textura (1/m)", Float) = 0.22
-        // CHAO DE PEDRA: so' o material do terreno liga (Ilha.MaterialTerreno). Tons em sRGB, MULTIPLICAM a cor.
-        _Chao("Chao de pedra (so' terreno)", Float) = 0
+        // CHAO VIVO (pedra da 5A + solo da 7B): so' o material do terreno liga (Ilha.MaterialTerreno). Tons em sRGB, MULTIPLICAM a cor.
+        _Chao("Chao vivo (so' terreno)", Float) = 0
         _EscalaManchaPedra("Escala da mancha de pedra (1/m)", Float) = 0.09
         // sobrios de proposito: o sol do entardecer ja' puxa tudo pro laranja (terra forte virava laranja, liquen virava limao)
         _TomGasta("Tom: pedra gasta", Color) = (0.74, 0.73, 0.76, 1)
@@ -38,6 +38,16 @@ Shader "Arkana/Toon"
         _TomLiquen("Tom: liquen", Color) = (0.74, 0.86, 0.66, 1)
         _Estrato("Estratos por metro (encosta)", Float) = 0.6
         _Fissura("Forca da fissura", Range(0, 1)) = 0.6
+        // SOLO VIVO (onda 7B, o mesmo _Chao): campina, mata, areia e chao pisado, pela composicao que a Ilha grava no UV0.
+        // Tons em sRGB multiplicando a cor, como os da pedra (acima de 1 clareia). A terra batida e' COR (verde nao vira marrom
+        // multiplicando).
+        _TomFria("Tom: grama funda e fria", Color) = (0.72, 0.84, 0.90, 1)
+        _TomQuente("Tom: grama clara e quente", Color) = (1.12, 1.06, 1.08, 1)
+        _TomMata("Tom: chao de mata", Color) = (0.74, 0.76, 0.72, 1)
+        _TomMusgo("Tom: musgo", Color) = (1.00, 1.14, 0.80, 1)
+        _CorTerraBatida("Cor: terra batida", Color) = (0.55, 0.48, 0.40, 1)
+        _TomMolhada("Tom: areia molhada", Color) = (0.80, 0.78, 0.80, 1)
+        _Pintado("Pintado de perto (trevo, flor, folha, concha)", Range(0, 1)) = 1
     }
 
     SubShader
@@ -72,6 +82,13 @@ Shader "Arkana/Toon"
             float4 _TomLiquen;
             float _Estrato;
             float _Fissura;
+            float4 _TomFria;
+            float4 _TomQuente;
+            float4 _TomMata;
+            float4 _TomMusgo;
+            float4 _CorTerraBatida;
+            float4 _TomMolhada;
+            float _Pintado;
         CBUFFER_END
         ENDHLSL
 
@@ -103,6 +120,7 @@ Shader "Arkana/Toon"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float4 color : COLOR;
+                float4 solo : TEXCOORD0;   // so' o terreno grava (Relevo.Solo); malha sem UV le' o padrao e _Chao 0 nem olha
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -113,6 +131,7 @@ Shader "Arkana/Toon"
                 float3 normalWS : TEXCOORD1;
                 float4 color : TEXCOORD2;
                 float fog : TEXCOORD3;
+                float4 solo : TEXCOORD4;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -140,6 +159,19 @@ Shader "Arkana/Toon"
                 float3 p3 = frac(p.xyx * float3(0.1031, 0.1030, 0.0973));
                 p3 += dot(p3, p3.yzx + 33.33);
                 return frac((p3.xx + p3.yz) * p3.zy);
+            }
+
+            // o mesmo value noise com o GRADIENTE analitico (por unidade de p): a trilha mede em METROS a distancia ate' a
+            // isolinha. So' o limiar em |n - 0,5| fazia bolha de 20 m onde o ruido fica perto de 0,5 (sela) — virou clareira.
+            float RuidoG(float2 p, out float2 g)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                float2 u = f * f * (3.0 - 2.0 * f);
+                float a = H21(i), b = H21(i + float2(1.0, 0.0)), c = H21(i + float2(0.0, 1.0)), d = H21(i + float2(1.0, 1.0));
+                float k = a - b - c + d;
+                g = 6.0 * f * (1.0 - f) * float2(b - a + k * u.y, c - a + k * u.x);
+                return a + (b - a) * u.x + (c - a) * u.y + k * u.x * u.y;
             }
 
             float Fbm2(float2 p)
@@ -254,6 +286,123 @@ Shader "Arkana/Toon"
                 return tom;
             }
 
+            // SOLO VIVO (_Chao, onda 7B): o chao que NAO e' pedra — campina, borda e chao da mata, praia e duna, e o chao
+            // pisado dos nascimentos e das ruinas. `k` = a composicao que a Ilha grava no UV0 (Relevo.Solo): r mata, g areia,
+            // b pisado, a grama; `solo` = 1 - pedra. O contrato do TomDaPedra: tom MULTIPLICA a cor do vertice (o bioma segue
+            // mandando e a transicao herda a rampa dele) e tudo passa pela `pegada` antes de virar chuvisco/moire'. So' a terra
+            // batida TROCA a cor.
+            // Custo (fxc, passe com sombra: 984 -> 1552 slots no total): +161 em todo pixel que nao e' pedra (a campina), +27 na
+            // mata, +128 na areia, +107 no chao pisado, +142 a menos de ~15 m do olho (o pintado). O pior pixel (grama pisada
+            // perto, ~880) fica abaixo da pedra perto da 5A (~985). _Pintado 0 e' o corte de custo.
+            float3 SoloVivo(float3 col, float3 p, float4 k, float solo, float pegada, float grao, float m)
+            {
+                float2 xz = p.xz;
+                k *= solo;
+                float nitido = 1.0 - smoothstep(0.25, 0.9, pegada);   // o grao de ~1 m ainda cabe no pixel
+                float roe = (grao - 0.5) * 0.16 * nitido;             // borda de mancha roida (sem ela e' aerografo)
+                float longe = smoothstep(3.0, 8.0, pegada);           // bem longe e rasante, a mancha grande vira o tom medio
+
+                // 1) CAMPINA: manchas de ~25 m, verde fundo e frio x claro e quente, dobradas por um ruido de ~50 m.
+                //    O limao chapado era a cor do vertice sozinha sob o sol quente (fotos 10 e 28).
+                float2 q = xz + (Ruido(xz * 0.02 + 7.3) - 0.5) * float2(18.0, -13.0);
+                float a = Fbm2(q * 0.04) + roe;
+                float fria = 1.0 - smoothstep(0.31, 0.44, a);
+                float quente = smoothstep(0.57, 0.71, a);
+                float3 tom = Tom(_TomFria.rgb, fria) * Tom(_TomQuente.rgb, quente);
+                tom = lerp(tom, Tom(_TomFria.rgb, 0.3) * Tom(_TomQuente.rgb, 0.3), longe);
+                float3 t = Tom(tom, k.a);
+
+                // 2) MATA: a borda entra na campina em lingua (a mancha de 5 m quebra o anel da regiao); dentro, humus mais
+                //    escuro x musgo claro, na mistura da mancha de 25 m com a de 5 m — nenhum ruido novo.
+                //    ponytail: _Mancha 0 deixa m = 0 e a borda so' encolhe
+                float mata = smoothstep(0.2, 0.75, k.r + (m - 0.5) * 0.5 * solo);
+                [branch] if (mata > 0.001)
+                {
+                    float hm = a * 0.5 + m * 0.5 + roe;
+                    float musgo = smoothstep(0.54, 0.64, hm);
+                    float humus = 1.0 - smoothstep(0.36, 0.46, hm);
+                    float3 tm = _TomMata.rgb * Tom(_TomMata.rgb, humus * 0.8) * Tom(_TomMusgo.rgb, musgo);
+                    tm = lerp(tm, _TomMata.rgb * Tom(_TomMata.rgb, 0.2) * Tom(_TomMusgo.rgb, 0.25), longe);
+                    t *= Tom(tm, mata);
+                }
+
+                // 3) AREIA: a borda molhada NITIDA pela cota do pixel (o vertice de 4,5 m so' dava degrade), o fio de sal logo
+                //    acima dela e a duna mais clara; de perto, a ondinha de vento (~0,55 m) paralela a' crista das dunas.
+                //    KNOB: a cota da molhada (0,5 m) e a largura do fio, por foto.
+                [branch] if (k.g > 0.01)
+                {
+                    float lim = 0.5 + (Ruido(xz * 0.23 + 3.0) - 0.5) * 0.4;
+                    float molhada = 1.0 - smoothstep(lim - 0.06, lim + 0.02, p.y);
+                    float fio = (1.0 - smoothstep(0.02, 0.07, abs(p.y - lim - 0.09))) * saturate(1.0 - pegada * 4.0);
+                    float seca = smoothstep(1.3, 2.8, p.y);
+                    float w = frac(dot(xz, float2(0.62, 0.78)) * 1.8 + Ruido(xz * 0.45) * 1.6);
+                    float ond = smoothstep(0.6, 0.9, abs(w - 0.5) * 2.0) * saturate(1.0 - pegada * 5.0) * seca;   // 4 px por onda
+                    // + a mancha de 25 m da campina, fraca: areal inteiro de uma cor so' lia como chao de estudio
+                    float3 ta = Tom(_TomMolhada.rgb, molhada) * (1.0 + 0.12 * seca - 0.18 * ond + 0.25 * fio + (a - 0.5) * 0.16);
+                    t *= Tom(ta, k.g);
+                }
+                col *= t;
+
+                // 4) PISADO: TRECHOS de terra batida de 2-5 m (a mancha de 5 m com o grao de 1 m) no miolo do nascimento e na
+                //    chegada das ruinas, e a TRILHA: a isolinha 0,5 de um ruido de ~25 m = caminho sinuoso de ~1 m cheio, medido
+                //    em metros pelo gradiente. As duas com borda de grama gasta (a mistura com o verde). Longe, viram a cobertura
+                //    media (nada de fio piscando). So' na grama e na mata: areia, lama e pedra nao se pisam aqui.
+                float chao = saturate(k.a + k.r);
+                float terra = 0.0;
+                [branch] if (k.b * chao > 0.01)
+                {
+                    float n = m * 0.45 + lerp(0.5, grao, nitido) * 0.55;
+                    float lb = 0.64 + (1.0 - k.b) * 0.6;   // o miolo abre ~1/5 do chao em trecho; a 15 m do nascimento, quase nada
+                    float borda = smoothstep(0.08, 0.35, k.b);
+                    float2 gt;
+                    float tn = RuidoG(xz * 0.04 + 91.0, gt);
+                    // metros ate' o eixo; o piso do gradiente (~1/3 do tipico) segura a sela, onde a conta explodiria
+                    float dt = abs(tn - 0.5) / max(length(gt) * 0.04, 0.01) + (grao - 0.5) * 0.3 * nitido;
+                    // longe os dois viram a cobertura MEDIA: a mancha de 5 m, amostrada a 5 m por pixel, virava clareira inteira
+                    float vago = smoothstep(0.5, 2.0, pegada);
+                    float bat = lerp(smoothstep(lb - 0.07, lb + 0.02, n), 0.12 * smoothstep(0.7, 1.0, k.b), vago);
+                    float tri = lerp(1.0 - smoothstep(0.45, 1.1, dt), 0.06, vago) * borda;
+                    terra = saturate(max(bat, tri)) * chao;
+                    // sob a copa a terra e' escura (humus): a batida clara no meio da mata lia como clareira de areia
+                    col = lerp(col, _CorTerraBatida.rgb * (0.85 + 0.3 * grao) * (1.0 - 0.45 * mata), terra * 0.92);
+                }
+
+                // 5) DE PERTO, pintado a mao: trevo (tres folhas de ~4 cm a 120 graus) em cacho de ~3 m e flor miuda na grama,
+                //    folha caida na mata, concha na areia — a MESMA celula de 0,4 m, a cor sai da composicao. Some a ~15 m do
+                //    olho. _Pintado 0 pula o bloco inteiro: corte de custo se o FPS cair no aparelho.
+                float perto = saturate(1.0 - pegada * 10.0) * (1.0 - terra);
+                [branch] if (perto * _Pintado > 0.0)
+                {
+                    float2 sc = xz / 0.4;
+                    float2 si = floor(sc);
+                    float2 sh = H22(si + 57.0);
+                    float2 d = sc - si - (0.3 + 0.4 * sh);
+                    // giro pelo hash, sem seno: um vetor sorteado normalizado e as duas rotacoes fixas de 120 graus
+                    float2 o = normalize(sh.yx - 0.5 + 0.001) * 0.11;
+                    float2 o2 = float2(-0.5 * o.x - 0.866 * o.y, 0.866 * o.x - 0.5 * o.y);
+                    float2 o3 = float2(-0.5 * o.x + 0.866 * o.y, -0.866 * o.x - 0.5 * o.y);
+                    float r2 = min(dot(d - o, d - o), min(dot(d - o2, d - o2), dot(d - o3, d - o3)));
+                    float cacho = smoothstep(0.5, 0.68, Ruido(xz * 0.33 + 23.0));
+                    float tem = step(frac((sh.x + sh.y) * 5.13), lerp(0.06, 0.85, cacho));
+                    float trevo = (1.0 - smoothstep(0.009, 0.014, r2)) * tem * k.a * perto;
+                    col *= 1.0 - trevo * float3(0.34, 0.20, 0.24);   // folha mais funda e mais fria que a grama em volta
+                    // flor / folha caida / concha: um ponto de ~4 cm noutro canto da celula (mais no trevo e na mata)
+                    float2 fh = H22(si + 211.0);
+                    float2 fd = sc - si - (0.15 + 0.7 * fh);
+                    float fr = dot(fd, fd);
+                    float taxa = (0.05 + 0.22 * cacho) * k.a + 0.12 * k.r + 0.05 * k.g;
+                    float ponto = (1.0 - smoothstep(0.007, 0.011, fr)) * step(frac(fh.x * 9.7 + fh.y), taxa) * perto;
+                    // cores ja' LINEARES: branco, dourado arcano e rosa das petalas do Grama (#f5f0ff, #f0c75e, #ff8ab3)
+                    float3 flor = fh.y < 0.5 ? float3(0.91, 0.87, 0.95) : (fh.x < 0.5 ? float3(0.87, 0.57, 0.11) : float3(0.95, 0.30, 0.45));
+                    flor = lerp(flor, float3(0.95, 0.62, 0.08), 1.0 - smoothstep(0.0008, 0.0018, fr));   // miolo amarelo
+                    float3 folha = fh.x < 0.5 ? float3(0.24, 0.12, 0.05) : float3(0.36, 0.22, 0.08);   // folha seca apagada: laranja vivo virava confete
+                    float3 cp = k.r > k.a ? folha : flor;
+                    cp = k.g > max(k.a, k.r) ? float3(0.90, 0.78, 0.70) : cp;
+                    col = lerp(col, cp, ponto);
+                }
+                return col;
+            }
+
             // ambiente em 3 cores (ceu/horizonte/chao) — o URP escreve unity_Ambient* no espaco de cor ativo
             float3 Ambiente(float3 n)
             {
@@ -272,6 +421,7 @@ Shader "Arkana/Toon"
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.color = v.color;
                 o.fog = ComputeFogFactor(p.positionCS.z);
+                o.solo = v.solo;
                 return o;
             }
 
@@ -311,6 +461,12 @@ Shader "Arkana/Toon"
                     grao = Ruido(xz * _EscalaGrao) * 0.65 + Ruido(xz * _EscalaGrao * 2.7 + 31.0) * 0.35;
                     float g = _Grao * (1.0 - smoothstep(0.25, 0.9, pegada));
                     col *= lerp(1.0 - g, 1.0 + g, grao);
+                }
+                // SOLO VIVO: tudo o que nao e' pedra (a pedra pura nao paga). Antes da textura: a terra batida tambem ganha o
+                // detalhe. Custo no comentario do SoloVivo.
+                [branch] if (_Chao > 0.0 && pedra < 0.997)
+                {
+                    col = SoloVivo(col, i.positionWS, i.solo, 1.0 - pedra, pegada, grao, m);
                 }
                 if (_ForcaTextura > 0.0)
                 {

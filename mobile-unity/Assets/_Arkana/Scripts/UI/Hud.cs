@@ -301,6 +301,8 @@ namespace Arkana.UI
         public CarrosselElementos Carrossel { get; private set; }
         /// <summary>Minimapa, mapa grande e bussola (Minimapa.cs).</summary>
         public Minimapa Mapa { get; private set; }
+        /// <summary>Barra de escudo/vida + nome sobre quem o jogador acertou e sobre o alvo da mira (MarcasDeAlvo.cs).</summary>
+        public MarcasDeAlvo Marcas { get; private set; }
         public IEntidade Jogador { get; private set; }
         public bool Pausado { get; private set; }
         public bool SegurandoSalto => Salto != null && Salto.Segurando;
@@ -398,6 +400,7 @@ namespace Arkana.UI
             olharImg.color = new Color(0, 0, 0, 0.001f);
             olharImg.raycastTarget = true;
             _olhar.gameObject.AddComponent<OlharArrasto>().Delta = d => OlharDelta?.Invoke(d);
+            Marcas = new MarcasDeAlvo(_raiz);   // sobre o mundo e POR BAIXO da HUD: barras, mira, numeros e controles leem por cima
 
             // barras (vida manda: mais alta; mana e escudo finas embaixo — cabem nos 56dp do HudLayout.Barras)
             _barras = Formas.No(_raiz, "Barras");
@@ -936,6 +939,7 @@ namespace Arkana.UI
             // olhar livre: da fronteira do joystick (35%) ate' a borda direita
             _olhar.anchorMin = new Vector2(0.35f, 0); _olhar.anchorMax = Vector2.one; _olhar.offsetMin = Vector2.zero; _olhar.offsetMax = Vector2.zero;
             _aviso.Layout(tela, m);
+            Marcas.Posicionar();   // a foto troca o alvo da camera aqui: as marcas reprojetam junto
         }
 
         // ---------- Bus ----------
@@ -1082,20 +1086,22 @@ namespace Arkana.UI
         void OnMatchStarted() { _fim.gameObject.SetActive(false); }
         void OnMatchOver(bool vitoria) { MostrarFim(vitoria); }
         void OnAbate(string nome) { Logica.Abater(nome); }
-        /// <summary>Morto nao esta' mais caido (a costura sai sem EntityReerguida): painel e vinheta saem, a tela de FIM assume.</summary>
-        void OnMorreu(IEntidade e) { if (EhJogador(e)) Aviso.Derrubar(false); }
+        /// <summary>Morto nao esta' mais caido (a costura sai sem EntityReerguida): painel e vinheta saem, a tela de FIM assume.
+        /// A marca de alvo dele sai na hora.</summary>
+        void OnMorreu(IEntidade e) { if (EhJogador(e)) Aviso.Derrubar(false); Marcas.Logica.Esquecer(e); }
         void OnElemento(Elemento e)
         {
             Carrossel.Selecionar(e);
             if (Logica.Armado) Disparo.Armar(Estilo.CorElemento(e), Elementos.Nome(e));
         }
 
-        /// <summary>O acerto completo: fui EU -> hitmarker + numero; acertaram EM MIM -> vinheta + arco; bot em bot -> nada.</summary>
+        /// <summary>O acerto completo: fui EU -> hitmarker + numero + marca de alvo; acertaram EM MIM -> vinheta + arco; bot em bot -> nada.</summary>
         void OnDano(IEntidade alvo, float dano, Elemento el, IEntidade fonte, bool emEscudo)
         {
             if (EhJogador(fonte) && !EhJogador(alvo))
             {
                 Logica.Acertei();
+                Marcas.Logica.Acertou(alvo);
                 if (_numerosDano && alvo != null) NumeroDano(alvo, dano, el, emEscudo);
             }
             if (EhJogador(alvo))
@@ -1400,6 +1406,8 @@ namespace Arkana.UI
                 float bate = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * VinhetaCaidoHz * 2f * Mathf.PI);
                 _vinhetaCaido.canvasRenderer.SetAlpha(Mathf.Lerp(VinhetaCaidoMin, VinhetaCaidoMax, 1f - Aviso.Esvaecimento) * (0.8f + 0.2f * bate));
             }
+            // marcas de alvo: quem acertei e quem esta' na mira (MarcasDeAlvo.cs)
+            Marcas.Pintar(dt, Jogador);
             // numeros de dano: PULAM a cada golpe (HudLogica.Pulo), sobem FREANDO (rapido no nascimento, param no fim) e so'
             // somem na fracao final. Alfa pelo CanvasRenderer e pulo pela escala: nao refaz a malha do texto + contorno por quadro.
             float vidaS = Mathf.Max((float)Balance.Feedback.NumLifeS, 0.01f);

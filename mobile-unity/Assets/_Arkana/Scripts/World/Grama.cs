@@ -526,12 +526,14 @@ namespace Arkana.World
             b.T.Add(i); b.T.Add(i + 2); b.T.Add(i + 3);
         }
 
-        /// <summary>Tufo de 3 laminas finas e tortas; a ponta encosta no tom do chao (ponta clara vira objeto, nao textura).</summary>
+        /// <summary>Tufo de 3 laminas finas e tortas; a ponta encosta no tom do chao (ponta clara vira objeto, nao textura).
+        /// A ponta segue a MEDIA da campina (Relevo.CorGrama*, onda 7B): com o chao mais fundo, a ponta de antes (0,42/0,71/0,37)
+        /// virava pingo de limao por cima dele.</summary>
         static Mesh MalhaTufo(bool linear)
         {
             var b = new MalhaProc.Construtor();
             var rng = new Sorteio(91);
-            Color pe = new Color(0.10f, 0.24f, 0.12f), ponta = new Color(0.42f, 0.71f, 0.37f);
+            Color pe = new Color(0.10f, 0.24f, 0.12f), ponta = new Color(0.39f, 0.62f, 0.36f);
             for (int k = 0; k < 3; k++)
             {
                 float a = Mathf.PI * 2f * k / 3f + 0.4f;

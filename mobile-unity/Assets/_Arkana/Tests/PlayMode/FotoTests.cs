@@ -1144,5 +1144,225 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// Leva o CORPO do jogador a (x, z) com o CharacterController desligado no meio. Existe porque o Pawn.Aterrar, depois do
+        /// pouso, devolve o corpo para Queda.Pos (a Queda ja' pousou e ignora Posicionar). A grama e o kit cortam pela camera
+        /// DELE: sem o corpo perto, a foto de outro canto da ilha sai sem tufo nenhum.
+        /// </summary>
+        static void LevarJogador(Main main, Vector3 p)
+        {
+            var cc = main.Player.Pawn.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            main.Player.Pawn.transform.position = new Vector3(p.x, Arkana.World.Ilha.AlturaDoChao(p.x, p.z) + 0.05f, p.z);
+            if (cc != null) cc.enabled = true;
+        }
+
+        /// <summary>
+        /// A CAMPINA VIVA (onda 7B): o _Chao do terreno saiu do pico para o resto da ilha. 33-campina: a camera do JOGADOR, baixa,
+        /// no nascimento de grama pura mais perto do centro (manchas fria/quente, trecho de terra batida, trilha, trevo e flor).
+        /// 33-mata-borda: o chao entrando na mata (lingua de musgo e humus, folha caida). 33-praia: a costa sul, onde a duna desce
+        /// ao mar (areia molhada nitida, fio de sal, duna clara). 33-ilha-aerea: o quadro da 04. Treino: deterministico.
+        /// Guarda junto o contrato: a malha do terreno leva a composicao do solo no UV0 e so' o material do terreno liga o _Chao.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Chao_CampinaMataPraiaAerea()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Relevo r = ilha.Relevo;
+            Assert.AreEqual(1f, Arkana.World.Ilha.MaterialTerreno().GetFloat("_Chao"), "o terreno liga o chao vivo (sem shader Arkana, cai aqui)");
+            Assert.AreEqual(0f, Arkana.World.Ilha.MaterialToon().GetFloat("_Chao"), "arvore e moita nao viram chao");
+            Mesh malha = ilha.MalhaDoTerreno;
+            var uv = new System.Collections.Generic.List<Vector4>();
+            malha.GetUVs(0, uv);
+            Assert.AreEqual(malha.vertexCount, uv.Count, "a malha do terreno leva a composicao do solo no UV0");
+            int meio = malha.vertexCount / 2;
+            Vector3 vm = malha.vertices[meio];
+            Color sm = r.Solo(vm.x, vm.z, vm.y);
+            Assert.AreEqual(sm.a, uv[meio].w, 1e-4f, "o UV0 e' o Relevo.Solo do vertice (grama)");
+            Assert.AreEqual(sm.b, uv[meio].z, 1e-4f, "o UV0 e' o Relevo.Solo do vertice (pisado)");
+            var sb = new System.Text.StringBuilder();
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+
+            // 1) CAMPINA: o nascimento de grama pura mais perto do centro, a camera do jogador baixa olhando para o miolo da ilha
+            Vector3 nasc = Vector3.zero;
+            float melhor = float.MaxValue;
+            foreach (Vector3 n in r.Nascimentos)
+            {
+                if (r.BiomaEm(n.x, n.z) != Arkana.World.Bioma.Campina || r.Solo(n.x, n.z, r.Altura(n.x, n.z)).a < 0.95f) continue;
+                float d = new Vector2(n.x, n.z).magnitude;
+                if (d < melhor) { melhor = d; nasc = n; }
+            }
+            Assert.Less(melhor, float.MaxValue, "nenhum nascimento em campina pura");
+            LevarJogador(main, nasc);
+            OlharParaOCentro(main);
+            main.Player.Camera.Logica.Pitch = 0.2f;   // mais rasante que o padrao (0,30): a mancha recua ate' o pico
+            yield return Esperar(1.5f);               // a camera assenta e a grama reclassifica (4 Hz) em volta dele
+            Foto(main.Player.Camera.Cam, "33-campina", false);
+            Diagnostico(main, "33-campina");
+            Color s = r.Solo(nasc.x, nasc.z, r.Altura(nasc.x, nasc.z));
+            sb.AppendLine("33-campina: nascimento=" + nasc.ToString("F1") + " solo(mata,areia,pisado,grama)=" + s.ToString("F2"));
+
+            // 2) MATA: a borda (metade da regiao da mata, ~57 m do centro), do lado mais livre de tronco; camera 4 m acima do chao,
+            //    fora da borda, olhando o chao que entra na mata. O corpo fica 4 m atras da camera, fora do quadro.
+            Vector2 f = r.Floresta;
+            Vector3 borda = Vector3.zero, fora = Vector3.zero;
+            float folga = -1f;
+            for (int k = 0; k < 48; k++)
+            {
+                float ang = Mathf.PI * 2f * k / 48f;
+                var d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                Vector3 b = new Vector3(f.x, 0f, f.y) + d * 57f, c = b + d * 7f;
+                if (!r.PodePousar(c.x, c.z) || !r.PodePousar(b.x, b.z)) continue;
+                float livre = 99f;
+                if (veg != null)
+                    for (int j = 0; j < veg.ContarArvores(); j++)
+                    {
+                        Vector3 t = veg.PosArvore(j) - c;
+                        t.y = 0f;
+                        livre = Mathf.Min(livre, t.magnitude);
+                    }
+                if (livre > folga) { folga = livre; borda = b; fora = d; }
+            }
+            Assert.Greater(folga, 0f, "nenhuma borda da mata em chao seco");
+            Vector3 olho = borda + fora * 7f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 4f;
+            Vector3 alvo = borda - fora * 6f;
+            alvo.y = Arkana.World.Ilha.AlturaDoChao(alvo.x, alvo.z);
+            LevarJogador(main, olho + fora * 4f);
+            yield return Esperar(1.2f);
+            Camera cam = CameraTemporaria("CamFotoMataBorda", olho, alvo, Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "33-mata-borda", false);
+            Object.Destroy(cam.gameObject);
+            sb.AppendLine("33-mata-borda: borda=" + borda.ToString("F1") + " cam=" + olho.ToString("F1") + " tronco-mais-perto=" + folga.ToString("F1")
+                + " solo-na-borda=" + r.Solo(borda.x, borda.z, r.Altura(borda.x, borda.z)).ToString("F2"));
+
+            // 3) PRAIA: a costa sul, onde as dunas descem ao mar. Camera de pe' na areia seca (1,4 m de cota), 16 graus a oeste do
+            //    eixo das dunas, olhando a beira d'agua 4 graus a leste dele: mar a direita, areia molhada, duna a esquerda.
+            float eixo = Mathf.Atan2(r.Dunas.y, r.Dunas.x);
+            Vector3 PontoDaCosta(float ang, float cota)
+            {
+                var d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                float m = r.Dunas.magnitude;
+                while (m < r.RaioTerra + 60f && r.Altura(d.x * m, d.z * m) > cota) m += 0.5f;
+                return new Vector3(d.x * m, cota, d.z * m);
+            }
+            olho = PontoDaCosta(eixo - 16f * Mathf.Deg2Rad, 1.4f);
+            alvo = PontoDaCosta(eixo + 4f * Mathf.Deg2Rad, 0.3f);
+            Vector3 praTras = (olho - alvo);
+            praTras.y = 0f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.9f;
+            LevarJogador(main, olho + praTras.normalized * 4f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoPraia", olho, alvo, Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "33-praia", false);
+            Object.Destroy(cam.gameObject);
+            sb.AppendLine("33-praia: cam=" + olho.ToString("F1") + " alvo=" + alvo.ToString("F1")
+                + " solo-na-agua=" + r.Solo(alvo.x, alvo.z, r.Altura(alvo.x, alvo.z)).ToString("F2"));
+
+            // 4) A ILHA DO ALTO, o quadro da 04
+            cam = CameraTemporaria("CamFotoChaoAerea", new Vector3(0f, 420f, -430f), new Vector3(0f, 0f, 20f), Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "33-ilha-aerea", false);
+            Object.Destroy(cam.gameObject);
+            if (veg != null) veg.Olho = null;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
+
+        /// <summary>
+        /// O ALVO LE' DE LONGE (onda 8A), no TREINO: uma rajada de tres fogos de verdade no boneco com o escudo em 12/50 — o
+        /// primeiro morde o escudo, o segundo o estoura e transborda, o terceiro entra na vida. 35-alvo: a marca em cima dele
+        /// (nome, escudo vazio com o fantasma do que tinha, vida com o RASTRO claro do golpe). 35-alvo-dois: o outro boneco
+        /// longe (~22 m), SOB A MIRA e sem acerto: duas marcas, a de longe menor e com o fio no ouro vivo.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Combate_Alvo()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            var alvo = (Gameplay.Pawn)main.Partida.Bonecos[0];
+            var longe = (Gameplay.Pawn)main.Partida.Bonecos[1];
+            Vector3 d = alvo.Pos - eu.Pos; d.y = 0f;
+            Vector3 dir = d.normalized, lado = new Vector3(dir.z, 0f, -dir.x);
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(d.x, d.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            longe.Aterrar(eu.Pos + dir * 22f + lado * 4f);   // o segundo nasce 3 m atras do primeiro: vai para longe, a direita
+            alvo.Vital.Escudo = 12f;
+            yield return Esperar(1.5f);   // a camera assenta e o rastro do escudo mexido a mao desce inteiro (0,35 + 0,76/0,8 s)
+
+            // a RAJADA: Projetil -> Combat -> DamageApplied, 0,12 s entre os tiros (golpe seguido segura o rastro inteiro)
+            for (int i = 0; i < 3; i++)
+            {
+                main.Partida.Registrar(Gameplay.Projetil.Lancar(eu, alvo.Pos + Vector3.up * 1.1f - dir * 1.5f, dir, Elemento.Fogo));
+                yield return Esperar(0.12f);
+            }
+            float t = 0f;
+            while (main.Partida.Projeteis.Count > 0 && t < 2f) { yield return null; t += Time.deltaTime; }
+            yield return null;
+            Foto(main.Player.Camera.Cam, "35-alvo", true);
+            Arkana.UI.MarcasLogica marcas = main.Hud.Marcas.Logica;
+            var sb = new System.Text.StringBuilder();
+            Arkana.UI.MarcasLogica.Marca doAlvo = null;
+            foreach (Arkana.UI.MarcasLogica.Marca m in marcas.Visiveis)
+            {
+                if (m.Alvo == (IEntidade)alvo) doAlvo = m;
+                sb.AppendLine("35-alvo: " + m.Alvo.Nome + " dist=" + m.Dist.ToString("F1") + " mira=" + m.NaMira + " alfa=" + m.Alfa.ToString("F2")
+                    + " vida=" + m.Vida.Frac.ToString("F2") + "/" + m.Vida.Fantasma.ToString("F2")
+                    + " escudo=" + m.Escudo.Frac.ToString("F2") + "/" + m.Escudo.Fantasma.ToString("F2") + " nivel=" + m.Nivel);
+            }
+            float rastroVida = doAlvo != null ? doAlvo.Vida.Fantasma - doAlvo.Vida.Frac : 0f;
+            float rastroEscudo = doAlvo != null ? doAlvo.Escudo.Fantasma - doAlvo.Escudo.Frac : 0f;
+
+            // 35-alvo-dois: a mira no de longe, sem tiro. O raio da camera passa pelo OMBRO (CameraLogica.Posicionar): mirar
+            // do ombro ao meio do corpo poe o corpo sob a mira. O ombro depende do yaw: duas passadas convergem.
+            var cl = main.Player.Camera.Logica;
+            Vector3 meio = longe.Pos + Vector3.up * 0.9f;
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 ombro = eu.Pos + Vector3.up * (Gameplay.CameraLogica.ALTURA_PIVO + Gameplay.CameraLogica.OMBRO_Y) + cl.Direita * Gameplay.CameraLogica.OMBRO_X;
+                Vector3 v = meio - ombro;
+                cl.Yaw = Mathf.Atan2(v.x, v.z);
+                cl.Pitch = Mathf.Atan2(-v.y, new Vector2(v.x, v.z).magnitude);
+            }
+            yield return Esperar(0.3f);
+            Foto(main.Player.Camera.Cam, "35-alvo-dois", true);
+            bool longeNaMira = false;
+            foreach (Arkana.UI.MarcasLogica.Marca m in marcas.Visiveis)
+            {
+                if (m.Alvo == (IEntidade)longe) longeNaMira = m.NaMira;
+                sb.AppendLine("35-alvo-dois: " + m.Alvo.Nome + " dist=" + m.Dist.ToString("F1") + " mira=" + m.NaMira + " alfa=" + m.Alfa.ToString("F2")
+                    + " vida=" + m.Vida.Frac.ToString("F2") + "/" + m.Vida.Fantasma.ToString("F2"));
+            }
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+
+            Assert.IsNotNull(doAlvo, "o boneco acertado tem marca");
+            Assert.Greater(rastroVida, 0.05f, "a vida mostra o rastro do golpe");
+            Assert.Greater(rastroEscudo, 0.05f, "o escudo estourado mostra o fantasma do que tinha");
+            Assert.AreEqual(2, marcas.Visiveis.Count, "duas marcas: a do acerto e a da mira");
+            Assert.AreSame(alvo, marcas.Visiveis[0].Alvo, "a mais perto primeiro");
+            Assert.IsTrue(longeNaMira, "o de longe esta' sob a mira (sem acerto)");
+        }
     }
 }

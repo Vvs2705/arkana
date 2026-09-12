@@ -309,6 +309,64 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void Solo_ComposicaoDoChao_PorBioma()
+        {
+            // O shader pinta cada bioma de perto (_Chao, onda 7B) pela composicao que a Ilha grava no UV0: r mata, g areia,
+            // b pisado, a grama. Se a conta quebrar, a campina vira mata, a praia perde a areia molhada ou a terra batida some
+            // dos nascimentos — calado, so' na foto.
+            var r = Nova();
+            System.Func<float, float, Color> solo = (x, z) => r.Solo(x, z, r.Altura(x, z));
+            Color vale = solo(0f, 0f), mata = solo(r.Floresta.x, r.Floresta.y), duna = solo(r.Dunas.x, r.Dunas.y), pico = solo(r.Pico.x, r.Pico.y);
+            Assert.Greater(vale.a, 0.8f, "o vale e' campina");
+            Assert.Less(vale.r + vale.g, 0.2f, "o vale nao e' mata nem areia");
+            Assert.Greater(mata.r, 0.8f, "o miolo da floresta e' chao de mata");
+            Assert.Less(mata.a, 0.2f, "e nao campina");
+            Assert.Greater(duna.g, 0.8f, "o areal e' areia");
+            Assert.Less(pico.r + pico.g + pico.a, 0.3f, "o cume e' pedra: o solo vivo nao pinta la'");
+
+            // a linha d'agua e' areia em volta da ilha (e' la' que o shader poe a areia molhada)
+            int costa = 0, areia = 0;
+            for (int k = 0; k < 48; k++)
+            {
+                float a = Mathf.PI * 2f * k / 48f, dx = Mathf.Cos(a), dz = Mathf.Sin(a);
+                for (float d = r.RaioTerra + 50f; d > 40f; d -= 0.5f)
+                {
+                    float h = r.Altura(dx * d, dz * d);
+                    if (h < 0.2f) continue;
+                    if (h < 0.6f) { costa++; if (solo(dx * d, dz * d).g > 0.8f) areia++; }
+                    break;
+                }
+            }
+            Assert.Greater(costa, 30, "a costa foi achada");
+            Assert.Greater(areia, costa * 0.8f, "a beira d'agua e' areia em quase toda a volta");
+
+            // pisado: cheio em todo nascimento; zero na campina longe de todos eles e das ruinas
+            foreach (Vector3 n in r.Nascimentos)
+                Assert.Greater(solo(n.x, n.z).b, 0.95f, "o nascimento " + n + " e' chao pisado");
+            bool achou = false;
+            for (float x = -200f; x <= 200f && !achou; x += 8f)
+                for (float z = -200f; z <= 200f && !achou; z += 8f)
+                {
+                    if (r.BiomaEm(x, z) != Bioma.Campina || Vector2.Distance(new Vector2(x, z), r.Ruinas) < r.RuinasR + 35f) continue;
+                    bool longe = true;
+                    foreach (Vector3 n in r.Nascimentos) if (Vector2.Distance(new Vector2(x, z), new Vector2(n.x, n.z)) < 45f) longe = false;
+                    if (!longe) continue;
+                    Assert.AreEqual(0f, solo(x, z).b, 1e-4f, "campina longe de nascimento e ruina nao e' pisada em " + x + "," + z);
+                    achou = true;
+                }
+            Assert.IsTrue(achou, "a ilha tem campina longe de todo nascimento");
+
+            // a composicao nunca passa de 1: cada camada que pinta cobre as de baixo na mesma fracao (a conta da cor)
+            for (float x = -260f; x <= 260f; x += 13f)
+                for (float z = -260f; z <= 260f; z += 13f)
+                {
+                    Color s = solo(x, z);
+                    Assert.LessOrEqual(s.r + s.g + s.a, 1.0001f, "composicao estourou em " + x + "," + z);
+                    Assert.GreaterOrEqual(Mathf.Min(Mathf.Min(s.r, s.g), Mathf.Min(s.b, s.a)), 0f, "peso negativo em " + x + "," + z);
+                }
+        }
+
+        [Test]
         public void Sorteio_EhDeterministico_EDiferePorSeed()
         {
             var a = new Sorteio(21);
