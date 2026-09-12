@@ -86,8 +86,10 @@ namespace Arkana.Gameplay
         public void Interagir() { Pawn.Pegar(); }
         public void Saltar() { Pawn.Saltar(); }
         public void Planar() { Pawn.Planar(); }
-        public void Tatica() { Pawn.UsarTatica(); }
-        public void Suprema() { Pawn.UsarSuprema(); }
+        // O botao do kit MIRA como o disparo: o kit sai para o reticulo (camera), nao para onde o corpo parou. Sem isto, parado
+        // depois de girar a camera, a muralha da Pyra nascia atras dela, fora da tela (diag da foto 17 de 12/09).
+        public void Tatica() { Pawn.YawAlvo = Camera.Logica.Yaw; Pawn.UsarTatica(); }
+        public void Suprema() { Pawn.YawAlvo = Camera.Logica.Yaw; Pawn.UsarSuprema(); }
 
         /// <summary>UM botao, tres leituras: no castelo salta; no ar abre/fecha o planeio; no chao pula.</summary>
         public void Salto()

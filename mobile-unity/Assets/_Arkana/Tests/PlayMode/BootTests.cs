@@ -98,6 +98,30 @@ namespace Arkana.Tests
         }
 
         [UnityTest]
+        public IEnumerator Treino_TaticaSaiNaMiraDaCamera_NaoNaFrenteDoCorpo()
+        {
+            // defeito (foto 17 de 12/09): o botao de tatica usava a frente do CORPO; parado, com a camera girada, a muralha
+            // da Pyra nascia atras dela — fora da tela. Vermelho sem o YawAlvo do Player.Tatica.
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Rodar(1f);
+            Gameplay.Pawn p = main.Player.Pawn;
+            float yawCorpo = p.transform.eulerAngles.y * Mathf.Deg2Rad;
+            main.Player.Camera.Logica.Yaw = yawCorpo + Mathf.PI;   // olhando para TRAS do corpo, sem andar
+            yield return null;
+            main.Player.Tatica();
+            Assert.Greater(p.Runner.Visuais.Count, 0, "a tatica desenha alguma coisa");
+            Gameplay.EfeitoVisual v = p.Runner.Visuais[p.Runner.Visuais.Count - 1];
+            Vector3 mira = new Vector3(Mathf.Sin(yawCorpo + Mathf.PI), 0f, Mathf.Cos(yawCorpo + Mathf.PI));
+            Vector3 centro = (v.Pos + v.Pos2) * 0.5f - p.Pos;
+            centro.y = 0f;
+            Assert.Greater(Vector3.Dot(centro, mira), 1f, v.Tipo + " saiu fora da mira da camera: " + centro);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest]
         public IEnumerator MatchOver_VaiParaFim_EMenuDesmontaAArena()
         {
             Main main = _go.AddComponent<Main>();
