@@ -30,6 +30,8 @@ namespace Arkana.UI
         public bool CarrosselVisivel { get; private set; }
         public float Hitmarker { get; private set; }
         public readonly List<Abate> KillFeed = new List<Abate>();
+        /// <summary>Abates da partida inteira: o feed esquece em KillFeedS, a tela de fim nao.</summary>
+        public int Abates { get; private set; }
         public float Agora { get; private set; }
 
         float _armaT = -1f;   // < 0 = sem rotulo na tela
@@ -46,6 +48,7 @@ namespace Arkana.UI
             ArmaRotulo = "";
             _armaT = -1f;
             KillFeed.Clear();
+            Abates = 0;
             _numeros.Clear();
             Hitmarker = 0f;
         }
@@ -76,7 +79,11 @@ namespace Arkana.UI
         {
             KillFeed.Add(new Abate { Nome = nomeDoMago, Ate = Agora + KillFeedS });
             while (KillFeed.Count > KillFeedMax) KillFeed.RemoveAt(0);
+            Abates++;
         }
+
+        /// <summary>Colocacao final: vencer = 1; cair com N bots de pe' = N + 1 (quem ainda esta' vivo ficou na frente).</summary>
+        public static int Colocacao(bool vitoria, int botsVivos) => vitoria ? 1 : Mathf.Max(botsVivos, 0) + 1;
 
         public void Acertei() { Hitmarker = HitmarkerS; }
 
@@ -185,8 +192,13 @@ namespace Arkana.UI
         public const string T_PAUSA_TITULO = Textos.PausaTitulo, T_RETOMAR = Textos.PausaRetomar, T_CONFIG = Textos.MenuConfig, T_ABANDONAR = Textos.PausaAbandonar;
         public const string T_ALTITUDE = "{0} m";            // ponytail: mover para Textos quando o CORE quiser
         public const string T_ABATE = "{0} derrubado";
+        public const string T_COLOCACAO = "COLOCAÇÃO", T_COLOCACAO_NUM = "#{0}", T_ABATES = "ABATES";   // idem (Textos.cs e' de outra frente hoje)
         public static IReadOnlyDictionary<string, string> Estados => Textos.HudEstados;
         static readonly Color CorZona = new Color(0.55f, 0.35f, 1f);
+        // veredito: vermelho-escuro que ainda le' em 46dp sobre o miolo (~3,5:1; o #8B0000 "de verdade" some no preto);
+        // a vitoria e' o Estilo.Ouro
+        static readonly Color CorDerrota = new Color(0.78f, 0.17f, 0.15f);
+        static readonly Color CorPerigo = new Color(1f, 0.52f, 0.46f);   // rotulo do ABANDONAR: a unica acao que custa a partida
         // a PLACA (fio + miolo) e' a das barras: relogio, kill feed, altimetro, carrossel e avisos falam o mesmo idioma.
         // Fio/icone sao propriedade (nao static readonly): a paleta do Estilo passa pelo ColorUtility, e inicializador
         // estatico de MonoBehaviour pode rodar dentro do AddComponent.
@@ -247,8 +259,12 @@ namespace Arkana.UI
         Image[] _hitmarker;
         RectTransform _numeros;
         readonly Dictionary<HudLogica.Numero, Text> _labels = new Dictionary<HudLogica.Numero, Text>();
-        RectTransform _fim;
-        Text _fimTexto;
+        RectTransform _fim, _fimPlaca, _fimChipColocacao, _fimChipAbates;
+        CanvasGroup _fimGrupo;
+        Image _fimFio, _fimBrilho, _fimLosango;
+        Text _fimTexto, _fimColocacao, _fimAbates;
+        float _fimT = 1f;   // 0 -> 1 durante a entrada da placa; 1 = pousada
+        bool _fimVitoria;
         RectTransform _pausaOverlay;
         RectTransform _olhar;
         Vector2 _telaAtual;
@@ -619,23 +635,107 @@ namespace Arkana.UI
             }
         }
 
+        // ---------- tela de FIM (veredito) ----------
+        const float FimL = 500f, FimA = 252f;   // dp da placa grande: cabe nos ~437dp de altura do Poco F4 deitado
+        const float FimTituloY = 52f, FimOrnamentoY = 94f, FimChipsY = 108f, FimChipX = 72f;   // dp a partir do topo da placa
+        const float FimEntraS = 0.35f;          // a placa POUSA: esvaece e encolhe de 1,12 para 1 (relogio sem escala)
+
+        /// <summary>
+        /// Tela de FIM no idioma da HUD (antes: texto solto numa coluna sobre veu chapado). Veu que escurece o jogo, PLACA
+        /// grande de fio na cor do veredito; titulo com BRILHO atras (VITORIA em ouro, respirando; DERROTA em vermelho-escuro),
+        /// ornamento, colocacao e abates em dois chips e os botoes-placa lado a lado. Cor/numeros sao do MostrarFim.
+        /// </summary>
         void MontarFim()
         {
+            var meio = new Vector2(0.5f, 0.5f);
+            var sup = new Vector2(0.5f, 1f);
+            var inf = new Vector2(0.5f, 0f);
             _fim = Formas.No(_raiz, "Fim");
             AreaSegura.Esticar(_fim);
-            var veu = Formas.Imagem(_fim, "Veu", null, new Color(0, 0, 0, 0.55f));
+            _fimGrupo = _fim.gameObject.AddComponent<CanvasGroup>();   // a entrada esvaece veu + placa de uma vez
+            var veu = Formas.Imagem(_fim, "Veu", null, new Color(0.01f, 0.015f, 0.03f, 0.62f));
             AreaSegura.Esticar(veu.rectTransform);
-            veu.raycastTarget = true;
-            var col = Estilo.Coluna(_fim, "Centro", 16f);
-            _fimTexto = Formas.Texto(col.transform, "Titulo", "", 30f, Color.white);
-            Estilo.Tamanho(_fimTexto, Dp.Px(320f), Dp.Px(44f));
-            var de_novo = Estilo.Botao(col.transform, "BtnJogarDeNovo", T_JOGAR_DE_NOVO, 200f, 56f, 16f);
-            Estilo.Tamanho(de_novo, Dp.Px(200f), Estilo.AlturaAlvo(56f));
+            veu.raycastTarget = true;   // o toque nao vaza para o joystick/olhar atras
+            _fimFio = Placa(_fim, "Placa", Dp.Px(14f));
+            _fimPlaca = _fimFio.rectTransform;
+            // a altura segue o botao (AlturaAlvo sobe em dpi baixo): o rodape nunca invade os chips
+            Fixar(_fimPlaca, meio, meio, Vector2.zero, new Vector2(Dp.Px(FimL), Dp.Px(FimA - 50f) + Estilo.AlturaAlvo(50f)));
+            // brilho: a sombra macia (disco que esvaece ate' a borda) esticada atras do titulo, na cor do veredito
+            _fimBrilho = Formas.Imagem(_fimPlaca, "Brilho", Formas.Sombra(), Color.white);
+            Fixar(_fimBrilho.rectTransform, sup, meio, new Vector2(0f, -Dp.Px(FimTituloY)), new Vector2(Dp.Px(420f), Dp.Px(118f)));
+            _fimTexto = Formas.Texto(_fimPlaca, "Titulo", "", 46f, Color.white);
+            _fimTexto.fontStyle = FontStyle.Bold;
+            _fimTexto.GetComponent<Shadow>().effectDistance = new Vector2(Dp.Px(1.5f), -Dp.Px(1.5f));   // 1px some num titulo de 46dp
+            Fixar(_fimTexto.rectTransform, sup, meio, new Vector2(0f, -Dp.Px(FimTituloY)), new Vector2(Dp.Px(FimL), Dp.Px(64f)));
+            _fimLosango = Ornamento(_fimPlaca, -Dp.Px(FimOrnamentoY), Dp.Px(320f));
+            _fimColocacao = ChipFim(_fimPlaca, "ChipColocacao", T_COLOCACAO, out _fimChipColocacao);
+            _fimAbates = ChipFim(_fimPlaca, "ChipAbates", T_ABATES, out _fimChipAbates);
+            // botoes lado a lado no rodape da placa: JOGAR DE NOVO cheio (a acao que o dedo procura) e MENU
+            const float bl = 210f, bm = 150f, vao = 14f, meia = (bl + vao + bm) * 0.5f;
+            var de_novo = BotaoPlaca(_fimPlaca, "BtnJogarDeNovo", T_JOGAR_DE_NOVO, bl, Estilo.Ouro, true);
+            Fixar((RectTransform)de_novo.transform, inf, inf, new Vector2(Dp.Px(bl * 0.5f - meia), Dp.Px(20f)), ((RectTransform)de_novo.transform).sizeDelta);
             de_novo.onClick.AddListener(() => ReiniciarPedido?.Invoke());
-            var menu = Estilo.Botao(col.transform, "BtnMenu", T_MENU, 200f, 56f, 16f);
-            Estilo.Tamanho(menu, Dp.Px(200f), Estilo.AlturaAlvo(56f));
+            var menu = BotaoPlaca(_fimPlaca, "BtnMenu", T_MENU, bm, Estilo.Texto, false);
+            Fixar((RectTransform)menu.transform, inf, inf, new Vector2(Dp.Px(meia - bm * 0.5f), Dp.Px(20f)), ((RectTransform)menu.transform).sizeDelta);
             menu.onClick.AddListener(() => MenuPedido?.Invoke());
             _fim.gameObject.SetActive(false);
+        }
+
+        /// <summary>Chip do fim: placa pequena, numero grande em negrito em cima e o rotulo fosco embaixo. Devolve o numero.</summary>
+        static Text ChipFim(RectTransform pai, string nome, string rotulo, out RectTransform chip)
+        {
+            var sup = new Vector2(0.5f, 1f);
+            var inf = new Vector2(0.5f, 0f);
+            chip = Placa(pai, nome, Dp.Px(8f)).rectTransform;
+            Fixar(chip, sup, sup, Vector2.zero, new Vector2(Dp.Px(130f), Dp.Px(56f)));
+            var n = Formas.Texto(chip, "Numero", "", 24f, Color.white);
+            n.fontStyle = FontStyle.Bold;
+            Fixar(n.rectTransform, sup, sup, new Vector2(0f, -Dp.Px(4f)), new Vector2(Dp.Px(130f), Dp.Px(30f)));
+            var r = Formas.Texto(chip, "Rotulo", rotulo, 10f, Estilo.TextoFosco);
+            r.fontStyle = FontStyle.Bold;
+            Fixar(r.rectTransform, inf, inf, new Vector2(0f, Dp.Px(5f)), new Vector2(Dp.Px(130f), Dp.Px(16f)));
+            return n;
+        }
+
+        /// <summary>Ornamento das placas grandes: fio fosco com um losango no meio. Devolve o losango (quem chama pinta).</summary>
+        static Image Ornamento(RectTransform pai, float yPx, float larguraPx)
+        {
+            var meio = new Vector2(0.5f, 0.5f);
+            var fio = Formas.Imagem(pai, "Ornamento", null, Formas.ComAlfa(Estilo.OuroFosco, 0.6f));
+            Fixar(fio.rectTransform, new Vector2(0.5f, 1f), meio, new Vector2(0f, yPx), new Vector2(larguraPx, Mathf.Max(Dp.Px(1f), 1f)));
+            var l = Formas.Imagem(fio.transform, "Losango", Formas.Losango(), Estilo.Ouro);
+            Fixar(l.rectTransform, meio, meio, Vector2.zero, Vector2.one * Dp.Px(9f));
+            return l;
+        }
+
+        /// <summary>
+        /// Botao no idioma das placas (fim e pausa): fio + miolo arredondados, rotulo em negrito, alvo &gt;= 48dp — o no'
+        /// INTEIRO pega o dedo. `cheio` = acao principal: miolo na `cor` em degrade (mais claro em cima) e rotulo escuro;
+        /// senao miolo escuro e rotulo na `cor`. ColorTint sobre miolo BRANCO: a cor de cada estado E' a cor do miolo; sem
+        /// fade (o dedo quer resposta no quadro do toque, e fade de 0,1 s deixava a foto pegar o miolo no meio do caminho).
+        /// </summary>
+        static Button BotaoPlaca(Transform pai, string nome, string texto, float larguraDp, Color cor, bool cheio)
+        {
+            var fio = Placa(pai, nome, Dp.Px(9f));
+            fio.rectTransform.sizeDelta = new Vector2(Dp.Px(larguraDp), Estilo.AlturaAlvo(50f));
+            fio.raycastTarget = true;
+            if (cheio) fio.color = cor;
+            var miolo = fio.transform.GetChild(0).GetComponent<Image>();   // a Placa nasce com o Miolo de primeiro filho
+            if (cheio) miolo.sprite = Formas.Arredondado(true);   // mesma borda de 9-slice: so' ganha o volume
+            miolo.color = Color.white;
+            var b = fio.gameObject.AddComponent<Button>();
+            b.targetGraphic = miolo;
+            Color normal = cheio ? cor : CorMiolo;
+            var c = b.colors;
+            c.normalColor = normal; c.highlightedColor = normal; c.selectedColor = normal;   // toque nao tem hover; solto nao fica aceso
+            c.pressedColor = cheio ? Formas.Escurecer(cor, 0.3f) : Color.Lerp(CorMiolo, cor, 0.3f);
+            c.fadeDuration = 0f;
+            b.colors = c;
+            var t = Formas.Texto(fio.transform, "Rotulo", texto, 16f, cheio ? Estilo.NoiteFunda : cor);
+            t.fontStyle = FontStyle.Bold;
+            AreaSegura.Esticar(t.rectTransform);
+            if (cheio) t.GetComponent<Shadow>().enabled = false;   // sombra preta sob letra escura so' borra
+            return b;
         }
 
         /// <summary>
@@ -763,11 +863,43 @@ namespace Arkana.UI
         /// <summary>No TREINO nao existe relogio nem contagem que importe: o canto diz o que a cena e'.</summary>
         public void ModoTreino() { _treino = true; }
 
+        /// <summary>O veredito: cor (fio, titulo, brilho, losango), colocacao (so' fora do treino, que nao tem ranking) e abates.</summary>
         public void MostrarFim(bool vitoria)
         {
+            _fimVitoria = vitoria;
+            Color cor = vitoria ? Estilo.Ouro : CorDerrota;
             _fimTexto.text = vitoria ? T_VITORIA : T_DERROTA;
-            _fimTexto.color = vitoria ? new Color(0.35f, 1f, 0.45f) : new Color(1f, 0.35f, 0.35f);
+            _fimTexto.color = cor;
+            _fimFio.color = cor;
+            _fimLosango.color = cor;
+            // brilho fraco de proposito: titulo e brilho tem a MESMA cor, e brilho forte vira borrao que come o contraste
+            _fimBrilho.color = Formas.ComAlfa(cor, vitoria ? 0.34f : 0.18f);
+            _fimBrilho.canvasRenderer.SetAlpha(1f);
+            bool rank = !_treino;
+            _fimChipColocacao.gameObject.SetActive(rank);
+            _fimColocacao.text = string.Format(T_COLOCACAO_NUM, HudLogica.Colocacao(vitoria, _botsVivos));
+            _fimColocacao.color = vitoria ? Estilo.Ouro : Color.white;
+            _fimAbates.text = Logica.Abates.ToString();
+            _fimChipColocacao.anchoredPosition = new Vector2(-Dp.Px(FimChipX), -Dp.Px(FimChipsY));
+            _fimChipAbates.anchoredPosition = new Vector2(rank ? Dp.Px(FimChipX) : 0f, -Dp.Px(FimChipsY));
+            _fimT = 0f;
+            PintarFim(0f);   // ja' nasce transparente e grande: o primeiro quadro nao pisca a placa pousada
             _fim.gameObject.SetActive(true);
+        }
+
+        /// <summary>Por frame so' com a tela de fim no ar: a entrada (ate' pousar) e, na vitoria, o brilho respirando (alfa
+        /// pelo CanvasRenderer: nao refaz malha). Pousada e sem vitoria, nao toca em nada.</summary>
+        void PintarFim(float dt)
+        {
+            if (_fimT < 1f)
+            {
+                _fimT = Mathf.Min(_fimT + dt / FimEntraS, 1f);
+                float e = 1f - (1f - _fimT) * (1f - _fimT);   // chega rapido, pousa devagar
+                _fimGrupo.alpha = e;
+                float s = Mathf.Lerp(1.12f, 1f, e);
+                _fimPlaca.localScale = new Vector3(s, s, 1f);
+            }
+            if (_fimVitoria) _fimBrilho.canvasRenderer.SetAlpha(0.72f + 0.28f * Mathf.Sin(Time.unscaledTime * 0.9f * 2f * Mathf.PI));
         }
 
         void AplicarConfig(ConfigLogica cfg)
@@ -977,29 +1109,44 @@ namespace Arkana.UI
             if (_pausaOverlay != null) _pausaOverlay.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// PAUSA no idioma da HUD (antes: a coluna de botoes do menu sobre um veu quase opaco). O veu ESCURECE o jogo
+        /// congelado atras (ele segue visivel: o jogador ve' onde parou); PLACA central com titulo em ouro, ornamento e os
+        /// botoes-placa empilhados: RETOMAR cheio (a acao que o dedo procura), CONFIGURACOES, e ABANDONAR com rotulo vermelho
+        /// (a unica que custa a partida). Abre NA HORA, sem animacao: pausa e' reflexo. Nasce na primeira pausa.
+        /// </summary>
         void MontarPausa()
         {
+            var meio = new Vector2(0.5f, 0.5f);
+            var sup = new Vector2(0.5f, 1f);
+            const float L = 340f, bl = 280f;
             _pausaOverlay = Formas.No(_raiz, "Pausa");
             AreaSegura.Esticar(_pausaOverlay);
-            var veu = Formas.Imagem(_pausaOverlay, "Veu", null, new Color(0.02f, 0.03f, 0.06f, 0.82f));
+            var veu = Formas.Imagem(_pausaOverlay, "Veu", null, new Color(0.01f, 0.015f, 0.03f, 0.66f));
             AreaSegura.Esticar(veu.rectTransform);
             veu.raycastTarget = true;
-            var col = Estilo.Coluna(_pausaOverlay, "Centro", 14f);
-            var titulo = Formas.Texto(col.transform, "Titulo", T_PAUSA_TITULO, 34f, Estilo.Ouro);
-            Estilo.Tamanho(titulo, Dp.Px(300f), Dp.Px(48f));
-            var retomar = Estilo.Botao(col.transform, "BtnRetomar", T_RETOMAR, 300f, 52f);
-            Estilo.Tamanho(retomar, Dp.Px(300f), Estilo.AlturaAlvo(52f));
-            retomar.onClick.AddListener(Retomar);
-            var cfg = Estilo.Botao(col.transform, "BtnPausaConfig", T_CONFIG, 300f, 52f);
-            Estilo.Tamanho(cfg, Dp.Px(300f), Estilo.AlturaAlvo(52f));
-            cfg.onClick.AddListener(() =>
+            var placa = Placa(_pausaOverlay, "Painel", Dp.Px(14f)).rectTransform;
+            var titulo = Formas.Texto(placa, "Titulo", T_PAUSA_TITULO, 30f, Estilo.Ouro);
+            titulo.fontStyle = FontStyle.Bold;
+            Fixar(titulo.rectTransform, sup, meio, new Vector2(0f, -Dp.Px(34f)), new Vector2(Dp.Px(L), Dp.Px(44f)));
+            Ornamento(placa, -Dp.Px(62f), Dp.Px(200f));
+            float y = Dp.Px(78f);   // topo do proximo botao, medido do topo da placa (a altura real vem do AlturaAlvo)
+            Button Empilhar(string nome, string texto, Color cor, bool cheio)
+            {
+                var b = BotaoPlaca(placa, nome, texto, bl, cor, cheio);
+                var rt = (RectTransform)b.transform;
+                Fixar(rt, sup, sup, new Vector2(0f, -y), rt.sizeDelta);
+                y += rt.sizeDelta.y + Dp.Px(10f);
+                return b;
+            }
+            Empilhar("BtnRetomar", T_RETOMAR, Estilo.Ouro, true).onClick.AddListener(Retomar);
+            Empilhar("BtnPausaConfig", T_CONFIG, Estilo.Texto, false).onClick.AddListener(() =>
             {
                 var tela = Config.Criar(_pausaOverlay);
                 tela.VoltarPedido += () => Destroy(tela.gameObject);
             });
-            var sair = Estilo.Botao(col.transform, "BtnAbandonar", T_ABANDONAR, 300f, 52f);
-            Estilo.Tamanho(sair, Dp.Px(300f), Estilo.AlturaAlvo(52f));
-            sair.onClick.AddListener(() => { Retomar(); AbandonarPedido?.Invoke(); });
+            Empilhar("BtnAbandonar", T_ABANDONAR, CorPerigo, false).onClick.AddListener(() => { Retomar(); AbandonarPedido?.Invoke(); });
+            Fixar(placa, meio, meio, Vector2.zero, new Vector2(Dp.Px(L), y - Dp.Px(10f) + Dp.Px(18f)));
         }
 
         /// <summary>Angulo de tela (rad; 0 = frente, horario) de um ponto do mundo, relativo ao YAW DA CAMERA.</summary>
@@ -1019,6 +1166,7 @@ namespace Arkana.UI
             if (Screen.width != (int)_telaAtual.x || Screen.height != (int)_telaAtual.y) Layout();
             // relogio / bots / fps
             PintarTopo();
+            if (_fim.gameObject.activeSelf) PintarFim(dt);
             if (_mostraFps) _fps.text = string.Format(T_FPS, Mathf.RoundToInt(1f / Mathf.Max(dt, 0.0001f)));
             // rotulo da arma: pulso -> espera -> apaga
             _armaRotulo.enabled = Logica.ArmaRotuloVisivel;

@@ -172,6 +172,9 @@ namespace Arkana.Gameplay
         /// <summary>Brilho HDR da marca na forca 1 (passa do limiar 1,1 do bloom); o pulso oscila entre 70% e 100% disto.
         /// KNOB por foto, como o MaterialVfx.BrilhoHdr.</summary>
         public const float BRILHO_MARCA = 1.4f, PULSO_S = 1.6f;
+        /// <summary>O NUCLEO do elemento ACENDE (foto 02 de 12/09: a esfera chapada lia bolinha de plastico): cor HDR no
+        /// Unlit (passa do limiar do bloom) + HALO de ponto macio aditivo em volta, de HALO_M m. KNOBs por foto.</summary>
+        public const float BRILHO_NUCLEO = 1.6f, BRILHO_HALO = 1.2f, HALO_M = 0.55f;
 
         /// <summary>Nome em Resources. Id desconhecido cai na luva comum — o mesmo fallback de Arma.Dados.</summary>
         public static string ModeloDe(string armaId) => "luva-" + Arma.Dados(armaId).Id;
@@ -379,6 +382,7 @@ namespace Arkana.Gameplay
             readonly LineRenderer _feixe, _fio;
             readonly ParticleSystem _motas, _aura;
             readonly MeshRenderer[] _nucleos = new MeshRenderer[2];
+            readonly ParticleSystem[] _halos = new ParticleSystem[2];
             readonly Dictionary<string, GameObject> _modelos = new Dictionary<string, GameObject>();
             string _id;
             int _nEls = -1;   // -1: a primeira passada sempre veste
@@ -415,6 +419,7 @@ namespace Arkana.Gameplay
                     _nucleos[k] = MaterialMago.Primitivo(_pivo, "Nucleo" + k, PrimitiveType.Sphere, Vector3.zero,
                         Vector3.one * LootVisual.NUCLEO_M, null).GetComponent<MeshRenderer>();
                     SemSombra(_nucleos[k]);
+                    _halos[k] = Halo(_nucleos[k].transform);   // filho: liga, desliga e anda com o nucleo
                 }
             }
 
@@ -447,7 +452,7 @@ namespace Arkana.Gameplay
                 Pintar(_marca, Brilho(_corMarca, 0.7f + 0.3f * pulso));
                 if (_coluna.activeSelf) _feixe.widthMultiplier = LootVisual.LARGURA_FEIXE * (1f + 0.08f * pulso);
                 Ativo(_raiz, true);
-                if (acordou || vestiu) { Tocar(_aura); Tocar(_motas); }
+                if (acordou || vestiu) { Tocar(_aura); Tocar(_motas); Tocar(_halos[0]); Tocar(_halos[1]); }
             }
 
             void Vestir(string id, int n, Elemento e0, Elemento e1)
@@ -494,8 +499,11 @@ namespace Arkana.Gameplay
                     bool liga = k < n;
                     Ativo(_nucleos[k].gameObject, liga);
                     if (!liga) continue;
-                    // o ELEMENTO se le' no nucleo (cor ja' pelo filtro de daltonismo); manopla mostra o PAR
-                    _nucleos[k].sharedMaterial = Opaco(Arkana.Menu.Estilo.CorElemento(k == 0 ? e0 : e1));
+                    // o ELEMENTO se le' no nucleo (cor ja' pelo filtro de daltonismo); manopla mostra o PAR. A MESMA cor, acesa:
+                    // HDR no miolo e no halo (a particula viva nao rele' startColor: o halo pinta por MaterialPropertyBlock)
+                    Color ce = Arkana.Menu.Estilo.CorElemento(k == 0 ? e0 : e1);
+                    _nucleos[k].sharedMaterial = Opaco(Brilho(ce, LootVisual.BRILHO_NUCLEO));
+                    Pintar(_halos[k].GetComponent<Renderer>(), Brilho(ce, LootVisual.BRILHO_HALO));
                     float x = n == 2 ? (k == 0 ? -0.1f : 0.1f) : 0f;
                     _nucleos[k].transform.localPosition = new Vector3(x, LootVisual.NUCLEO_Y, 0f);
                 }
@@ -782,6 +790,22 @@ namespace Arkana.Gameplay
             v.orbitalY = 0f;
             v.orbitalZ = gira;
             v.radial = radial;
+            return ps;
+        }
+
+        /// <summary>
+        /// HALO: UMA particula de ponto macio aditivo (DeParticula), imortal, no centro do pai — billboard de graca. A taxa
+        /// com teto 1 repoe a particula em 0,1 s se o GameObject dormir e acordar. Escala LOCAL explicita: o pai (o nucleo)
+        /// tem 0,15 de escala, e na Hierarchy o halo encolheria para dentro da esfera.
+        /// </summary>
+        static ParticleSystem Halo(Transform pai)
+        {
+            ParticleSystem ps = ParticulaVfx.Novo(pai, "Halo", Color.white, Color.white, 10f, new Vector2(1e5f, 1e5f),
+                Vector2.zero, new Vector2(LootVisual.HALO_M, LootVisual.HALO_M), false, 0f, 1);
+            ParticleSystem.MainModule m = ps.main;
+            m.scalingMode = ParticleSystemScalingMode.Local;
+            ParticleSystem.ShapeModule sh = ps.shape;
+            sh.enabled = false;   // nasce no centro, nao na caixa de 1 m do Novo
             return ps;
         }
 

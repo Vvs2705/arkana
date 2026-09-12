@@ -56,6 +56,19 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void TelaDeFimContaAbatesEColocacao()
+        {
+            _h.Abater("Pyra"); _h.Abater("Veu");
+            _h.Tick(HudLogica.KillFeedS + 0.01f);
+            Assert.AreEqual(2, _h.Abates, "o feed esquece; a tela de fim nao");
+            _h.MaosNuas();
+            Assert.AreEqual(0, _h.Abates, "partida nova zera");
+            Assert.AreEqual(1, HudLogica.Colocacao(true, 5), "vencer e' #1");
+            Assert.AreEqual(6, HudLogica.Colocacao(false, 5), "cair com 5 de pe' = #6");
+            Assert.AreEqual(1, HudLogica.Colocacao(false, -1), "contagem suja nao vira #0");
+        }
+
+        [Test]
         public void RelogioMostraTreinoNoTreino()
         {
             Assert.AreEqual("TREINO", HudLogica.TextoRelogio(125f, true, "TREINO"));

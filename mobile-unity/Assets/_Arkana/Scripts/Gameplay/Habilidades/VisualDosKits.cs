@@ -352,6 +352,11 @@ namespace Arkana.Gameplay
         const float PassoAnime = 1f / 12f;
         static readonly float[] Flicker = { 1f, 0.8f, 0.95f, 0.75f, 0.9f };
         static readonly float[] Cintila = { 0.1f, 0.17f, 0.12f, 0.2f, 0.14f };
+        /// <summary>O braco de chama "pulsa no ritmo do coracao dela" (ficha 01-pyra): tum-TUM e pausa, em passos de anime.
+        /// 8 passos = 0,67 s, 90 bpm de quem esta' lutando. Multiplica a TAXA: a chama engrossa e afina no compasso.</summary>
+        static readonly float[] Batimento = { 1.5f, 0.85f, 1.3f, 0.75f, 0.75f, 0.75f, 0.75f, 0.75f };
+        /// <summary>m — altura do vulto do eco (a Veu e' "silhueta pequena").</summary>
+        const float AlturaEco = 1.7f, LarguraEco = 0.8f;
 
         static readonly Color CorFogo = new Color32(0xFF, 0x5A, 0x2A, 255);
         static readonly Color CorRaio = new Color32(0xF5, 0xD9, 0x0A, 255);   // Tessa e' Raio: paleta GDD §10
@@ -359,7 +364,8 @@ namespace Arkana.Gameplay
         static readonly Color CorTear = new Color(0.9f, 0.8f, 0.2f, 1f);
         static readonly Color CorAviso = new Color(1f, 0.18f, 0.3f, 1f);
         static int _idCor;
-        static Material _mNucleo, _mBrasa, _mEco, _mTear, _mFeixe, _mAviso;
+        static Material _mNucleo, _mBrasa, _mFantasma, _mTear, _mFeixe, _mAviso;
+        static Texture2D _silhueta;
 
         Partida _partida;
         MaterialPropertyBlock _mpb;
@@ -368,6 +374,7 @@ namespace Arkana.Gameplay
         readonly Dictionary<string, Stack<Item>> _livres = new Dictionary<string, Stack<Item>>();
         readonly List<EfeitoVisual> _mortos = new List<EfeitoVisual>();
         readonly List<Aviso> _avisos = new List<Aviso>();
+        readonly Dictionary<Pawn, Braco> _bracos = new Dictionary<Pawn, Braco>();
 
         sealed class Item
         {
@@ -385,6 +392,15 @@ namespace Arkana.Gameplay
             public Vector3 Pos;
             public float Raio, Duracao, Restante;
             public Item It;
+        }
+
+        /// <summary>Os ossos do braco de chama de UMA Pyra + os dois efeitos dela (chave estavel no pool: o mesmo Item quadro
+        /// a quadro). Restante 1 fixo: ninguem desconta, quem liga e desliga e' o estado do kit.</summary>
+        sealed class Braco
+        {
+            public Transform Ombro, Mao;
+            public readonly EfeitoVisual Livre = new EfeitoVisual("braco_livre", Vector3.zero, Vector3.zero, 0f, 1f);
+            public readonly EfeitoVisual Fornalha = new EfeitoVisual("fornalha", Vector3.zero, Vector3.zero, 0f, 1f);
         }
 
         /// <summary>Nasce sob a arena (morre com ela). `partida` null = Partida.Atual a cada frame.</summary>
@@ -405,7 +421,8 @@ namespace Arkana.Gameplay
             {
                 _mNucleo = MaterialVfx.CorDeVertice(MaterialVfx.Mistura.Alfa);
                 _mBrasa = MaterialVfx.Solido(CorFogo, MaterialVfx.Mistura.Alfa);
-                _mEco = MaterialVfx.Solido(CorEspectro, MaterialVfx.Mistura.Alfa);
+                float k = MaterialVfx.BrilhoHdr;
+                _mFantasma = MaterialVfx.Novo(MaterialVfx.ParticulaUnlit, new Color(k, k, k, 1f), MaterialVfx.Mistura.Aditivo, true, Silhueta());
                 _mTear = MaterialVfx.Solido(CorTear, MaterialVfx.Mistura.Aditivo, true);   // dos dois lados: a camera fica DENTRO da bolha
                 _mFeixe = MaterialVfx.Solido(CorRaio, MaterialVfx.Mistura.Aditivo, true);
                 _mAviso = MaterialVfx.Solido(CorAviso, MaterialVfx.Mistura.Alfa, true);
@@ -426,6 +443,7 @@ namespace Arkana.Gameplay
                     if (dono == null || dono.Runner == null) continue;
                     IReadOnlyList<EfeitoVisual> vs = dono.Runner.Visuais;
                     for (int j = 0; j < vs.Count; j++) Desenhar(vs[j], dono);
+                    if (dono.Runner.Impl is Pyra) BracoDaPyra(dono);
                 }
             Recolher();
             Avisos(Time.deltaTime);
@@ -449,7 +467,67 @@ namespace Arkana.Gameplay
                 case "tear": Tear(it, v, e, dono); break;
                 case "aceso": Aceso(it, v, e); break;
                 case "revelado": Revelado(it, v, e); break;
+                case "braco_livre": Chama(it, v, 110f, 36f); break;
+                case "fornalha": Chama(it, v, 18f, 0f); break;
             }
+        }
+
+        /// <summary>
+        /// O BRACO DE CHAMA da Pyra (ficha 01-pyra: o ESQUERDO, chama viva presa na manopla). No Braco Livre ele pega fogo
+        /// inteiro; com a passiva acesa (o +vel de pisar fogo, o unico buff > 1 no kit dela) ou na telegrafia da suprema (o
+        /// "brilho crescente" da ficha) solta um fio de brasas. Nao e' EfeitoVisual do kit (a regra nao muda): e' LEITURA do
+        /// estado, desenhada pelo mesmo pool — o quadro em que o estado some, o Recolher devolve e a chama morre sozinha.
+        /// Morta nao arde: o relogio do kit para na morte e o estado ficaria.
+        /// </summary>
+        void BracoDaPyra(Pawn dono)
+        {
+            if (!dono.Viva) return;
+            bool livre = dono.Runner.EstadoAtivo(Pyra.BRACO_LIVRE);
+            if (!livre && !(Efeitos.De(dono).StatusMult > 1f || dono.Runner.Telegrafia > 0f)) return;
+            Braco b;
+            if (!_bracos.TryGetValue(dono, out b)) { b = AcharBraco(dono.Visual); _bracos[dono] = b; }
+            if (b.Ombro == null || b.Mao == null) return;   // sem osso (ou o modelo morreu): nao desenha, nao quebra
+            EfeitoVisual v = livre ? b.Livre : b.Fornalha;
+            v.Pos = b.Ombro.position;
+            v.Pos2 = b.Mao.position;
+            Desenhar(v, dono);
+        }
+
+        /// <summary>Ombro e mao ESQUERDOS por nome, 1x por pawn: Meshy/Mixamo ("LeftArm", "LeftHand" — o 01-pyra.fbx tem os
+        /// dois) ou o procedural ("BracoE" e a "Mao" dele). Nao achou fica no cache sem osso: a busca aloca, nao se repete.</summary>
+        static Braco AcharBraco(Component mago)
+        {
+            var b = new Braco();
+            if (mago == null) return b;
+            foreach (Transform t in mago.GetComponentsInChildren<Transform>())
+            {
+                string n = t.name.ToLowerInvariant();
+                if (n.EndsWith("leftarm") || n == "bracoe") b.Ombro = t;
+                else if (n.EndsWith("lefthand")) b.Mao = t;
+            }
+            if (b.Mao == null && b.Ombro != null) b.Mao = b.Ombro.Find("Mao");
+            return b;
+        }
+
+        /// <summary>Chama no braco (Pos = ombro, Pos2 = punho): a caixa corre do ombro a um palmo alem do punho (o punho
+        /// fechado tambem arde) e a raiz segue o osso a cada quadro. Direcao ALEATORIA + gravidade negativa: o osso gira, o
+        /// fogo sobe para o ceu. MUNDO: o braco varre e a chama fica no rastro. A taxa bate no compasso do coracao.</summary>
+        void Chama(Item it, EfeitoVisual v, float taxa, float taxaFaisca)
+        {
+            Vector3 d = (v.Pos2 - v.Pos) * 1.2f;
+            Transform t = it.Go.transform;
+            t.position = v.Pos + d * 0.5f;
+            if (d.sqrMagnitude > 1e-6f) t.rotation = Quaternion.FromToRotation(Vector3.forward, d);
+            float bate = Batimento[Passo() % Batimento.Length];
+            ParticleSystem.ShapeModule sh = it.Ps.shape;
+            sh.scale = new Vector3(0.16f, d.magnitude, 0.16f);   // y da caixa = -z da raiz = o braco (o Novo gira -90 em X)
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = taxa * bate;
+            if (it.Ps2 == null) return;
+            ParticleSystem.ShapeModule sh2 = it.Ps2.shape;
+            sh2.scale = sh.scale;
+            ParticleSystem.EmissionModule em2 = it.Ps2.emission;
+            em2.rateOverTimeMultiplier = taxaFaisca * bate;
         }
 
         /// <summary>Segmento de chamas: cunha emissiva no chao + chamas subindo (espaco LOCAL: o vento empurra e a chama vai junto).</summary>
@@ -520,15 +598,21 @@ namespace Arkana.Gameplay
             em.rateOverTimeMultiplier = d.magnitude * 16f * e;
         }
 
-        /// <summary>Eco da Veu: "Veu de vidro" parada na ENTRADA (a capsula tremeluz) vazando neblina espectral que sobe
-        /// devagar; some encolhendo. Escala so' na capsula: a raiz escalada levaria a caixa da neblina junto.</summary>
+        /// <summary>Eco da Veu: "Veu de vidro" parada na ENTRADA — o vulto (so' o contorno aceso) tremeluz no meio da neblina
+        /// espectral que sobe devagar; some encolhendo para dentro dela (pe' fixo no chao, largura e altura juntas).</summary>
         void Eco(Item it, EfeitoVisual v, float e)
         {
-            it.Go.transform.position = NoChao(v.Pos) + Vector3.up * 0.9f;
-            it.R.transform.localScale = new Vector3(0.7f, 0.9f, 0.7f) * e;   // capsula de 2 m x 0.5 -> corpo de 1,8 m x 0,35
-            Pintar(it.R, CorEspectro, e * Flicker[Passo() % Flicker.Length]);
+            Vector3 pe = NoChao(v.Pos);
+            it.Go.transform.position = pe + Vector3.up * 0.9f;
+            it.Linha.SetPosition(0, pe);
+            it.Linha.SetPosition(1, pe + Vector3.up * (AlturaEco * e));
+            it.Linha.widthMultiplier = LarguraEco * e;
+            Color c = CorEspectro;
+            c.a = 0.8f * e * Flicker[Passo() % Flicker.Length];   // KNOB por foto: 0,8 com o HDR 1,8 do material
+            it.Linha.startColor = c;
+            it.Linha.endColor = c;
             ParticleSystem.EmissionModule em = it.Ps.emission;
-            em.rateOverTimeMultiplier = 16f * e;
+            em.rateOverTimeMultiplier = 22f * e;
             ParticleSystem.EmissionModule em2 = it.Ps2.emission;
             em2.rateOverTimeMultiplier = 10f * e;
         }
@@ -682,12 +766,16 @@ namespace Arkana.Gameplay
                         new Vector2(0.12f, 0.3f), new Vector2(1.5f, 4f), new Vector2(0.06f, 0.14f), true, 1f, 60);
                     break;
                 case "eco":
-                    it.R = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Capsule), _mEco);
-                    // a capsula sozinha lia "plastico": NEBLINA espectral vazando do corpo (abre ao subir) + almas miudas
-                    // (filhas: o Play(true)/Stop(true) do pool liga as duas). Alfa baixo: aditivo grande estoura o bloom.
-                    // MUNDO: o eco e' parado. Caixa = o corpo em pe' (0,2-1,6 m).
-                    it.Ps = ParticulaVfx.Novo(raiz, "Neblina", new Color(0.91f, 0.9f, 0.94f, 0.25f), new Color(0.55f, 0.75f, 1f, 0.18f), 16f,
-                        new Vector2(1f, 1.8f), new Vector2(0.15f, 0.5f), new Vector2(0.5f, 1.1f), true, 0.25f, 40);
+                    // a capsula lia PILULA azul (foto 19 de 12/09): no lugar, um CARTAO virado para a camera (linha de VISTA:
+                    // nao tem face, nao le' caixa de angulo nenhum) com a SILHUETA de capuz e manto so' no contorno — borda
+                    // acesa, miolo vazado: o fresnel que o Unlit nao tem, pintado na textura. A NEBLINA e' a leitura principal:
+                    // vaza do corpo (abre ao subir) + almas miudas (filhas: o Play(true)/Stop(true) do pool liga as duas).
+                    // Alfa baixo: aditivo grande estoura o bloom. MUNDO: o eco e' parado. Caixa = o corpo em pe' (0,2-1,6 m).
+                    it.Linha = Linha(it.Go, LarguraEco);
+                    it.Linha.sharedMaterial = _mFantasma;
+                    it.Linha.numCapVertices = 0;   // a ponta redonda esticaria o texel da borda alem do pe' e do capuz
+                    it.Ps = ParticulaVfx.Novo(raiz, "Neblina", new Color(0.91f, 0.9f, 0.94f, 0.25f), new Color(0.55f, 0.75f, 1f, 0.18f), 22f,
+                        new Vector2(1f, 1.8f), new Vector2(0.15f, 0.5f), new Vector2(0.5f, 1.1f), true, 0.25f, 56);
                     ParticleSystem.SizeOverLifetimeModule sze = it.Ps.sizeOverLifetime;
                     sze.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 1.4f));
                     ParticleSystem.ShapeModule she = it.Ps.shape;
@@ -733,8 +821,69 @@ namespace Arkana.Gameplay
                     it.R2 = Peca(raiz, MalhaVfx.Disco(), _mAviso);
                     it.R.transform.localPosition = new Vector3(0f, 0.02f, 0f);   // a borda por cima do miolo
                     break;
+                case "braco_livre":
+                    // CHAMA TOTAL (a manopla destravou): lambidas curtas e densas do tamanho do braco (as da muralha sao de
+                    // parede) + faisca miuda espirrando para todo lado. Filhas: o Play(true)/Stop(true) do pool liga as duas.
+                    it.Ps = ParticulaVfx.Novo(raiz, "Chamas", new Color(1f, 0.85f, 0.3f), new Color(1f, 0.32f, 0.08f), 110f,
+                        new Vector2(0.25f, 0.5f), new Vector2(0.1f, 0.4f), new Vector2(0.14f, 0.34f), true, 1f, 90);
+                    Subir(it.Ps, 0.7f);
+                    it.Ps2 = ParticulaVfx.Novo(it.Ps.transform, "Faiscas", new Color(1f, 0.92f, 0.55f), new Color(1f, 0.5f, 0.15f), 36f,
+                        new Vector2(0.35f, 0.8f), new Vector2(0.8f, 2.2f), new Vector2(0.03f, 0.07f), true, 1f, 50);
+                    it.Ps2.transform.localRotation = Quaternion.identity;   // ja' herda o -90 das chamas
+                    Subir(it.Ps2, 0.3f);
+                    break;
+                case "fornalha":
+                    // FIO DE BRASAS (passiva acesa): poucas, miudas e lentas — ela corre e o fio fica para tras.
+                    it.Ps = ParticulaVfx.Novo(raiz, "Brasas", new Color(1f, 0.8f, 0.35f), CorFogo, 18f,
+                        new Vector2(0.5f, 1f), new Vector2(0.05f, 0.3f), new Vector2(0.04f, 0.09f), true, 1f, 24);
+                    Subir(it.Ps, 0.15f);
+                    break;
             }
             return it;
+        }
+
+        /// <summary>Empuxo para CIMA do mundo (gravidade negativa, fracao de g): a chama sobe qualquer que seja o giro do osso.</summary>
+        static void Subir(ParticleSystem ps, float empuxo)
+        {
+            ParticleSystem.MainModule m = ps.main;
+            m.gravityModifier = -empuxo;
+        }
+
+        /// <summary>
+        /// O vulto do eco (64 no comprimento x 32 na largura, gerado 1x, zero arquivo): capuz em gota, ombro, manto abrindo na
+        /// barra e o pe' DISSOLVENDO na neblina. Alfa so' no CONTORNO (miolo 10%, borda cheia, brilho curto para fora): borda
+        /// acesa e meio vazado sao o que le' "fantasma" e nao "plastico". u = do pe' ao capuz (o comprimento da linha,
+        /// textureMode Stretch), v = a largura. ponytail: silhueta generica de capuz — o vulto DELA pede o BakeMesh do modelo.
+        /// </summary>
+        static Texture2D Silhueta()
+        {
+            if (_silhueta != null) return _silhueta;
+            const int nu = 64, nv = 32;
+            var t = new Texture2D(nu, nv, TextureFormat.RGBA32, false) { name = "SilhuetaEco", wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[nu * nv];
+            for (int x = 0; x < nu; x++)
+            {
+                float h = (x + 0.5f) / nu, w = Mathf.Max(MeiaLargura(h), 1e-3f), pe = Mathf.Clamp01(h / 0.3f);
+                for (int y = 0; y < nv; y++)
+                {
+                    float d = Mathf.Abs((y + 0.5f) / nv * 2f - 1f) / w;   // 0 no eixo, 1 no contorno
+                    float a = d <= 1f ? 0.1f + 0.9f * d * d * d * d : Mathf.Clamp01(1f - (d - 1f) * 5f);
+                    px[y * nu + x] = new Color32(255, 255, 255, (byte)(a * pe * 255f));
+                }
+            }
+            t.SetPixels32(px);
+            t.Apply(false, true);
+            return _silhueta = t;
+        }
+
+        /// <summary>Meia largura do vulto (1 = a borda do cartao) na altura h (0 = pe', 1 = bico do capuz).</summary>
+        static float MeiaLargura(float h)
+        {
+            if (h < 0.45f) return Mathf.Lerp(0.55f, 0.46f, h / 0.45f);            // manto: abre na barra
+            if (h < 0.68f) return Mathf.Lerp(0.46f, 0.6f, (h - 0.45f) / 0.23f);   // tronco ate' os ombros
+            if (h < 0.76f) return Mathf.Lerp(0.6f, 0.34f, (h - 0.68f) / 0.08f);   // ombro caindo no pescoco
+            float c = (h - 0.76f) / 0.24f;                                         // o CAPUZ: gota com bico no alto
+            return 0.4f * Mathf.Sqrt(Mathf.Max(0f, 1f - c * c)) * (1f - 0.35f * c);
         }
 
         /// <summary>Filho com malha, sem colisor (a camera e a mira nao podem esbarrar em VFX) e sem sombra.</summary>

@@ -509,5 +509,49 @@ namespace Arkana.Tests
                 Diagnostico(main, "10-jogador-na-zona");
             }
         }
+
+        /// <summary>
+        /// As telas que fecham a partida, no idioma da HUD: PAUSA (veu sobre o jogo congelado + placa central) e o FIM nos dois
+        /// vereditos (placa grande, titulo com brilho, colocacao e abates, botoes-placa). Partida NORMAL: o treino nao tem
+        /// colocacao e a placa sairia sem o chip. Tudo pelo caminho do jogo: o II pelo toque, o veredito por Partida.Fim ->
+        /// Bus.MatchOver, e a segunda partida pelo JOGAR DE NOVO (arena nova, mesmo seed).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Telas_FimEPausa()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "partida sem jogador");
+            Assert.IsNotNull(main.Hud, "partida sem HUD");
+
+            // PAUSA pelo caminho do dedo: o II e' um BotaoAcao (OnPointerDown -> Tocado -> AbrirPausa)
+            var toque = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+            main.Hud.Pausa.OnPointerDown(toque);
+            main.Hud.Pausa.OnPointerUp(toque);
+            Assert.IsTrue(main.Hud.Pausado, "o II pausa");
+            Assert.AreEqual(0f, Time.timeScale, "a pausa congela o jogo");
+            yield return null;   // timeScale 0: o quadro passa, o relogio do jogo nao (a pausa abre sem animacao)
+            Foto(main.Player.Camera.Cam, "23-pausa", true);
+            Tocar("BtnRetomar");
+            Assert.IsFalse(main.Hud.Pausado, "RETOMAR solta a pausa");
+            Assert.AreEqual(1f, Time.timeScale, "e devolve o relogio");
+
+            // DERROTA com a arena cheia: 12 bots de pe' = colocacao #13
+            main.Partida.Fim(false);
+            yield return Esperar(0.8f);   // a placa pousa em 0,35 s (relogio sem escala)
+            Assert.AreEqual(FluxoDeJogo.Estado.Fim, main.Fluxo.Atual, "MatchOver leva ao Fim");
+            Foto(main.Player.Camera.Cam, "22-fim-derrota", true);
+
+            // VITORIA: JOGAR DE NOVO pelo botao da placa e o outro veredito (#1, titulo em ouro respirando)
+            Tocar("BtnJogarDeNovo");
+            yield return Esperar(2f);
+            Assert.AreEqual(FluxoDeJogo.Estado.Partida, main.Fluxo.Atual, "JOGAR DE NOVO monta partida nova");
+            main.Partida.Fim(true);
+            yield return Esperar(0.8f);
+            Foto(main.Player.Camera.Cam, "22-fim-vitoria", true);
+        }
     }
 }
