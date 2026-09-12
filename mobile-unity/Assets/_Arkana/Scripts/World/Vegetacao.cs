@@ -193,7 +193,7 @@ namespace Arkana.World
     /// larga (campina, avulsas e 1/3 da mata) e pinheiro (2/3 da mata), desenhados como a Grama: RenderMeshInstanced por
     /// BLOCO de 60 m, um lote por especie x tinta x LOD, nenhum GameObject por arvore, LOD por arvore a 4 Hz. Os lugares,
     /// o colisor do tronco e o registro (PosArvore) sao os de sempre. Queimada: o toco procedural na malha da celula.
-    /// MOITA DA MESHY (onda 6B): a mesma receita por celula, so' perto do olho (AlcanceMoitaMeshy); longe, a procedural.
+    /// MOITA DA MESHY (onda 6B): a mesma receita por celula; perto do olho (AlcanceMoitaMeshy) a de 1,2K, dali ao CorteMoitas a de 428 tris.
     /// Sem os .glb (ou sem instancing, no -nographics), volta a procedural na malha da celula.
     /// </summary>
     public sealed class Vegetacao : MonoBehaviour
@@ -232,13 +232,12 @@ namespace Arkana.World
             { new Color(1.14f, 1f, 0.72f), new Color(1.24f, 1.06f, 0.68f), new Color(1.02f, 0.94f, 0.8f) },      // pinheiro
         };
 
-        /// <summary>A moita da Meshy (1,2K tris, 2,2 x 1,6 m). Sem LOD1: a decimacao para em ~1.150 tris (a malha soldada tem
-        /// 385 vertices e UV em retalhos — 3,2K vertices na GPU).</summary>
+        /// <summary>A moita da Meshy (1,2K tris, 2,2 x 1,6 m). O LOD1 ("-lod1", 428 tris) e' OUTRO remesh do site: a decimacao
+        /// no Blender parava em ~1.150 tris (a malha soldada tem 385 vertices e UV em retalhos — 3,2K vertices na GPU).</summary>
         public const string MoitaMeshy = "37-moita";
         /// <summary>
-        /// Ate' onde a moita e' a da Meshy (m, do olho ao centro da celula); dali ate' o CorteMoitas, a procedural da celula.
-        /// Toda moita da Meshy ate' 95 m custaria ~330 moitas na tela da mata = ~400K tris e ~1M vertices (sonda de 12/09);
-        /// ate' 45 m, ~80. KNOB: 95 quando houver uma moita de ~400 tris.
+        /// Ate' onde a moita e' a da Meshy de 1,2K (m, do olho ao centro da celula); dali ate' o CorteMoitas, a de 428 tris
+        /// (sem ela, a procedural). A de 1,2K ate' 95 m custaria ~400K tris na tela da mata (sonda de 12/09); ate' 45 m, ~80 moitas.
         /// </summary>
         public const float AlcanceMoitaMeshy = 45f;
         /// <summary>A moita da Meshy chega verde-limao (folha 0,27/0,49/0,12): a tinta aprofunda o verde. Campina, mata. KNOB.</summary>
@@ -287,7 +286,7 @@ namespace Arkana.World
             // a moita da Meshy da celula (fixa: sem LOD, sem fogo) e se o olho esta' perto o bastante para ela
             public Lote[] MoitasMeshy;
             public Bounds CaixaMoitas;
-            public bool MoitasPerto;
+            public bool MoitasPerto, MoitasMedio;   // Meshy de perto (LOD0) / Meshy leve ate' o CorteMoitas (LOD1)
         }
 
         Relevo relevo;
@@ -325,9 +324,9 @@ namespace Arkana.World
         // a moita da Meshy: matriz (com o molde) e tinta (0 campina, 1 mata) por moita; null = so' a procedural
         readonly List<Matrix4x4> moiVis = new List<Matrix4x4>();
         readonly List<int> moiVar = new List<int>();
-        Mesh malhaMoita;
+        Mesh malhaMoita, malhaMoitaLod1;
         Matrix4x4 moldeMoita;
-        static readonly Material[] matMoita = new Material[2];
+        static readonly Material[] matMoita = new Material[2], matMoitaLod1 = new Material[2];
 
         public int ContarArvores() => arvPos.Count;
         public Vector3 PosArvore(int i) => arvPos[i];
@@ -379,8 +378,8 @@ namespace Arkana.World
             MoldeDasRochas = rocha != null ? rocha.name : "blob";
             malhaArvore = MalhasDasArvores(moldeArvore, trisArvore);
             MoldeDasArvores = malhaArvore != null ? ArvoreCopa + " + " + ArvorePinheiro : "procedural";
-            malhaMoita = MalhaDaMoita(out moldeMoita);
-            MoldeDasMoitas = malhaMoita != null ? MoitaMeshy : "procedural";
+            malhaMoita = MalhaDaMoita(out moldeMoita, out malhaMoitaLod1);
+            MoldeDasMoitas = malhaMoita != null ? MoitaMeshy + (malhaMoitaLod1 != null ? " + lod1" : "") : "procedural";
             arvPos.Clear(); arvM.Clear(); arvTinta.Clear(); arvQueimada.Clear(); arvColisor.Clear();
             arvEsp.Clear(); arvVar.Clear(); arvVis.Clear(); blocos.Clear();
             rocM.Clear(); rocVis.Clear(); moiM.Clear(); moiTinta.Clear(); moiVis.Clear(); moiVar.Clear();
@@ -865,14 +864,19 @@ namespace Arkana.World
 
         /// <summary>A moita da Meshy, os materiais das duas tintas e o molde (base em y = 0, centro da pegada na origem);
         /// null = falta o .glb, a textura, o instancing ou o Lit (fica a procedural em toda distancia).</summary>
-        static Mesh MalhaDaMoita(out Matrix4x4 molde)
+        static Mesh MalhaDaMoita(out Matrix4x4 molde, out Mesh lod1)
         {
             molde = Matrix4x4.identity;
+            lod1 = null;
             if (!SystemInfo.supportsInstancing) return null;
             Mesh m = MalhaDoGlb(MoitaMeshy, out Texture tex);
             if (m == null || tex == null) return null;
             for (int v = 0; v < matMoita.Length; v++)
                 if (MaterialDaMeshy(ref matMoita[v], "Moita" + v, tex, TintaMoita[v]) == null) return null;
+            // o LOD1 e' OUTRO remesh do site (428 tris): outra UV, outra textura -> materiais proprios; falhou, fica a procedural longe
+            lod1 = MalhaDoGlb(MoitaMeshy + "-lod1", out Texture tex1);
+            for (int v = 0; lod1 != null && v < matMoitaLod1.Length; v++)
+                if (tex1 == null || MaterialDaMeshy(ref matMoitaLod1[v], "MoitaLod1" + v, tex1, TintaMoita[v]) == null) lod1 = null;
             Bounds b = m.bounds;
             molde = Matrix4x4.Translate(-new Vector3(b.center.x, b.min.y, b.center.z));
             return m;
@@ -1064,7 +1068,8 @@ namespace Arkana.World
                 Vector3 centro = transform.TransformPoint(c.Centro);
                 float d2 = (olho - centro).sqrMagnitude;
                 c.MoitasPerto = c.MoitasMeshy != null && d2 < perto2;
-                bool liga = d2 < corte2 && !c.MoitasPerto;
+                c.MoitasMedio = c.MoitasMeshy != null && malhaMoitaLod1 != null && !c.MoitasPerto && d2 < corte2;
+                bool liga = d2 < corte2 && !c.MoitasPerto && !c.MoitasMedio;
                 if (liga != c.MoitasLigadas)
                 {
                     c.MoitasLigadas = liga;
@@ -1079,12 +1084,14 @@ namespace Arkana.World
             for (int k = 0; k < cels.Length; k++)
             {
                 Celula c = cels[k];
-                if (c == null || !c.MoitasPerto) continue;
+                if (c == null || !(c.MoitasPerto || c.MoitasMedio)) continue;
+                Mesh malha = c.MoitasPerto ? malhaMoita : malhaMoitaLod1;
+                Material[] mats = c.MoitasPerto ? matMoita : matMoitaLod1;
                 for (int v = 0; v < c.MoitasMeshy.Length; v++)
                 {
                     Lote l = c.MoitasMeshy[v];
                     if (l == null) continue;
-                    var rp = new RenderParams(matMoita[v])
+                    var rp = new RenderParams(mats[v])
                     {
                         worldBounds = c.CaixaMoitas,
                         shadowCastingMode = ShadowCastingMode.Off,
@@ -1092,7 +1099,7 @@ namespace Arkana.World
                         lightProbeUsage = LightProbeUsage.Off,
                         layer = gameObject.layer,
                     };
-                    Graphics.RenderMeshInstanced(rp, malhaMoita, 0, l.M, l.N);
+                    Graphics.RenderMeshInstanced(rp, malha, 0, l.M, l.N);
                 }
             }
         }

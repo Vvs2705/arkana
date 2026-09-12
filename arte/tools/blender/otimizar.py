@@ -10,7 +10,7 @@
 #
 # Uso (headless):
 #   blender --background --python tools/blender/otimizar.py -- \
-#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m> [tex_max_px] [entradas_extras] [giro_x_graus]
+#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m> [tex_max_px] [entradas_extras] [giro_x_graus] [suave_graus]
 #
 # 12/09/2026: a DECIMACAO COLLAPSE abria buracos (a rocha saia estilhacada no jogo). A topologia agora vem
 # do REMESH do site da Meshy (10K/3K, fechada); aqui passa-se tris_alvo = 0 (nao decima) e tex_max_px
@@ -28,6 +28,9 @@ manter = {"Base Color"} | (set(argv[5].split(",")) if len(argv) > 5 and argv[5] 
 # 7o argumento (12/09): giro em X (graus) antes de medir — a luva do cajado veio DEITADA da Meshy (dedos em +Z) e
 # as outras em pe'; -90 poe os dedos para cima
 giro_x = float(argv[6]) if len(argv) > 6 else 0.0
+# 8o argumento (12/09): angulo da normal suave (graus). Pedra quer 40 (aresta viva); FOLHAGEM quer ~80 — a copa de
+# 1,5 K a 40 saia em planos chapados na foto 31. Dado, vale tambem sem decimar (tris_alvo = 0).
+suave = float(argv[7]) if len(argv) > 7 else None
 
 # cena limpa (o cubo default do Blender ja' vazou para um export uma vez na
 # historia de todo pipeline do mundo; aqui ele morre antes de nascer)
@@ -66,7 +69,11 @@ if tris_alvo > 0:
     mod.decimate_type = "COLLAPSE"
     mod.ratio = razao
     bpy.ops.object.modifier_apply(modifier=mod.name)
-    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))   # KNOB: aresta de pedra viva x face lisa
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(suave if suave is not None else 40))   # KNOB: aresta viva x face lisa
+elif suave is not None:
+    import math
+    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(suave))
 
 if tex_max > 0:
     # so' a cor base (e o que `manter` pedir) fica ligada no BSDF; o resto sai do export
@@ -110,8 +117,9 @@ tris_final = sum(len(p.vertices) - 2 for p in obj.data.polygons)
 print(f"[otimizar] final: {tris_final} tris, dims {obj.dimensions.x:.2f} x "
       f"{obj.dimensions.y:.2f} x {obj.dimensions.z:.2f} m")
 
+# export_apply: o shade_smooth_by_angle do Blender 4.1+ e' um MODIFICADOR; sem aplicar, a normal suave nao saia no glb
 if tex_max > 0:
-    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", export_image_format="JPEG")
+    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", export_image_format="JPEG", export_apply=True)
 else:
-    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB")
+    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", export_apply=True)
 print(f"[otimizar] salvo: {saida}")
