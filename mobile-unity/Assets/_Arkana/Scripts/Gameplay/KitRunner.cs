@@ -80,6 +80,11 @@ namespace Arkana.Gameplay
 
         public IReadOnlyList<EfeitoVisual> Visuais => _visuais;
 
+        /// <summary>Segundos para a suprema encher: a PARTIDA decide (no treino, 5 s — Partida.SupremaCargaS); sem partida
+        /// (teste puro), o dado do kit. O treino tinha o numero e o teste dele, mas o runner nunca perguntava: a Pyra
+        /// esperava os 50 s de partida no treino (diag da foto 18 de 12/09).</summary>
+        public float SupremaCargaS => Partida.Atual != null ? Partida.Atual.SupremaCargaS(Dados.SupremaCarga) : Dados.SupremaCarga;
+
         /// <summary>`dados` so' para teste (grampo da telegrafia com ficha ruim); em jogo vem de Kits.De(slug).</summary>
         public KitRunner(string slug, IConjurador dono, Kits.KitDef dados = null)
         {
@@ -116,7 +121,7 @@ namespace Arkana.Gameplay
             if (Dono == null || Dono.Vital == null || !Dono.Vital.Viva || !(dt > 0f)) return;
             float taticaAntes = TaticaCd;
             TaticaCd = Mathf.Max(TaticaCd - dt, 0f);
-            Carregar(dt / Mathf.Max(Dados.SupremaCarga, 0.001f));
+            Carregar(dt / Mathf.Max(SupremaCargaS, 0.001f));
             Carregar(danoCausadoDelta * Kits.CargaPorDano);
             Silencio = Mathf.Max(Silencio - dt, 0f);
             DesdeAtaque += dt;
@@ -186,7 +191,7 @@ namespace Arkana.Gameplay
             if (!ProntoSuprema) return false;
             CargaSuprema = 0f;
             Telegrafia = Mathf.Clamp(Dados.Telegrafia, Kits.TelegrafiaMin, Kits.TelegrafiaMax);
-            AvisarCd("suprema", Dados.SupremaCarga);
+            AvisarCd("suprema", SupremaCargaS);
             // "Se mata rapido, avisa antes" — vale para TODOS, inclusive bot (a suprema inimiga muda mata a contrajogada).
             Bus.EmitKitTelegraph(Slug, "suprema", Telegrafia, Dono.Pos);
             return true;
@@ -213,7 +218,7 @@ namespace Arkana.Gameplay
         public void AvisarCd(string tipo, float restante)
         {
             if (Dono == null || !Dono.EhPlayer) return;
-            Bus.EmitKitCooldown(tipo, restante, tipo == "tatica" ? Dados.TaticaCd : Dados.SupremaCarga);
+            Bus.EmitKitCooldown(tipo, restante, tipo == "tatica" ? Dados.TaticaCd : SupremaCargaS);
         }
 
         public void AvisarEstado(string nome, bool ligado)

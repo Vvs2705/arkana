@@ -336,12 +336,26 @@ namespace Arkana.Tests
             OlharParaOCentro(main);
             yield return Esperar(0.3f);
             main.Player.Tatica();
-            yield return Esperar(0.3f);
+            yield return Esperar(0.9f);   // a chama sobe 1,4-3 m/s: aos 0,3 s ela ainda estava no chao
             Foto(main.Player.Camera.Cam, "17-kit-tatica", true);
+            // o que o kit escreveu e o que a casca desenhou (um quadro sem efeito, sem dado, vira palpite)
+            var sb = new System.Text.StringBuilder("17-kit-tatica: pawn=" + main.Player.Pawn.Pos.ToString("F1")
+                + " cam=" + main.Player.Camera.Cam.transform.position.ToString("F1") + " visuais=" + main.Player.Pawn.Runner.Visuais.Count + "\n");
+            foreach (var v in main.Player.Pawn.Runner.Visuais) sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " restante=" + v.Restante.ToString("F2"));
+            var vk = Object.FindFirstObjectByType<Gameplay.VisualDosKits>();
+            if (vk != null)
+                foreach (Renderer r in vk.GetComponentsInChildren<Renderer>(true))
+                    sb.AppendLine("  desenho " + Caminho(r.transform) + " ativo=" + r.gameObject.activeInHierarchy + " ligado=" + r.enabled
+                        + " bounds=" + r.bounds.center.ToString("F1") + " tam=" + r.bounds.size.ToString("F1") + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.shader.name : "NULL"));
+            else sb.AppendLine("  SEM VisualDosKits");
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             yield return Esperar(1.2f);
+            var runner = main.Player.Pawn.Runner;
+            string antes = "18-kit-suprema: carga=" + runner.CargaSuprema.ToString("F2") + " pronto=" + runner.ProntoSuprema;
             main.Player.Suprema();
-            yield return Esperar(0.6f);
+            yield return Esperar(2f);   // a suprema e' TELEGRAFADA: o braco livre so' sai quando o aviso no chao enche
             Foto(main.Player.Camera.Cam, "18-kit-suprema", true);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), antes + " visuais depois=" + runner.Visuais.Count + "\n");
         }
 
         [UnityTest]

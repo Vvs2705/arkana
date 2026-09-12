@@ -159,6 +159,23 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void Suprema_NoTreino_EncheEm5s_ARegraDaPartidaChegaNoRunner()
+        {
+            // defeito (foto 18 de 12/09): Partida.SupremaCargaS tinha teste proprio, mas o runner lia Dados.SupremaCarga
+            // direto — no treino a Pyra esperava os 50 s de partida para ver a suprema
+            var m = new Partida(new FakeRelevo());
+            try
+            {
+                m.Iniciar(5, 3, true, Vector3.zero);
+                var k = new KitRunner("01-pyra", new FakeConjurador("pyra", Vector3.zero));
+                Assert.AreEqual(Partida.SUPREMA_TREINO_S, k.SupremaCargaS, 1e-4f);
+                Andar(k, Partida.SUPREMA_TREINO_S + 0.1f);
+                Assert.IsTrue(k.ProntoSuprema, "cheia em 5 s no treino: carga=" + k.CargaSuprema);
+            }
+            finally { m.Encerrar(); }
+        }
+
+        [Test]
         public void Suprema_NaoCarregaNoAr_NemPorTempoNemPorDano()
         {
             var p = new FakeConjurador("pyra", Vector3.zero) { NoChao = false };

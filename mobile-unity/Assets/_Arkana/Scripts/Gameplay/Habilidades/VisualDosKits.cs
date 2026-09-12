@@ -345,7 +345,7 @@ namespace Arkana.Gameplay
             public string Tipo;
             public GameObject Go;
             public Renderer R, R2;
-            public ParticleSystem Ps;
+            public ParticleSystem Ps, Ps2;
             public LineRenderer Linha;
             public Vector3[] Pontos;
             public int Quadro;
@@ -435,11 +435,15 @@ namespace Arkana.Gameplay
             if (d.sqrMagnitude > 1e-4f) t.rotation = Quaternion.LookRotation(d, Vector3.up);
             float f = Flicker[Passo() % Flicker.Length];
             it.R.transform.localScale = new Vector3(v.Raio * 2f, AlturaNucleo * Mathf.Lerp(0.5f, 1f, e) * f, comp);
-            Pintar(it.R, Color.white, 0.9f * e);
+            Pintar(it.R, Color.white, 0.6f * e);   // o nucleo e' o calor no pe' da muralha; quem desenha o fogo sao as chamas
             ParticleSystem.ShapeModule sh = it.Ps.shape;
             sh.scale = new Vector3(v.Raio * 2f, comp, 0.1f);
             ParticleSystem.EmissionModule em = it.Ps.emission;
-            em.rateOverTimeMultiplier = comp * 6f * e;
+            em.rateOverTimeMultiplier = comp * 22f * e;
+            ParticleSystem.ShapeModule sh2 = it.Ps2.shape;
+            sh2.scale = sh.scale;
+            ParticleSystem.EmissionModule em2 = it.Ps2.emission;
+            em2.rateOverTimeMultiplier = comp * 7f * e;
         }
 
         /// <summary>Poca do dash: disco emissivo no chao, piscando em passos.</summary>
@@ -578,8 +582,15 @@ namespace Arkana.Gameplay
             {
                 case "muralha":
                     it.R = Peca(raiz, MalhaVfx.Cunha(), _mNucleo);
-                    it.Ps = ParticulaVfx.Fogo(raiz, "Chamas", 30f, false);
+                    // PAREDE DE FOGO, nao barra de lava (foto 17 de 12/09): chama grande e densa (o teto padrao de 48
+                    // particulas deixava 8 m de muralha com meia duzia de pontos) + faisca miuda que sobe alto e espirra.
+                    // As faiscas sao FILHAS das chamas: o Play(true)/Stop(true) do pool liga as duas.
+                    it.Ps = ParticulaVfx.Novo(raiz, "Chamas", new Color(1f, 0.85f, 0.3f), new Color(1f, 0.32f, 0.08f), 30f,
+                        new Vector2(0.5f, 1f), new Vector2(1.4f, 3f), new Vector2(0.6f, 1.3f), false, 0.08f, 260);
                     it.Ps.transform.localPosition = new Vector3(0f, 0.1f, 0f);
+                    it.Ps2 = ParticulaVfx.Novo(it.Ps.transform, "Faiscas", new Color(1f, 0.92f, 0.55f), new Color(1f, 0.5f, 0.15f), 10f,
+                        new Vector2(0.8f, 1.6f), new Vector2(2f, 4.5f), new Vector2(0.06f, 0.14f), false, 0.35f, 120);
+                    it.Ps2.transform.localRotation = Quaternion.identity;   // ja' herda o -90 das chamas
                     break;
                 case "poca":
                     it.R = Peca(raiz, MalhaVfx.Disco(), _mBrasa);
