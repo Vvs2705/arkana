@@ -523,9 +523,11 @@ namespace Arkana.World
         {
             var b = new MalhaProc.Construtor();
             var rng = new Sorteio(11);
-            // tronco mais escuro (o CorTronco puro saia laranja no sol do entardecer) e copa em CACHO: a massa grande e tres
-            // menores em volta — duas pecas redondas liam como pirulito (foto 15 de 12/09). ~90 triangulos por arvore.
-            b.Tronco(Vector3.zero, 0.32f, 0.22f, 3.35f, 5, Relevo.Escurecer(Relevo.CorTronco, 0.2f), Relevo.CorTronco);
+            // tronco escurecido e puxado pro cinza (o CorTronco puro, no sol do entardecer e com o pos saturando, saia laranja)
+            // e copa em CACHO: a massa grande e tres menores em volta — duas pecas redondas liam como pirulito (foto 15 de
+            // 12/09). ~90 triangulos por arvore.
+            Color tronco = new Color(0.34f, 0.29f, 0.25f);   // casca escura: o sol quente (1; 0,86; 0,63 x 1,55) ja' doura
+            b.Tronco(Vector3.zero, 0.32f, 0.22f, 3.35f, 5, Relevo.Escurecer(tronco, 0.2f), tronco);
             b.Blob(new Vector3(0f, 4.3f, 0f), new Vector3(1.8f, 1.3f, 1.8f), Relevo.CorFolhaA, rng, 0.20f);
             b.Blob(new Vector3(1.0f, 4.0f, 0.45f), new Vector3(1.05f, 0.85f, 1.05f), Relevo.CorFolhaA, rng, 0.18f);
             b.Blob(new Vector3(-0.85f, 4.1f, -0.6f), new Vector3(1.0f, 0.8f, 1.0f), Relevo.CorFolhaB, rng, 0.18f);
