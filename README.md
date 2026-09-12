@@ -56,13 +56,13 @@ sobrou daquele desvio está registrado em `design/PROJETO.md` como lição.
 CONTINUAR DAQUI sempre no topo. É o único arquivo que precisa ser lido para saber
 onde as coisas estão.
 
-## Estado (11/09/2026)
+## Estado (12/09/2026)
 
 | | |
 |---|---|
 | **Plataforma alvo** | Android (aparelho de teste: Poco F4) |
 | **Engine** | Unity 6000.3.23f1, instalado com o módulo Android |
-| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu, áudio e o visual (shaders próprios, grama, kit de cenário, loot/baú/tempestade/efeitos) reescritos; portão headless verde (268 testes) e fotos do jogo rodando (`foto.ps1`). APK ainda não gerado |
+| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu, áudio e o visual (shaders próprios, grama, kit de cenário, loot/baú/tempestade/efeitos) reescritos; portão headless verde (268 testes), fotos do jogo rodando (`foto.ps1`) e **APK jogado no Poco F4 a 60 FPS** (12/09) |
 | **mobile-godot** | referência, 12/12 autotestes verdes na última execução (04/09) |
 | **Rede** | **não existe.** É o item mais caro e ainda não começou |
 | **Elenco** | 20 fichas e 160 vistas de concept prontas; modelos 3D a refazer no site da Meshy, um por um |

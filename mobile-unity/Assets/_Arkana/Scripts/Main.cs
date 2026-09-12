@@ -158,10 +158,14 @@ namespace Arkana
             Fluxo = new FluxoDeJogo(Montar, Desmontar);
             Fluxo.Ligar();
             _pedidoAdb = PartidaPeloAdb.Pedido();   // teste sem dedo (MIUI recusa toque pelo adb); null = jogo normal
+            _fpsAdb = PartidaPeloAdb.FpsPedido();
         }
+
+        int _fpsAdb;
 
         string _pedidoAdb;
         float _relogioAdb;
+        bool _saltoAdb;
 
         void OnDestroy()
         {
@@ -182,8 +186,16 @@ namespace Arkana
                 {
                     ArkMenu.PedidoDeTreino = _pedidoAdb == "treino";
                     _pedidoAdb = null;
+                    _saltoAdb = true;
                     Bus.EmitGameStartRequested();
+                    if (_fpsAdb != 0) Application.targetFrameRate = _fpsAdb;   // depois da Config (que roda no Criar do Menu)
                 }
+            }
+            // o jogador automatico salta no meio da rota (a 1a rodada no aparelho caiu no mar: o castelo empurra no FIM da rota, fora da ilha)
+            if (_saltoAdb && Castelo != null && Player != null && Castelo.Progresso >= PartidaPeloAdb.SALTO_EM)
+            {
+                _saltoAdb = false;
+                Player.Saltar();
             }
             if (Partida == null) return;
             Partida.Tick(dt);

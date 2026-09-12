@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 11/09/2026, noite (o Unity alcançou o Godot em código e em tela: 268 testes e 10 fotos; falta o aparelho)
+> **Atualizado em:** 12/09/2026, madrugada (APK no Poco F4: 60 FPS medidos; a prioridade seguinte é o visual)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,7 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o Unity alcançou o Godot em código E em tela; o que falta é o APARELHO (11/09/2026)
+### >>> COMECE POR AQUI — o jogo RODA NO APARELHO a 60 FPS; o Diretor achou o visual amador (12/09/2026)
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
 Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
@@ -73,7 +73,8 @@ de engine do projeto.
 | **Portão** | `powershell -File mobile-unity\portao.ps1` → **268 testes, 0 falhas** (262 EditMode sobre classes puras + 6 PlayMode que montam a arena inteira e rodam 3 s sem um log sequer) |
 | **Fotos** | `powershell -File mobile-unityoto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
-| **APK** | **ainda NÃO gerado** — ordem do Diretor: "mais para frente". `build_apk.ps1` está pronto |
+| **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
+| **FPS no aparelho (a dívida de 25/08, PAGA)** | **60 FPS sustentados, quadro de 16,6 ms, pior quadro 33 ms, 36,9 °C**, sem erro nem exceção no logcat, numa partida inteira: castelo, queda, pouso, 12 bots em FFA, tempestade. A tela do Poco estava em 60 Hz: o vsync segura aí; a folga real só aparece com a tela em 120 Hz |
 | **Visual** | seis shaders próprios (toon do chão com textura de detalhe, grama instanciada, água com ondas e espuma, céu de entardecer, bruma, toon do mago), grama/flores/juncos por célula, as 8 peças do kit plantadas, ruínas, mar até o horizonte, castelo e luvas `.glb` do Godot via glTFast, 20 retratos, loot/baú/tempestade/kits/terreno desenhados, sol do Godot, espaço de cor Linear |
 
 **Como foi feito.** Sete raias em paralelo (Core, Mundo, Gameplay, UI; depois
@@ -126,11 +127,46 @@ ruínas e rochedos no mar; o castelo e as luvas `.glb` do Godot (glTFast 6.20);
 os 20 retratos do menu; o sol quente do Godot; projeto em espaço de cor Linear
 (o Godot é Linear; em Gamma o toon saía saturado).
 
-#### O que o Unity AINDA NÃO TEM (registro honesto, 11/09 à noite)
+#### PASSO A FEITO (12/09, madrugada): o APK no Poco F4, sem dedo
 
-Tudo acima **passa no teste e foi visto em foto** — nunca no aparelho. Faltam:
+**O que foi feito.** Três APKs em 25 minutos; o terceiro joga uma partida
+inteira sozinho no aparelho e mede o FPS. O jogo passou: 60 FPS cravados,
+HUD na escala certa (dp de verdade, 395 ppi), salto com altímetro, pouso na
+campina, bots se matando (12 → 6 em dois minutos), tempestade contando.
 
-1. **Nada foi visto no aparelho.** FPS continua sem medição desde 25/08.
+**Como.** O MIUI do Poco F4 recusa três coisas do `adb`: toque injetado
+(`INJECT_EVENTS`), `install -g` (permissões em lote) e instalação sem
+"Instalar via USB" ligado. Então o jogo ganhou dois extras de intent e um
+medidor:
+
+```
+adb shell am start -n br.com.vstack.arkana/com.unity3d.player.UnityPlayerGameActivity     --es arkana_auto partida --ei arkana_fps 300     # ou "treino"; sem extras = jogo normal
+adb logcat -s Unity | grep "ARKANA FPS"              # media, pior segundo, pior quadro, a cada 5 s
+adb exec-out screencap -p > foto.png                 # a tela do aparelho
+```
+
+O jogador automático salta a 45% da rota do castelo (na 1ª rodada ele não
+saltava e o castelo o empurrou no FIM da rota, no mar). `targetFrameRate = -1`
+**não é "sem teto" no Android: é 30 FPS** (o padrão do Unity) — pedir 300 é o
+jeito de medir.
+
+**O que o aparelho mostrou que a foto de PC não mostrava.** O boot tem dois
+engasgos de 6 s (montar a ilha e a arena: grama, kit, colisores); os bots
+duelam de verdade; a água de nado funciona (o mago caiu no mar e nadou); as
+rochas do kit continuam "rachadas" de perto (asset).
+
+**A avaliação do Diretor, na hora:** *"parte gráfica está muito amadora ainda,
+muito longe de algo real; espero que em breve seja possível ver algo
+visualmente melhor."* **Isso vira a prioridade.** O que está na tela é
+placeholder: mago de primitivas, rochas decimadas com buracos, luz de primeira
+passada, nenhum VFX de assinatura. O caminho para "real" está na ORDEM abaixo.
+
+#### O que o Unity AINDA NÃO TEM (registro honesto, 12/09)
+
+Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
+
+1. **Visual de jogo de verdade** (a avaliação do Diretor acima): elenco real,
+   peças sem buracos, VFX de assinatura, pós-processamento, iluminação afinada.
 2. **As peças do kit têm BURACOS de perto**: a malha decimada a 6.000 faces
    deixa frestas onde o chão aparece por dentro (foto `08-pouso`). É asset,
    não código: re-derivar do original de 3 M de faces no Blender com "fechar
@@ -169,15 +205,16 @@ Tudo acima **passa no teste e foi visto em foto** — nunca no aparelho. Faltam:
 |---|---|
 | `pc-unreal/`, `design/referencias/PC-STEAM-ANALISE.md`, exportador de heightmap, CI do Godot | produto abandonado; o que valia atravessou para as lições abaixo |
 
-#### A ORDEM daqui para a frente
+#### A ORDEM daqui para a frente — o VISUAL primeiro (ordem do Diretor, 12/09)
 
 | Passo | O quê | Portão |
 |---|---|---|
-| **A** | `build_apk.ps1` → instalar no Poco F4 → **jogar uma partida** e **medir FPS** | o número que falta desde 25/08 |
-| **B** | O que o aparelho mostrar de errado (é a primeira vez que alguém JOGA este código) | partida completa contra bots, no aparelho, com FPS |
-| **C** | Peças do kit sem buracos (re-derivar do original no Blender); ponte-raiz com vão; ajuste de toon/ambiente/sombra pelas fotos | a ilha do Godot, no Unity, com FPS medido |
-| **D** | Elenco: os 20 magos refeitos no SITE da Meshy, em FBX Humanoid + adaptador de `Animator` no `Mago` | jogo bonito de ver em vídeo |
-| **E** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
+| **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
+| **B** | **Elenco real**: os 20 magos refeitos no SITE da Meshy (um por um, com a marcação de articulações), exportados em FBX Humanoid; adaptador de `Animator` no `Mago`. Começa pelos 3 com kit (Pyra, Véu, Tessa) | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
+| **C** | **Peças do kit sem buracos**: re-derivar as 8 do original de 3 M de faces no Blender (decimate + "fechar buracos" + normais coerentes); ponte-raiz com vão; e as 7 peças novas da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana, obelisco, plataforma, braseiro) | a rocha de perto lê como rocha; FPS mantido |
+| **D** | **VFX de assinatura e pós**: braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
+| **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
+| **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
 
 **Antes da rede, o jogo solo contra bots vale por si** — a decisão de gênero
 que sobreviveu ao desvio (ver lições). Modelo de receita fica com o Diretor.
@@ -188,7 +225,7 @@ que sobreviveu ao desvio (ver lições). Modelo de receita fica com o Diretor.
   receita estão na seção da leva 7, abaixo. Destino: FBX para o Unity.
 - `design/` e `arte/` alimentam as implementações; as implementações **nunca
   cruzam código**. GDScript não se traduz: se relê a decisão e se escreve em C#.
-- **FPS se mede, não se estima.** Passo A.
+- **FPS se mede, não se estima.** Medido: 60 no Poco F4 (12/09). Toda leva visual mede de novo.
 - **Teste provado em vermelho, portão verde antes de entregar.** *"Sem
   atropelar as coisas."*
 

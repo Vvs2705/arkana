@@ -13,9 +13,18 @@ namespace Arkana
     public static class PartidaPeloAdb
     {
         public const string EXTRA = "arkana_auto";
+        /// <summary>`--ei arkana_fps 120` (ou -1 = sem teto): mede a folga real; sem o extra vale a Config do jogador.</summary>
+        public const string EXTRA_FPS = "arkana_fps";
+        /// <summary>Progresso da rota do castelo em que o jogador automatico salta (os bots sorteiam 0,18-0,86).</summary>
+        public const float SALTO_EM = 0.45f;
 
         /// <summary>"partida", "treino" ou null.</summary>
-        public static string Pedido()
+        public static string Pedido() => Extra(i => i.Call<string>("getStringExtra", EXTRA));
+
+        /// <summary>0 = sem pedido; -1 = sem teto; N = teto de N quadros.</summary>
+        public static int FpsPedido() => Extra(i => i.Call<int>("getIntExtra", EXTRA_FPS, 0));
+
+        static T Extra<T>(System.Func<AndroidJavaObject, T> ler)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
@@ -24,13 +33,13 @@ namespace Arkana
                 using (var atividade = player.GetStatic<AndroidJavaObject>("currentActivity"))
                 using (var intent = atividade.Call<AndroidJavaObject>("getIntent"))
                 {
-                    string v = intent.Call<string>("getStringExtra", EXTRA);
-                    return string.IsNullOrEmpty(v) ? null : v;
+                    T v = ler(intent);
+                    return v is string str && string.IsNullOrEmpty(str) ? default(T) : v;
                 }
             }
-            catch (System.Exception) { return null; }   // sem atividade (teste, outra plataforma): sem pedido
+            catch (System.Exception) { return default(T); }   // sem atividade (teste, outra plataforma): sem pedido
 #else
-            return null;
+            return default(T);
 #endif
         }
     }
