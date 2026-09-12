@@ -174,12 +174,10 @@ namespace Arkana.Tests
         public IEnumerator Foto_Menu()
         {
             ExigirGpu();
-            _go.AddComponent<Main>();
-            yield return Esperar(0.5f);
-            Camera c = CameraTemporaria("CamFotoMenu", new Vector3(0f, 3f, -5f), Vector3.zero, Arkana.Menu.Estilo.Noite);
-            c.clearFlags = CameraClearFlags.SolidColor;
-            Foto(c, "01-menu", true);
-            Object.Destroy(c.gameObject);
+            Main main = _go.AddComponent<Main>();
+            yield return Esperar(1.2f);   // a vitrine poe o mago no pico e o corte por distancia (4 Hz) acorda
+            Assert.IsNotNull(main.CameraDoMenu, "o menu tem camera (a vitrine 3D do fundo)");
+            Foto(main.CameraDoMenu, "01-menu", true);
         }
 
         [UnityTest]
@@ -356,6 +354,41 @@ namespace Arkana.Tests
             yield return Esperar(2f);   // a suprema e' TELEGRAFADA: o braco livre so' sai quando o aviso no chao enche
             Foto(main.Player.Camera.Cam, "18-kit-suprema", true);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), antes + " visuais depois=" + runner.Visuais.Count + "\n");
+        }
+
+        /// <summary>Os outros dois kits implementados (Veu e Tessa) em acao, pelo mesmo roteiro da Pyra: tatica e suprema no treino.</summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_VeuTessa([Values("03-veu", "10-tessa")] string slug)
+        {
+            ExigirGpu();
+            // a escolha do mago mora nos PlayerPrefs (persiste no editor): guarda e devolve, a foto nao troca o mago de ninguem
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                OlharParaOCentro(main);
+                yield return Esperar(0.3f);
+                main.Player.Tatica();
+                yield return Esperar(0.9f);
+                Foto(main.Player.Camera.Cam, "19-kit-" + slug + "-tatica", true);
+                yield return Esperar(1.2f);
+                main.Player.Suprema();
+                yield return Esperar(2f);
+                Foto(main.Player.Camera.Cam, "20-kit-" + slug + "-suprema", true);
+                var sb = new System.Text.StringBuilder("19/20-kit-" + slug + ": visuais=" + main.Player.Pawn.Runner.Visuais.Count + "\n");
+                foreach (var v in main.Player.Pawn.Runner.Visuais) sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " restante=" + v.Restante.ToString("F2"));
+                File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
         }
 
         [UnityTest]

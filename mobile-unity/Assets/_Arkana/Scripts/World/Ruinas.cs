@@ -114,13 +114,25 @@ namespace Arkana.World
             go.AddComponent<MeshCollider>().sharedMesh = malha;
         }
 
-        /// <summary>Rochedos num anel alem da praia, dentro da nevoa e fora da sombra: cenario de fundo, nao rota.</summary>
+        /// <summary>Nome em Resources da rocha dos rochedos: a rocha vulcanica do kit (Emberstone Outcrop) em 3K, remesh do site.</summary>
+        public const string RochaDoMar = "18-rocha-mar";
+
+        /// <summary>
+        /// Rochedos num anel alem da praia, dentro da nevoa e fora da sombra: cenario de fundo, nao rota. Desde 12/09 cada
+        /// um e' a ROCHA do kit em 3K (22 x 3K tris): o bloco facetado lia como placeholder do castelo e da queda. Sem o
+        /// .glb, volta o bloco (fiacao defensiva). Os sorteios sao os mesmos: o anel nao muda de lugar.
+        /// </summary>
         void MontarRochedos(Relevo r, Material pedra, bool linear)
         {
             var rng = new Sorteio(111);
+            GameObject rocha = Resources.Load<GameObject>(RochaDoMar);
+            Bounds molde = rocha != null ? Limites(rocha) : new Bounds();
+            if (!(molde.size.y > 0.001f)) rocha = null;
             var proto = new MalhaProc.Construtor();
             proto.Blob(Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorPedregulho, new Sorteio(13), 0.3f);
             var b = new MalhaProc.Construtor();
+            Transform raiz = null;
+            if (rocha != null) { raiz = new GameObject("Rochedos").transform; raiz.SetParent(transform, false); }
             const int n = 22;
             for (int i = 0; i < n; i++)
             {
@@ -130,10 +142,32 @@ namespace Arkana.World
                 float sc = rng.Faixa(4f, 12f);
                 var pos = new Vector3(Mathf.Cos(a) * d, rng.Faixa(-2.6f, -0.6f), Mathf.Sin(a) * d);
                 var esc = new Vector3(sc, sc * rng.Faixa(0.8f, 1.9f), sc);
-                b.Adicionar(proto, Matrix4x4.TRS(pos, Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f), esc), Desgaste(rng, -0.1f, 0.1f));
+                var giro = Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f);
+                Color tinta = Desgaste(rng, -0.1f, 0.1f);
+                if (rocha == null) { b.Adicionar(proto, Matrix4x4.TRS(pos, giro, esc), tinta); continue; }
+                // o bloco tinha 2 x sc de largura e 1,5 x sc x (0,8..1,9) de altura em volta do centro: a rocha ocupa a
+                // mesma caixa, com o pe' afundado no mar
+                float largura = 2f * esc.x, altura = 1.5f * esc.y;
+                float lx = Mathf.Max(molde.size.x, molde.size.z);
+                var go = Instantiate(rocha, Vector3.zero, giro, raiz);
+                go.transform.localScale = new Vector3(largura / lx, altura / molde.size.y, largura / lx);
+                go.transform.position = pos + Vector3.down * (altura * 0.5f + molde.min.y * go.transform.localScale.y);
+                foreach (Renderer rr in go.GetComponentsInChildren<Renderer>()) rr.shadowCastingMode = ShadowCastingMode.Off;
             }
             Rochedos = n;
-            Filho("Rochedos", b.ParaMesh("Rochedos", linear), pedra, ShadowCastingMode.Off);
+            if (rocha == null) Filho("Rochedos", b.ParaMesh("Rochedos", linear), pedra, ShadowCastingMode.Off);
+        }
+
+        /// <summary>Limites do molde na origem, sem giro (o que o glb traz de hierarquia conta junto).</summary>
+        static Bounds Limites(GameObject prefab)
+        {
+            GameObject tmp = Instantiate(prefab);
+            Renderer[] rs = tmp.GetComponentsInChildren<Renderer>();
+            var b = new Bounds();
+            for (int i = 0; i < rs.Length; i++) { if (i == 0) b = rs[i].bounds; else b.Encapsulate(rs[i].bounds); }
+            tmp.SetActive(false);
+            if (Application.isPlaying) Destroy(tmp); else DestroyImmediate(tmp);
+            return b;
         }
 
         GameObject Filho(string nome, Mesh malha, Material mat, ShadowCastingMode sombra)

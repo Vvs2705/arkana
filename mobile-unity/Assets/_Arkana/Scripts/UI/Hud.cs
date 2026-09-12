@@ -224,8 +224,9 @@ namespace Arkana.UI
 
         Canvas _canvas;
         RectTransform _raiz;
-        Image _hp, _mana, _escudo;
-        RectTransform _linhaEscudo;
+        RectTransform _barras;
+        BarraHud _hp, _mana, _escudo;
+        Arkana.Gameplay.Pawn _pawn;
         Image[] _escudoSegs = new Image[0];
         Text _relogio, _bots, _fps, _armaRotulo, _altimetro, _killFeed;
         RectTransform _altimetroBox;
@@ -279,13 +280,12 @@ namespace Arkana.UI
             olharImg.raycastTarget = true;
             _olhar.gameObject.AddComponent<OlharArrasto>().Delta = d => OlharDelta?.Invoke(d);
 
-            // barras
-            var barras = Formas.No(_raiz, "Barras");
-            _hp = Barra(barras, T_VIDA, new Color(0.85f, 0.2f, 0.2f), 0);
-            _mana = Barra(barras, T_MANA, new Color(0.2f, 0.45f, 0.95f), 1);
-            _escudo = Barra(barras, T_ESCUDO, Color.white, 2);
-            _linhaEscudo = (RectTransform)_escudo.transform.parent;
-            _linhaEscudo.gameObject.SetActive(false);
+            // barras (vida manda: mais alta; mana e escudo finas embaixo — cabem nos 56dp do HudLayout.Barras)
+            _barras = Formas.No(_raiz, "Barras");
+            _hp = new BarraHud(_barras, T_VIDA, new Color(0.88f, 0.22f, 0.2f), 0f, 18f, 10f);
+            _mana = new BarraHud(_barras, T_MANA, new Color(0.22f, 0.5f, 1f), 22f, 13f, 8.5f);
+            _escudo = new BarraHud(_barras, T_ESCUDO, Color.white, 39f, 13f, 8.5f);
+            _escudo.Linha.gameObject.SetActive(false);
             _killFeed = Formas.Texto(_raiz, "KillFeed", "", 11f, new Color(1, 1, 1, 0.9f), TextAnchor.UpperLeft);
 
             // topo direito
@@ -340,7 +340,7 @@ namespace Arkana.UI
             Disparo = BotaoDisparo.Criar(_raiz, Dp.Px(88f));
             Esquiva = BotaoAcao.Criar(_raiz, "Esquiva", T_ESQUIVA, new Color(0.25f, 0.85f, 0.95f), Dp.Px(64f));
             Tatica = BotaoAcao.Criar(_raiz, "Tatica", T_TATICA, new Color(0.55f, 0.80f, 1f), Dp.Px(64f));
-            Suprema = BotaoAcao.Criar(_raiz, "Suprema", T_SUPREMA, new Color(1f, 0.72f, 0.30f), Dp.Px(64f));
+            Suprema = BotaoAcao.Criar(_raiz, "Suprema", T_SUPREMA, Estilo.Ouro, Dp.Px(64f));   // o ouro da paleta, o mesmo do fio das barras
             Suprema.Logica.MostraCarga = true;    // a suprema mostra 0->100% (carga, nao cooldown)
             Tatica.Ativo(false); Suprema.Ativo(false);   // ate' o KitBound dizer que o mago tem kit
             Salto = BotaoAcao.Criar(_raiz, "Salto", T_SALTO, new Color(0.80f, 0.86f, 1f), Dp.Px(64f));
@@ -362,20 +362,107 @@ namespace Arkana.UI
             Disparo.Desarmar();
         }
 
-        Image Barra(RectTransform pai, string rotulo, Color cor, int linha)
+        /// <summary>
+        /// Uma barra (vida/mana/escudo). A foto de 12/09 mostrava retangulo chapado com o rotulo solto ao lado; agora:
+        /// moldura escura de fio dourado e cantos redondos, trilho, RASTRO de dano (faixa clara que segura o valor velho e
+        /// desce devagar ate' o atual — o olho le' QUANTO o golpe tirou) e preenchimento em degrade (mais claro em cima),
+        /// com ROTULO a esquerda e atual/max a direita DENTRO da barra. Texto so' e' refeito quando o inteiro muda.
+        /// </summary>
+        sealed class BarraHud
         {
-            var row = Formas.No(pai, "Linha" + rotulo);
-            AreaSegura.NoRect(row, new Rect(0, -linha * Dp.Px(18f) - Dp.Px(14f), Dp.Px(190f), Dp.Px(14f)));
-            row.anchorMin = new Vector2(0, 1); row.anchorMax = new Vector2(0, 1); row.pivot = new Vector2(0, 1);
-            row.anchoredPosition = new Vector2(0, -linha * Dp.Px(18f));
-            var t = Formas.Texto(row, "Rotulo", rotulo, 11f, Color.white, TextAnchor.MiddleLeft);
-            AreaSegura.NoRect(t.rectTransform, new Rect(0, 0, Dp.Px(56f), Dp.Px(14f)));
-            var fundo = Formas.Imagem(row, "Fundo", null, new Color(0, 0, 0, 0.45f));
-            AreaSegura.NoRect(fundo.rectTransform, new Rect(Dp.Px(58f), Dp.Px(1f), Dp.Px(130f), Dp.Px(12f)));
-            var fill = Formas.Imagem(row, "Fill", null, cor);
-            AreaSegura.NoRect(fill.rectTransform, new Rect(Dp.Px(58f), Dp.Px(1f), Dp.Px(130f), Dp.Px(12f)));
-            fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 1f;
-            return fill;
+            const float LarguraDp = 190f;
+            const float RastroEsperaS = 0.35f;   // segura o valor velho antes de descer
+            const float RastroVel = 0.8f;        // fracao da barra por segundo na descida
+            static readonly Color CorRastro = new Color(1f, 0.93f, 0.8f, 0.85f);
+
+            public readonly RectTransform Linha;
+            public readonly RectTransform Trilho;   // o escudo pendura os separadores de nivel aqui
+            public readonly Image Fill;
+            readonly Image _rastro;
+            readonly Text _numero;
+            float _frac = 1f, _rastroF = 1f, _espera;
+            int _cur = int.MinValue, _max = int.MinValue;
+
+            public BarraHud(RectTransform pai, string rotulo, Color cor, float yDp, float alturaDp, float fonteDp)
+            {
+                float h = Dp.Px(alturaDp);
+                float fio = Mathf.Max(Dp.Px(1f), 1f), folga = Mathf.Max(Dp.Px(2f), 2f);
+                float raio = Mathf.Min(Dp.Px(5f), h * 0.5f);
+                Linha = Formas.No(pai, "Linha" + rotulo);
+                Linha.anchorMin = new Vector2(0, 1); Linha.anchorMax = new Vector2(0, 1); Linha.pivot = new Vector2(0, 1);
+                Linha.sizeDelta = new Vector2(Dp.Px(LarguraDp), h);
+                Linha.anchoredPosition = new Vector2(0, -Dp.Px(yDp));
+                var borda = Formas.Arredondada(Linha, "Borda", Formas.ComAlfa(Estilo.OuroFosco, 0.95f), raio);
+                AreaSegura.Esticar(borda.rectTransform);
+                var fundo = Formas.Arredondada(Linha, "Fundo", new Color(0.03f, 0.04f, 0.07f, 0.8f), raio - fio);
+                Recuar(fundo.rectTransform, fio, fio);
+                Trilho = Formas.No(Linha, "Trilho");
+                Recuar(Trilho, folga, folga);
+                float raioDentro = Mathf.Max(raio - folga, 1f);
+                _rastro = Formas.Arredondada(Trilho, "Rastro", CorRastro, raioDentro);
+                AreaSegura.Esticar(_rastro.rectTransform);
+                Fill = Formas.Arredondada(Trilho, "Fill", cor, raioDentro, true);
+                AreaSegura.Esticar(Fill.rectTransform);
+                var t = Formas.Texto(Linha, "Rotulo", rotulo, fonteDp, new Color(1f, 1f, 1f, 0.95f), TextAnchor.MiddleLeft);
+                t.fontStyle = FontStyle.Bold;
+                Contornar(t);
+                Recuar(t.rectTransform, Dp.Px(6f), 0f);
+                _numero = Formas.Texto(Linha, "Numero", "", fonteDp, new Color(1f, 1f, 1f, 0.92f), TextAnchor.MiddleRight);
+                Contornar(_numero);
+                Recuar(_numero.rectTransform, Dp.Px(6f), 0f);
+            }
+
+            /// <summary>Valor novo. Caiu = o rastro segura e depois desce; subiu (cura) = sem rastro.</summary>
+            public void Valor(float cur, float max)
+            {
+                float f = max > 0f ? Mathf.Clamp01(cur / max) : 0f;
+                if (f < _frac - 0.0001f) _espera = RastroEsperaS;
+                _frac = f;
+                if (_rastroF < f) _rastroF = f;
+                Ancorar(Fill, f);
+                Ancorar(_rastro, _rastroF);
+                int c = Mathf.Max(Mathf.CeilToInt(cur - 0.001f), 0), m = Mathf.Max(Mathf.RoundToInt(max), 0);
+                if (c == _cur && m == _max) return;
+                _cur = c; _max = m;
+                _numero.text = m > 0 ? c + "/" + m : "";
+            }
+
+            /// <summary>Partida nova: o valor sem rastro (nao houve golpe).</summary>
+            public void Encher(float cur, float max)
+            {
+                Valor(cur, max);
+                _rastroF = _frac; _espera = 0f;
+                Ancorar(_rastro, _rastroF);
+            }
+
+            /// <summary>Por frame: parado (rastro == valor) nao toca em nada.</summary>
+            public void Tick(float dt)
+            {
+                if (_rastroF <= _frac) return;
+                if (_espera > 0f) { _espera -= dt; return; }
+                _rastroF = Mathf.Max(_rastroF - RastroVel * dt, _frac);
+                Ancorar(_rastro, _rastroF);
+            }
+
+            static void Ancorar(Image img, float f)
+            {
+                img.enabled = f > 0.001f;
+                img.rectTransform.anchorMax = new Vector2(f, 1f);
+            }
+
+            static void Recuar(RectTransform rt, float x, float y)
+            {
+                rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(x, y); rt.offsetMax = new Vector2(-x, -y);
+            }
+
+            /// <summary>Contorno escuro: o texto le' em cima do vermelho, do azul E do escudo branco/dourado.</summary>
+            static void Contornar(Text t)
+            {
+                var o = t.gameObject.AddComponent<Outline>();
+                o.effectColor = new Color(0f, 0f, 0f, 0.55f);
+                o.effectDistance = new Vector2(1f, -1f);
+            }
         }
 
         void MontarFim()
@@ -415,7 +502,7 @@ namespace Arkana.UI
             _telaAtual = tela;
             Margens m = AreaSegura.Atual();
             HudLayout l = HudLayout.Calcular(tela, m, Dp.Px(1f));
-            AreaSegura.NoRect((RectTransform)_hp.transform.parent.parent, l.Barras);
+            AreaSegura.NoRect(_barras, l.Barras);
             AreaSegura.NoRect((RectTransform)_relogio.transform.parent, l.Topo);
             AreaSegura.NoRect((RectTransform)Pausa.transform, l.Pausa);
             AreaSegura.NoRect((RectTransform)Joystick.transform, l.Joystick);
@@ -497,10 +584,17 @@ namespace Arkana.UI
             // O KitBound sai no Pawn.Montar, que pode acontecer ANTES desta HUD existir (ordem da cena).
             // Sem isto os botoes de tatica/suprema ficariam apagados para sempre — costura de 11/09/2026.
             var pawn = jogador as Arkana.Gameplay.Pawn;
+            _pawn = pawn;
             if (pawn != null && pawn.Runner != null) OnKitBound(pawn.Runner.Slug, pawn.Runner.Impl != null);
-            _escudoVal = 0f; _escudoMax = 0f; _escudoNivel = 0;
-            _linhaEscudo.gameObject.SetActive(false);
-            _hp.fillAmount = 1f; _mana.fillAmount = 1f;
+            // As barras nascem com o que o corpo TEM: nenhum evento sai no spawn, e sem isto o atual/max ficava vazio ate'
+            // o primeiro golpe e o escudo N1 com que todo mago cai (GDD §5) nem aparecia.
+            Vitalidade vit = jogador != null ? jogador.Vital : null;
+            _escudoVal = vit != null ? vit.Escudo : 0f; _escudoMax = vit != null ? vit.EscudoMax : 0f; _escudoNivel = vit != null ? vit.Nivel : 0;
+            if (vit != null) _hp.Encher(vit.Hp, vit.HpMax);
+            _mana.Encher(pawn != null ? pawn.Mana : Balance.Player.ManaMax, Balance.Player.ManaMax);
+            _escudo.Encher(_escudoVal, _escudoMax);
+            _escudo.Linha.gameObject.SetActive(_escudoMax > 0f);
+            if (_escudoMax > 0f) PintarEscudo();
             _fim.gameObject.SetActive(false);
             _restante = (float)Balance.Match.DurationS;
             _botsVivos = (int)Balance.Match.Bots;
@@ -531,8 +625,8 @@ namespace Arkana.UI
 
         bool EhJogador(IEntidade e) => e != null && (e == Jogador || e.EhPlayer);
 
-        void OnHp(float cur, float max) { _hp.fillAmount = max > 0f ? Mathf.Clamp01(cur / max) : 0f; }
-        void OnMana(float cur, float max) { _mana.fillAmount = max > 0f ? Mathf.Clamp01(cur / max) : 0f; }
+        void OnHp(float cur, float max) { _hp.Valor(cur, max); }
+        void OnMana(float cur, float max) { _mana.Valor(cur, max); }
         void OnMatchStarted() { _fim.gameObject.SetActive(false); }
         void OnMatchOver(bool vitoria) { MostrarFim(vitoria); }
         void OnAbate(string nome) { Logica.Abater(nome); }
@@ -589,7 +683,7 @@ namespace Arkana.UI
         {
             if (!EhJogador(e)) return;   // 6 bots escudados na barra do jogador e' ruido
             _escudoVal = escudo; _escudoMax = max; _escudoNivel = nivel;
-            _linhaEscudo.gameObject.SetActive(max > 0f);
+            _escudo.Linha.gameObject.SetActive(max > 0f);
             PintarEscudo();
         }
 
@@ -602,17 +696,19 @@ namespace Arkana.UI
             var cores = Balance.Escudo.Cores;
             Color cor = Formas.Cor(cores[Mathf.Clamp(n - 1, 0, cores.Length - 1)]);
             if (_escudoQuebrou > 0f) cor = Color.white;
-            _escudo.color = cor;
-            _escudo.fillAmount = _escudoMax > 0f ? Mathf.Clamp01(_escudoVal / _escudoMax) : 0f;
+            _escudo.Fill.color = cor;
+            _escudo.Valor(_escudoVal, _escudoMax);
             if (_escudoSegs.Length != n - 1)
             {
                 foreach (var s in _escudoSegs) if (s != null) Destroy(s.gameObject);
                 _escudoSegs = new Image[Mathf.Max(n - 1, 0)];
-                float w = _escudo.rectTransform.sizeDelta.x;
                 for (int i = 1; i < n; i++)
                 {
-                    var seg = Formas.Imagem(_escudo.transform.parent, "Seg" + i, null, new Color(0, 0, 0, 0.8f));
-                    AreaSegura.NoRect(seg.rectTransform, new Rect(Dp.Px(58f) + w * i / n, Dp.Px(1f), Mathf.Max(Dp.Px(1.5f), 1f), Dp.Px(12f)));
+                    // separador de nivel ancorado em i/n do trilho: acompanha a barra em qualquer dpi
+                    var seg = Formas.Imagem(_escudo.Trilho, "Seg" + i, null, new Color(0, 0, 0, 0.6f));
+                    seg.rectTransform.anchorMin = new Vector2(i / (float)n, 0f); seg.rectTransform.anchorMax = new Vector2(i / (float)n, 1f);
+                    seg.rectTransform.sizeDelta = new Vector2(Mathf.Max(Dp.Px(1.5f), 1f), 0f);
+                    seg.rectTransform.anchoredPosition = Vector2.zero;
                     _escudoSegs[i - 1] = seg;
                 }
             }
@@ -779,6 +875,18 @@ namespace Arkana.UI
             for (int i = 0; i < 4; i++) { _hitmarker[i].enabled = a > 0f; _hitmarker[i].color = new Color(1, 1, 1, 0.85f * a); }
             // escudo piscando
             if (_escudoQuebrou > 0f) { _escudoQuebrou = Mathf.Max(_escudoQuebrou - dt, 0f); PintarEscudo(); }
+            // rastro de dano das barras (parado nao toca em nada)
+            _hp.Tick(dt); _mana.Tick(dt); _escudo.Tick(dt);
+            // tatica/suprema LIDAS do runner (FracTatica/FracSuprema existem para a HUD): a carga da suprema nao e' linear
+            // (para no ar, acelera com dano) e nasce VAZIA — so' com a borda do Bus o botao dizia PRONTA no spawn, e o
+            // brilho de "pronta" mentiria. Leitura, nao decisao: quem nega o toque continua sendo o KitRunner.
+            var kit = _pawn != null ? _pawn.Runner : null;
+            if (kit != null && kit.Impl != null)
+            {
+                Tatica.Logica.Cooldown(kit.TaticaCd, kit.Dados.TaticaCd);
+                float carga = kit.SupremaCargaS;
+                Suprema.Logica.Cooldown(kit.FracSuprema * carga, carga);
+            }
             // kill feed
             var sb = new System.Text.StringBuilder();
             foreach (var ab in Logica.KillFeed) sb.AppendLine(string.Format(T_ABATE, ab.Nome));

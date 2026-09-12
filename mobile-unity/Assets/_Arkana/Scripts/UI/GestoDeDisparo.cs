@@ -95,7 +95,11 @@ namespace Arkana.UI
 
         public bool Desarmado { get; private set; } = true;
 
+        static readonly Color Fundo = new Color(0.03f, 0.04f, 0.08f);
+        static readonly Color Cinza = new Color(0.42f, 0.44f, 0.5f);
+
         Image _disco;
+        Image _borda;
         Image _anel;
         Image _xis;
         Text _rotulo;
@@ -113,13 +117,17 @@ namespace Arkana.UI
             b._disco = go.GetComponent<Image>();
             b._disco.sprite = Formas.Disco();
             b._disco.raycastTarget = true;
-            var borda = Formas.Imagem(go.transform, "Borda", Formas.Anel(), new Color(1, 1, 1, 0.3f));
-            AreaSegura.Esticar(borda.rectTransform);
+            // mesmo idioma dos botoes de acao (disco escuro + halo + aro na cor), com o aro MAIS GROSSO: e' o botao-mestre
+            var sombra = Formas.Imagem(go.transform, "Sombra", Formas.Halo(), new Color(0, 0, 0, 0.45f));
+            sombra.rectTransform.sizeDelta = new Vector2(ladoPx, ladoPx) * Formas.HaloEscala;
+            b._borda = Formas.Imagem(go.transform, "Borda", Formas.Anel(0.83f), Cinza);
+            AreaSegura.Esticar(b._borda.rectTransform);
             b._anel = Formas.Imagem(go.transform, "AnelMira", Formas.Anel(), new Color(0.2f, 1f, 0.4f, 1f));
             b._anel.rectTransform.sizeDelta = new Vector2(ladoPx * 1.16f, ladoPx * 1.16f);
             b._xis = Formas.Imagem(go.transform, "Xis", Formas.Xis(), new Color(1f, 0.36f, 0.30f, 1f));
             b._xis.rectTransform.sizeDelta = new Vector2(ladoPx * 0.7f, ladoPx * 0.7f);
-            b._rotulo = Formas.Texto(go.transform, "Rotulo", "", 13f, new Color(1, 1, 0.92f, 0.92f));
+            b._rotulo = Formas.Texto(go.transform, "Rotulo", "", 12f, new Color(1, 1, 0.94f, 0.95f));
+            b._rotulo.fontStyle = FontStyle.Bold;
             AreaSegura.Esticar(b._rotulo.rectTransform);
             b.Gesto = new GestoLogica(Dp.Deadzone, (int)Balance.Touch.TapMaxMs);
             b.Gesto.Disparou += d => b.Disparou?.Invoke(d);
@@ -146,8 +154,10 @@ namespace Arkana.UI
 
         void Pintar()
         {
-            Color c = Desarmado ? new Color(0.42f, 0.44f, 0.5f) : _cor;
-            _disco.color = Formas.ComAlfa(Formas.Escurecer(c, 0.35f), 0.38f);
+            Color c = Desarmado ? Cinza : _cor;
+            bool apertado = Gesto != null && Gesto.Pressionado;
+            _disco.color = Formas.ComAlfa(Color.Lerp(Fundo, c, apertado ? 0.4f : 0.2f), Desarmado ? 0.5f : 0.68f);
+            _borda.color = Formas.ComAlfa(c, Desarmado ? 0.5f : 1f);
             _rotulo.text = Desarmado ? "" : _texto;
             _anel.enabled = Gesto != null && Gesto.MostraAnel && !Desarmado;
             _xis.enabled = Gesto != null && Gesto.MostraXis;

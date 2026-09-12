@@ -1,5 +1,8 @@
 # mobile-unity/foto.ps1 — FOTOS do jogo rodando, COM GPU (sem -nographics).
-# Uso: powershell -File mobile-unity\foto.ps1
+# Uso: powershell -File mobile-unity\foto.ps1 [filtro]
+#   filtro = -testFilter do Unity (regex no nome do teste). Sem filtro: TODAS (~15 min, as 20 folhas de clipes pesam).
+#   Ex.: .\foto.ps1 "Foto_Kit|Foto_Menu" — so' o que a leva mexeu (12/09: rodada inteira a cada ajuste travava o dia).
+param([string]$Filtro = "FotoTests")
 # Saida: mobile-unity/Logs/fotos/*.png (fora do git). Julgar pelo quadro, nao so' pelo numero (regua do Godot).
 # Nao roda junto com o portao: um Unity por vez (trava de instancia).
 $ErrorActionPreference = "Stop"
@@ -21,7 +24,7 @@ $Xml = Join-Path $Logs "foto-resultados.xml"
 if (Test-Path $Xml) { Remove-Item $Xml }
 
 $UnityArgs = @("-batchmode", "-projectPath", "`"$Proj`"",
-               "-runTests", "-testPlatform", "PlayMode", "-testFilter", "FotoTests",
+               "-runTests", "-testPlatform", "PlayMode", "-testFilter", "`"$Filtro`"",
                "-testResults", "`"$Xml`"", "-logFile", "`"$Log`"")
 $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -PassThru -NoNewWindow
 $null = $P.Handle   # sem tocar no handle antes do fim, o ExitCode volta vazio (quirk do PowerShell)

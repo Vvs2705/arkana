@@ -79,7 +79,7 @@ de engine do projeto.
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
 | **Portão** | `powershell -File mobile-unity\portao.ps1` → **315 testes, 0 falhas** (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
-| **Fotos** | `powershell -File mobile-unity\foto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
+| **Fotos** | `powershell -File mobile-unity\foto.ps1 [filtro]` → as fotos do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera, o corpo e os kits tocam). Sem filtro roda todas (~15 min, as 20 folhas de clipes pesam); com filtro, só o que a leva mexeu, ex. `.\foto.ps1 "Foto_Kit\|Foto_Menu"`. **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
 | **FPS no aparelho (a dívida de 25/08, PAGA)** | **60 FPS sustentados, quadro de 16,6 ms, pior quadro 33 ms, 36,9 °C**, sem erro nem exceção no logcat, numa partida inteira: castelo, queda, pouso, 12 bots em FFA, tempestade. A tela do Poco estava em 60 Hz: o vsync segura aí; a folga real só aparece com a tela em 120 Hz |
@@ -292,7 +292,29 @@ defeitos de jogo que os testes não pegavam:
 | A muralha da Pyra nascia **atrás** dela, fora da tela | os botões TÁTICA/SUPREMA não contavam como mira: o kit saía para a frente do CORPO; parado e com a câmera girada, ia para trás | `Player.Tatica/Suprema` miram como o disparo (`YawAlvo` = yaw da câmera). Teste `Treino_TaticaSaiNaMiraDaCamera` |
 | No treino a suprema levava 50 s, não 5 | `Partida.SupremaCargaS` existia e tinha teste, mas o `KitRunner` lia `Dados.SupremaCarga` direto | `KitRunner.SupremaCargaS` pergunta à partida. Teste `Suprema_NoTreino_EncheEm5s` |
 | A muralha era uma barra laranja lisa | teto de 48 partículas para 8 m de parede, chama miúda | chama grande e densa (teto 260) + faíscas que espirram |
-| Tiro = bola chapada | primitiva `Unlit` de cor pura | cor HDR (acende no bloom) + rastro aditivo por elemento | **Decisão que volta ao Diretor:** o validador propôs "Altar
+| Tiro = bola chapada | primitiva `Unlit` de cor pura | cor HDR (acende no bloom) + rastro aditivo por elemento |
+
+**Três frentes em paralelo (12/09, tarde; ordem do Diretor: "acelere, mais atividades
+ao mesmo tempo").** Três agentes escreveram código em arquivos separados e
+compilaram fora do Unity (Roslyn do próprio 6000.3 contra as DLLs). Houve **uma
+rodada só** de portão e fotos para as três:
+- **Menu com fundo 3D (`VitrineDoMenu`).** A ilha e o sol nascem no boot. O
+  mago escolhido fica no pico, virado para a câmera, que orbita devagar; o fundo
+  do menu virou translúcido. A foto `01-menu` usa a câmera real do menu.
+- **VFX da Véu e da Tessa.** O eco ganhou névoa e partículas espectrais. O fio
+  ficou mais grosso, com faíscas e âncoras acesas. O tear ganhou anel no chão e
+  faíscas girando na cúpula. O revelado virou feixe de luz, e a poça da Pyra
+  ganhou chamas. Material novo `MaterialVfx.DeLinha()` (faixa macia na largura)
+  para fio, feixe e rastro de tiro. Fotos `19/20-kit-<slug>`.
+- **HUD.**
+  - Barras com moldura, degradê, rastro de dano e número.
+  - Botões com anel na cor da ação, cooldown radial e pulso da suprema pronta.
+  - Joystick escuro com anel.
+  - As barras já nascem com o valor real, e a suprema não aparece mais "pronta"
+    no nascimento.
+
+Rochedos do mar: a rocha vulcânica do kit num remesh de 3K, grátis (22 × 3K),
+no lugar do bloco facetado. **Decisão que volta ao Diretor:** o validador propôs "Altar
 só depois do playtest" porque o Altar encosta na Sintonia. Ele entrou só como
 CENÁRIO, sem sistema nenhum; se for para esperar, é tirar uma linha do
 `KitCenario.Montar`.

@@ -43,7 +43,14 @@ namespace Arkana.Menu
         {
             _raiz = (RectTransform)_canvas.transform;
             ConfigLogica.Aplicar(ConfigLogica.Atual);   // settings lidos e aplicados UMA vez, no boot
-            Estilo.Fundo(_raiz);
+            // FUNDO TRANSLUCIDO: atras do Titulo e do menu principal passa o 3D (VitrineDoMenu, o mago no pico). Continua
+            // bloqueando o toque. Elenco e Configuracoes pintam o PROPRIO Estilo.Fundo opaco por cima (muito texto) — nao ha'
+            // o que trocar no Ir. O degrade de baixo segura a leitura do "toque para comecar" sobre a neve.
+            // KNOB: os dois alfas, por foto.
+            Estilo.Fundo(_raiz).color = Formas.ComAlfa(Estilo.Noite, 0.35f);
+            var sombra = Formas.Imagem(_raiz, "SombraBaixo", Formas.Degrade(false), Formas.ComAlfa(Estilo.Noite, 0.55f));
+            sombra.rectTransform.anchorMin = Vector2.zero; sombra.rectTransform.anchorMax = new Vector2(1f, 0.4f);
+            sombra.rectTransform.offsetMin = Vector2.zero; sombra.rectTransform.offsetMax = Vector2.zero;
             _titulo = MontarTitulo();
             _menu = MontarMenu();
             _elenco = null;

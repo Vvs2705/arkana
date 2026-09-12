@@ -18,6 +18,11 @@ namespace Arkana.UI
 
         public static Sprite Disco() => Get("disco", (x, y) => Dentro(x, y, 0.98f));
         public static Sprite Anel() => Get("anel", (x, y) => Dentro(x, y, 0.98f) && !Dentro(x, y, 0.84f));
+        /// <summary>Anel de espessura escolhida (`interno` = raio do furo, 0..0.98): botoes de acao finos, disparo grosso.</summary>
+        public static Sprite Anel(float interno) => Get("anel-" + Mathf.RoundToInt(interno * 100f), (x, y) => Dentro(x, y, 0.98f) && !Dentro(x, y, interno), 128);
+        /// <summary>So' o CONTORNO do losango/triangulo (raridade no botao PEGAR: forma no aro, nao um bloco cheio).</summary>
+        public static Sprite LosangoAnel() => Get("losango-anel", (x, y) => Mathf.Abs(x) + Mathf.Abs(y) < 0.95f && Mathf.Abs(x) + Mathf.Abs(y) >= 0.8f, 128);
+        public static Sprite TrianguloAnel() => Get("triangulo-anel", (x, y) => Tri(x, y, 1f) && !Tri(x, y, 0.8f), 128);
         public static Sprite Xis() => Get("xis", (x, y) => Mathf.Abs(Mathf.Abs(x) - Mathf.Abs(y)) < 0.14f && Mathf.Abs(x) < 0.7f);
         public static Sprite Quadrado() => Get("quadrado", (x, y) => Mathf.Abs(x) < 0.95f && Mathf.Abs(y) < 0.95f);
         public static Sprite Triangulo() => Get("triangulo", (x, y) => y > -0.8f && Mathf.Abs(x) < (0.8f - y) * 0.6f);
@@ -39,6 +44,59 @@ namespace Arkana.UI
         }
 
         static bool Dentro(float x, float y, float r) => x * x + y * y <= r * r;
+        static bool Tri(float x, float y, float s) => y > -0.8f * s && Mathf.Abs(x) < (0.8f * s - y) * 0.6f;
+        /// <summary>Smoothstep de verdade (o Mathf.SmoothStep do Unity interpola entre from/to, nao e' o do shader).</summary>
+        static float Liso(float a, float b, float v) { float t = Mathf.Clamp01((v - a) / (b - a)); return t * t * (3f - 2f * t); }
+
+        // ---------- sprites SUAVES (alfa continuo): o que deixa a HUD com cara de jogo e nao de placeholder ----------
+
+        /// <summary>Halo desenhado num quadrado HaloEscala x o botao: brilho no aro, some para dentro e esvaece para fora.</summary>
+        public const float HaloEscala = 1.5f;
+        /// <summary>Raio (texels) dos cantos do Arredondado = borda do 9-slice.</summary>
+        public const float ArredondadoRaio = 12f;
+
+        /// <summary>
+        /// Halo em volta de um botao redondo (Image com lado * HaloEscala, mesmo centro): em PRETO separa o botao da
+        /// areia/ceu claro (foto de 12/09: disco claro sumia no chao); na COR da acao e' o brilho da suprema pronta.
+        /// </summary>
+        public static Sprite Halo() => GetSuave("halo", 64, (x, y) =>
+        {
+            float r = Mathf.Sqrt(x * x + y * y), d = r - 1f / HaloEscala;
+            float a = Mathf.Exp(-d * d / (d < 0f ? 0.006f : 0.03f));   // cai rapido para dentro, espalha para fora
+            return new Color(1f, 1f, 1f, a * (1f - Liso(0.85f, 1f, r)));   // zera antes da borda do quadrado
+        });
+
+        /// <summary>Sombra macia (disco que esvaece ate' a borda): o miolo do joystick "descola" do chao.</summary>
+        public static Sprite Sombra() => GetSuave("sombra", 64, (x, y) => new Color(1f, 1f, 1f, 1f - Liso(0.3f, 1f, Mathf.Sqrt(x * x + y * y))));
+
+        /// <summary>Disco com volume: branco em cima, cinza embaixo (a Image tinge). 1 texel de antialias na borda.</summary>
+        public static Sprite DiscoDegrade() => GetSuave("disco-degrade", 64, (x, y) =>
+        {
+            float v = Mathf.Lerp(0.62f, 1f, (y + 1f) * 0.5f);
+            return new Color(v, v, v, Mathf.Clamp01((0.98f - Mathf.Sqrt(x * x + y * y)) * 32f));
+        });
+
+        /// <summary>
+        /// Retangulo de cantos redondos para Image.Type.Sliced (moldura, trilho e preenchimento das barras).
+        /// `degrade`: branco em cima, cinza embaixo — o preenchimento ganha volume (mais claro em cima) sem shader.
+        /// </summary>
+        public static Sprite Arredondado(bool degrade = false) => GetSuave(degrade ? "arred-degrade" : "arred", 32, (x, y) =>
+        {
+            const float r = ArredondadoRaio / 16f;   // 32 texels = 2 unidades: 12 texels = 0,75
+            float qx = Mathf.Max(Mathf.Abs(x) - (1f - r), 0f), qy = Mathf.Max(Mathf.Abs(y) - (1f - r), 0f);
+            float a = Mathf.Clamp01((r - Mathf.Sqrt(qx * qx + qy * qy)) * 16f + 0.5f);
+            float v = degrade ? Mathf.Lerp(0.6f, 1f, (y + 1f) * 0.5f) : 1f;
+            return new Color(v, v, v, a);
+        }, ArredondadoRaio);
+
+        /// <summary>Image 9-slice de cantos redondos com raio `raioPx` NA TELA (o multiplicador escala a borda do sprite).</summary>
+        public static Image Arredondada(Transform pai, string nome, Color cor, float raioPx, bool degrade = false)
+        {
+            var img = Imagem(pai, nome, Arredondado(degrade), cor);
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = ArredondadoRaio / Mathf.Max(raioPx, 0.5f);
+            return img;
+        }
 
         static bool Raio(float x, float y)
         {
@@ -91,30 +149,53 @@ namespace Arkana.UI
             return s;
         }
 
-        static Sprite Get(string chave, Func<float, float, bool> f)
+        /// <summary>`lado` maior so' para traco FINO (aros de 3-4dp): a 64 texels ele sai em contas quando ampliado 5x.</summary>
+        static Sprite Get(string chave, Func<float, float, bool> f, int lado = Lado)
         {
             Sprite s;
             if (_cache.TryGetValue(chave, out s) && s != null) return s;
-            var tex = new Texture2D(Lado, Lado, TextureFormat.RGBA32, false);
+            var tex = new Texture2D(lado, lado, TextureFormat.RGBA32, false);
             tex.wrapMode = TextureWrapMode.Clamp;
-            var px = new Color32[Lado * Lado];
-            for (int y = 0; y < Lado; y++)
-                for (int x = 0; x < Lado; x++)
+            var px = new Color32[lado * lado];
+            for (int y = 0; y < lado; y++)
+                for (int x = 0; x < lado; x++)
                 {
                     // 4 amostras por pixel: antialias barato nas bordas
                     int n = 0;
                     for (int sy = 0; sy < 2; sy++)
                         for (int sx = 0; sx < 2; sx++)
                         {
-                            float fx = ((x + 0.25f + sx * 0.5f) / Lado) * 2f - 1f;
-                            float fy = ((y + 0.25f + sy * 0.5f) / Lado) * 2f - 1f;
+                            float fx = ((x + 0.25f + sx * 0.5f) / lado) * 2f - 1f;
+                            float fy = ((y + 0.25f + sy * 0.5f) / lado) * 2f - 1f;
                             if (f(fx, fy)) n++;
                         }
-                    px[y * Lado + x] = new Color32(255, 255, 255, (byte)(n * 63));
+                    px[y * lado + x] = new Color32(255, 255, 255, (byte)(n * 63));
                 }
             tex.SetPixels32(px);
             tex.Apply();
-            s = Sprite.Create(tex, new Rect(0, 0, Lado, Lado), new Vector2(0.5f, 0.5f), 100f);
+            s = Sprite.Create(tex, new Rect(0, 0, lado, lado), new Vector2(0.5f, 0.5f), 100f);
+            _cache[chave] = s;
+            return s;
+        }
+
+        // ponytail: uma textura por sprite (cada uma quebra o lote do uGUI); juntar num atlas se o profiler da HUD reclamar de draw call
+        /// <summary>Gerador de cor + alfa CONTINUOS por pixel (1 amostra; a borda suave vem da propria funcao). `borda` &gt; 0 = 9-slice.</summary>
+        static Sprite GetSuave(string chave, int lado, Func<float, float, Color> f, float borda = 0f)
+        {
+            Sprite s;
+            if (_cache.TryGetValue(chave, out s) && s != null) return s;
+            var tex = new Texture2D(lado, lado, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var px = new Color32[lado * lado];
+            for (int y = 0; y < lado; y++)
+                for (int x = 0; x < lado; x++)
+                    px[y * lado + x] = f(((x + 0.5f) / lado) * 2f - 1f, ((y + 0.5f) / lado) * 2f - 1f);
+            tex.SetPixels32(px);
+            tex.Apply();
+            var r = new Rect(0, 0, lado, lado);
+            s = borda > 0f
+                ? Sprite.Create(tex, r, new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(borda, borda, borda, borda))
+                : Sprite.Create(tex, r, new Vector2(0.5f, 0.5f), 100f);
             _cache[chave] = s;
             return s;
         }

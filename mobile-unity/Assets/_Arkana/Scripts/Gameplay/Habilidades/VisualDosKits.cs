@@ -81,8 +81,8 @@ namespace Arkana.Gameplay
 
         public const string Unlit = "Universal Render Pipeline/Unlit";
         public const string ParticulaUnlit = "Universal Render Pipeline/Particles/Unlit";
-        static Material _particula;
-        static Texture2D _ponto;
+        static Material _particula, _linha;
+        static Texture2D _ponto, _faixa;
 
         /// <summary>Cor chapada (Unlit: nao le' cor de vertice). Null so' sem URP no build.</summary>
         public static Material Solido(Color cor, Mistura m, bool duploLado = false) => Novo(Unlit, cor, m, duploLado, null);
@@ -97,6 +97,15 @@ namespace Arkana.Gameplay
             // alfa fica 1: Color.white * k multiplicaria o alfa junto, e no aditivo (SrcAlpha) o brilho sairia k^2
             if (_particula == null) _particula = Novo(ParticulaUnlit, new Color(BrilhoHdr, BrilhoHdr, BrilhoHdr, 1f), Mistura.Aditivo, true, PontoSuave());
             return _particula;
+        }
+
+        /// <summary>Fios e feixes (LineRenderer): o mesmo aditivo HDR do DeParticula, mas com FAIXA macia — alfa so' na
+        /// LARGURA. O ponto do DeParticula esticado no comprimento apagava as pontas: o fio de 6 m acendia so' no meio e
+        /// sumia justo nas ancoras (o ponto fraco que tem de aparecer).</summary>
+        public static Material DeLinha()
+        {
+            if (_linha == null) _linha = Novo(ParticulaUnlit, new Color(BrilhoHdr, BrilhoHdr, BrilhoHdr, 1f), Mistura.Aditivo, true, FaixaSuave());
+            return _linha;
         }
 
         /// <summary>Cor de vertice (degrade da cunha de fogo) sem textura, em alfa.</summary>
@@ -149,6 +158,24 @@ namespace Arkana.Gameplay
             t.Apply(false, true);
             _ponto = t;
             return t;
+        }
+
+        /// <summary>Faixa 4x32 (zero arquivo): alfa so' no v (a largura da linha), cheio no u (o comprimento). Miolo
+        /// duro, borda macia — o mesmo perfil do PontoSuave, sem apagar nas pontas.</summary>
+        public static Texture2D FaixaSuave()
+        {
+            if (_faixa != null) return _faixa;
+            const int n = 32;
+            var t = new Texture2D(4, n, TextureFormat.RGBA32, false) { name = "FaixaSuave", wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[4 * n];
+            for (int y = 0; y < n; y++)
+            {
+                float a = Mathf.Clamp01(1f - Mathf.Abs((y + 0.5f) / n * 2f - 1f));
+                for (int x = 0; x < 4; x++) px[y * 4 + x] = new Color32(255, 255, 255, (byte)(a * a * 255f));
+            }
+            t.SetPixels32(px);
+            t.Apply(false, true);
+            return _faixa = t;
         }
     }
 
@@ -319,6 +346,8 @@ namespace Arkana.Gameplay
         const float AlturaNucleo = 1.1f;
         /// <summary>O revelado se le' de longe: e' informacao para o time.</summary>
         const float AlturaFeixe = 14f;
+        /// <summary>Centro da cupula do Tear acima dos pes da dona (a borda no chao sai do corte da esfera).</summary>
+        const float AlturaTear = 1.2f;
         /// <summary>VFX em passos de 12 fps (look de anime, SPELLBREAK.md §2.2), nunca lerp continuo.</summary>
         const float PassoAnime = 1f / 12f;
         static readonly float[] Flicker = { 1f, 0.8f, 0.95f, 0.75f, 0.9f };
@@ -446,48 +475,86 @@ namespace Arkana.Gameplay
             em2.rateOverTimeMultiplier = comp * 7f * e;
         }
 
-        /// <summary>Poca do dash: disco emissivo no chao, piscando em passos.</summary>
+        /// <summary>Poca do dash: brasa no chao piscando em passos + chamas BAIXAS em cima. Escala so' no disco: a raiz
+        /// escalada levaria a caixa das chamas junto.</summary>
         void Poca(Item it, EfeitoVisual v, float e)
         {
-            Transform t = it.Go.transform;
-            t.SetPositionAndRotation(NoChao(v.Pos) + Vector3.up * 0.07f, Inclinacao(v.Pos));
-            t.localScale = Vector3.one * Mathf.Max(v.Raio, 0.1f);
-            Pintar(it.R, CorFogo, 0.75f * e * Flicker[Passo() % Flicker.Length]);
+            float r = Mathf.Max(v.Raio, 0.1f);
+            it.Go.transform.SetPositionAndRotation(NoChao(v.Pos) + Vector3.up * 0.07f, Inclinacao(v.Pos));
+            it.R.transform.localScale = Vector3.one * r;
+            Pintar(it.R, CorFogo, 0.55f * e * Flicker[Passo() % Flicker.Length]);   // o disco e' a AREA; quem desenha o fogo sao as chamas
+            ParticleSystem.ShapeModule sh = it.Ps.shape;
+            sh.scale = new Vector3(r * 1.4f, r * 1.4f, 0.1f);   // quadrado dentro do disco (canto a 0,99 r)
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = r * 12f * e;
         }
 
-        /// <summary>Fio do Tear: linha de raio com tremor entre as duas ANCORAS (o ponto fraco, entao aparecem).</summary>
+        /// <summary>Fio do Tear: linha de raio com tremor (a espessura treme junto) entre as duas ANCORAS — o ponto fraco:
+        /// acendem em HDR e pulsam no proprio compasso — com faiscas espirrando ao longo do fio.</summary>
         void Fio(Item it, EfeitoVisual v, float e)
         {
             Vector3 a = NoChao(v.Pos) + Vector3.up * AlturaFio, b = NoChao(v.Pos2) + Vector3.up * AlturaFio;
-            it.Pontos = LeituraDosKits.PontosDoFio(a, b, PontosFio, Passo() * PassoAnime, it.Pontos);
+            int passo = Passo();
+            it.Pontos = LeituraDosKits.PontosDoFio(a, b, PontosFio, passo * PassoAnime, it.Pontos);
             it.Linha.positionCount = PontosFio;
             it.Linha.SetPositions(it.Pontos);
+            it.Linha.widthMultiplier = 0.2f * Flicker[passo % Flicker.Length];
             Color c = CorRaio;
             c.a = e;
             it.Linha.startColor = c;
             it.Linha.endColor = c;
+            // a raiz corre no fio (so' a caixa das faiscas le' isso: a linha e as ancoras sao de mundo)
+            Vector3 d = b - a;
+            Transform t = it.Go.transform;
+            t.position = (a + b) * 0.5f;
+            if (d.sqrMagnitude > 1e-4f) t.rotation = Quaternion.LookRotation(d, Vector3.up);
+            float pulso = Flicker[(passo + 2) % Flicker.Length];   // defasado do fio: a ancora bate no compasso dela
             it.R.transform.position = a;
             it.R2.transform.position = b;
-            Pintar(it.R, CorRaio, e);
-            Pintar(it.R2, CorRaio, e);
+            it.R.transform.localScale = it.R2.transform.localScale = Vector3.one * (0.42f * pulso);
+            Pintar(it.R, Hdr(CorRaio, 2f * pulso), e);
+            Pintar(it.R2, Hdr(CorRaio, 2f * pulso), e);
+            ParticleSystem.ShapeModule sh = it.Ps.shape;
+            sh.scale = new Vector3(0.12f, d.magnitude, 0.12f);
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = d.magnitude * 16f * e;
         }
 
-        /// <summary>Eco da Veu: fantasma translucido na ENTRADA, some encolhendo.</summary>
+        /// <summary>Eco da Veu: "Veu de vidro" parada na ENTRADA (a capsula tremeluz) vazando neblina espectral que sobe
+        /// devagar; some encolhendo. Escala so' na capsula: a raiz escalada levaria a caixa da neblina junto.</summary>
         void Eco(Item it, EfeitoVisual v, float e)
         {
-            Transform t = it.Go.transform;
-            t.position = NoChao(v.Pos) + Vector3.up * 0.9f;
-            t.localScale = new Vector3(0.7f, 0.9f, 0.7f) * e;   // capsula de 2 m x 0.5 -> corpo de 1,8 m x 0,35
-            Pintar(it.R, CorEspectro, e);
+            it.Go.transform.position = NoChao(v.Pos) + Vector3.up * 0.9f;
+            it.R.transform.localScale = new Vector3(0.7f, 0.9f, 0.7f) * e;   // capsula de 2 m x 0.5 -> corpo de 1,8 m x 0,35
+            Pintar(it.R, CorEspectro, e * Flicker[Passo() % Flicker.Length]);
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = 16f * e;
+            ParticleSystem.EmissionModule em2 = it.Ps2.emission;
+            em2.rateOverTimeMultiplier = 10f * e;
         }
 
-        /// <summary>Tear-Mae: esfera cintilante do raio de absorcao. Acompanha a DONA, como a logica (Tear.Tick mede em _dona.Pos).</summary>
+        /// <summary>
+        /// Tear-Mae: cupula cintilante do raio de absorcao + BORDA acesa onde a esfera corta o chao + TRAMA de faiscas na
+        /// casca, girando com a raiz em passos (o tear "gira tecendo"). Acompanha a DONA, como a logica (Tear.Tick mede
+        /// em _dona.Pos). ponytail: a manta de luz que VOA para os aliados (ficha) espera um evento de absorcao na casca.
+        /// </summary>
         void Tear(Item it, EfeitoVisual v, float e, Pawn dono)
         {
+            Vector3 p = dono != null ? dono.Pos : v.Pos;
+            int passo = Passo();
             Transform t = it.Go.transform;
-            t.position = (dono != null ? dono.Pos : v.Pos) + Vector3.up * 1.2f;
-            t.localScale = Vector3.one * (v.Raio * 2f);
-            Pintar(it.R, CorTear, Cintila[Passo() % Cintila.Length] * e);
+            t.SetPositionAndRotation(p + Vector3.up * AlturaTear, Quaternion.Euler(0f, passo % 72 * 5f, 0f));   // 60 graus/s
+            it.R.transform.localScale = Vector3.one * (v.Raio * 2f);
+            Pintar(it.R, CorTear, Cintila[passo % Cintila.Length] * e);
+            Vector3 chao = NoChao(p);
+            float h = p.y + AlturaTear - chao.y;
+            it.R2.transform.SetPositionAndRotation(chao + Vector3.up * 0.06f, Inclinacao(p));   // mundo: nao gira com a raiz
+            it.R2.transform.localScale = Vector3.one * Mathf.Sqrt(Mathf.Max(v.Raio * v.Raio - h * h, 0.01f));
+            Pintar(it.R2, Hdr(CorRaio, 1.6f), e * Flicker[passo % Flicker.Length]);
+            ParticleSystem.ShapeModule sh = it.Ps.shape;
+            sh.radius = v.Raio;
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = 180f * e;
         }
 
         /// <summary>Aceso: fogo preso ao alvo, em espaco de MUNDO (o rastro fica — e' informacao para os outros).</summary>
@@ -498,13 +565,17 @@ namespace Arkana.Gameplay
             em.rateOverTimeMultiplier = 22f * e;
         }
 
-        /// <summary>Revelado: feixe vertical sobre o alvo tocado pelo fio.</summary>
+        /// <summary>Revelado: feixe de luz sobre o alvo tocado pelo fio (largo nele, some no ceu) + motas subindo por dentro.
+        /// O brilho (e, flicker) vai pelo _BaseColor da linha: o degrade do feixe fica fixo, sem Gradient novo por quadro.</summary>
         void Revelado(Item it, EfeitoVisual v, float e)
         {
-            Transform t = it.Go.transform;
-            t.position = PosDoAlvo(v) + Vector3.up * (AlturaFeixe * 0.5f);
-            t.localScale = new Vector3(0.3f, AlturaFeixe * 0.5f, 0.3f);   // cilindro de 2 m de altura
-            Pintar(it.R, CorRaio, 0.45f * e);
+            Vector3 p = PosDoAlvo(v);
+            it.Go.transform.position = p;
+            it.Linha.SetPosition(0, p);
+            it.Linha.SetPosition(1, p + Vector3.up * AlturaFeixe);
+            Pintar(it.Linha, Hdr(Color.white, MaterialVfx.BrilhoHdr), 0.8f * e * Flicker[Passo() % Flicker.Length]);
+            ParticleSystem.EmissionModule em = it.Ps.emission;
+            em.rateOverTimeMultiplier = 16f * e;
         }
 
         /// <summary>Quem sumiu da lista volta ao pool. Particula PARA de emitir (a chama morre sozinha, sem piscar).</summary>
@@ -594,25 +665,49 @@ namespace Arkana.Gameplay
                     break;
                 case "poca":
                     it.R = Peca(raiz, MalhaVfx.Disco(), _mBrasa);
+                    // chamas BAIXAS (o preset de fogo, mais lento e com teto menor: o dash solta 3-4 pocas encavaladas).
+                    // MUNDO: a poca e' parada, e a chama que sobra ao recolher morre onde estava.
+                    it.Ps = ParticulaVfx.Fogo(raiz, "Chamas", 20f, true);
+                    ParticleSystem.MainModule mp = it.Ps.main;
+                    mp.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.3f);
+                    mp.maxParticles = 40;
                     break;
                 case "fio":
-                    it.Linha = it.Go.AddComponent<LineRenderer>();
-                    it.Linha.useWorldSpace = true;
-                    it.Linha.widthMultiplier = 0.07f;
-                    it.Linha.numCapVertices = 2;
-                    it.Linha.alignment = LineAlignment.View;
-                    it.Linha.sharedMaterial = MaterialVfx.DeParticula();
-                    it.Linha.shadowCastingMode = ShadowCastingMode.Off;
-                    it.Linha.receiveShadows = false;
+                    it.Linha = Linha(it.Go, 0.2f);
                     it.R = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Sphere), _mFeixe);
                     it.R2 = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Sphere), _mFeixe);
-                    it.R.transform.localScale = it.R2.transform.localScale = Vector3.one * 0.36f;
+                    // faisca ELETRICA: miuda, rapida, curta e para todo lado (aleatorio 1), na caixa esticada no fio.
+                    // MUNDO: o fio nao anda.
+                    it.Ps = ParticulaVfx.Novo(raiz, "Faiscas", new Color(1f, 1f, 0.85f), CorRaio, 60f,
+                        new Vector2(0.12f, 0.3f), new Vector2(1.5f, 4f), new Vector2(0.06f, 0.14f), true, 1f, 60);
                     break;
                 case "eco":
                     it.R = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Capsule), _mEco);
+                    // a capsula sozinha lia "plastico": NEBLINA espectral vazando do corpo (abre ao subir) + almas miudas
+                    // (filhas: o Play(true)/Stop(true) do pool liga as duas). Alfa baixo: aditivo grande estoura o bloom.
+                    // MUNDO: o eco e' parado. Caixa = o corpo em pe' (0,2-1,6 m).
+                    it.Ps = ParticulaVfx.Novo(raiz, "Neblina", new Color(0.91f, 0.9f, 0.94f, 0.25f), new Color(0.55f, 0.75f, 1f, 0.18f), 16f,
+                        new Vector2(1f, 1.8f), new Vector2(0.15f, 0.5f), new Vector2(0.5f, 1.1f), true, 0.25f, 40);
+                    ParticleSystem.SizeOverLifetimeModule sze = it.Ps.sizeOverLifetime;
+                    sze.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 1.4f));
+                    ParticleSystem.ShapeModule she = it.Ps.shape;
+                    she.scale = new Vector3(0.6f, 0.6f, 1.4f);
+                    it.Ps2 = ParticulaVfx.Novo(it.Ps.transform, "Almas", new Color(0.9f, 0.95f, 1f), new Color(0.55f, 0.75f, 1f), 10f,
+                        new Vector2(0.8f, 1.6f), new Vector2(0.3f, 0.9f), new Vector2(0.05f, 0.12f), true, 0.4f, 24);
+                    it.Ps2.transform.localRotation = Quaternion.identity;   // ja' herda o -90 da neblina
+                    ParticleSystem.ShapeModule sha = it.Ps2.shape;
+                    sha.scale = she.scale;
                     break;
                 case "tear":
                     it.R = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Sphere), _mTear);
+                    it.R2 = Peca(raiz, MalhaVfx.Anel(), _mFeixe);   // a BORDA, no chao
+                    // TRAMA: faisca so' na CASCA da cupula (hemisferio, espessura 0), escorrendo para dentro (absorve).
+                    // LOCAL: a cupula anda com a dona e gira em passos — a trama vai junto.
+                    it.Ps = ParticulaVfx.Novo(raiz, "Trama", new Color(1f, 0.97f, 0.7f), CorRaio, 180f,
+                        new Vector2(0.5f, 1.1f), new Vector2(-0.6f, -0.1f), new Vector2(0.1f, 0.26f), false, 0f, 200);
+                    ParticleSystem.ShapeModule sht = it.Ps.shape;
+                    sht.shapeType = ParticleSystemShapeType.Hemisphere;   // +Z local = cima (o Novo gira -90 em X)
+                    sht.radiusThickness = 0f;
                     break;
                 case "aceso":
                     it.Ps = ParticulaVfx.Fogo(raiz, "Aceso", 22f, true);
@@ -620,7 +715,18 @@ namespace Arkana.Gameplay
                     sh.scale = new Vector3(0.5f, 0.5f, 1.2f);
                     break;
                 case "revelado":
-                    it.R = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Cylinder), _mFeixe);
+                    // FEIXE: faixa aditiva virada para a camera, larga no alvo e sumindo no ceu (o cilindro chapado lia
+                    // placeholder) + motas subindo por dentro. LOCAL: o alvo corre e a coluna vai junto, reta.
+                    it.Linha = Linha(it.Go, 0.7f);
+                    it.Linha.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, 0.35f);
+                    var gf = new Gradient();
+                    gf.SetKeys(new[] { new GradientColorKey(CorRaio, 0f), new GradientColorKey(CorRaio, 1f) },
+                        new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.6f, 0.4f), new GradientAlphaKey(0f, 1f) });
+                    it.Linha.colorGradient = gf;
+                    it.Ps = ParticulaVfx.Novo(raiz, "Motas", new Color(1f, 1f, 0.8f), CorRaio, 16f,
+                        new Vector2(0.8f, 1.8f), new Vector2(3f, 7f), new Vector2(0.08f, 0.2f), false, 0.04f, 48);
+                    ParticleSystem.ShapeModule shr = it.Ps.shape;
+                    shr.scale = new Vector3(0.3f, 0.3f, 0.4f);
                     break;
                 case "aviso":
                     it.R = Peca(raiz, MalhaVfx.Anel(), _mAviso);
@@ -644,6 +750,20 @@ namespace Arkana.Gameplay
             return mr;
         }
 
+        /// <summary>Linha aditiva de MUNDO virada para a camera, com a faixa macia (MaterialVfx.DeLinha).</summary>
+        static LineRenderer Linha(GameObject go, float largura)
+        {
+            var l = go.AddComponent<LineRenderer>();
+            l.useWorldSpace = true;
+            l.widthMultiplier = largura;
+            l.numCapVertices = 2;
+            l.alignment = LineAlignment.View;
+            l.sharedMaterial = MaterialVfx.DeLinha();
+            l.shadowCastingMode = ShadowCastingMode.Off;
+            l.receiveShadows = false;
+            return l;
+        }
+
         // ------------------------------------------------------------------ utilidades
 
         /// <summary>Cor por objeto sem material novo (MaterialPropertyBlock): so' o alfa muda de efeito para efeito.</summary>
@@ -654,6 +774,9 @@ namespace Arkana.Gameplay
             _mpb.SetColor(_idCor, c);
             r.SetPropertyBlock(_mpb);
         }
+
+        /// <summary>Cor acima de 1 (acende no bloom) com o alfa intacto: Color * k multiplicaria o alfa e o aditivo sairia k^2.</summary>
+        static Color Hdr(Color c, float k) => new Color(c.r * k, c.g * k, c.b * k, c.a);
 
         static int Passo() => (int)(Time.time / PassoAnime);
 

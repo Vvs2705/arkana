@@ -11,6 +11,7 @@ using Arkana.Terrain;
 using Arkana.World;
 using ArkMenu = Arkana.Menu.Menu;
 using ArkSelecao = Arkana.Menu.SelecaoPersonagem;
+using ArkVitrine = Arkana.Menu.VitrineDoMenu;
 
 namespace Arkana
 {
@@ -111,8 +112,8 @@ namespace Arkana
     }
 
     /// <summary>
-    /// A casca fina da cena Main: garante EventSystem, cria Sfx e Menu no boot, e a cada partida monta a arena
-    /// (Ilha se falta, Sol, HUD, Castelo, Player, Bots/bonecos, Partida) e a desmonta no fim/abandono.
+    /// A casca fina da cena Main: garante EventSystem, cria Sfx, Menu, Ilha, Sol e a camera do menu (com a VitrineDoMenu) no
+    /// boot, e a cada partida monta a arena (HUD, Castelo, Player, Bots/bonecos, Partida) e a desmonta no fim/abandono.
     /// Tudo por-partida vive sob "Arena" (restart = arena nova, limpa — estado que atravessa partida ja' vazou 3x no Godot).
     /// Fiacao defensiva: peca ausente vira aviso, nunca excecao. Nao chama Bus.Reset(): HUD/Sfx/Fluxo ja' assinaram.
     /// </summary>
@@ -132,9 +133,12 @@ namespace Arkana
         public ArkMenu Menu { get; private set; }
         public Sfx Sfx { get; private set; }
         public Castelo Castelo { get; private set; }
+        /// <summary>A camera do menu (a "Main Camera" da cena ou, sem cena, a que o boot criou): filma a VitrineDoMenu.</summary>
+        public Camera CameraDoMenu => _camMenu;
 
         Transform _arena;
         Camera _camMenu;
+        ArkVitrine _vitrine;
         readonly List<GameObject> _meus = new List<GameObject>();      // o que este boot criou fora da arena (some com ele)
         readonly List<GameObject> _tiros = new List<GameObject>();
         /// <summary>Qual projetil cada objeto do pool desenhou no quadro anterior: trocou de dono, o rastro recomeca (senao risca a tela).</summary>
@@ -146,17 +150,32 @@ namespace Arkana
         {
             GarantirEventSystem();
             if (GetComponent<AudioListener>() == null) gameObject.AddComponent<AudioListener>();   // o unico ouvinte da cena (menu e partida)
-            // A camera da cena so' serve ao menu (limpa a tela na cor da noite); na partida a de verdade nasce com o Player.
-            GameObject cam = GameObject.Find("Main Camera");
-            _camMenu = cam != null ? cam.GetComponent<Camera>() : null;
-            if (_camMenu != null) _camMenu.enabled = true;
             Sfx = Sfx.Criar();
             _meus.Add(Sfx.gameObject);
 #if !UNITY_EDITOR
             gameObject.AddComponent<MedidorDeFps>();   // so' no aparelho: FPS no logcat (a medicao que faltava desde 25/08)
 #endif
-            Menu = ArkMenu.Criar();
+            Menu = ArkMenu.Criar();   // ANTES da ilha: o Criar aplica a Config (nivel de qualidade) que a ilha e o sol encontram
             _meus.Add(Menu.gameObject);
+            GarantirIlha();   // ja' no boot: o fundo do menu e' o mago no pico (a partida reaproveita a mesma ilha)
+            // A camera do menu: a da cena ou, sem cena (PlayMode), uma propria. Na partida ela desliga e a do Player vira a
+            // Camera.main (Grama/Vegetacao/Kit cortam por ela); no menu ela e' a Camera.main e o corte mede o pico.
+            GameObject cam = GameObject.Find("Main Camera");
+            _camMenu = cam != null ? cam.GetComponent<Camera>() : null;
+            if (_camMenu == null)
+            {
+                var go = new GameObject("CameraMenu");
+                go.tag = "MainCamera";
+                _camMenu = go.AddComponent<Camera>();   // sem AudioListener: o unico e' o do Main
+                _meus.Add(go);
+            }
+            _camMenu.clearFlags = CameraClearFlags.Skybox;   // o ceu do por do sol da ilha, nao mais a cor chapada da noite
+            _camMenu.fieldOfView = 40f;
+            _camMenu.nearClipPlane = 0.1f;
+            _camMenu.farClipPlane = Ilha.FarDaCamera;
+            Ilha.LigarPos(_camMenu);   // o mesmo pos da partida (bloom, tonemapping)
+            _camMenu.enabled = true;
+            _vitrine = _camMenu.gameObject.AddComponent<ArkVitrine>();
             Fluxo = new FluxoDeJogo(Montar, Desmontar);
             Fluxo.Ligar();
             _pedidoAdb = PartidaPeloAdb.Pedido();   // teste sem dedo (MIUI recusa toque pelo adb); null = jogo normal
@@ -223,6 +242,21 @@ namespace Arkana
                 if (on) Menu.Rearmar();
             }
             if (_camMenu != null) _camMenu.enabled = on;
+            if (_vitrine != null) _vitrine.enabled = on;   // desligada, o mago do pico some (o treino nasce la')
+        }
+
+        /// <summary>Ilha e Sol SE FALTAREM (a cena so' tem Main + luz + camera). Nascem no boot e atravessam partidas.
+        /// Sem log: o BootTests reprova qualquer log inesperado.</summary>
+        Ilha GarantirIlha()
+        {
+            Ilha ilha = Ilha.Atual;
+            if (ilha == null)
+            {
+                ilha = new GameObject("Ilha").AddComponent<Ilha>();   // Awake -> Montar()
+                _meus.Add(ilha.gameObject);
+            }
+            if (FindFirstObjectByType<Sol>() == null) _meus.Add(new GameObject("Sol", typeof(Sol)));
+            return ilha;
         }
 
         // ---------------------------------------------------------------- arena
@@ -230,18 +264,7 @@ namespace Arkana
         void Montar()
         {
             MostrarMenu(false);
-            Ilha ilha = Ilha.Atual;
-            if (ilha == null)
-            {
-                // Caminho NORMAL (a cena so' tem Main + luz + camera): a ilha nasce aqui. Sem log: o BootTests reprova qualquer log inesperado.
-                ilha = new GameObject("Ilha").AddComponent<Ilha>();   // Awake -> Montar()
-                _meus.Add(ilha.gameObject);
-            }
-            Relevo relevo = ilha.Relevo;
-            if (FindFirstObjectByType<Sol>() == null)
-            {
-                _meus.Add(new GameObject("Sol", typeof(Sol)));
-            }
+            Relevo relevo = GarantirIlha().Relevo;   // a do boot, quase sempre
 
             _arena = new GameObject(NomeArena).transform;
             // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede. SeedForcado > 0 so' para foto/teste:
@@ -399,7 +422,7 @@ namespace Arkana
             tr.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
             tr.numCapVertices = 2;
             tr.alignment = LineAlignment.View;
-            tr.sharedMaterial = MaterialVfx.DeParticula();
+            tr.sharedMaterial = MaterialVfx.DeLinha();   // faixa macia na LARGURA: o ponto esticado apagava as pontas do rastro
             tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             tr.receiveShadows = false;
             go.SetActive(false);

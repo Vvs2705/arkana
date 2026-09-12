@@ -122,6 +122,29 @@ namespace Arkana.Tests
         }
 
         [UnityTest]
+        public IEnumerator Menu_VitrineMostraOMagoNoPico_ESomeNaPartida()
+        {
+            // o fundo do menu e' o mago escolhido no pico; o treino nasce LA' — o mago da vitrine nao pode sobrar na partida
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            yield return null;
+            Assert.IsNotNull(main.CameraDoMenu, "o menu tem camera");
+            Assert.AreSame(main.CameraDoMenu, Camera.main, "no menu quem filma e' a camera do menu");
+            var mago = Object.FindFirstObjectByType<Arkana.Characters.Mago>();
+            Assert.IsNotNull(mago, "o mago da vitrine existe no menu");
+            Vector2 pk = Ilha.Atual.Relevo.Pico;
+            Vector3 p = mago.transform.position;
+            Assert.Less(Vector2.Distance(new Vector2(p.x, p.z), pk), 0.01f, "o mago esta' no pico");
+            Assert.Less(Vector3.Distance(main.CameraDoMenu.transform.position, p), 8f, "a camera orbita perto dele");
+
+            Bus.EmitGameStartRequested();
+            yield return null;
+            foreach (var m in Object.FindObjectsByType<Arkana.Characters.Mago>(FindObjectsSortMode.None))
+                Assert.IsNotNull(m.GetComponentInParent<Gameplay.Pawn>(), "na partida so' ha' mago com corpo: o da vitrine sumiu");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest]
         public IEnumerator MatchOver_VaiParaFim_EMenuDesmontaAArena()
         {
             Main main = _go.AddComponent<Main>();
