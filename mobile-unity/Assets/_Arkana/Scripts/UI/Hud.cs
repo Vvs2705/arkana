@@ -1119,9 +1119,11 @@ namespace Arkana.UI
             if (!novo && _labels.TryGetValue(n, out lbl) && lbl != null) { PintarNumero(lbl, n); return; }
             var cam = Camera.main;
             if (cam == null) return;
-            Vector3 mundo = alvo.Pos + Vector3.up * 1.7f;
+            // ao LADO da cabeca e abaixo da placa do alvo (MarcasDeAlvo): a 1,7 m no eixo, o "33" subia por cima do nome (foto 35)
+            Vector3 mundo = alvo.Pos + Vector3.up * 1.45f;
             Vector3 vp = cam.WorldToViewportPoint(mundo);
             if (vp.z < 0f) return;   // atras da camera projetaria no lugar errado
+            vp.x += 0.05f;   // KNOB: passa da ponta da placa do alvo, a' direita
             lbl = _numerosLivres.Count > 0 ? _numerosLivres.Pop() : NovoNumero();
             lbl.gameObject.SetActive(true);
             lbl.canvasRenderer.SetAlpha(1f);
