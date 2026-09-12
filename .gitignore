@@ -6,6 +6,7 @@ mobile-unity/[Bb]uild/
 mobile-unity/[Bb]uilds/
 mobile-unity/[Ll]ogs/
 mobile-unity/[Uu]ser[Ss]ettings/
+mobile-unity/.utmp/
 mobile-unity/*.csproj
 mobile-unity/*.sln
 mobile-unity/.vs/
