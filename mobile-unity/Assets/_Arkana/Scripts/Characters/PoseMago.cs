@@ -243,7 +243,9 @@ namespace Arkana.Characters
         /// </summary>
         static readonly Dictionary<Clipe, string[]> _aliases = new Dictionary<Clipe, string[]>
         {
-            { Clipe.Idle, new[] { "idle", "Armature|Idle", "mixamo.com", "standing_idle", "breathing_idle",
+            // Combat_Stance ("Combate Ocioso" na biblioteca da Meshy) PRIMEIRO: o Idle_02 ("Parado 1") levanta o braco no
+            // meio do laco — o elenco inteiro acenava junto na foto de 12/09
+            { Clipe.Idle, new[] { "Combat_Stance", "idle", "Armature|Idle", "mixamo.com", "standing_idle", "breathing_idle",
                 "idle_01", "idle_loop", "idle_02", "idle_03" } },
             { Clipe.Run, new[] { "run", "Running", "Armature|Run", "Armature|Running", "Run Forward",
                 "running_forward", "locomotion_run", "sprint", "jog", "fast_run", "walk", "Walking" } },

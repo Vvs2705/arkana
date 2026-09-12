@@ -290,13 +290,13 @@ namespace Arkana.World
                         // parede invisivel na borda da rocha e' melhor que camera dentro dela.
                         if (malha.isReadable)
                         {
-                            // CONVEXO, nao a malha crua: a malha da Meshy tem triangulo com a volta trocada, e o PhysX
-                            // ignora o verso — o raio da Queda atravessou o topo da rocha e o mago pousou DENTRO dela
-                            // (diag de 11/09: "camera dentro do colisor 18-rocha-vulcanica"). O casco fecha a peca de
-                            // todo lado, custa <=255 faces e nao depende da volta. Preco: a ponte-raiz vira bloco.
+                            // A MALHA REAL (12/09). O casco convexo existia porque a malha DECIMADA tinha triangulo com a
+                            // volta trocada e o raio da Queda atravessava o topo (diag de 11/09). O kit agora vem do REMESH
+                            // do site (fechado, volta coerente) e a sonda da Queda acerta o verso de qualquer jeito
+                            // (queriesHitBackfaces). E o casco de 10K triangulos estoura o limite de 255 faces do PhysX
+                            // ("partial hull", aviso que reprova o BootTests). Ganho de brinde: a ponte-raiz tem vao.
                             var mc = mfs[m].gameObject.AddComponent<MeshCollider>();
                             mc.sharedMesh = malha;
-                            mc.convex = true;
                             continue;
                         }
                         Bounds b = malha.bounds;   // espaco da malha: a caixa gira e escala com a peca

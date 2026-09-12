@@ -10,12 +10,18 @@
 #
 # Uso (headless):
 #   blender --background --python tools/blender/otimizar.py -- \
-#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m>
+#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m> [tex_max_px]
+#
+# 12/09/2026: a DECIMACAO COLLAPSE abria buracos (a rocha saia estilhacada no jogo). A topologia agora vem
+# do REMESH do site da Meshy (10K/3K, fechada); aqui passa-se tris_alvo = 0 (nao decima) e tex_max_px
+# (ex.: 1024) — a textura cai para JPEG desse tamanho e so' a cor base fica: o KitCenario do Unity so' le'
+# baseColor, e normal/metal 2K embutidos iam para o APK a toa.
 import bpy
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 entrada, saida, tris_alvo, tamanho = argv[0], argv[1], int(argv[2]), float(argv[3])
+tex_max = int(argv[4]) if len(argv) > 4 else 0
 
 # cena limpa (o cubo default do Blender ja' vazou para um export uma vez na
 # historia de todo pipeline do mundo; aqui ele morre antes de nascer)
@@ -38,10 +44,29 @@ tris_atual = sum(len(p.vertices) - 2 for p in obj.data.polygons)
 razao = min(1.0, tris_alvo / max(tris_atual, 1))
 print(f"[otimizar] {entrada}: {tris_atual} tris -> alvo {tris_alvo} (razao {razao:.4f})")
 
-mod = obj.modifiers.new("Decimar", "DECIMATE")
-mod.decimate_type = "COLLAPSE"
-mod.ratio = razao
-bpy.ops.object.modifier_apply(modifier=mod.name)
+if tris_alvo > 0:
+    mod = obj.modifiers.new("Decimar", "DECIMATE")
+    mod.decimate_type = "COLLAPSE"
+    mod.ratio = razao
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+if tex_max > 0:
+    # so' a cor base fica ligada no BSDF; o resto sai do export
+    for mat in bpy.data.materials:
+        if not mat.use_nodes:
+            continue
+        for no in mat.node_tree.nodes:
+            if no.type != "BSDF_PRINCIPLED":
+                continue
+            for entrada_bsdf in no.inputs:
+                if entrada_bsdf.name != "Base Color":
+                    for link in list(entrada_bsdf.links):
+                        mat.node_tree.links.remove(link)
+    for img in bpy.data.images:
+        w, h = img.size
+        if max(w, h) > tex_max:
+            k = tex_max / max(w, h)
+            img.scale(max(1, int(w * k)), max(1, int(h * k)))
 
 # escala para o tamanho REAL: maior dimensao da caixa = <tamanho> metros
 dims = obj.dimensions
@@ -60,5 +85,8 @@ tris_final = sum(len(p.vertices) - 2 for p in obj.data.polygons)
 print(f"[otimizar] final: {tris_final} tris, dims {obj.dimensions.x:.2f} x "
       f"{obj.dimensions.y:.2f} x {obj.dimensions.z:.2f} m")
 
-bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB")
+if tex_max > 0:
+    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", export_image_format="JPEG")
+else:
+    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB")
 print(f"[otimizar] salvo: {saida}")

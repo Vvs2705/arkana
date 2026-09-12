@@ -23,7 +23,9 @@ if (Test-Path $Xml) { Remove-Item $Xml }
 $UnityArgs = @("-batchmode", "-projectPath", "`"$Proj`"",
                "-runTests", "-testPlatform", "PlayMode", "-testFilter", "FotoTests",
                "-testResults", "`"$Xml`"", "-logFile", "`"$Log`"")
-$P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
+$P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -PassThru -NoNewWindow
+$null = $P.Handle   # sem tocar no handle antes do fim, o ExitCode volta vazio (quirk do PowerShell)
+$P.WaitForExit()   # nunca -Wait: espera a arvore, e o VBCSCompiler do Unity fica vivo ~10 min (ver portao.ps1)
 
 if (Test-Path $Xml) {
     [xml]$R = Get-Content $Xml

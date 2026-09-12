@@ -261,10 +261,15 @@ namespace Arkana.Characters
                 return false;
             }
             // O importador traz tudo sem laco: run tocava tres passos e congelava (patinacao, 25/08).
+            // Disparo unico em ClampForever: segura o ultimo quadro e o crossfade de volta parte DELE (em Once o estado
+            // morria e o blend saia do nada). O fim do disparo se le' pelo tempo, no Tick.
             foreach (KeyValuePair<Clipe, string> kv in _clipesExternos)
-                anim[kv.Value].wrapMode = PoseMago.Laco(kv.Key) ? WrapMode.Loop : WrapMode.Once;
+                anim[kv.Value].wrapMode = PoseMago.Laco(kv.Key) ? WrapMode.Loop : WrapMode.ClampForever;
             anim.playAutomatically = false;
             _anim = anim;
+            // o clipe inicial JA' e' Idle, e Play(Idle) sai cedo (laco igual ao atual): sem isto o externo ficava na pose
+            // congelada do FBX (o elenco inteiro de braco erguido, foto de 12/09) ate' correr a primeira vez
+            anim.Play(_clipesExternos[Clipe.Idle]);
 
             // materiais proprios (o tint de um bot nao pode pintar o player) + metal domado
             Bounds b = new Bounds(inst.transform.position, Vector3.zero);
@@ -355,9 +360,11 @@ namespace Arkana.Characters
             _castDisparado = pedido != Clipe.Cast;
             if (_anim != null)
             {
+                // CROSSFADE com os mesmos tempos do procedural (a troca seca de clipe era o "pulo" do externo).
+                // Disparo unico reinicia do zero (o cast continuo); laco que ja' esta' saindo nao volta ao comeco.
                 string real = _clipesExternos[c];
-                _anim.Stop(real);   // play() com o clipe corrente nao reinicia: parar antes e' o que reinicia o cast
-                _anim.Play(real);
+                if (!PoseMago.Laco(c) || !_anim.IsPlaying(real)) _anim[real].time = 0f;
+                _anim.CrossFade(real, _blendDur);
             }
         }
 
@@ -394,7 +401,9 @@ namespace Arkana.Characters
                 CastFired?.Invoke();
             }
             // Disparo unico acabou: volta ao idle/run. E' o blend de volta que ABAIXA o braco (DIRECAO.md).
-            bool acabou = _anim != null ? !_anim.IsPlaying(_clipesExternos[_clipe]) : _t >= PoseMago.Duracao(_clipe);
+            bool acabou;
+            if (_anim != null) { AnimationState st = _anim[_clipesExternos[_clipe]]; acabou = st.time >= st.length; }
+            else acabou = _t >= PoseMago.Duracao(_clipe);
             if (!PoseMago.Laco(_clipe) && acabou) { Play(Locomocao()); return; }
 
             if (_anim != null) return;

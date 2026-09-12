@@ -212,8 +212,49 @@ namespace Arkana.Tests
         /// FOLHA DE CLIPES do mago externo: os 10 clipes lado a lado, no cenario do jogo. Existe porque o "Planar horizontal
         /// v2" da Meshy mergulhava de cabeca para baixo e so' o Diretor viu (12/09) — clipe torto tem de aparecer AQUI antes.
         /// </summary>
+        static System.Collections.Generic.IEnumerable<string> SlugsExternos()
+        {
+            foreach (string s in Arkana.Core.Kits.Slugs)
+                if (Resources.Load<GameObject>("magos/" + s) != null) yield return s;
+        }
+
+        /// <summary>O ELENCO lado a lado, parado, na luz do jogo: o quadro que mostra ao Diretor o que ja' entrou.</summary>
         [UnityTest]
-        public IEnumerator Foto_Elenco_ClipesDoMago([Values("01-pyra")] string slug)
+        public IEnumerator Foto_Elenco_Todos()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+
+            var slugs = new System.Collections.Generic.List<string>(SlugsExternos());
+            Assume.That(slugs.Count, Is.GreaterThan(0), "nenhum FBX em Resources/magos");
+            Vector3 c = main.Player.Pawn.Pos + new Vector3(14f, 0f, 0f);
+            const float passo = 1.5f;
+            int colunas = Mathf.Min(10, slugs.Count);   // 20 numa fila so' viram formigas: duas filas de 10
+            var magos = new System.Collections.Generic.List<GameObject>();
+            for (int i = 0; i < slugs.Count; i++)
+            {
+                int col = i % colunas, fila = i / colunas;
+                Vector3 p = c + new Vector3((col - (colunas - 1) * 0.5f + fila * 0.5f) * passo, 0f, -fila * 2.6f);
+                p.y = Arkana.World.Ilha.AlturaDoChao(p.x, p.z);
+                var m = Arkana.Characters.Mago.Criar(null, slugs[i]);
+                m.transform.position = p;
+                magos.Add(m.gameObject);
+            }
+            yield return Esperar(0.6f);
+            float largura = colunas * passo;
+            Camera cam = CameraTemporaria("CamFotoElenco", c + new Vector3(0f, 2.6f, 1.2f + largura * 0.95f), c + new Vector3(0f, 0.9f, -1.3f), Color.gray);
+            Foto(cam, "12-elenco", false);
+            Object.Destroy(cam.gameObject);
+            foreach (GameObject g in magos) Object.Destroy(g);
+        }
+
+        [UnityTest]
+        public IEnumerator Foto_Elenco_ClipesDoMago([ValueSource(nameof(SlugsExternos))] string slug)
         {
             ExigirGpu();
             Main main = _go.AddComponent<Main>();

@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 12/09/2026, madrugada (APK no Poco F4: 60 FPS medidos; a prioridade seguinte é o visual)
+> **Atualizado em:** 12/09/2026, manhã (os 20 magos reais e o kit sem buracos no jogo; falta medir no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,12 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — o jogo RODA NO APARELHO a 60 FPS; o Diretor achou o visual amador (12/09/2026)
+### >>> COMECE POR AQUI — os 20 magos REAIS e o kit sem buracos estão no jogo (foto); falta jogar no aparelho (12/09/2026, manhã)
+
+**Próximo passo, na ordem:** instalar o APK novo no Poco F4 e medir FPS com o
+elenco real (`--es arkana_auto partida`); se cair, o primeiro corte é o LOD dos
+magos distantes. Depois: castelo/baú/luvas pela receita do kit (leva 4), luz e
+pós (passo D). A seção "LEVA 4", depois do passo A, tem a receita inteira do site.
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
 Steam... tudo que estava sendo feito no Godot eu quero que seja adaptado para
@@ -70,8 +75,8 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **268 testes, 0 falhas** (262 EditMode sobre classes puras + 6 PlayMode que montam a arena inteira e rodam 3 s sem um log sequer) |
-| **Fotos** | `powershell -File mobile-unityoto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **309 testes, 0 falhas** (282 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 27 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Fotos** | `powershell -File mobile-unity\foto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
 | **FPS no aparelho (a dívida de 25/08, PAGA)** | **60 FPS sustentados, quadro de 16,6 ms, pior quadro 33 ms, 36,9 °C**, sem erro nem exceção no logcat, numa partida inteira: castelo, queda, pouso, 12 bots em FFA, tempestade. A tela do Poco estava em 60 Hz: o vsync segura aí; a folga real só aparece com a tela em 120 Hz |
@@ -161,21 +166,83 @@ visualmente melhor."* **Isso vira a prioridade.** O que está na tela é
 placeholder: mago de primitivas, rochas decimadas com buracos, luz de primeira
 passada, nenhum VFX de assinatura. O caminho para "real" está na ORDEM abaixo.
 
+#### LEVA 4 (12/09, madrugada, sem o Diretor): o ELENCO REAL e o kit SEM BURACOS
+
+**O que foi feito.** Os **20 magos** refeitos no SITE da Meshy (nunca pela API),
+um por um, e dentro do jogo: `mobile-unity/Assets/_Arkana/Resources/magos/NN-slug.fbx`
++ `-cor.png` + `-normal.png`. E as **8 peças do kit** trocadas por versões com
+topologia fechada (o "vidro estilhaçado" das rochas era a decimação).
+
+**A receita do elenco (a que funcionou, para refazer um mago):**
+
+1. **Modelo** → Meshy 7 Flagship, **Multi-View** com três vistas das
+   referências: `master-reference-frente.png` (principal), `vista-costas.png`
+   (Trás) e `vista-lateral.png` no slot do lado para onde o personagem OLHA
+   (Esquerda = olha para a esquerda da imagem: 01, 03-08, 11-17, 19; Direita:
+   02, 09, 10, 18, 20). Ultra 2K, Textura, **Pose T**, Melhoria de imagem,
+   Privado → **35 créditos**. A Pyra ficou com a de 1 imagem (ordem do Diretor:
+   "se funcionar, não refaz").
+2. **Ilusionista:** as três vistas trazem o clone de cristal junto; recortado
+   por polígono (fundo pintado com a cor da própria linha) →
+   `_originais/multiview-*-sem-clone.png`. Saiu limpo.
+3. **Animar → Rig** → pede remesh (300 K+ faces): **Corrigido 30K, Triângulo**
+   (0 crédito). Rig **Humanoide**, **altura da ficha** (`IdentidadeMago`), e
+   **conferir os marcadores**: a Meshy põe a **virilha no cinto** em quase
+   todos — descer até onde as pernas se separam; tornozelo no tornozelo.
+4. **Clipes** (biblioteca, grátis; o rig já traz Walking/Running):
+   **Combate Ocioso** (idle), Mage Spell Cast, Outono 1 (queda), Coletar
+   objeto, Alcance Prone Ajuda (derrubado), Nadar para frente, Nadar Parado,
+   Andar Agachado com Cautela, e **Planar Arkana** (Texto para Movimento, 10
+   créditos, uma vez só: vale para todos, mesmo id). **NUNCA** o "Planar
+   horizontal v2" (movimento de IA antigo da conta): mergulha de cabeça para
+   baixo — o Diretor viu e disse *"não é aceitável"*. **Nem** o "Parado 1"
+   como idle: ergue o braço no meio do laço.
+5. **Baixar**: fbx, **Todos Adicionados**, **Arquivo único**, 30 FPS → zip.
+   `powershell -File mobile-unity\importar_mago.ps1 <zip> NN-slug` extrai e lista
+   as takes.
+6. Custo total da noite: **650 créditos** (1.569 → 919), com o remesh do kit
+   (grátis). A geração do Gromm falhou no servidor uma vez (crédito devolvido);
+   o "tentar de novo" gerou só a malha e a textura saiu pelo botão Textura (10).
+
+**O que o Unity precisou (e os defeitos que só a foto mostrou):**
+
+| Defeito | Causa | Conserto |
+|---|---|---|
+| Pyra entrou com **1 cm** (um ponto no chão) e o portão verde | o `SkinnedMeshRenderer.bounds` do FBX da Meshy vem ~100× maior (localBounds no espaço do Hips, que herda a escala 100 da Armature) e o Mago escalava por ele | altura pela malha de repouso levada pelo transform do renderer; teste `CharactersMagoExternoTests` mede a malha DEFORMADA (BakeMesh) de todo slug com FBX |
+| FBX sem textura | a Meshy não grava o caminho das PNGs | `ImportacaoArkana` liga `-cor`/`-normal` no material NA IMPORTAÇÃO (`_NORMALMAP` ligado em runtime some no APK) |
+| Elenco inteiro de **braço erguido** na foto | `Play(Idle)` sai cedo porque o clipe inicial já é Idle: o modelo ficava na pose congelada do FBX até correr a 1ª vez | o Mago começa o idle ao vestir o FBX; teste exige `Animation.isPlaying` |
+| Planar de cabeça para baixo | clipe ruim da conta | trocado pelo Planar Arkana; alias por id no `PoseMago` |
+| Troca de clipe "pulando" no externo | `Animation.Play` seco; disparo único em `Once` morria e a volta saía do nada | `CrossFade` com os tempos do procedural; disparo único em `ClampForever` e fim lido pelo tempo |
+| Portão parado para sempre depois do EditMode | `Start-Process -Wait` espera a ÁRVORE de processos, e o Unity deixa o `VBCSCompiler` (Roslyn) vivo ~10 min | `WaitForExit()` só no Unity (portão, foto e build) |
+| PlayMode vermelho com o kit novo ("partial hull") | o casco convexo tem teto de 255 faces no PhysX; a peça de 10 K estoura | `MeshCollider` com a malha REAL (não convexa): some o aviso e a ponte-raiz ganha o vão embaixo |
+| Nuvens cortadas em **linhas retas** no céu (foto `12-elenco`) | o hash `frac(sin(x)*43758)` com x na casa dos milhares: o mesmo canto da grade de ruído, calculado por duas células vizinhas, dava valores diferentes | hash sem seno (Hoskins) no céu, no chão toon e na água — os três tinham o mesmo hash |
+
+Fotos novas: `11-clipes-<slug>.png` (os 10 clipes do mago lado a lado, **toda
+leva que mexer em clipe olha essa foto**) e `12-elenco.png` (os 20 juntos).
+
+**O kit sem buracos.** A causa do "estilhaçado" era a decimação COLLAPSE do
+`arte/tools/blender/otimizar.py` sobre o original de 3 M de faces. Agora a
+topologia vem do **Remesh do site** (grátis): 10K triângulos nas 7 peças
+grandes, 3K no piso de runa; e o `otimizar.py` ganhou `tris_alvo = 0` (não
+decima) e `tex_max_px` (textura 1K JPEG, só a cor base — o `KitCenario` só lê
+baseColor). Cada peça: ~0,3–0,9 MB. Mapa (nome na Meshy → peça): Runic Stone
+Sanctuary → 17, Emberstone Outcrop → 18, Verdant Rune Arch → 19, Mossroot
+Arch → 20, Stormspire Nexus → 21, Arcane Celestial Altar → 28, Emberbloom
+Tree → 30, Ancient Keystone Slab → 32.
+
 #### O que o Unity AINDA NÃO TEM (registro honesto, 12/09)
 
 Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 
-1. **Visual de jogo de verdade** (a avaliação do Diretor acima): elenco real,
-   peças sem buracos, VFX de assinatura, pós-processamento, iluminação afinada.
-2. **As peças do kit têm BURACOS de perto**: a malha decimada a 6.000 faces
-   deixa frestas onde o chão aparece por dentro (foto `08-pouso`). É asset,
-   não código: re-derivar do original de 3 M de faces no Blender com "fechar
-   buracos", ou usar o original com LOD. Os originais estão em
-   `arte/cenario/*/origem/`.
-3. **A ponte-raiz virou bloco**: o casco convexo fecha o vão embaixo dela.
-   Trocar por casco composto (ou malha crua com a volta corrigida no Blender).
-4. **Modelo externo** só entra como `Animation` legado; FBX Humanoid com
-   `Animator` precisa de um adaptador (passo E).
+1. **Medir no aparelho** o elenco real (20 × ~30 K triângulos) e o kit novo
+   (10 K por peça): FPS e temperatura. Nada disso foi medido ainda.
+2. **VFX de assinatura, pós-processamento e luz**: o personagem de frente para
+   a câmera fica escuro contra o sol (ambiente baixo); sem bloom/tonemapping.
+3. **Baú e luvas** ainda são os `.glb` do Godot. O castelo (30 K da API, foto
+   `06-castelo`) lê bem e fica. Se o baú/luvas estilhaçarem de perto: mesma
+   receita do kit — "Gemforged Treasure Chest" é o baú na oficina.
+4. **Modelo externo** entra como `Animation` legado (com crossfade);
+   retargeting/Humanoid ficou desnecessário para os clipes da Meshy.
 5. "Intangível" não muda a colisão; bots não usam kit (como no Godot).
 6. O gesto de disparo é o do GDD §19.3 (pressionar-arrastar-soltar, cancelar
    voltando ao centro). O Godot R17 tinha "tocar dispara + segurar auto-fogo".
@@ -210,8 +277,8 @@ Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 | Passo | O quê | Portão |
 |---|---|---|
 | **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
-| **B** | **Elenco real**: os 20 magos refeitos no SITE da Meshy (um por um, com a marcação de articulações), exportados em FBX Humanoid; adaptador de `Animator` no `Mago`. Começa pelos 3 com kit (Pyra, Véu, Tessa) | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
-| **C** | **Peças do kit sem buracos**: re-derivar as 8 do original de 3 M de faces no Blender (decimate + "fechar buracos" + normais coerentes); ponte-raiz com vão; e as 7 peças novas da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana, obelisco, plataforma, braseiro) | a rocha de perto lê como rocha; FPS mantido |
+| **B ✅ (foto)** | **Elenco real**: os 20 magos do SITE da Meshy no jogo, 11 clipes cada (leva 4). **Falta o aparelho** | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
+| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅. Faltam castelo/baú/luvas pela mesma receita e as 7 peças novas da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana, obelisco, plataforma, braseiro) | a rocha de perto lê como rocha; FPS mantido |
 | **D** | **VFX de assinatura e pós**: braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
 | **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
 | **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |

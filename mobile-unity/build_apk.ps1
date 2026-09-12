@@ -19,7 +19,9 @@ if (-not (Get-Process "Unity Hub" -ErrorAction SilentlyContinue)) {
 
 $UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"", "-buildTarget", "Android",
                "-executeMethod", "Arkana.EditorTools.Build.Android", "-logFile", "`"$Log`"", "-quit")
-$P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
+$P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -PassThru -NoNewWindow
+$null = $P.Handle   # sem tocar no handle antes do fim, o ExitCode volta vazio (quirk do PowerShell)
+$P.WaitForExit()   # nunca -Wait: espera a arvore, e o VBCSCompiler do Unity fica vivo ~10 min (ver portao.ps1)
 "---- build.log (ultimas 25 linhas) ----"
 Get-Content $Log -Tail 25
 if (Test-Path $Apk) {

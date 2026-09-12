@@ -62,7 +62,8 @@ onde as coisas estão.
 |---|---|
 | **Plataforma alvo** | Android (aparelho de teste: Poco F4) |
 | **Engine** | Unity 6000.3.23f1, instalado com o módulo Android |
-| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu, áudio e o visual (shaders próprios, grama, kit de cenário, loot/baú/tempestade/efeitos) reescritos; portão headless verde (268 testes), fotos do jogo rodando (`foto.ps1`) e **APK jogado no Poco F4 a 60 FPS** (12/09) |
+| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu, áudio e o visual (shaders próprios, grama, kit de cenário, loot/baú/tempestade/efeitos) reescritos; portão headless verde (309 testes), fotos do jogo rodando (`foto.ps1`) e **APK jogado no Poco F4 a 60 FPS** (12/09) |
 | **mobile-godot** | referência, 12/12 autotestes verdes na última execução (04/09) |
 | **Rede** | **não existe.** É o item mais caro e ainda não começou |
-| **Elenco** | 20 fichas e 160 vistas de concept prontas; modelos 3D a refazer no site da Meshy, um por um |
+| **Elenco** | **os 20 magos reais no jogo** (12/09): feitos no site da Meshy com três vistas, rig humanoide na altura da ficha e 11 clipes cada (`Resources/magos/`); falta medir no aparelho |
+| **Cenário** | as 8 peças do kit com topologia fechada (remesh do site, 10 K); castelo mantido |

@@ -99,10 +99,13 @@ Shader "Arkana/Toon"
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
-            // hash + value noise: o mesmo ruido barato do Godot (1 hash por canto)
+            // hash + value noise (1 hash por canto). Hash SEM seno (Hoskins): o frac(sin(x)*43758) do Godot, com as
+            // coordenadas de mundo (+-300 m), dava hash diferente pro mesmo canto visto de duas celulas = costura reta.
             float H21(float2 p)
             {
-                return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+                float3 p3 = frac(p.xyx * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return frac((p3.x + p3.y) * p3.z);
             }
 
             float Ruido(float2 p)

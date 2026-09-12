@@ -24,7 +24,11 @@ function Passada([string]$Plataforma, [string]$Log, [string]$Xml) {
     $UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"",
                    "-runTests", "-testPlatform", $Plataforma,
                    "-testResults", "`"$Xml`"", "-logFile", "`"$Log`"")
-    $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -Wait -PassThru -NoNewWindow
+    # WaitForExit, NUNCA -Wait: o -Wait espera a ARVORE de processos, e o Unity deixa o VBCSCompiler (servidor do
+    # Roslyn) vivo ~10 min depois de compilar — o portao ficou parado ali em 12/09
+    $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -PassThru -NoNewWindow
+    $null = $P.Handle   # sem tocar no handle antes do fim, o ExitCode volta vazio (quirk do PowerShell)
+    $P.WaitForExit()
 
     if (-not (Test-Path $Xml)) {
         Write-Host "PORTAO VERMELHO ($Plataforma): nao houve resultado de teste (compilou?). Unity exit $($P.ExitCode). Erros do log:"

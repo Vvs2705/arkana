@@ -69,9 +69,12 @@ Shader "Arkana/Agua"
                 float fog : TEXCOORD3;
             };
 
+            // hash SEM seno (Hoskins): o de seno costurava em retas longe da origem (ver ArkanaCeu.shader)
             float H21(float2 p)
             {
-                return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+                float3 p3 = frac(p.xyx * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return frac((p3.x + p3.y) * p3.z);
             }
 
             float Ruido(float2 p)

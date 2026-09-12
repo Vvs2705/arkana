@@ -13,7 +13,14 @@ namespace Arkana.Tests
     /// </summary>
     public class CharactersMagoExternoTests
     {
-        [TestCase("01-pyra")]
+        /// <summary>Todo slug do elenco que ja' tem FBX em Resources/magos (o elenco entra aos poucos).</summary>
+        public static System.Collections.Generic.IEnumerable<string> SlugsExternos()
+        {
+            foreach (string s in Arkana.Core.Kits.Slugs)
+                if (Resources.Load<GameObject>("magos/" + s) != null) yield return s;
+        }
+
+        [TestCaseSource(nameof(SlugsExternos))]
         public void MagoExterno_CarregaNaAlturaDaFicha_ComPesNoChao(string slug)
         {
             // o Mago instancia materiais (r.materials: o tint de um bot nao pinta o player); no EditMode isso loga erro
@@ -22,6 +29,7 @@ namespace Arkana.Tests
             try
             {
                 Assert.AreEqual("external:magos/" + slug, m.Fonte, "o FBX nao vestiu (sem idle/run/cast?)");
+                Assert.IsTrue(m.GetComponentInChildren<Animation>().isPlaying, "nasce na pose congelada do FBX, sem idle");
                 Bounds b = MalhaDeformada(m.gameObject, out string diag);
                 File.WriteAllText(Path.Combine(Application.dataPath, "..", "Logs", "diag-mago-" + slug + ".txt"), diag);
                 float ficha = IdentidadeMago.De(slug).AlturaM;
