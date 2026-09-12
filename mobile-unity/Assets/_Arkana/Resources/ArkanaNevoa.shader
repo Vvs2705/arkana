@@ -65,6 +65,10 @@ Shader "Arkana/Nevoa"
                 float3 p = i.positionWS;
                 float n = sin(p.x * 0.35 + t * 0.14) * sin(p.z * 0.28 - t * 0.1)
                         + 0.5 * sin(p.x * 0.9 - t * 0.07 + p.z * 0.6);
+                // LONGE o desenho some e fica o veu medio. As duas camadas tem o MESMO desenho (e' do mundo: girar o
+                // disco nao gira o padrao) e o seno x seno e' uma grade por construcao: do castelo e da queda o alagado
+                // virava xadrez listrado (fotos 04/06/07). Bruma e' coisa de perto. KNOB: 35-110 m.
+                n *= 1.0 - smoothstep(35.0, 110.0, distance(p, GetCameraPositionWS()));
                 float a = _Cor.a * (0.55 + 0.3 * n) * (1.0 - smoothstep(0.5, 1.0, i.anel));
                 return float4(MixFog(_Cor.rgb, InitializeInputDataFog(float4(p, 1.0), i.fog)), saturate(a));
             }

@@ -1071,5 +1071,78 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             Assert.Greater(voo.Pousos, 0, "o pouso estalou");
         }
+
+        // ONDA 7A — colar em FotoTests.cs, depois de Foto_Chao_PicoEEncosta. Rodar: .\foto.ps1 "Foto_Agua"
+
+        /// <summary>
+        /// ONDA 7A — a AGUA de longe e de perto. 32-lago-alto: 200 m acima da lamina, olhando para o sul (para o sol), o lago
+        /// a' esquerda e o ALAGADO a' direita — a agua listrada das fotos 06/07 era o alagado: o xadrez era a bruma (seno x seno
+        /// sem LOD) e o miolo azul de borda dura era o MAR desenhado por cima da poca. 32-lago-perto: a camera de 3a pessoa (a
+        /// altura e o pitch do jogo) a 5 m da margem do lago, de frente para o sol: onda, espuma de margem e o caminho de
+        /// faiscas. Camera fixa: a foto de hoje se compara com a de ontem.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Agua_LagoAltoEPerto()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            var r = ilha.Relevo;
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Assert.IsNotNull(sol, "sem sol");
+            var sb = new System.Text.StringBuilder();
+
+            // o MAR nao desenha sob o lago e o alagado (senao a ordem dos transparentes o poe por cima, vista do alto)
+            GameObject mar = GameObject.Find("Ilha/Gerado/Mar");
+            Assert.IsNotNull(mar, "sem mar");
+            Material mm = mar.GetComponent<Renderer>().sharedMaterial;
+            if (mm.shader.name == "Arkana/Agua")
+            {
+                Vector4 s0 = mm.GetVector("_SemMar0"), s1 = mm.GetVector("_SemMar1");
+                Assert.AreEqual(r.LagoDiscoR, s0.z, 0.01f, "o mar abre o disco do lago");
+                Assert.AreEqual(r.AlagadoDiscoR, s1.z, 0.01f, "o mar abre o disco do alagado");
+                sb.AppendLine("32-agua: mar=" + mm.name + " semMar0=" + s0.ToString("F1") + " semMar1=" + s1.ToString("F1")
+                    + " reflexo=" + mm.GetFloat("_Reflexo").ToString("F2") + " brilho=" + mm.GetFloat("_Brilho").ToString("F2"));
+            }
+            else sb.AppendLine("32-agua: SEM Arkana/Agua (cadeia antiga): " + mm.shader.name);
+
+            // 1) DO ALTO: a 200 m, os dois POIs d'agua no quadro (o lago a' esquerda, o alagado a' direita)
+            Vector2 meio = (r.Lago + r.Alagado) * 0.5f;
+            Vector3 c = new Vector3(meio.x, Arkana.World.Relevo.LagoY + 200f, meio.y + 240f);
+            const float pitchAlto = 27f * Mathf.Deg2Rad;
+            Camera cam = CameraTemporaria("CamFotoLagoAlto", c, c + new Vector3(0f, -Mathf.Sin(pitchAlto), -Mathf.Cos(pitchAlto)) * 100f, Color.gray);
+            Foto(cam, "32-lago-alto", false);
+            cam.aspect = (float)L / A;   // a do PNG (fora da foto a camera volta ao aspecto da janela)
+            Vector3 pl = cam.WorldToViewportPoint(new Vector3(r.Lago.x, Arkana.World.Relevo.LagoY, r.Lago.y));
+            Vector3 pa = cam.WorldToViewportPoint(new Vector3(r.Alagado.x, Arkana.World.Relevo.AlagadoY, r.Alagado.y));
+            sb.AppendLine("32-lago-alto: cam=" + c.ToString("F1") + " lago no png=(" + (pl.x * L).ToString("F0") + ", " + ((1f - pl.y) * A).ToString("F0") + ") a " + pl.z.ToString("F0")
+                + " m, alagado=(" + (pa.x * L).ToString("F0") + ", " + ((1f - pa.y) * A).ToString("F0") + ") a " + pa.z.ToString("F0") + " m");
+            Object.Destroy(cam.gameObject);
+
+            // 2) DE PERTO: de costas para a sombra (= de frente para o sol), 5 m alem da margem REAL do lago nessa direcao
+            Vector3 l = sol.transform.forward; l.y = 0f; l.Normalize();
+            Vector2 d = new Vector2(l.x, l.z);
+            float margem = 0f;
+            while (margem < r.LagoDiscoR && r.Altura(r.Lago.x + d.x * margem, r.Lago.y + d.y * margem) < Arkana.World.Relevo.LagoY) margem += 0.25f;
+            Vector2 pe = r.Lago + d * (margem + 5f);
+            c = new Vector3(pe.x, r.Altura(pe.x, pe.y) + 3.6f, pe.y);   // pivo 1,85 + ombro + braco 4,15 a 17 graus
+            float pitch = CameraLogica_PitchPadrao();
+            Vector3 dir = new Vector3(-d.x * Mathf.Cos(pitch), -Mathf.Sin(pitch), -d.y * Mathf.Cos(pitch));
+            cam = CameraTemporaria("CamFotoLagoPerto", c, c + dir * 10f, Color.gray);
+            Foto(cam, "32-lago-perto", false);
+            // o que houver entre a camera e o ponto da lamina no centro do quadro (a agua nao tem colisor)
+            Vector3 naAgua = c + dir * ((c.y - Arkana.World.Relevo.LagoY) / Mathf.Sin(pitch));
+            bool tapa = Physics.Linecast(c, naAgua, out RaycastHit h);
+            sb.AppendLine("32-lago-perto: margem a " + margem.ToString("F1") + " m do centro, cam=" + c.ToString("F1") + " pitch=" + (pitch * Mathf.Rad2Deg).ToString("F0")
+                + " centro do quadro na lamina a " + Vector3.Distance(c, naAgua).ToString("F1") + " m, no caminho: " + (tapa ? Caminho(h.collider.transform) + " a " + h.distance.ToString("F1") + " m" : "nada"));
+            Object.Destroy(cam.gameObject);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }

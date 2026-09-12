@@ -225,6 +225,20 @@ namespace Arkana.World
             // Lago e alagado sao POI: celula menor, contraste cheio, azul mais fundo (o claro virava lilas).
             Material mLago = nova ? MaterialAgua("Lago", 0x35b0f2, 0x0f4f9e, 0.07f, 1f, 1.15f, 1f) : MaterialPadrao();
             Material mBrejo = nova ? MaterialAgua("Alagado", 0x4ba589, 0x1e6b62, 0.04f, 1f, 1.4f, 0.85f) : MaterialPadrao();
+            if (nova)
+            {
+                // O MAR passa por BAIXO da ilha inteira (y = 0) e o fundo do lago (-2,4 m) e a poca do alagado (-0,15 m)
+                // descem abaixo dele. As tres laminas estao na mesma fila e o Unity ordena pela distancia ao centro dos
+                // bounds — o do mar mora sob a camera: do castelo e da queda o mar saia POR CIMA do lago e do alagado (o
+                // miolo azul de borda dura das fotos 06/07). Sob os dois discos o mar nao desenha. Na borda dos discos o
+                // terreno ja' esta' acima do mar (medido: >= 0,29 m), entao o corte nunca aparece.
+                mMar.SetVector("_SemMar0", new Vector4(Relevo.Lago.x, Relevo.Lago.y, Relevo.LagoDiscoR, 0f));
+                mMar.SetVector("_SemMar1", new Vector4(Relevo.Alagado.x, Relevo.Alagado.y, Relevo.AlagadoDiscoR, 0f));
+                // o mar ocupa meia tela: reflexo do alto e brilho do sol mais contidos que no lago. KNOB: por foto.
+                mMar.SetFloat("_Reflexo", 0.06f);
+                mMar.SetFloat("_Brilho", 0.6f);
+                mMar.SetFloat("_BrilhoDuro", 2000f);
+            }
 
             mar = Agua(parent, mMar, MalhaMar(nova ? new Color(0f, 0f, 0f, 1f) : CorCrua(0x2f8fe0)),
                 new Vector3(0f, Relevo.AguaY, 0f), "Mar").transform;
