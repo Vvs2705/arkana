@@ -78,7 +78,7 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **312 testes, 0 falhas** (284 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 28 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **315 testes, 0 falhas** (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
 | **Fotos** | `powershell -File mobile-unity\foto.ps1` → 10 PNGs do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera e o corpo tocam). **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
@@ -281,7 +281,18 @@ vai rodar legal, disso tenho certeza"*.
   0,4 MB.
 - **Mapa das luvas.** Varinha = Emberhand Gauntlet · cajado = Celestial
   Sovereign Gauntlet · manopla = Gemini Gauntlet. Os glb do remesh ficam em
-  `arte/cenario/*/origem/` (fora do git). **Decisão que volta ao Diretor:** o validador propôs "Altar
+  `arte/cenario/*/origem/` (fora do git).
+
+**O kit em ação, pela primeira vez em foto (`17-kit-tatica`, `18-kit-suprema`).**
+Nenhuma foto tinha mostrado um kit disparando, e o diagnóstico achou dois
+defeitos de jogo que os testes não pegavam:
+
+| Defeito | Causa | Conserto |
+|---|---|---|
+| A muralha da Pyra nascia **atrás** dela, fora da tela | os botões TÁTICA/SUPREMA não contavam como mira: o kit saía para a frente do CORPO; parado e com a câmera girada, ia para trás | `Player.Tatica/Suprema` miram como o disparo (`YawAlvo` = yaw da câmera). Teste `Treino_TaticaSaiNaMiraDaCamera` |
+| No treino a suprema levava 50 s, não 5 | `Partida.SupremaCargaS` existia e tinha teste, mas o `KitRunner` lia `Dados.SupremaCarga` direto | `KitRunner.SupremaCargaS` pergunta à partida. Teste `Suprema_NoTreino_EncheEm5s` |
+| A muralha era uma barra laranja lisa | teto de 48 partículas para 8 m de parede, chama miúda | chama grande e densa (teto 260) + faíscas que espirram |
+| Tiro = bola chapada | primitiva `Unlit` de cor pura | cor HDR (acende no bloom) + rastro aditivo por elemento | **Decisão que volta ao Diretor:** o validador propôs "Altar
 só depois do playtest" porque o Altar encosta na Sintonia. Ele entrou só como
 CENÁRIO, sem sistema nenhum; se for para esperar, é tirar uma linha do
 `KitCenario.Montar`.

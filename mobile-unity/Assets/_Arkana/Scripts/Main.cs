@@ -137,6 +137,8 @@ namespace Arkana
         Camera _camMenu;
         readonly List<GameObject> _meus = new List<GameObject>();      // o que este boot criou fora da arena (some com ele)
         readonly List<GameObject> _tiros = new List<GameObject>();
+        /// <summary>Qual projetil cada objeto do pool desenhou no quadro anterior: trocou de dono, o rastro recomeca (senao risca a tela).</summary>
+        readonly List<Projetil> _donoDoTiro = new List<Projetil>();
         static readonly Dictionary<Projetil.Forma, Mesh> _malhas = new Dictionary<Projetil.Forma, Mesh>();
         static readonly Dictionary<Elemento, Material> _materiais = new Dictionary<Elemento, Material>();
 
@@ -305,6 +307,7 @@ namespace Arkana
             if (_arena != null) { Destroy(_arena.gameObject); _arena = null; }
             for (int i = 0; i < _tiros.Count; i++) if (_tiros[i] != null) Destroy(_tiros[i]);
             _tiros.Clear();
+            _donoDoTiro.Clear();
             Player = null; Castelo = null; Bots.Clear();
             Time.timeScale = 1f;   // a pausa da HUD nao pode atravessar partida
         }
@@ -360,15 +363,25 @@ namespace Arkana
         void DesenharTiros()
         {
             List<Projetil> lista = Partida.Projeteis;
-            while (_tiros.Count < lista.Count) _tiros.Add(NovoTiro());
+            while (_tiros.Count < lista.Count) { _tiros.Add(NovoTiro()); _donoDoTiro.Add(null); }
             for (int i = 0; i < _tiros.Count; i++)
             {
                 GameObject go = _tiros[i];
                 if (go == null) continue;
-                if (i >= lista.Count) { if (go.activeSelf) go.SetActive(false); continue; }
+                if (i >= lista.Count) { if (go.activeSelf) go.SetActive(false); _donoDoTiro[i] = null; continue; }
                 Projetil p = lista[i];
                 Vestir(go, p.FormaDoTiro, p.ElementoDoTiro);
                 go.transform.position = p.Pos;
+                if (_donoDoTiro[i] != p)
+                {
+                    // o pool casa por INDICE: quando um tiro morre, os de tras trocam de objeto — o rastro recomeca aqui
+                    _donoDoTiro[i] = p;
+                    var tr = go.GetComponent<TrailRenderer>();
+                    Color c = Projetil.Tint(p.ElementoDoTiro);
+                    tr.startColor = c;
+                    tr.endColor = new Color(c.r, c.g, c.b, 0f);
+                    tr.Clear();
+                }
                 if (p.Dir.sqrMagnitude > 0.0001f) go.transform.rotation = Quaternion.LookRotation(p.Dir, Vector3.up);
                 if (!go.activeSelf) go.SetActive(true);
             }
@@ -378,6 +391,17 @@ namespace Arkana
         {
             var go = new GameObject("Tiro", typeof(MeshFilter), typeof(MeshRenderer));   // sem colisor: a camera e a mira nao podem esbarrar no tiro
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // RASTRO: bola chapada voando le' como placeholder (foto 18 de 12/09); o fio aditivo (HDR) da o movimento e acende no bloom
+            var tr = go.AddComponent<TrailRenderer>();
+            tr.time = 0.18f;
+            tr.minVertexDistance = 0.12f;
+            tr.widthMultiplier = 0.32f;
+            tr.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
+            tr.numCapVertices = 2;
+            tr.alignment = LineAlignment.View;
+            tr.sharedMaterial = MaterialVfx.DeParticula();
+            tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            tr.receiveShadows = false;
             go.SetActive(false);
             return go;
         }
@@ -427,7 +451,11 @@ namespace Arkana
             if (s == null) s = Shader.Find("Standard");
             mat = s != null ? new Material(s) : Ilha.MaterialPadrao();
             mat.name = "Tiro_" + Elementos.Id(el);
-            mat.color = Projetil.Tint(el);   // [MainColor] do URP: color escreve _BaseColor
+            // [MainColor] do URP: color escreve _BaseColor. Acima de 1 (HDR): o miolo do tiro passa do limiar do bloom
+            // e vira ORBE aceso, nao bola de plastico. Alfa 1 (Color * k multiplicaria o alfa junto). KNOB: com 2,2 o fogo
+            // saturava o vermelho e virava AMARELO — a cor do Raio da Tessa (foto 18 de 12/09); 1,5 segura o matiz.
+            Color t = Projetil.Tint(el);
+            mat.color = new Color(t.r * 1.5f, t.g * 1.5f, t.b * 1.5f, 1f);
             _materiais[el] = mat;
             return mat;
         }
