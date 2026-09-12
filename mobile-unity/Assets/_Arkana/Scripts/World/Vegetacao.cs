@@ -189,6 +189,12 @@ namespace Arkana.World
     /// Arvore e' dado VIVO: o terreno reativo queima a floresta (GDD §14) por MarcarQueimada(i).
     /// PEDREGULHO (onda 5B): a rocha da Meshy no lugar do blob marrom ("piramide de papelao" na foto 02), um
     /// GameObject por pedra no load, filho da celula; sem o .glb, volta o blob na malha da celula.
+    /// ARVORE DA MESHY (onda 6B): o cacho de 4 blobs lia como "brinquedo de blocos" ao lado da pedra texturizada. Copa
+    /// larga (campina, avulsas e 1/3 da mata) e pinheiro (2/3 da mata), desenhados como a Grama: RenderMeshInstanced por
+    /// BLOCO de 60 m, um lote por especie x tinta x LOD, nenhum GameObject por arvore, LOD por arvore a 4 Hz. Os lugares,
+    /// o colisor do tronco e o registro (PosArvore) sao os de sempre. Queimada: o toco procedural na malha da celula.
+    /// MOITA DA MESHY (onda 6B): a mesma receita por celula, so' perto do olho (AlcanceMoitaMeshy); longe, a procedural.
+    /// Sem os .glb (ou sem instancing, no -nographics), volta a procedural na malha da celula.
     /// </summary>
     public sealed class Vegetacao : MonoBehaviour
     {
@@ -199,16 +205,89 @@ namespace Arkana.World
         /// rochedos do mar (Ruinas.RochaDoMar); sem as duas, o blob.</summary>
         public const string RochaDoPedregulho = "18-pedregulho";
 
+        /// <summary>As arvores da Meshy em Resources (1,5K tris; o LOD1 e' o mesmo nome + "-lod1", ~600 tris).</summary>
+        public const string ArvoreCopa = "35-arvore-copa", ArvorePinheiro = "36-pinheiro";
+        /// <summary>Distancia 3D do olho a' arvore em que ela passa para o LOD1 (m). Nunca some: le'-se da queda.</summary>
+        public const float DistanciaLod1 = 40f;   // KNOB: 35-45 m, por foto e FPS
+        /// <summary>Quanto da mata fechada e' pinheiro; o resto e' copa larga. A previa de 12/09 leu como mata com 2 de 3.</summary>
+        public const float PinheirosNaMata = 0.65f;   // KNOB
+        /// <summary>Tintas por especie (base, sol, sombra). Cada uma e' um material e um lote a mais por bloco.</summary>
+        public const int Variantes = 3;
+        /// <summary>Inclinacao maxima da arvore da Meshy (graus, em X e em Z): tudo a prumo le' como plantacao.</summary>
+        public const float Inclinacao = 4f;   // KNOB
+        /// <summary>Quanto o pe' da Meshy desce abaixo do chao mais baixo da pegada (m): raiz boiando na encosta le' como defeito.</summary>
+        const float AfundaArvore = 0.08f;
+        /// <summary>Lado do BLOCO de desenho da Meshy (m). Com a celula de 30 m, o voo via ~250 lotes; com 60, ~metade.</summary>
+        const float PassoBloco = 60f;   // KNOB
+        const float Periodo = 0.25f;    // 4 Hz: corte da moita e LOD da arvore
+
+        /// <summary>
+        /// A TINTA da Meshy (multiplica a textura, sRGB), por especie x variante (base, sol, sombra). O pinheiro chega TEAL
+        /// puro (folha media 0,05/0,32/0,33): na sombra fria do entardecer virava arvore de natal azul (previa de 12/09); o
+        /// azul cai ~30% e ele vira verde-abeto. A copa (oliva 0,31/0,43/0,20) ganha um pouco de verde. KNOB: por foto.
+        /// </summary>
+        static readonly Color[,] TintaMeshy =
+        {
+            { new Color(1f, 1.06f, 0.92f), new Color(1.1f, 1.12f, 0.84f), new Color(0.88f, 0.98f, 0.94f) },     // copa
+            { new Color(1.14f, 1f, 0.72f), new Color(1.24f, 1.06f, 0.68f), new Color(1.02f, 0.94f, 0.8f) },      // pinheiro
+        };
+
+        /// <summary>A moita da Meshy (1,2K tris, 2,2 x 1,6 m). Sem LOD1: a decimacao para em ~1.150 tris (a malha soldada tem
+        /// 385 vertices e UV em retalhos — 3,2K vertices na GPU).</summary>
+        public const string MoitaMeshy = "37-moita";
+        /// <summary>
+        /// Ate' onde a moita e' a da Meshy (m, do olho ao centro da celula); dali ate' o CorteMoitas, a procedural da celula.
+        /// Toda moita da Meshy ate' 95 m custaria ~330 moitas na tela da mata = ~400K tris e ~1M vertices (sonda de 12/09);
+        /// ate' 45 m, ~80. KNOB: 95 quando houver uma moita de ~400 tris.
+        /// </summary>
+        public const float AlcanceMoitaMeshy = 45f;
+        /// <summary>A moita da Meshy chega verde-limao (folha 0,27/0,49/0,12): a tinta aprofunda o verde. Campina, mata. KNOB.</summary>
+        static readonly Color[] TintaMoita = { new Color(0.74f, 0.86f, 1.04f), new Color(0.64f, 0.78f, 1.06f) };
+
+        public enum Especie { Copa, Pinheiro }
+
+        /// <summary>Uma arvore do plantio, PURA: onde ela esta' (o registro que o terreno reativo e o colisor usam), a procedural
+        /// de reserva e a da Meshy (pe' na malha desenhada, giro com inclinacao, escala — sem o molde do .glb).</summary>
+        public struct ArvorePlantada
+        {
+            public Vector3 Pos;
+            public Matrix4x4 Proc;
+            public Color Tinta;
+            public Especie Especie;
+            public int Variante;
+            public Matrix4x4 Meshy;
+        }
+
+        /// <summary>Um lote instanciado: as matrizes de UMA malha (especie x LOD) com UMA tinta, num bloco. So' o N muda (4 Hz).</summary>
+        sealed class Lote
+        {
+            public Matrix4x4[] M;
+            public int N;
+        }
+
+        /// <summary>Bloco de desenho da Meshy: a caixa que o frustum corta e um lote por especie x variante x LOD.</summary>
+        sealed class Bloco
+        {
+            public Bounds Caixa;
+            public readonly List<int> Arvores = new List<int>();
+            public readonly Lote[] Lotes = new Lote[2 * Variantes * 2];
+        }
+
         sealed class Celula
         {
             public GameObject Go;
             public MeshFilter Mf;
+            public MeshRenderer Mr;
             public Vector3 Centro;
             public readonly List<int> Arvores = new List<int>();
             public readonly List<int> Rochas = new List<int>();
             public readonly List<int> Moitas = new List<int>();
             public Renderer MoitasR;
             public bool MoitasLigadas = true;
+            // a moita da Meshy da celula (fixa: sem LOD, sem fogo) e se o olho esta' perto o bastante para ela
+            public Lote[] MoitasMeshy;
+            public Bounds CaixaMoitas;
+            public bool MoitasPerto;
         }
 
         Relevo relevo;
@@ -231,15 +310,51 @@ namespace Arkana.World
         GameObject rocha;
         Bounds moldeRocha;
         static readonly Material[] matRocha = new Material[9];   // um por Bioma: 6 materiais para as 232 pedras (SRP Batcher)
-        float relogio;
+        float relogio = Periodo;
+
+        // a arvore da Meshy: especie, tinta e matriz (ja' com o molde) por arvore; malha [especie * 2 + lod]; null = procedural
+        readonly List<Especie> arvEsp = new List<Especie>();
+        readonly List<int> arvVar = new List<int>();
+        readonly List<Matrix4x4> arvVis = new List<Matrix4x4>();
+        readonly List<Bloco> blocos = new List<Bloco>();
+        readonly Matrix4x4[] moldeArvore = new Matrix4x4[2];
+        readonly int[] trisArvore = new int[4];
+        Mesh[] malhaArvore;
+        static readonly Material[] matArvore = new Material[2 * Variantes];
+        Camera cameraDoLod;
+        // a moita da Meshy: matriz (com o molde) e tinta (0 campina, 1 mata) por moita; null = so' a procedural
+        readonly List<Matrix4x4> moiVis = new List<Matrix4x4>();
+        readonly List<int> moiVar = new List<int>();
+        Mesh malhaMoita;
+        Matrix4x4 moldeMoita;
+        static readonly Material[] matMoita = new Material[2];
 
         public int ContarArvores() => arvPos.Count;
         public Vector3 PosArvore(int i) => arvPos[i];
         public bool EstaQueimada(int i) => i >= 0 && i < arvQueimada.Count && arvQueimada[i];
+        public Especie EspecieDe(int i) => arvEsp[i];
         public int ContarRochas() => rocM.Count;
         public int ContarMoitas() => moiM.Count;
         /// <summary>De onde saiu a pedra: RochaDoPedregulho, Ruinas.RochaDoMar ou "blob" (diag da foto).</summary>
         public string MoldeDasRochas { get; private set; }
+        /// <summary>De onde saiu a arvore: "35-arvore-copa + 36-pinheiro" ou "procedural" (diag da foto).</summary>
+        public string MoldeDasArvores { get; private set; }
+        /// <summary>De onde saiu a moita perto do olho: MoitaMeshy ou "procedural" (diag da foto).</summary>
+        public string MoldeDasMoitas { get; private set; }
+        /// <summary>Do ultimo corte (4 Hz), para o diag: lotes mandados por quadro e triangulos ANTES do frustum, e arvores em LOD0.</summary>
+        public int LotesEnviados { get; private set; }
+        public int TrisEnviados { get; private set; }
+        public int ArvoresPerto { get; private set; }
+
+        /// <summary>A camera que manda no LOD da arvore e no corte da moita; null = Camera.main. A foto aponta a dela.</summary>
+        public Camera Olho
+        {
+            get => cameraDoLod;
+            set { cameraDoLod = value; relogio = Periodo; }
+        }
+
+        /// <summary>A arvore em `arvore` vista de `olho` vai no LOD1? Distancia 3D: do castelo (320 m) a mata inteira e' LOD1.</summary>
+        public static bool Lod1(Vector3 olho, Vector3 arvore) => (olho - arvore).sqrMagnitude > DistanciaLod1 * DistanciaLod1;
 
         /// <summary>Fogo consumiu a arvore `i`: a copa SOME, sobra o toco e o tronco deixa de colidir. `false` restaura (restart).</summary>
         public void MarcarQueimada(int i, bool queimada = true)
@@ -248,6 +363,7 @@ namespace Arkana.World
             arvQueimada[i] = queimada;
             if (arvColisor[i] != null) arvColisor[i].enabled = !queimada;
             RemontarCelula(CelulaDe(arvPos[i]));
+            relogio = Periodo;   // a arvore da Meshy sai (ou volta) dos lotes no proximo quadro, junto com o toco
         }
 
         public void Montar(Relevo relevo, Material mat)
@@ -261,19 +377,47 @@ namespace Arkana.World
             protoMoita = ProtoMoita();
             rocha = MoldeDaRocha(out moldeRocha);
             MoldeDasRochas = rocha != null ? rocha.name : "blob";
+            malhaArvore = MalhasDasArvores(moldeArvore, trisArvore);
+            MoldeDasArvores = malhaArvore != null ? ArvoreCopa + " + " + ArvorePinheiro : "procedural";
+            malhaMoita = MalhaDaMoita(out moldeMoita);
+            MoldeDasMoitas = malhaMoita != null ? MoitaMeshy : "procedural";
             arvPos.Clear(); arvM.Clear(); arvTinta.Clear(); arvQueimada.Clear(); arvColisor.Clear();
-            rocM.Clear(); rocVis.Clear(); moiM.Clear(); moiTinta.Clear();
+            arvEsp.Clear(); arvVar.Clear(); arvVis.Clear(); blocos.Clear();
+            rocM.Clear(); rocVis.Clear(); moiM.Clear(); moiTinta.Clear(); moiVis.Clear(); moiVar.Clear();
             PlantarArvores();
             PlantarRochas();
             PlantarMoitas();
             MontarCelulas();
+            MontarBlocos();
+            relogio = Periodo;   // o primeiro Update ja' enche os lotes
         }
 
         // ---------------------------------------------------------------- scatter
 
         void PlantarArvores()
         {
+            foreach (ArvorePlantada a in PlantioDasArvores(relevo))
+            {
+                arvPos.Add(a.Pos);
+                arvM.Add(a.Proc);
+                arvTinta.Add(a.Tinta);
+                arvEsp.Add(a.Especie);
+                arvVar.Add(a.Variante);
+                arvVis.Add(a.Meshy * moldeArvore[(int)a.Especie]);
+                arvQueimada.Add(false);
+                arvColisor.Add(null);
+            }
+        }
+
+        /// <summary>
+        /// As arvores da ilha, PURO por seed: a mata fechada (150 x AREA, 4,4 m entre troncos) e as avulsas (26 x AREA). O
+        /// sorteio 21 e' o de sempre — a Meshy nao mudou o lugar de nenhuma arvore; especie e inclinacao saem do 22.
+        /// </summary>
+        public static List<ArvorePlantada> PlantioDasArvores(Relevo relevo)
+        {
+            var lista = new List<ArvorePlantada>();
             var rng = new Sorteio(21);
+            var meshy = new Sorteio(22);
             float area = relevo.Escala * relevo.Escala;   // densidade constante: contagem x area
             var xz = new List<Vector2>();
             int tries = 0;
@@ -290,7 +434,7 @@ namespace Arkana.World
                     if (Vector2.Distance(xz[j], p) < 4.4f) { ok = false; break; }
                 if (!ok) continue;
                 xz.Add(p);
-                Arvore(rng, p, h);
+                lista.Add(Arvore(relevo, rng, meshy, p, h, true));
             }
             // arvores avulsas fora da mata fechada
             tries = 0;
@@ -306,24 +450,41 @@ namespace Arkana.World
                     continue;
                 float h = relevo.Altura(p.x, p.y);
                 if (h < 1.2f || h > 9.5f) continue;
-                Arvore(rng, p, h);
+                lista.Add(Arvore(relevo, rng, meshy, p, h, false));
                 extra++;
             }
+            return lista;
         }
 
-        void Arvore(Sorteio rng, Vector2 p, float h)
+        static ArvorePlantada Arvore(Relevo relevo, Sorteio rng, Sorteio meshy, Vector2 p, float h, bool mata)
         {
+            // os quatro sorteios do 21, na ordem de sempre: escala, giro, esticao, tinta
             float s = rng.Faixa(0.75f, 1.16f);
             var pos = new Vector3(p.x, h - 0.1f, p.y);
-            var rot = Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f);
-            var esc = new Vector3(s, rng.Faixa(0.95f, 1.22f) * s, s);
-            arvPos.Add(pos);
-            arvM.Add(Matrix4x4.TRS(pos, rot, esc));
+            float giro = rng.Faixa(0f, 360f);
+            float sy = rng.Faixa(0.95f, 1.22f);
             // tinta por arvore: quebra a repeticao (umas puxam pro amarelo-sol, outras pro verde-frio)
             float v = rng.Faixa(-0.15f, 0.15f);
-            arvTinta.Add(new Color(1f + v * 1.5f, 1f + v * 0.5f, 1f - v * 0.9f));
-            arvQueimada.Add(false);
-            arvColisor.Add(null);
+
+            // a Meshy: os tres sorteios do 22 saem SEMPRE (a sequencia nao depende da especie)
+            bool pinheiro = meshy.Float() < PinheirosNaMata && mata;
+            float tx = meshy.Faixa(-Inclinacao, Inclinacao), tz = meshy.Faixa(-Inclinacao, Inclinacao);
+            // a escala da procedural vira a da especie (a copa sozinha na campina abre mais) e o esticao cai para 0,95-1,1: a
+            // Meshy esticada 22% deforma. KNOB: as faixas, por foto (copa 5,15 m x 6,5 m; pinheiro 8 m x 3,3 m no .glb)
+            float k = Mathf.InverseLerp(0.75f, 1.16f, s);
+            float e = pinheiro ? Mathf.Lerp(0.85f, 1.15f, k) : mata ? Mathf.Lerp(0.9f, 1.15f, k) : Mathf.Lerp(1f, 1.3f, k);
+            float ey = e * Mathf.Lerp(0.95f, 1.1f, Mathf.InverseLerp(0.95f, 1.22f, sy));
+            // o pe' no chao DESENHADO mais baixo da pegada (a raiz da copa abre ~2 m; o pinheiro e' tronco fino)
+            float pe = PeNoChao(relevo, p, (pinheiro ? 0.5f : 1.3f) * e);
+            return new ArvorePlantada
+            {
+                Pos = pos,
+                Proc = Matrix4x4.TRS(pos, Quaternion.Euler(0f, giro, 0f), new Vector3(s, sy * s, s)),
+                Tinta = new Color(1f + v * 1.5f, 1f + v * 0.5f, 1f - v * 0.9f),
+                Especie = pinheiro ? Especie.Pinheiro : Especie.Copa,
+                Variante = v > 0.05f ? 1 : v < -0.05f ? 2 : 0,   // a mesma leitura da tinta: sol / sombra
+                Meshy = Matrix4x4.TRS(new Vector3(p.x, pe - AfundaArvore, p.y), Quaternion.Euler(tx, giro, tz), new Vector3(e, ey, e)),
+            };
         }
 
         void PlantarRochas()
@@ -401,6 +562,14 @@ namespace Arkana.World
             return Matrix4x4.Translate(new Vector3(x0, y0 - afunda, z0)) * rs;
         }
 
+        /// <summary>O chao desenhado mais baixo entre `p` e os quatro pontos a `raio` dele: onde assenta a base de quem tem pegada.</summary>
+        static float PeNoChao(Relevo r, Vector2 p, float raio)
+        {
+            float a = Mathf.Min(ChaoDesenhado(r, p.x, p.y), ChaoDesenhado(r, p.x + raio, p.y));
+            float b = Mathf.Min(ChaoDesenhado(r, p.x - raio, p.y), ChaoDesenhado(r, p.x, p.y + raio));
+            return Mathf.Min(Mathf.Min(a, b), ChaoDesenhado(r, p.x, p.y - raio));
+        }
+
         /// <summary>Altura do chao DESENHADO (a malha de Ilha.Quads, a divisao de triangulo da Ilha, que o GradeDoChao repete)
         /// sem montar a grade: 4 Altura() por consulta. Nos sitios das rochas a Altura() exata passa ate' 0,23 m da malha (medido).</summary>
         static float ChaoDesenhado(Relevo r, float x, float z)
@@ -435,10 +604,17 @@ namespace Arkana.World
                 float h = ChaoAberto(p, 1.15f, 12f, 0.7f);
                 if (h < 0f) continue;
                 float sc = rng.Faixa(0.62f, 1.35f);
-                moiM.Add(Matrix4x4.TRS(new Vector3(p.x, h - 0.12f, p.y), Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f),
-                    new Vector3(sc, rng.Faixa(0.7f, 1.15f) * sc, sc)));
+                var giro = Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f);
+                float sy = rng.Faixa(0.7f, 1.15f);
+                moiM.Add(Matrix4x4.TRS(new Vector3(p.x, h - 0.12f, p.y), giro, new Vector3(sc, sy * sc, sc)));
                 float v = rng.Faixa(-0.14f, 0.14f);
                 moiTinta.Add(new Color(1f - v * 0.5f, 1f + v, 1f + v * 0.7f));
+                if (malhaMoita == null) continue;
+                // a da Meshy do TAMANHO da procedural (a cobertura nao muda: ~1,4 m de largura em sc = 1) e pe' no chao mais
+                // baixo da pegada: moita boiando na encosta le' como defeito
+                float e = 0.65f * sc;
+                moiVis.Add(Matrix4x4.TRS(new Vector3(p.x, PeNoChao(relevo, p, 0.7f * e) - 0.1f, p.y), giro, new Vector3(e, sy * e, e)) * moldeMoita);
+                moiVar.Add(relevo.BiomaEm(p.x, p.y) == Bioma.Floresta ? 1 : 0);
             }
         }
 
@@ -483,8 +659,8 @@ namespace Arkana.World
                 c.Go.transform.SetParent(transform, false);
                 c.Go.transform.localPosition = c.Centro;      // CADA CELULA NO SEU LUGAR
                 c.Mf = c.Go.AddComponent<MeshFilter>();
-                var mr = c.Go.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = mat;
+                c.Mr = c.Go.AddComponent<MeshRenderer>();
+                c.Mr.sharedMaterial = mat;
                 // colisao: tronco = capsula por arvore; rocha grande = esfera. Todas no GameObject da celula.
                 for (int j = 0; j < c.Arvores.Count; j++)
                 {
@@ -525,9 +701,32 @@ namespace Arkana.World
                         buf.Adicionar(protoMoita, m, moiTinta[i]);
                     }
                     mmf.sharedMesh = buf.ParaMesh("Moitas" + k, Linear());
+                    if (malhaMoita != null) MoitasDaMeshy(c);
                 }
                 RemontarCelula(k);
             }
+        }
+
+        /// <summary>Os lotes da moita da Meshy da celula, um por tinta, cheios de uma vez (moita nao queima nem troca de LOD).</summary>
+        void MoitasDaMeshy(Celula c)
+        {
+            c.MoitasMeshy = new Lote[2];
+            for (int j = 0; j < c.Moitas.Count; j++)
+            {
+                int i = c.Moitas[j];
+                Lote l = c.MoitasMeshy[moiVar[i]];
+                if (l == null)
+                {
+                    int n = 0;
+                    for (int q = 0; q < c.Moitas.Count; q++) if (moiVar[c.Moitas[q]] == moiVar[i]) n++;
+                    l = c.MoitasMeshy[moiVar[i]] = new Lote { M = new Matrix4x4[n] };
+                }
+                l.M[l.N++] = moiVis[i];
+                Vector3 p = moiVis[i].GetColumn(3);
+                if (j == 0) c.CaixaMoitas = new Bounds(p, Vector3.zero);
+                else c.CaixaMoitas.Encapsulate(p);
+            }
+            c.CaixaMoitas.SetMinMax(c.CaixaMoitas.min - new Vector3(1.5f, 0.5f, 1.5f), c.CaixaMoitas.max + new Vector3(1.5f, 2.5f, 1.5f));
         }
 
         Celula Cel(int k)
@@ -596,7 +795,8 @@ namespace Arkana.World
             return null;
         }
 
-        /// <summary>Arvores (ou tocos, se queimadas) + rochas-blob da celula numa malha so', em coordenada local.</summary>
+        /// <summary>Tocos (arvore queimada), a arvore procedural (sem a Meshy) e as rochas-blob da celula numa malha so', em
+        /// coordenada local. Celula sem nada disso (Meshy nas arvores e nas pedras) desliga o renderer.</summary>
         void RemontarCelula(int k)
         {
             Celula c = cels != null && k >= 0 && k < cels.Length ? cels[k] : null;
@@ -612,7 +812,7 @@ namespace Arkana.World
                     var m = Matrix4x4.TRS(arvPos[i] - c.Centro, Quaternion.Euler(0f, i * 137.5f, 0f), Vector3.one);
                     buf.Adicionar(protoToco, m, Color.white);
                 }
-                else
+                else if (malhaArvore == null)
                 {
                     Matrix4x4 m = arvM[i];
                     m.SetColumn(3, m.GetColumn(3) - off);
@@ -627,34 +827,272 @@ namespace Arkana.World
             }
             Mesh velha = c.Mf.sharedMesh;
             c.Mf.sharedMesh = buf.ParaMesh("Celula" + k, Linear());
+            c.Mr.enabled = buf.V.Count > 0;
             if (velha != null) Destroy(velha);
         }
 
         static bool Linear() => QualitySettings.activeColorSpace == ColorSpace.Linear;
 
+        // ---------------------------------------------------------------- arvore da Meshy
+
         /// <summary>
-        /// Corte por distancia da MOITA, na horizontal, por celula. 4 Hz: uma distancia por celula,
-        /// nada por instancia. Arvore e rocha ficam com o frustum (bounds da propria celula).
+        /// As malhas das duas arvores da Meshy ([especie * 2 + lod]), o molde e os triangulos de cada uma e os materiais das
+        /// variantes; null = falta .glb, textura, instancing (-nographics) ou o Lit: a ilha fica com a procedural.
+        /// Sem o LOD1, longe fica o LOD0 (custa triangulo, nao some).
+        /// </summary>
+        static Mesh[] MalhasDasArvores(Matrix4x4[] molde, int[] tris)
+        {
+            if (!SystemInfo.supportsInstancing) return null;
+            var m = new Mesh[4];
+            string[] nomes = { ArvoreCopa, ArvorePinheiro };
+            for (int e = 0; e < 2; e++)
+            {
+                m[e * 2] = MalhaDoGlb(nomes[e], out Texture tex);
+                if (m[e * 2] == null || tex == null) return null;
+                m[e * 2 + 1] = MalhaDoGlb(nomes[e] + "-lod1", out _);
+                if (m[e * 2 + 1] == null) m[e * 2 + 1] = m[e * 2];
+                // o LOD1 e' a mesma arvore decimada (mesmo pivo, mesma UV): um molde e uma textura servem aos dois
+                molde[e] = PeDoTronco(m[e * 2]);
+                for (int v = 0; v < Variantes; v++)
+                {
+                    int k = e * Variantes + v;
+                    if (MaterialDaMeshy(ref matArvore[k], "Arvore" + (Especie)e + v, tex, TintaMeshy[e, v]) == null) return null;
+                }
+            }
+            for (int i = 0; i < 4; i++) tris[i] = (int)(m[i].GetIndexCount(0) / 3);
+            return m;
+        }
+
+        /// <summary>A moita da Meshy, os materiais das duas tintas e o molde (base em y = 0, centro da pegada na origem);
+        /// null = falta o .glb, a textura, o instancing ou o Lit (fica a procedural em toda distancia).</summary>
+        static Mesh MalhaDaMoita(out Matrix4x4 molde)
+        {
+            molde = Matrix4x4.identity;
+            if (!SystemInfo.supportsInstancing) return null;
+            Mesh m = MalhaDoGlb(MoitaMeshy, out Texture tex);
+            if (m == null || tex == null) return null;
+            for (int v = 0; v < matMoita.Length; v++)
+                if (MaterialDaMeshy(ref matMoita[v], "Moita" + v, tex, TintaMoita[v]) == null) return null;
+            Bounds b = m.bounds;
+            molde = Matrix4x4.Translate(-new Vector3(b.center.x, b.min.y, b.center.z));
+            return m;
+        }
+
+        /// <summary>A malha e a textura de cor do .glb em Resources. ponytail: a Meshy entrega UM no' sem transformacao
+        /// (conferido nos quatro .glb); peca com hierarquia pediria a matriz do no' junto.</summary>
+        static Mesh MalhaDoGlb(string nome, out Texture tex)
+        {
+            tex = null;
+            GameObject g = Resources.Load<GameObject>(nome);
+            MeshFilter mf = g != null ? g.GetComponentInChildren<MeshFilter>() : null;
+            if (mf == null || mf.sharedMesh == null) return null;
+            Renderer r = mf.GetComponent<Renderer>();
+            Material o = r != null ? r.sharedMaterial : null;
+            if (o != null) tex = o.HasProperty("baseColorTexture") ? o.GetTexture("baseColorTexture") : o.mainTexture;
+            return mf.sharedMesh;
+        }
+
+        /// <summary>
+        /// O MOLDE: leva o pe' do TRONCO para a origem, onde mora o colisor (capsula de 0,38 m no PosArvore). A copa da Meshy
+        /// tem o tronco torcido ~0,6 m fora do pivo do .glb (medido nos vertices de 8 a 35% da altura); a base vai a y = 0.
+        /// Malha ilegivel: so' a base.
+        /// </summary>
+        static Matrix4x4 PeDoTronco(Mesh m)
+        {
+            Bounds b = m.bounds;
+            var pe = new Vector3(0f, b.min.y, 0f);
+            if (m.isReadable)
+            {
+                Vector3[] vs = m.vertices;   // uma vez por especie, no load
+                float y0 = b.min.y + b.size.y * 0.08f, y1 = b.min.y + b.size.y * 0.35f, sx = 0f, sz = 0f;
+                int n = 0;
+                for (int i = 0; i < vs.Length; i++)
+                    if (vs[i].y >= y0 && vs[i].y < y1) { sx += vs[i].x; sz += vs[i].z; n++; }
+                if (n > 0) { pe.x = sx / n; pe.z = sz / n; }
+            }
+            return Matrix4x4.Translate(-pe);
+        }
+
+        /// <summary>
+        /// URP Lit com a textura da Meshy x a TINTA da variante, fosco e dos DOIS lados: a folha da Meshy e' casca aberta
+        /// (~100 arestas de borda e ~90 nao-manifold por arvore, medido no Blender). Instanciado: com "Strip Unused" a variante
+        /// de instancing so' vai pro APK se algum material-ASSET a pede — o ArkanaArvoreInstancing (Lit + GPU Instancing, como
+        /// o ArkanaGramaInstancing da grama); sem ele, o Lit dos Always Included Shaders. Copia: nunca altera o asset.
+        /// </summary>
+        static Material MaterialDaMeshy(ref Material cache, string nome, Texture tex, Color tinta)
+        {
+            if (cache != null) return cache;
+            Material molde = Resources.Load<Material>("ArkanaArvoreInstancing");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (molde != null && molde.shader != lit) molde = null;   // referencia quebrada (meta regenerado): ignora
+            if (lit == null) return null;
+            var m = molde != null ? new Material(molde) : new Material(lit);
+            m.name = nome;
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", tinta);
+            m.SetFloat("_Cull", 0f);          // 0 = Off: frente e verso (a sombra tambem)
+            m.SetFloat("_Smoothness", 0.12f); // folha fosca: o 0,5 do Lit vira plastico
+            m.SetFloat("_Metallic", 0f);
+            m.enableInstancing = true;        // o RenderMeshInstanced exige
+            return cache = m;
+        }
+
+        /// <summary>
+        /// Bina as arvores da Meshy em blocos de ~60 m e reserva os lotes (capacidade = arvores daquela especie e tinta no
+        /// bloco, nos dois LOD). Tudo alocado AQUI: o corte de 4 Hz so' copia matriz e o quadro so' desenha.
+        /// ponytail: ilha na origem (o PosArvore e o terreno reativo ja' supoem): matriz e caixa vao em coordenada de mundo.
+        /// </summary>
+        void MontarBlocos()
+        {
+            if (malhaArvore == null) return;
+            int lado = Mathf.Max(1, Mathf.RoundToInt(relevo.Lado / PassoBloco));
+            float passoB = relevo.Lado / lado, meio = relevo.Lado * 0.5f;
+            var porBloco = new Dictionary<int, Bloco>();
+            for (int i = 0; i < arvPos.Count; i++)
+            {
+                Vector3 p = arvPos[i];
+                int k = Mathf.Clamp((int)((p.z + meio) / passoB), 0, lado - 1) * lado + Mathf.Clamp((int)((p.x + meio) / passoB), 0, lado - 1);
+                if (!porBloco.TryGetValue(k, out Bloco b))
+                {
+                    porBloco[k] = b = new Bloco { Caixa = new Bounds(p, Vector3.zero) };
+                    blocos.Add(b);
+                }
+                b.Arvores.Add(i);
+                b.Caixa.Encapsulate(p);
+            }
+            // a caixa do frustum: a arvore mais larga e mais alta na escala maxima (1,3 x 1,1), + o molde e a inclinacao
+            Vector3 t = Vector3.Max(malhaArvore[0].bounds.size, malhaArvore[2].bounds.size) * 1.45f;
+            var folga = new Vector3(Mathf.Max(t.x, t.z) * 0.5f + 1f, 1f, Mathf.Max(t.x, t.z) * 0.5f + 1f);
+            var n = new int[2 * Variantes];
+            foreach (Bloco b in blocos)
+            {
+                System.Array.Clear(n, 0, n.Length);
+                foreach (int i in b.Arvores) n[(int)arvEsp[i] * Variantes + arvVar[i]]++;
+                for (int v = 0; v < n.Length; v++)
+                {
+                    if (n[v] == 0) continue;
+                    b.Lotes[v * 2] = new Lote { M = new Matrix4x4[n[v]] };
+                    b.Lotes[v * 2 + 1] = new Lote { M = new Matrix4x4[n[v]] };
+                }
+                b.Caixa.SetMinMax(b.Caixa.min - folga, b.Caixa.max + new Vector3(folga.x, t.y + 1f, folga.z));
+            }
+        }
+
+        /// <summary>
+        /// Enche os lotes pelo LOD de CADA arvore (4 Hz): LOD0 perto, LOD1 alem de DistanciaLod1. Queimada nao entra: quem a
+        /// desenha e' o toco da celula. Anota o custo do quadro para o diag.
+        /// </summary>
+        void Reclassificar(Vector3 olhoDoLod)
+        {
+            int lotes = 0, tris = 0, perto = 0;
+            for (int j = 0; j < blocos.Count; j++)
+            {
+                Bloco b = blocos[j];
+                for (int k = 0; k < b.Lotes.Length; k++) if (b.Lotes[k] != null) b.Lotes[k].N = 0;
+                for (int a = 0; a < b.Arvores.Count; a++)
+                {
+                    int i = b.Arvores[a];
+                    if (arvQueimada[i]) continue;
+                    bool longe = Lod1(olhoDoLod, arvPos[i]);
+                    if (!longe) perto++;
+                    Lote l = b.Lotes[((int)arvEsp[i] * Variantes + arvVar[i]) * 2 + (longe ? 1 : 0)];
+                    l.M[l.N++] = arvVis[i];
+                }
+                for (int k = 0; k < b.Lotes.Length; k++)
+                {
+                    if (b.Lotes[k] == null || b.Lotes[k].N == 0) continue;
+                    lotes++;
+                    tris += b.Lotes[k].N * trisArvore[(k >> 1) / Variantes * 2 + (k & 1)];
+                }
+            }
+            LotesEnviados = lotes;
+            TrisEnviados = tris;
+            ArvoresPerto = perto;
+        }
+
+        /// <summary>Um RenderMeshInstanced por lote cheio, todo quadro (como a Grama). O frustum de cada camera — e de cada
+        /// cascata da sombra — corta o lote pela caixa do bloco.</summary>
+        void Desenhar()
+        {
+            for (int j = 0; j < blocos.Count; j++)
+            {
+                Bloco b = blocos[j];
+                for (int k = 0; k < b.Lotes.Length; k++)
+                {
+                    Lote l = b.Lotes[k];
+                    if (l == null || l.N == 0) continue;
+                    var rp = new RenderParams(matArvore[k >> 1])
+                    {
+                        worldBounds = b.Caixa,
+                        shadowCastingMode = ShadowCastingMode.On,   // a arvore fazia sombra (malha da celula); continua fazendo
+                        receiveShadows = true,
+                        lightProbeUsage = LightProbeUsage.Off,      // Off = o probe AMBIENTE da cena (o Trilight da Ilha)
+                        layer = gameObject.layer,
+                    };
+                    Graphics.RenderMeshInstanced(rp, malhaArvore[(k >> 1) / Variantes * 2 + (k & 1)], 0, l.M, l.N);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 4 Hz: o corte da MOITA (distancia horizontal, uma por celula) e o LOD da arvore da Meshy (uma por arvore). Todo
+        /// quadro: os lotes. A rocha fica com o frustum (bounds da propria celula).
         /// </summary>
         void Update()
         {
             relogio += Time.deltaTime;
-            if (relogio < 0.25f || cels == null) return;
-            relogio = 0f;
-            Camera cam = Camera.main;
-            if (cam == null) return;
-            Vector3 olho = cam.transform.position;
-            float corte2 = CorteMoitas * CorteMoitas;
+            if (relogio >= Periodo && cels != null)
+            {
+                relogio = 0f;
+                Camera cam = cameraDoLod != null ? cameraDoLod : Camera.main;
+                if (cam != null) CortarMoitas(cam.transform.position);
+                // sem camera nenhuma, tudo em LOD1: desenha, nunca some
+                if (malhaArvore != null) Reclassificar(cam != null ? cam.transform.position : new Vector3(0f, 1e4f, 0f));
+            }
+            if (malhaArvore != null) Desenhar();
+            if (malhaMoita != null && cels != null) DesenharMoitas();
+        }
+
+        /// <summary>A moita da celula: da Meshy ate' AlcanceMoitaMeshy, a procedural dali ao CorteMoitas, nada alem.</summary>
+        void CortarMoitas(Vector3 olho)
+        {
+            float corte2 = CorteMoitas * CorteMoitas, perto2 = AlcanceMoitaMeshy * AlcanceMoitaMeshy;
             for (int k = 0; k < cels.Length; k++)
             {
                 Celula c = cels[k];
                 if (c == null || c.MoitasR == null) continue;
                 Vector3 centro = transform.TransformPoint(c.Centro);
-                bool liga = (olho - centro).sqrMagnitude < corte2;
+                float d2 = (olho - centro).sqrMagnitude;
+                c.MoitasPerto = c.MoitasMeshy != null && d2 < perto2;
+                bool liga = d2 < corte2 && !c.MoitasPerto;
                 if (liga != c.MoitasLigadas)
                 {
                     c.MoitasLigadas = liga;
                     c.MoitasR.enabled = liga;
+                }
+            }
+        }
+
+        /// <summary>A moita da Meshy das celulas perto: um lote por tinta, sem sombra (moita nao pagava sombra e continua nao pagando).</summary>
+        void DesenharMoitas()
+        {
+            for (int k = 0; k < cels.Length; k++)
+            {
+                Celula c = cels[k];
+                if (c == null || !c.MoitasPerto) continue;
+                for (int v = 0; v < c.MoitasMeshy.Length; v++)
+                {
+                    Lote l = c.MoitasMeshy[v];
+                    if (l == null) continue;
+                    var rp = new RenderParams(matMoita[v])
+                    {
+                        worldBounds = c.CaixaMoitas,
+                        shadowCastingMode = ShadowCastingMode.Off,
+                        receiveShadows = true,
+                        lightProbeUsage = LightProbeUsage.Off,
+                        layer = gameObject.layer,
+                    };
+                    Graphics.RenderMeshInstanced(rp, malhaMoita, 0, l.M, l.N);
                 }
             }
         }

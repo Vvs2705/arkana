@@ -900,5 +900,118 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// AS ARVORES DA MESHY (onda 6B) no lugar do cacho de blobs: a copa mais sozinha da campina a ~15 m (grama, ceu e a
+        /// moita da Meshy perto), a borda da mata fechada (pinheiro + copa, a moita da Meshy no chao) e a ilha do alto como a
+        /// 04 (a mata do SW toda em LOD1). O jogador e' levado (Aterrar) para perto de cada camera: a grama e o kit cortam pela
+        /// camera DELE; o LOD da arvore e a moita, pela camera da foto (Vegetacao.Olho). As tres olham a ~60 graus do sol.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Arvores_CampinaMataAerea()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            Assert.IsNotNull(veg, "sem vegetacao");
+            Arkana.World.Relevo r = ilha.Relevo;
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Vector3 l = sol != null ? sol.transform.forward : new Vector3(0.6f, -0.5f, 0.6f);
+            l.y = 0f;
+            l.Normalize();
+            Vector3 v = (l * 0.5f + new Vector3(-l.z, 0f, l.x) * 0.87f).normalized;   // olhar a 60 graus do sol: luz de lado, volume
+            int n = veg.ContarArvores(), pinheiros = 0;
+            for (int i = 0; i < n; i++) if (veg.EspecieDe(i) == Arkana.World.Vegetacao.Especie.Pinheiro) pinheiros++;
+            var sb = new System.Text.StringBuilder("31-arvores: molde=" + veg.MoldeDasArvores + " moita-perto=" + veg.MoldeDasMoitas
+                + " arvores=" + n + " pinheiros=" + pinheiros + " copas=" + (n - pinheiros) + " moitas=" + veg.ContarMoitas() + "\n");
+
+            // 1) CAMPINA: a copa em campina com menos vizinhas a 20 m, camera a 15 m em chao seco e no nivel dela
+            int melhor = -1, vizMelhor = 0;
+            float nota = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                if (veg.EspecieDe(i) != Arkana.World.Vegetacao.Especie.Copa) continue;
+                Vector3 a = veg.PosArvore(i);
+                if (r.BiomaEm(a.x, a.z) != Arkana.World.Bioma.Campina) continue;
+                Vector3 c = a - v * 15f;
+                if (!r.PodePousar(c.x, c.z)) continue;
+                int viz = 0;
+                for (int j = 0; j < n; j++)
+                {
+                    Vector3 b = veg.PosArvore(j) - a;
+                    b.y = 0f;
+                    if (j != i && b.sqrMagnitude < 400f) viz++;
+                }
+                float s = viz * 10f + Mathf.Abs(r.Altura(c.x, c.z) - a.y);
+                if (s < nota) { nota = s; melhor = i; vizMelhor = viz; }
+            }
+            Assert.GreaterOrEqual(melhor, 0, "nenhuma copa na campina com chao seco a 15 m");
+            Vector3 arv = veg.PosArvore(melhor);
+            Vector3 olho = arv - v * 15f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.9f;
+            main.Player.Pawn.Aterrar(olho - v * 3f);   // atras da camera: fora do quadro
+            yield return Esperar(1.2f);
+            Camera cam = CameraTemporaria("CamFotoArvoreCampina", olho, arv + Vector3.up * 3.4f, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "31-arvores-campina", false);
+            sb.AppendLine("  31-arvores-campina: arvore #" + melhor + " em " + arv.ToString("F1") + " vizinhas<20m=" + vizMelhor
+                + " cam=" + olho.ToString("F1") + " lotes=" + veg.LotesEnviados + " tris-enviados=" + veg.TrisEnviados + " LOD0=" + veg.ArvoresPerto);
+            Object.Destroy(cam.gameObject);
+
+            // 2) MATA: a borda da mata fechada (2 m fora do disco), olhando 25 m para dentro, sem tronco colado na lente
+            Vector2 f = r.Floresta;
+            float R = r.FlorestaR, melhorDot = -2f;
+            Vector3 borda = Vector3.zero, dentro = Vector3.zero;
+            for (int k = 0; k < 48; k++)
+            {
+                float ang = Mathf.PI * 2f * k / 48f;
+                var d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                Vector3 c = new Vector3(f.x, 0f, f.y) + d * (R + 2f);
+                if (!r.PodePousar(c.x, c.z) || r.Altura(c.x, c.z) < 1.3f) continue;
+                float perto = float.MaxValue;
+                for (int j = 0; j < n; j++)
+                {
+                    Vector3 b = veg.PosArvore(j) - c;
+                    b.y = 0f;
+                    perto = Mathf.Min(perto, b.magnitude);
+                }
+                if (perto < 3.5f) continue;
+                float dot = Vector3.Dot(-d, v);   // o sol de lado-costas do fotografo
+                if (dot > melhorDot) { melhorDot = dot; borda = c; dentro = new Vector3(f.x, 0f, f.y) + d * (R - 25f); }
+            }
+            Assert.Greater(melhorDot, -2f, "nenhuma borda da mata com chao seco");
+            borda.y = Arkana.World.Ilha.AlturaDoChao(borda.x, borda.z) + 1.9f;
+            dentro.y = Arkana.World.Ilha.AlturaDoChao(dentro.x, dentro.z) + 3f;
+            Vector3 fora = new Vector3(borda.x - f.x, 0f, borda.z - f.y).normalized;
+            main.Player.Pawn.Aterrar(borda + fora * 3f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoArvoreMata", borda, dentro, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "31-arvores-mata", false);
+            sb.AppendLine("  31-arvores-mata: cam=" + borda.ToString("F1") + " alvo=" + dentro.ToString("F1") + " sol-de-costas=" + melhorDot.ToString("F2")
+                + " lotes=" + veg.LotesEnviados + " tris-enviados=" + veg.TrisEnviados + " LOD0=" + veg.ArvoresPerto);
+            Object.Destroy(cam.gameObject);
+
+            // 3) A ILHA DO ALTO, o mesmo quadro da 04: a mata do SW em LOD1 (o custo do castelo e da queda)
+            cam = CameraTemporaria("CamFotoArvoreAerea", new Vector3(0f, 420f, -430f), new Vector3(0f, 0f, 20f), Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "31-ilha-aerea", false);
+            sb.AppendLine("  31-ilha-aerea: lotes=" + veg.LotesEnviados + " tris-enviados=" + veg.TrisEnviados + " LOD0=" + veg.ArvoresPerto);
+            Object.Destroy(cam.gameObject);
+            veg.Olho = null;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.AreNotEqual("procedural", veg.MoldeDasArvores, "as arvores da Meshy nao carregaram (faltam os .glb em Resources?)");
+        }
     }
 }

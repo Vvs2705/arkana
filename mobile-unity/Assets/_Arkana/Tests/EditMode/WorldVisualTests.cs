@@ -247,6 +247,53 @@ namespace Arkana.Tests
             Assert.Greater(cume, 800, "seixos na tampa do pico: " + cume);
         }
 
+        // ---------------------------------------------------------------- arvores da Meshy (onda 6B)
+
+        [Test]
+        public void Arvore_DaMeshy_NoLugarDeSempre_PinheiroSoNaMata_PeNaMalha_LodPelaDistancia3D()
+        {
+            // defeitos: sorteio a mais no rng 21 (a mata inteira muda de lugar e o terreno reativo queima outra arvore); pinheiro
+            // na campina ou mata sem pinheiro; pe' pela Altura() exata (raiz boiando nas dobras da malha) ou enterrado; inclinacao
+            // sem teto (mata bebada); a Meshy esticada; LOD pela distancia HORIZONTAL (do castelo, a 320 m, a mata toda em LOD0)
+            List<Vegetacao.ArvorePlantada> a = Vegetacao.PlantioDasArvores(Relevo2);
+            Assert.AreEqual(615, a.Count, "150 + 26 por AREA: a mata cheia e as avulsas na ilha de 600 m");
+            // o registro de ANTES da Meshy (a procedural de 12/09, medido): PosArvore(i) nao se mexe
+            Assert.Less(Vector3.Distance(new Vector3(-103.2437f, 7.026678f, -106.0411f), a[0].Pos), 1e-3f, "arvore 0 em " + a[0].Pos);
+            Assert.Less(Vector3.Distance(new Vector3(-194.3382f, 4.247117f, -104.7702f), a[510].Pos), 1e-3f, "ultima da mata em " + a[510].Pos);
+            Assert.Less(Vector3.Distance(new Vector3(50.42117f, 4.697743f, 15.64644f), a[614].Pos), 1e-3f, "ultima avulsa em " + a[614].Pos);
+
+            var floresta = new Vector3(Relevo2.Floresta.x, 0f, Relevo2.Floresta.y);
+            int mata = 0, pinheiros = 0;
+            var tintas = new int[Vegetacao.Variantes];
+            foreach (Vegetacao.ArvorePlantada t in a)
+            {
+                bool naMata = DistH(t.Pos, floresta) <= Relevo2.FlorestaR;
+                if (naMata) mata++;
+                if (t.Especie == Vegetacao.Especie.Pinheiro)
+                {
+                    pinheiros++;
+                    Assert.IsTrue(naMata, "pinheiro fora da mata em " + t.Pos);
+                }
+                tintas[t.Variante]++;
+                Vector3 pe = t.Meshy.GetColumn(3), cima = t.Meshy.GetColumn(1), lado = t.Meshy.GetColumn(0);
+                Assert.Less(DistH(pe, t.Pos), 1e-3f, "a Meshy fora do registro em " + t.Pos);
+                float chao = Grade.AlturaNaMalha(pe.x, pe.z);
+                Assert.LessOrEqual(pe.y, chao - 0.05f, "pe' boiando em " + t.Pos);
+                Assert.Greater(pe.y, chao - 1f, "arvore enterrada em " + t.Pos);
+                Assert.LessOrEqual(Vector3.Angle(cima, Vector3.up), Vegetacao.Inclinacao * 1.42f, "arvore bebada em " + t.Pos);
+                Assert.That(lado.magnitude, Is.InRange(0.84f, 1.31f), "escala em " + t.Pos);
+                Assert.That(cima.magnitude / lado.magnitude, Is.InRange(0.94f, 1.11f), "a Meshy esticada em " + t.Pos);
+            }
+            Assert.AreEqual(511, mata, "a mata fechada");
+            Assert.That(pinheiros / (float)mata, Is.InRange(0.55f, 0.75f), "pinheiros na mata: " + pinheiros + " de " + mata);
+            foreach (int n in tintas) Assert.Greater(n, a.Count / 5, "as tres tintas aparecem: " + string.Join("/", tintas));
+
+            Vector3 p = a[0].Pos;
+            Assert.IsFalse(Vegetacao.Lod1(p + new Vector3(Vegetacao.DistanciaLod1 - 1f, 1.8f, 0f), p), "perto: LOD0");
+            Assert.IsTrue(Vegetacao.Lod1(p + new Vector3(0f, 1.8f, Vegetacao.DistanciaLod1 + 1f), p), "longe: LOD1");
+            Assert.IsTrue(Vegetacao.Lod1(p + new Vector3(0f, 320f, 0f), p), "do castelo, bem em cima da mata: LOD1");
+        }
+
         // ---------------------------------------------------------------- culling
 
         [Test]
