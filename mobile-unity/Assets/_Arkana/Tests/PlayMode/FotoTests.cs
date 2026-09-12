@@ -164,6 +164,7 @@ namespace Arkana.Tests
             c.nearClipPlane = 0.3f;
             c.farClipPlane = 4000f;
             c.enabled = false;   // so' renderiza quando a foto pede
+            Arkana.World.Ilha.LigarPos(c);   // a foto mostra o quadro que o jogador ve', com o pos
             go.transform.position = pos;
             go.transform.LookAt(olhar);
             return c;
@@ -293,8 +294,54 @@ namespace Arkana.Tests
             cam = CameraTemporaria("CamFotoTorre", t + new Vector3(20f, 5f, -20f), t + Vector3.up * 9f, Color.gray);
             Foto(cam, "15-torre", false);
             Object.Destroy(cam.gameObject);
+
+            // o BAU e as tres LUVAS de perto, pelo mesmo caminho da partida (VisualDaPartida.Modelo): e' a distancia em
+            // que o jogador canaliza o bau e pega a luva — buraco de decimacao aparece aqui ou nao aparece
+            Vector3 b0 = main.Player.Pawn.Pos + new Vector3(4f, 0f, 0f);
+            b0.y = Arkana.World.Ilha.AlturaDoChao(b0.x, b0.z);
+            var pivos = new System.Collections.Generic.List<GameObject>();
+            var pb = new GameObject("FotoBau"); pb.transform.position = b0; pivos.Add(pb);
+            Gameplay.VisualDaPartida.Modelo(Gameplay.BauVisual.MODELO, pb.transform, Gameplay.BauVisual.TAMANHO, true);
+            string[] luvas = Gameplay.Arma.TIERS;
+            for (int i = 0; i < luvas.Length; i++)
+            {
+                var pl = new GameObject("FotoLuva" + i);
+                pl.transform.position = b0 + new Vector3(-0.2f + i * 0.75f, 1.0f, -1.3f);
+                pivos.Add(pl);
+                Gameplay.VisualDaPartida.Modelo(Gameplay.LootVisual.ModeloDe(luvas[i]), pl.transform, Gameplay.LootVisual.TAMANHO_LUVA, false);
+            }
+            yield return null;
+            cam = CameraTemporaria("CamFotoBau", b0 + new Vector3(0.4f, 1.5f, -3.4f), b0 + new Vector3(0.3f, 0.6f, -0.4f), Color.gray);
+            cam.fieldOfView = 40f;
+            Foto(cam, "16-bau-luvas", false);
+            Object.Destroy(cam.gameObject);
+            foreach (GameObject g in pivos) Object.Destroy(g);
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
+        /// <summary>O KIT da Pyra em acao (tatica e suprema) de lado: o VFX de assinatura se julga pelo quadro, com o bloom.</summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_PyraTaticaSuprema()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);   // no treino a suprema enche em 5 s
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            // o kit sai na MIRA (yaw da camera do jogador): vira para o centro da ilha (longe das colunas do loot do
+            // treino, que ficam no nascimento) e fotografa pela propria camera do jogador — o quadro que ele ve'
+            OlharParaOCentro(main);
+            yield return Esperar(0.3f);
+            main.Player.Tatica();
+            yield return Esperar(0.3f);
+            Foto(main.Player.Camera.Cam, "17-kit-tatica", true);
+            yield return Esperar(1.2f);
+            main.Player.Suprema();
+            yield return Esperar(0.6f);
+            Foto(main.Player.Camera.Cam, "18-kit-suprema", true);
         }
 
         [UnityTest]

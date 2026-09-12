@@ -551,7 +551,7 @@ namespace Arkana.Gameplay
         /// Mede nos bounds na origem, depois pendura. `peNoChao` = base em y=0 (bau); senao centro no pivo (luva).
         /// Ausente -> null, sem log: quem chama poe a primitiva.
         /// </summary>
-        static GameObject Modelo(string nome, Transform pai, float tamanho, bool peNoChao)
+        public static GameObject Modelo(string nome, Transform pai, float tamanho, bool peNoChao)
         {
             if (string.IsNullOrEmpty(nome)) return null;
             GameObject prefab = Resources.Load<GameObject>(nome);

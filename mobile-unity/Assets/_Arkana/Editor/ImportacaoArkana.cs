@@ -30,6 +30,8 @@ namespace Arkana.EditorTools
 
         // depois do preprocessador do URP (que faz o Lit): quem fala por ultimo sobre o material do mago somos nos
         public override int GetPostprocessOrder() => 100;
+        // mudou a regra do material? sobe: sem isto o FBX ja' importado nao reimporta e a mudanca nao aparece
+        public override uint GetVersion() => 2;
 
         /// <summary>
         /// O FBX da Meshy vem SEM caminho de textura (as PNGs vem soltas no zip). Convencao: NN-slug-cor.png e
@@ -49,7 +51,17 @@ namespace Arkana.EditorTools
             context.DependsOnArtifact(raiz + "-normal.png");
             var cor = AssetDatabase.LoadAssetAtPath<Texture2D>(raiz + "-cor.png");
             var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(raiz + "-normal.png");
-            if (cor != null) m.SetTexture("_BaseMap", cor);
+            if (cor != null)
+            {
+                m.SetTexture("_BaseMap", cor);
+                // PREENCHIMENTO: de frente para a camera o mago fica contra o sol e sai escuro (foto 12-elenco de 12/09).
+                // Emissao = a propria cor x 0,16: le' como luz de rebote, nao como brilho (abaixo do limiar do bloom).
+                // Keyword aqui, na importacao, pelo mesmo motivo do _NORMALMAP. KNOB: por foto.
+                m.SetTexture("_EmissionMap", cor);
+                m.SetColor("_EmissionColor", Color.white * 0.16f);
+                m.EnableKeyword("_EMISSION");
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            }
             if (normal != null) { m.SetTexture("_BumpMap", normal); m.EnableKeyword("_NORMALMAP"); }
         }
 

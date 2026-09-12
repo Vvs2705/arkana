@@ -260,7 +260,28 @@ que é código lia como maquete. Três ajustes sem triângulo a mais:
 - As colunas das Ruínas passaram a usar `CorRuina`, de pedra gasta; o azulado
   lia como cano de PVC.
 
-Fotos `13-altar`, `14-ruinas` e `15-torre` (novas no `FotoTests`). **Decisão que volta ao Diretor:** o validador propôs "Altar
+Fotos `13-altar`, `14-ruinas` e `15-torre` (novas no `FotoTests`).
+
+**Passo D começado (12/09, tarde).** O Diretor liberou o custo de FPS: *"o FPS
+vai rodar legal, disso tenho certeza"*.
+- **Pós-processamento.** Um volume global criado em código (`Ilha.MontarPos`)
+  aplica tonemapping neutro, bloom leve (limiar 1,1), contraste e saturação
+  +10 e vinheta 0,2. A câmera do jogador liga o `renderPostProcessing`, que no
+  URP vem desligado. O `GlobalSettings` não remove variantes de pós, então o
+  perfil feito em código vale no APK.
+- **Personagem legível.** No `ImportacaoArkana`, a emissão virou a própria cor
+  × 0,16, uma luz de rebote que tira o mago do contraluz sem brilhar. A versão
+  do importador subiu para 2 para os FBX reimportarem.
+- **Magia acesa.** A partícula aditiva dos kits ganhou cor base 1,8 (HDR), e o
+  miolo passa do limiar do bloom.
+- **Baú e luvas.** Estavam decimados (a foto `16-bau-luvas` mostrava o baú
+  estilhaçado) e foram trocados pelo remesh do site: baú em 10K, luvas em 3K, 0
+  crédito. A emissão das gemas e das brasas ficou, graças ao 6º argumento do
+  `otimizar.py`. O baú caiu de 9,8 MB para 0,8 MB e cada luva de ~8 MB para
+  0,4 MB.
+- **Mapa das luvas.** Varinha = Emberhand Gauntlet · cajado = Celestial
+  Sovereign Gauntlet · manopla = Gemini Gauntlet. Os glb do remesh ficam em
+  `arte/cenario/*/origem/` (fora do git). **Decisão que volta ao Diretor:** o validador propôs "Altar
 só depois do playtest" porque o Altar encosta na Sintonia. Ele entrou só como
 CENÁRIO, sem sistema nenhum; se for para esperar, é tirar uma linha do
 `KitCenario.Montar`.
@@ -313,8 +334,8 @@ Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 |---|---|---|
 | **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
 | **B ✅ (foto)** | **Elenco real**: os 20 magos do SITE da Meshy no jogo, 11 clipes cada (leva 4). **Falta o aparelho** | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
-| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Faltam baú/luvas pela mesma receita; árvore e pedregulho seguem procedurais (melhorados por degradê e cacho) | a rocha de perto lê como rocha; FPS mantido |
-| **D** | **VFX de assinatura e pós**: braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
+| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Baú e luvas pela receita ✅ (foto 16). Árvore e pedregulho seguem procedurais (melhorados por degradê e cacho) | a rocha de perto lê como rocha; FPS mantido |
+| **D ½** | **VFX de assinatura e pós** (pós ✅, partícula HDR ✅, preenchimento do mago ✅): braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
 | **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
 | **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
 

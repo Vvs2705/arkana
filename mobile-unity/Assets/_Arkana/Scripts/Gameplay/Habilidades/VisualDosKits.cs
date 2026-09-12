@@ -87,10 +87,15 @@ namespace Arkana.Gameplay
         /// <summary>Cor chapada (Unlit: nao le' cor de vertice). Null so' sem URP no build.</summary>
         public static Material Solido(Color cor, Mistura m, bool duploLado = false) => Novo(Unlit, cor, m, duploLado, null);
 
-        /// <summary>Particulas, fios e malhas com cor de vertice: aditivo com ponto macio. UM para todos (a cor vem do vertice).</summary>
+        /// <summary>Particulas, fios e malhas com cor de vertice: aditivo com ponto macio. UM para todos (a cor vem do vertice).
+        /// Cor base ACIMA de 1 (HDR): o miolo passa do limiar do bloom do pos (Ilha.MontarPos) e a magia ACENDE em vez de
+        /// so' pintar. KNOB: 1,8 por foto (17/18-kit).</summary>
+        public const float BrilhoHdr = 1.8f;
+
         public static Material DeParticula()
         {
-            if (_particula == null) _particula = Novo(ParticulaUnlit, Color.white, Mistura.Aditivo, true, PontoSuave());
+            // alfa fica 1: Color.white * k multiplicaria o alfa junto, e no aditivo (SrcAlpha) o brilho sairia k^2
+            if (_particula == null) _particula = Novo(ParticulaUnlit, new Color(BrilhoHdr, BrilhoHdr, BrilhoHdr, 1f), Mistura.Aditivo, true, PontoSuave());
             return _particula;
         }
 

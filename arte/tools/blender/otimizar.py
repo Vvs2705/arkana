@@ -10,7 +10,7 @@
 #
 # Uso (headless):
 #   blender --background --python tools/blender/otimizar.py -- \
-#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m> [tex_max_px]
+#       <entrada.glb> <saida.glb> <tris_alvo> <maior_dimensao_m> [tex_max_px] [entradas_extras] [giro_x_graus]
 #
 # 12/09/2026: a DECIMACAO COLLAPSE abria buracos (a rocha saia estilhacada no jogo). A topologia agora vem
 # do REMESH do site da Meshy (10K/3K, fechada); aqui passa-se tris_alvo = 0 (nao decima) e tex_max_px
@@ -22,6 +22,12 @@ import sys
 argv = sys.argv[sys.argv.index("--") + 1:]
 entrada, saida, tris_alvo, tamanho = argv[0], argv[1], int(argv[2]), float(argv[3])
 tex_max = int(argv[4]) if len(argv) > 4 else 0
+# 6o argumento (12/09): entradas do BSDF que ficam ALEM da cor base, separadas por virgula — o bau e as luvas mantem
+# a emissao ("Emission Color,Emission Strength"): gema e brasa acesas sao a leitura do loot, e o pos agora tem bloom
+manter = {"Base Color"} | (set(argv[5].split(",")) if len(argv) > 5 and argv[5] else set())
+# 7o argumento (12/09): giro em X (graus) antes de medir — a luva do cajado veio DEITADA da Meshy (dedos em +Z) e
+# as outras em pe'; -90 poe os dedos para cima
+giro_x = float(argv[6]) if len(argv) > 6 else 0.0
 
 # cena limpa (o cubo default do Blender ja' vazou para um export uma vez na
 # historia de todo pipeline do mundo; aqui ele morre antes de nascer)
@@ -51,7 +57,7 @@ if tris_alvo > 0:
     bpy.ops.object.modifier_apply(modifier=mod.name)
 
 if tex_max > 0:
-    # so' a cor base fica ligada no BSDF; o resto sai do export
+    # so' a cor base (e o que `manter` pedir) fica ligada no BSDF; o resto sai do export
     for mat in bpy.data.materials:
         if not mat.use_nodes:
             continue
@@ -59,7 +65,7 @@ if tex_max > 0:
             if no.type != "BSDF_PRINCIPLED":
                 continue
             for entrada_bsdf in no.inputs:
-                if entrada_bsdf.name != "Base Color":
+                if entrada_bsdf.name not in manter:
                     for link in list(entrada_bsdf.links):
                         mat.node_tree.links.remove(link)
     for img in bpy.data.images:
@@ -67,6 +73,13 @@ if tex_max > 0:
         if max(w, h) > tex_max:
             k = tex_max / max(w, h)
             img.scale(max(1, int(w * k)), max(1, int(h * k)))
+
+if giro_x:
+    # gira a MALHA (o importador do glTF deixa o objeto em modo quaternio: rotation_euler seria ignorado calado)
+    import math
+    from mathutils import Matrix
+    obj.data.transform(Matrix.Rotation(math.radians(giro_x), 4, "X"))
+    obj.data.update()
 
 # escala para o tamanho REAL: maior dimensao da caixa = <tamanho> metros
 dims = obj.dimensions
