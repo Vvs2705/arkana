@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 12/09/2026, manhã (os 20 magos reais, o kit sem buracos com as 7 peças da oficina e o Altar de Sintonia no jogo; falta medir no aparelho)
+> **Atualizado em:** 12/09/2026, tarde (ondas 3 a 5 em paralelo: impacto do combate, derrubado/eliminado, chão vivo, pedras da Meshy, sombra macia + SSAO; onda 6 — árvores da Meshy e minimapa — em andamento; falta medir no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,40 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — os 20 magos REAIS, o kit sem buracos e o Altar estão no jogo (foto); falta jogar no aparelho (12/09/2026, manhã)
+### >>> COMECE POR AQUI — ondas em paralelo: o jogo ganhou peso, chão, pedra e sombra (12/09/2026, tarde)
+
+**Próximo passo, na ordem:**
+1. Aplicar a **onda 6**: árvores da Meshy e minimapa. Os agentes entregam nos rascunhos; o coordenador confere o md5 da base, aplica, roda portão e fotos numa rodada só e commita.
+2. Instalar o APK mais novo (pasta de testes de sempre) no Poco F4 e **medir FPS**. As ondas 5 e 6 são as mais caras até aqui: sombra 4096 com 4 cascatas e SSAO, o shader do chão com o dobro de instruções na pedra perto, 232 pedregulhos de 1 K e as árvores de 1,5 K. Se cair, os KNOBs, pela ordem:
+   - `m_RenderScale` 0,85;
+   - SSAO `m_Active` 0;
+   - `_Fissura` 0;
+   - sombra 2048.
+
+**O que foi feito (12/09, tarde — ordem do Diretor: "acelere, mais atividades ao
+mesmo tempo").** Cada onda tem 2 a 4 agentes, cada um dono dos seus arquivos. Eles
+escrevem em cópias no rascunho e compilam fora do Unity (Roslyn contra as DLLs do
+Library). O coordenador confere o md5 da base, aplica, roda UM portão e UMA
+rodada de fotos filtrada (`foto.ps1 "Foto_X|Foto_Y"`) e gera o APK enquanto a
+próxima onda escreve.
+
+| Onda | O que se vê | Arquivos | Foto |
+|---|---|---|---|
+| 3 | Braço esquerdo da Pyra em brasa, eco do Véu em silhueta, orbes de loot com halo, telas de VITÓRIA/DERROTA e PAUSA | VisualDosKits, VisualDaPartida, Hud | 17–23 |
+| 4 | O PESO do acerto: estouro por elemento, piscada do corpo (MaterialPropertyBlock HDR), bolha na cor do escudo, número de dano que pula. **O chão agora para o tiro** (antes varava morro; o terreno reativo só via tiro em corpo) | VisualDoImpacto (novo), Partida, Hud | 24, 25 |
+| 5A | Chão do pico: manchas de pedra gasta, terra quente e líquen, estratos na encosta, fissura e seixo pintado de perto. Liga só no material do terreno (`_Chao`) | ArkanaToon.shader, Relevo, Ilha | 26 |
+| 5B | Os 232 pedregulhos viram a rocha da Meshy (`18-pedregulho.glb`, 1 K), assentados e tintos por bioma; seixos no cume | Vegetacao, Ruinas, Grama | 27 |
+| 5C | **A sombra macia estava DESLIGADA no asset URP** (a luz pedia e o asset ignorava). Agora: 4096 px, 4 cascatas, macia alta, SSAO | Sol, URP_Base(_Renderer).asset | 28 |
+| 5D | Derrubado: anel vermelho e losango. Abate: coluna de alma e corpo que deita e afunda. Faixa ELIMINADO: NOME. Vinhetas macias: as 4 tarjas chapadas de dano davam moldura de borda dura | VisualDoAbate (novo), Pawn, Hud, HudAviso | 29 |
+
+**Lições da tarde:**
+- Número de dano ancora no **viewport**, não em pixel. A foto de 2400x1080 sobre a tela de 640x480 do teste jogava o número no joystick, e no aparelho a área segura o deslocava.
+- O `otimizar.py` agora **solda por distância antes de decimar**. O glb do remesh chega em ~900 ilhas soltas, e era isso que estilhaçava a peça, não a razão.
+- Foto de combate roda no **treino**. A versão na partida normal dependia de onde o castelo estava, e uma rodada pousou os dois no convés, a 262 m.
+
+**Portão:** 334 testes, 0 falhas. **Créditos Meshy:** ~909 (2 árvores, 20 + 10 de textura cada; remesh grátis).
+
+#### (12/09, manhã) os 20 magos REAIS, o kit sem buracos e o Altar estão no jogo (foto); falta jogar no aparelho
 
 **Próximo passo, na ordem:** instalar o APK novo no Poco F4 e medir FPS com o
 elenco real e as 15 peças do kit (`--es arkana_auto partida`); se cair, o
@@ -78,7 +111,7 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **315 testes, 0 falhas** (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **334 testes, 0 falhas** (12/09, tarde) (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
 | **Fotos** | `powershell -File mobile-unity\foto.ps1 [filtro]` → as fotos do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera, o corpo e os kits tocam). Sem filtro roda todas (~15 min, as 20 folhas de clipes pesam); com filtro, só o que a leva mexeu, ex. `.\foto.ps1 "Foto_Kit\|Foto_Menu"`. **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
@@ -367,8 +400,8 @@ Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 |---|---|---|
 | **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
 | **B ✅ (foto)** | **Elenco real**: os 20 magos do SITE da Meshy no jogo, 11 clipes cada (leva 4). **Falta o aparelho** | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
-| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Baú e luvas pela receita ✅ (foto 16). Árvore e pedregulho seguem procedurais (melhorados por degradê e cacho) | a rocha de perto lê como rocha; FPS mantido |
-| **D ½** | **VFX de assinatura e pós** (pós ✅, partícula HDR ✅, preenchimento do mago ✅): braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
+| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Baú e luvas pela receita ✅ (foto 16). Pedregulho da Meshy ✅ (onda 5B); árvore da Meshy na onda 6 | a rocha de perto lê como rocha; FPS mantido |
+| **D ¾** | **VFX de assinatura e pós**: pós ✅, partícula HDR ✅, preenchimento do mago ✅, braço de chama da Pyra ✅, muralha de brasas ✅, fio da Tessa ✅, eco da Véu ✅, impacto/derrubado/abate ✅, sombra macia + SSAO ✅. Falta afinar luz e ambiente pelas fotos NO APARELHO | jogo bonito de ver em vídeo — o Diretor aprova |
 | **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
 | **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
 
