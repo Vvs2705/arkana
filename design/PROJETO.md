@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 12/09/2026, tarde (ondas 3 a 5 em paralelo: impacto do combate, derrubado/eliminado, chão vivo, pedras da Meshy, sombra macia + SSAO; onda 6 — árvores da Meshy e minimapa — em andamento; falta medir no aparelho)
+> **Atualizado em:** 12/09/2026, fim de tarde (ondas 3 a 8 em paralelo: combate, chão vivo em toda a ilha, pedras/árvores/moitas da Meshy, sombra macia + SSAO, água sem moiré, minimapa, voo, barra do alvo; falta medir FPS no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -54,12 +54,35 @@ aparelho apareceu em `adb devices`.
 ### >>> COMECE POR AQUI — ondas em paralelo: o jogo ganhou peso, chão, pedra e sombra (12/09/2026, tarde)
 
 **Próximo passo, na ordem:**
-1. Aplicar a **onda 6**: árvores da Meshy e minimapa. Os agentes entregam nos rascunhos; o coordenador confere o md5 da base, aplica, roda portão e fotos numa rodada só e commita.
-2. Instalar o APK mais novo (pasta de testes de sempre) no Poco F4 e **medir FPS**. As ondas 5 e 6 são as mais caras até aqui: sombra 4096 com 4 cascatas e SSAO, o shader do chão com o dobro de instruções na pedra perto, 232 pedregulhos de 1 K e as árvores de 1,5 K. Se cair, os KNOBs, pela ordem:
-   - `m_RenderScale` 0,85;
-   - SSAO `m_Active` 0;
-   - `_Fissura` 0;
-   - sombra 2048.
+1. **Medir FPS no Poco F4** com o APK mais novo (pasta de testes de sempre). O aparelho não estava no `adb devices` em 12/09 à tarde. As ondas 5 a 8 são as mais caras até aqui:
+   - sombra 4096 com 4 cascatas e SSAO;
+   - chão `_Chao` em toda a ilha (~880–985 slots no pior pixel);
+   - 615 árvores da Meshy instanciadas (LOD0 de 3 K até 40 m) e 1.040 moitas;
+   - água +45%;
+   - VFX do voo.
+
+   Se cair, os KNOBs pela ordem: `m_RenderScale` 0,85; SSAO `m_Active` 0; `_Pintado`/`_Fissura` 0; sombra 2048; `DistanciaLod1` 30.
+2. Aplicar as ondas 9A (contorno de luz nos magos) e 9B (piso das ruínas), que estavam em andamento.
+
+**Ondas 6 a 8 (12/09, fim de tarde), mesmo método:**
+
+| Onda | O que se vê | Arquivos | Foto |
+|---|---|---|---|
+| 6A | Minimapa (ilha pintada 1x fora da thread principal, tempestade, próximo círculo, baú, seta com cone), bússola no topo, mapa grande ao tocar | Minimapa (novo), Hud, Textos | 30 |
+| 6B | Árvores e moita geradas no SITE da Meshy (texto → textura → remesh grátis): copa larga e pinheiro; 615 no lugar de sempre, `RenderMeshInstanced` por bloco de 60 m, LOD1 a 40 m; moita de 1,2 K até 45 m e de 428 tris até 95 m | Vegetacao, 35/36/37-*.glb, ArkanaArvoreInstancing.mat | 31 |
+| 7A | A água "listrada" do alto era o ALAGADO: bruma sem LOD (seno×seno) + o mar desenhado por cima das poças (ordem de transparente). Mar mascarado nos discos, detalhe por fwidth, reflexo e caminho de sol | ArkanaAgua/ArkanaNevoa.shader, Ilha | 32 |
+| 7B | Campina, mata e praia no modo `_Chao`: manchas frias/quentes, terra batida e trilhas, trevo e flor, chão escuro na mata, areia molhada | ArkanaToon, Relevo, Ilha, Grama | 33 |
+| 7C | O voo: círculo de runas e rochas em órbita no castelo, esteira dourada, vento na queda, fitas no planeio, anel no pouso | VisualDoVoo (novo), Main | 34 |
+| 8A | Barra de vida/escudo e nome sobre o inimigo acertado (e sob a mira, com linha de visada) | MarcasDeAlvo (novo), Hud | 35 |
+
+**Lições:**
+- **Meshy para vegetação:** nuvem de folhas soltas estilhaça no remesh; peça cachos SÓLIDOS no prompt.
+- **Remesh personalizado:** o do site aceita valor abaixo de 3K (só avisa); a moita de 428 tris saiu de lá.
+- **PowerShell:** o 5.1 DESCARTA argumento vazio ("") para exe nativo, e os parâmetros do `otimizar.py` escorregam. O 80 virou giro em X e o pinheiro saiu deitado. Passe sempre um valor.
+- **Blender 4.1+:** o `shade_smooth_by_angle` é modificador, então `export_apply=True` é necessário.
+- **Árvores:** o facetado de perto era geometria (decimação para 1,5 K), não normal. O LOD0 passou a ser o remesh de 3K do site.
+
+**Portão:** 347 testes, 0 falhas. A bateria completa de fotos (38 testes, 71 fotos) passou sem regressão. **Créditos Meshy:** 879.
 
 **O que foi feito (12/09, tarde — ordem do Diretor: "acelere, mais atividades ao
 mesmo tempo").** Cada onda tem 2 a 4 agentes, cada um dono dos seus arquivos. Eles
@@ -82,7 +105,7 @@ próxima onda escreve.
 - O `otimizar.py` agora **solda por distância antes de decimar**. O glb do remesh chega em ~900 ilhas soltas, e era isso que estilhaçava a peça, não a razão.
 - Foto de combate roda no **treino**. A versão na partida normal dependia de onde o castelo estava, e uma rodada pousou os dois no convés, a 262 m.
 
-**Portão:** 334 testes, 0 falhas. **Créditos Meshy:** ~909 (2 árvores, 20 + 10 de textura cada; remesh grátis).
+**Portão (onda 5):** 334 testes, 0 falhas.
 
 #### (12/09, manhã) os 20 magos REAIS, o kit sem buracos e o Altar estão no jogo (foto); falta jogar no aparelho
 
@@ -111,7 +134,7 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **334 testes, 0 falhas** (12/09, tarde) (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **347 testes, 0 falhas** (12/09, fim de tarde) (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
 | **Fotos** | `powershell -File mobile-unity\foto.ps1 [filtro]` → as fotos do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera, o corpo e os kits tocam). Sem filtro roda todas (~15 min, as 20 folhas de clipes pesam); com filtro, só o que a leva mexeu, ex. `.\foto.ps1 "Foto_Kit\|Foto_Menu"`. **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
