@@ -273,7 +273,8 @@ namespace Arkana.Characters
             {
                 Material[] mats = r.materials;   // instancia
                 foreach (Material m in mats) { MaterialMago.Domar(m); _tint.Add(m); }
-                if (!temBounds) { b = r.bounds; temBounds = true; } else b.Encapsulate(r.bounds);
+                Bounds rb = LimitesDeRepouso(r);
+                if (!temBounds) { b = rb; temBounds = true; } else b.Encapsulate(rb);
             }
             float alturaMalha = temBounds && b.size.y > 0.01f ? b.size.y : IdentidadeMago.AlturaRef;
             float escala = Identidade.AlturaM / alturaMalha;
@@ -284,6 +285,25 @@ namespace Arkana.Characters
             MaoDireita = Osso(inst.transform, "hand", "r") ?? MaterialMago.Pivo(_rig, "MaoD", new Vector3(0.25f, 0.55f * alturaMalha, 0.2f));
             Cabeca = Osso(inst.transform, "head", null) ?? MaterialMago.Pivo(_rig, "Cabeca", new Vector3(0f, 0.9f * alturaMalha, 0f));
             return true;
+        }
+
+        /// <summary>
+        /// Tamanho REAL em repouso. O SkinnedMeshRenderer.bounds do FBX da Meshy vem ~100x maior (localBounds no espaco do
+        /// Hips, que herda a escala 100 da Armature) e a Pyra saia com 1 cm (12/09). A malha de repouso levada pelo
+        /// transform do proprio renderer e' o que o skinning desenha na pose de bind.
+        /// ponytail: os bounds de culling seguem gigantes (o mago nunca e' cortado); corrigir localBounds se pesar.
+        /// </summary>
+        static Bounds LimitesDeRepouso(Renderer r)
+        {
+            var smr = r as SkinnedMeshRenderer;
+            if (smr == null || smr.sharedMesh == null) return r.bounds;
+            Bounds m = smr.sharedMesh.bounds;
+            Matrix4x4 w = smr.transform.localToWorldMatrix;
+            Bounds b = new Bounds(w.MultiplyPoint3x4(m.min), Vector3.zero);
+            for (int i = 1; i < 8; i++)
+                b.Encapsulate(w.MultiplyPoint3x4(new Vector3((i & 1) != 0 ? m.max.x : m.min.x,
+                    (i & 2) != 0 ? m.max.y : m.min.y, (i & 4) != 0 ? m.max.z : m.min.z)));
+            return b;
         }
 
         static Transform Osso(Transform raiz, string contem, string lado)

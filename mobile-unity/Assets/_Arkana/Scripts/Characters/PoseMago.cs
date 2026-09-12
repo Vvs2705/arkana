@@ -250,14 +250,19 @@ namespace Arkana.Characters
             { Clipe.Cast, new[] { "cast", "Spellcast", "Spell Cast", "spell_cast", "casting", "magic_cast",
                 "Attack", "attack1", "Standing 1H Magic Attack", "magic_attack", "shoot", "fireball",
                 "Armature|Cast", "Armature|Attack", "mage_soell_cast", "mage_spell_cast", "Mage Spell Cast" } },
-            { Clipe.Cair, new[] { "cair", "fall", "falling", "freefall", "free_fall", "skydive", "Skydiving", "air", "jump_loop" } },
-            { Clipe.Planar, new[] { "planar", "glide", "gliding", "parachute", "wingsuit", "hover", "Hovering", "flying" } },
-            { Clipe.Pegar, new[] { "pegar", "pickup", "pick_up", "Picking Up", "grab", "interact", "Interacting", "loot", "crouch_pickup" } },
+            { Clipe.Cair, new[] { "cair", "fall", "Fall1", "falling", "freefall", "free_fall", "skydive", "Skydiving", "air", "jump_loop" } },
+            // o UUID e' o "Planar Arkana" (Texto para Movimento na conta da Meshy, 12/09): o FBX grava a take com o id.
+            // NAO usar o "Planar horizontal v2" (01a040ba-...): mergulha de cabeca para baixo — o Diretor reprovou.
+            { Clipe.Planar, new[] { "planar", "glide", "gliding", "parachute", "wingsuit", "hover", "Hovering", "flying",
+                "01a093df-6ebc-763c-9c24-9f20123e366c" } },
+            { Clipe.Pegar, new[] { "pegar", "pickup", "pick_up", "Picking Up", "grab", "interact", "Interacting", "loot", "crouch_pickup",
+                "Collect_Object" } },
             { Clipe.Derrubado, new[] { "derrubado", "downed", "knocked", "Knocked Down", "knockdown", "crawl",
-                "crawling", "wounded", "injured", "dying", "getting_up", "lying" } },
+                "crawling", "wounded", "injured", "dying", "getting_up", "lying", "Prone_Reach_Help" } },
             { Clipe.Nadar, new[] { "nadar", "swim", "swimming", "swim_forward", "breaststroke", "freestyle" } },
             { Clipe.NadarParado, new[] { "nadar_parado", "swim_idle", "treading", "treading_water", "Water_Idle", "float", "floating" } },
-            { Clipe.AndeAgachado, new[] { "ande_agachado", "crouch_walk", "crouch", "crouching", "sneak", "sneaking", "Crouched Walking" } },
+            { Clipe.AndeAgachado, new[] { "ande_agachado", "crouch_walk", "crouch", "crouching", "sneak", "sneaking", "Crouched Walking",
+                "Cautious_Crouch_Walk_Forward" } },
         };
 
         static readonly Dictionary<string, Clipe> _porNome = MontaAliases();

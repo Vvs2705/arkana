@@ -208,6 +208,55 @@ namespace Arkana.Tests
             Object.Destroy(rasante.gameObject);
         }
 
+        /// <summary>
+        /// FOLHA DE CLIPES do mago externo: os 10 clipes lado a lado, no cenario do jogo. Existe porque o "Planar horizontal
+        /// v2" da Meshy mergulhava de cabeca para baixo e so' o Diretor viu (12/09) — clipe torto tem de aparecer AQUI antes.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Elenco_ClipesDoMago([Values("01-pyra")] string slug)
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+
+            Vector3 p = main.Player.Pawn.Pos + new Vector3(12f, 0f, 0f);
+            p.y = Arkana.World.Ilha.AlturaDoChao(p.x, p.z) + 1.2f;   // no ar: queda, planeio e nado sao horizontais
+            var m = Arkana.Characters.Mago.Criar(null, slug);
+            m.transform.position = p;
+            Camera cam = CameraTemporaria("CamFotoClipes", p + new Vector3(0f, 1.1f, 4.2f), p + Vector3.up * 0.8f, Color.gray);
+
+            const int cw = 480, ch = 640, colunas = 5;
+            var folha = new Texture2D(cw * colunas, ch * 2, TextureFormat.RGB24, false);
+            var rt = new RenderTexture(cw, ch, 24, RenderTextureFormat.ARGB32);
+            cam.targetTexture = rt;
+            Arkana.Characters.Clipe[] todos = Arkana.Characters.PoseMago.Todos;
+            for (int i = 0; i < todos.Length; i++)
+            {
+                m.Play(todos[i]);
+                bool unico = !Arkana.Characters.PoseMago.Laco(todos[i]);
+                yield return Esperar(unico ? 0.35f : 0.8f);   // disparo unico: foto no meio, antes de voltar ao idle
+                cam.Render();
+                RenderTexture.active = rt;
+                folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (1 - i / colunas) * ch);
+                RenderTexture.active = null;
+            }
+            folha.Apply();
+            Directory.CreateDirectory(Pasta);
+            File.WriteAllBytes(Path.Combine(Pasta, "11-clipes-" + slug + ".png"), folha.EncodeToPNG());
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), "11-clipes-" + slug + ": fonte=" + m.Fonte
+                + " ordem=" + string.Join(",", todos) + "\n");
+            cam.targetTexture = null;
+            Object.Destroy(folha);
+            rt.Release();
+            Object.Destroy(rt);
+            Object.Destroy(cam.gameObject);
+            Object.Destroy(m.gameObject);
+        }
+
         [UnityTest]
         public IEnumerator Foto_Partida_CasteloQuedaPouso()
         {
