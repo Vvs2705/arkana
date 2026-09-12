@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Arkana.World
 {
@@ -118,6 +119,7 @@ namespace Arkana.World
             MontarTerreno(gen.transform, MaterialTerreno());
             MontarAgua(gen.transform);
             Atmosfera();
+            Pos = MontarPos(gen.transform);
             if (comVegetacao)
             {
                 Vegetacao = Filho<Vegetacao>(gen.transform, "Vegetacao");
@@ -418,6 +420,49 @@ namespace Arkana.World
             Material ceu = MaterialCeu();
             if (ceu != null) RenderSettings.skybox = ceu;
         }
+
+        /// <summary>O volume global do pos (tonemapping, bloom, cor, vinheta). So' aparece na camera com LigarPos.</summary>
+        public Volume Pos { get; private set; }
+
+        /// <summary>
+        /// POS-PROCESSAMENTO (passo D; o Diretor liberou em 12/09: "o FPS vai rodar legal"). Tonemapping NEUTRO segura o
+        /// HDR do sol sem virar a paleta; bloom leve so' no que passa de 1 (disco do sol, brilho duro); cor um pouco mais
+        /// viva e vinheta de cinema. Perfil criado em codigo: o UniversalRenderPipelineGlobalSettings deste projeto NAO
+        /// remove variantes de pos nao usadas, entao isto vale no APK. KNOB: todos os numeros, por foto.
+        /// </summary>
+        static Volume MontarPos(Transform pai)
+        {
+            var go = new GameObject("Pos");
+            go.transform.SetParent(pai, false);
+            var v = go.AddComponent<Volume>();
+            v.isGlobal = true;
+            var p = ScriptableObject.CreateInstance<VolumeProfile>();
+            p.name = "ArkanaPos";
+            p.Add<Tonemapping>(true).mode.value = TonemappingMode.Neutral;
+            Bloom b = p.Add<Bloom>(true);
+            b.threshold.value = 1.1f;
+            b.intensity.value = 0.35f;
+            b.scatter.value = 0.6f;
+            ColorAdjustments c = p.Add<ColorAdjustments>(true);
+            c.postExposure.value = 0.15f;   // o neutro escurece o meio-tom: devolve um pouco
+            c.contrast.value = 10f;
+            c.saturation.value = 10f;
+            Vignette vi = p.Add<Vignette>(true);
+            vi.intensity.value = 0.2f;
+            vi.smoothness.value = 0.45f;
+            v.sharedProfile = p;
+            return v;
+        }
+
+        /// <summary>A camera so' desenha o pos com o renderPostProcessing ligado (o padrao do URP e' desligado).</summary>
+        public static void LigarPos(Camera c)
+        {
+            if (c == null) return;
+            var d = c.GetUniversalAdditionalCameraData();
+            d.renderPostProcessing = true;
+        }
+
+        public static bool PosLigado(Camera c) => c != null && c.TryGetComponent(out UniversalAdditionalCameraData d) && d.renderPostProcessing;
 
         // ------------------------------------------------------------------ materiais
 

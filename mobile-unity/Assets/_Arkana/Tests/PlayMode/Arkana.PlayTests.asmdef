@@ -3,6 +3,7 @@
     "rootNamespace": "Arkana.Tests",
     "references": [
         "Arkana",
+        "Unity.RenderPipelines.Core.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

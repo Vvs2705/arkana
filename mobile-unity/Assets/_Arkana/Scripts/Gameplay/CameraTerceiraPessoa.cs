@@ -103,6 +103,7 @@ namespace Arkana.Gameplay
             c.Cam = go.AddComponent<Camera>();
             c.Cam.fieldOfView = CameraLogica.FOV;
             c.Cam.nearClipPlane = 0.1f;
+            Ilha.LigarPos(c.Cam);   // tonemapping/bloom/cor do volume da ilha
             // Sem AudioListener aqui: o UNICO da cena vive no Main (o Sfx atenua por distancia sozinho).
             // Dois ouvintes ou nenhum = aviso do Unity por frame (visto no portao PlayMode de 11/09).
             c.Alvo = alvo;

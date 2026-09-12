@@ -65,6 +65,9 @@ namespace Arkana.Tests
             Assert.AreEqual(Balance.Match.Bots, main.Partida.BotsVivos);
             Assert.IsNotNull(main.Hud);
             Assert.IsNotNull(Camera.main, "a camera do jogador e' a MainCamera");
+            // o volume sozinho nao muda nada na tela: a camera tem de pedir o pos
+            Assert.IsNotNull(Ilha.Atual.Pos, "o volume do pos existe");
+            Assert.IsTrue(Ilha.PosLigado(Camera.main), "a camera do jogador desenha o pos (bloom/tonemapping)");
             // A LICAO DE 11/09: o terreno reativo tinha 25 testes verdes e NENHUMA cena o criava. Sistema testado nao
             // prova sistema ligado — o boot cobra que a partida monta cada peca que o jogador precisa ver.
             Assert.IsNotNull(Arkana.Terrain.TerrenoReativoBehaviour.Atual, "o terreno reativo existe na partida");
