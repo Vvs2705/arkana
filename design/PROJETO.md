@@ -56,8 +56,9 @@ aparelho apareceu em `adb devices`.
 **Próximo passo, na ordem:** instalar o APK novo no Poco F4 e medir FPS com o
 elenco real e as 15 peças do kit (`--es arkana_auto partida`); se cair, o
 primeiro corte é o LOD dos magos distantes. Depois: baú/luvas pela receita do
-kit, os pedregulhos procedurais (hoje recoloridos; a troca boa é um remesh de 1K
-da rocha do kit, grátis no site), luz e pós (passo D). A seção "LEVA 4", depois
+kit, luz e pós (passo D, que custa FPS: só com o aparelho medindo). Se o
+procedural ainda destoar no celular, a troca boa é um remesh de 1K da rocha do
+kit (grátis no site) para os pedregulhos. A seção "LEVA 4", depois
 do passo A, tem a receita inteira do site.
 
 **09/09/2026.** Ordem do Diretor: *"quero desistir da ideia de fazer para
@@ -247,7 +248,19 @@ Onde cada uma nasce vem das fichas de `arte/prompts/06`, `07` e `08`:
 | 27 braseiro (Elemental Crucible) · 33 obelisco (Crimson Obelisk) · 34 plataforma (Stonefoot Shrine) | **o Altar de Sintonia, montado como a ficha**: braseiro no centro, 5 obeliscos no pentágono de 9 m (**dois tombados**, gema no chão), as duas plataformas frente a frente. Um só, no vale | 1,35 · 2,85 · 1,2 m |
 
 O kit agora recebe as **pegadas das Ruínas** (colunas e blocos da muralha) e não
-planta em cima delas. **Decisão que volta ao Diretor:** o validador propôs "Altar
+planta em cima delas.
+
+**O procedural perto da Meshy (mesma manhã).** Ao lado das peças texturizadas, o
+que é código lia como maquete. Três ajustes sem triângulo a mais:
+- A copa ganhou cacho de 4 massas e `MalhaProc.Blob` passou a pintar em
+  degradê por vértice (escuro embaixo). Árvore, moita, pedregulho, seixo e
+  rochedo ganham volume.
+- O pedregulho passou a usar `CorPedregulho` (família do basalto); o lilás
+  lia como gelo.
+- As colunas das Ruínas passaram a usar `CorRuina`, de pedra gasta; o azulado
+  lia como cano de PVC.
+
+Fotos `13-altar`, `14-ruinas` e `15-torre` (novas no `FotoTests`). **Decisão que volta ao Diretor:** o validador propôs "Altar
 só depois do playtest" porque o Altar encosta na Sintonia. Ele entrou só como
 CENÁRIO, sem sistema nenhum; se for para esperar, é tirar uma linha do
 `KitCenario.Montar`.
@@ -300,7 +313,7 @@ Tudo acima **passa no teste, foi visto em foto e rodou no aparelho**. Faltam:
 |---|---|---|
 | **A ✅** | APK no Poco F4, partida inteira, FPS medido | 60 FPS, 16,6 ms, sem erro |
 | **B ✅ (foto)** | **Elenco real**: os 20 magos do SITE da Meshy no jogo, 11 clipes cada (leva 4). **Falta o aparelho** | o mago real anda, corre, conjura e cai no aparelho; foto lado a lado com a ficha |
-| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Faltam baú/luvas pela mesma receita e os pedregulhos procedurais (hoje só recoloridos) | a rocha de perto lê como rocha; FPS mantido |
+| **C ½** | **Kit sem buracos**: as 8 peças com remesh do site (leva 4) ✅, a ponte-raiz com vão (colisor da malha real) ✅, as 7 peças da oficina (arco, coluna-braseiro, estátua-vigia, torre arcana e o Altar de Sintonia) ✅ (foto). Faltam baú/luvas pela mesma receita; árvore e pedregulho seguem procedurais (melhorados por degradê e cacho) | a rocha de perto lê como rocha; FPS mantido |
 | **D** | **VFX de assinatura e pós**: braço de chama da Pyra, muralha de brasas, fio da Tessa, eco da Véu; bloom/tonemapping do URP; luz e ambiente afinados pelas fotos no aparelho; sombra da grama | jogo bonito de ver em vídeo — o Diretor aprova |
 | **E** | Boot sem engasgo (montar ilha/arena em fatias por frame); tela em 120 Hz para medir a folga | sem quadro acima de 100 ms |
 | **F** | Rede: continua não existindo e continua sendo o item mais caro. Netcode for GameObjects + servidor dedicado sem amarrar a fornecedor | dois celulares na mesma partida |
