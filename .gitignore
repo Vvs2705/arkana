@@ -11,6 +11,8 @@ mobile-unity/*.csproj
 mobile-unity/*.sln
 mobile-unity/.vs/
 mobile-unity/crashlytics-build.properties
+# cena temporaria do Test Framework: existe enquanto um teste PlayMode roda (entrou num commit de 12/09 por isso)
+mobile-unity/Assets/InitTestScene*
 *.apk
 *.aab
 
