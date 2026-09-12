@@ -43,9 +43,10 @@ namespace Arkana.Menu
         {
             _raiz = (RectTransform)_canvas.transform;
             ConfigLogica.Aplicar(ConfigLogica.Atual);   // settings lidos e aplicados UMA vez, no boot
-            // FUNDO TRANSLUCIDO: atras do Titulo e do menu principal passa o 3D (VitrineDoMenu, o mago no pico). Continua
-            // bloqueando o toque. Elenco e Configuracoes pintam o PROPRIO Estilo.Fundo opaco por cima (muito texto) — nao ha'
-            // o que trocar no Ir. O degrade de baixo segura a leitura do "toque para comecar" sobre a neve.
+            // FUNDO TRANSLUCIDO: atras do Titulo, do menu principal e do Elenco passa o 3D (VitrineDoMenu, o mago no pico).
+            // Continua bloqueando o toque. O Elenco nao pinta fundo (painel a esquerda, o mago escolhido a direita); so' as
+            // Configuracoes pintam o PROPRIO Estilo.Fundo opaco por cima (muito texto) — nao ha' o que trocar no Ir. O degrade
+            // de baixo segura a leitura do "toque para comecar" sobre a neve.
             // KNOB: os dois alfas, por foto.
             Estilo.Fundo(_raiz).color = Formas.ComAlfa(Estilo.Noite, 0.35f);
             var sombra = Formas.Imagem(_raiz, "SombraBaixo", Formas.Degrade(false), Formas.ComAlfa(Estilo.Noite, 0.55f));
@@ -71,18 +72,38 @@ namespace Arkana.Menu
             var t = Tela("Titulo");
             var tap = Estilo.BotaoInvisivel(t, "TapTitulo");   // toque em QUALQUER lugar avanca
             tap.onClick.AddListener(() => Ir(_menu));
+            // LEITURA SOBRE A NEVE (foto 01-menu de 12/09: o subtitulo cinza e o "toque" sumiam no branco do pico): um halo
+            // escuro MACIO atras da coluna e outro atras do "toque" (Formas.Sombra esvaece ate' a borda: sem retangulo, e o
+            // mago no terco direito fica de fora) + contorno escuro no texto. KNOB: alfas e tamanhos, por foto.
+            var halo = Formas.Imagem(t, "SombraCentro", Formas.Sombra(), Formas.ComAlfa(Estilo.NoiteFunda, 0.5f));
+            halo.rectTransform.sizeDelta = new Vector2(Dp.Px(420f), Dp.Px(360f));   // 0,28-0,72 da tela no 20:9: o mago (0,64+) quase nao escurece
+            halo.rectTransform.anchoredPosition = new Vector2(0, -Dp.Px(10f));   // centrado entre a wordmark e o subtitulo
             var col = Estilo.Coluna(t, "Centro", 6f);
             ((RectTransform)col.transform).anchoredPosition = new Vector2(0, Dp.Px(20f));
             var selo = Formas.Imagem(col.transform, "Selo", Selo.SpriteDe(256), Color.white);
             Estilo.Tamanho(selo, Dp.Px(150f), Dp.Px(150f));
             var marca = Wordmark(col.transform, 44f, 8f);
             Estilo.Tamanho(marca, Dp.Px(300f), Dp.Px(52f));
-            var sub = Formas.Texto(col.transform, "Sub", T_SUB, 16f, Estilo.TextoFosco);
+            var sub = Formas.Texto(col.transform, "Sub", T_SUB, 16f, Estilo.Texto);   // Texto, nao TextoFosco: o fosco sumia na neve
+            Contorno(sub);
             Estilo.Tamanho(sub, Dp.Px(300f), Dp.Px(22f));
+            var haloTap = Formas.Imagem(t, "SombraToque", Formas.Sombra(), Formas.ComAlfa(Estilo.NoiteFunda, 0.55f));
+            haloTap.rectTransform.anchorMin = new Vector2(0.5f, 0); haloTap.rectTransform.anchorMax = new Vector2(0.5f, 0);
+            haloTap.rectTransform.anchoredPosition = new Vector2(0, Dp.Px(38f)); haloTap.rectTransform.sizeDelta = new Vector2(Dp.Px(380f), Dp.Px(64f));
             _tap = Formas.Texto(t, "Toque", T_TOQUE, 14f, Estilo.Ouro);
+            Contorno(_tap);
             _tap.rectTransform.anchorMin = new Vector2(0.5f, 0); _tap.rectTransform.anchorMax = new Vector2(0.5f, 0); _tap.rectTransform.pivot = new Vector2(0.5f, 0);
             _tap.rectTransform.anchoredPosition = new Vector2(0, Dp.Px(28f)); _tap.rectTransform.sizeDelta = new Vector2(Dp.Px(300f), Dp.Px(20f));
             return t;
+        }
+
+        /// <summary>Contorno escuro de 1,2 dp: o Shadow de 1 px do Formas.Texto some a 395 ppi; o Outline le' sobre a neve e
+        /// sobre a noite. Acompanha o alfa do texto (useGraphicAlpha): o "toque" pulsa com contorno e tudo.</summary>
+        static void Contorno(Text t)
+        {
+            var o = t.gameObject.AddComponent<Outline>();
+            o.effectColor = Formas.ComAlfa(Estilo.NoiteFunda, 0.9f);
+            o.effectDistance = new Vector2(Dp.Px(1.2f), -Dp.Px(1.2f));
         }
 
         /// <summary>Wordmark ARKANA: uma letra por Text (espacamento largo), o K na cor do raio (GDD §10).</summary>
@@ -96,6 +117,7 @@ namespace Arkana.Menu
             foreach (char ch in T_MARCA)
             {
                 var l = Formas.Texto(go.transform, "L" + ch, ch.ToString(), tamDp, ch == 'K' ? Estilo.Raio : Estilo.Ouro);
+                Contorno(l);   // o ouro sobre a neve do pico (titulo e menu principal)
                 Estilo.Tamanho(l, Dp.Px(tamDp * 0.8f), Dp.Px(tamDp * 1.2f));
             }
             return h;
@@ -164,7 +186,7 @@ namespace Arkana.Menu
         {
             _fase += Time.unscaledDeltaTime;
             if (_tap != null && _tap.gameObject.activeInHierarchy)
-                _tap.color = Formas.ComAlfa(Estilo.Ouro, 0.5f + 0.4f * Mathf.Sin(_fase * 3f));
+                _tap.color = Formas.ComAlfa(Estilo.Ouro, 0.6f + 0.35f * Mathf.Sin(_fase * 3f));   // piso 0,25: nunca some de vez
         }
     }
 }

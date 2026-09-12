@@ -19,6 +19,7 @@ namespace Arkana.UI
         public const float ArmaRotuloS = 2.5f;
         public const float ArmaFadeS = 0.5f;
         public const float KillFeedS = 4f;
+        public const int KillFeedMax = 4;   // a casca tem uma linha fixa por abate: mudar aqui muda as duas
         public const float HitmarkerS = 0.16f;
 
         public sealed class Numero { public float Total; public float Nasceu; public float Ate; public bool EmEscudo; public Elemento Elemento; }
@@ -74,7 +75,7 @@ namespace Arkana.UI
         public void Abater(string nomeDoMago)
         {
             KillFeed.Add(new Abate { Nome = nomeDoMago, Ate = Agora + KillFeedS });
-            while (KillFeed.Count > 4) KillFeed.RemoveAt(0);
+            while (KillFeed.Count > KillFeedMax) KillFeed.RemoveAt(0);
         }
 
         public void Acertei() { Hitmarker = HitmarkerS; }
@@ -186,6 +187,13 @@ namespace Arkana.UI
         public const string T_ABATE = "{0} derrubado";
         public static IReadOnlyDictionary<string, string> Estados => Textos.HudEstados;
         static readonly Color CorZona = new Color(0.55f, 0.35f, 1f);
+        // a PLACA (fio + miolo) e' a das barras: relogio, kill feed, altimetro, carrossel e avisos falam o mesmo idioma.
+        // Fio/icone sao propriedade (nao static readonly): a paleta do Estilo passa pelo ColorUtility, e inicializador
+        // estatico de MonoBehaviour pode rodar dentro do AddComponent.
+        static Color CorFio => Formas.ComAlfa(Estilo.OuroFosco, 0.95f);
+        static Color CorIcone => Formas.ComAlfa(Estilo.Ouro, 0.95f);
+        static readonly Color CorMiolo = new Color(0.03f, 0.04f, 0.07f, 0.8f);
+        static readonly Color CorAbate = new Color(1f, 0.42f, 0.36f);
 
         /// <summary>Raridade -> cor + FORMA do contorno (GDD §10). Desconhecida = branco redondo.</summary>
         public static void Raridade(string r, out Color cor, out string forma)
@@ -228,8 +236,12 @@ namespace Arkana.UI
         BarraHud _hp, _mana, _escudo;
         Arkana.Gameplay.Pawn _pawn;
         Image[] _escudoSegs = new Image[0];
-        Text _relogio, _bots, _fps, _armaRotulo, _altimetro, _killFeed;
-        RectTransform _altimetroBox;
+        Text _relogio, _bots, _fps, _armaRotulo, _altimetro;
+        RectTransform _topo, _killFeed, _altimetroBox;
+        Image _placaTopo;
+        GameObject _iconeRelogio, _linhaBots;
+        int _topoSeg = int.MinValue, _topoBots = int.MinValue;   // o que a placa do topo mostra: refaz so' quando muda
+        AbateLinha[] _abates;
         HudAviso _aviso;
         Image _reticulo;
         Image[] _hitmarker;
@@ -286,20 +298,12 @@ namespace Arkana.UI
             _mana = new BarraHud(_barras, T_MANA, new Color(0.22f, 0.5f, 1f), 22f, 13f, 8.5f);
             _escudo = new BarraHud(_barras, T_ESCUDO, Color.white, 39f, 13f, 8.5f);
             _escudo.Linha.gameObject.SetActive(false);
-            _killFeed = Formas.Texto(_raiz, "KillFeed", "", 11f, new Color(1, 1, 1, 0.9f), TextAnchor.UpperLeft);
+            // kill feed: uma linha fixa por abate (placa pequena + X + nome), nada de StringBuilder por frame
+            _killFeed = Formas.No(_raiz, "KillFeed");
+            _abates = new AbateLinha[HudLogica.KillFeedMax];
+            for (int i = 0; i < _abates.Length; i++) _abates[i] = new AbateLinha(_killFeed, i);
 
-            // topo direito
-            var topo = Formas.No(_raiz, "Topo");
-            _relogio = Formas.Texto(topo, "Relogio", "0:00", 20f, Color.white, TextAnchor.UpperRight);
-            _bots = Formas.Texto(topo, "Bots", "", 13f, Color.white, TextAnchor.UpperRight);
-            _fps = Formas.Texto(topo, "Fps", "", 12f, new Color(0.6f, 1f, 0.7f, 0.85f), TextAnchor.UpperRight);
-            _relogio.rectTransform.anchorMin = new Vector2(0, 1); _relogio.rectTransform.anchorMax = new Vector2(1, 1); _relogio.rectTransform.pivot = new Vector2(1, 1);
-            _relogio.rectTransform.anchoredPosition = Vector2.zero; _relogio.rectTransform.sizeDelta = new Vector2(0, Dp.Px(24f));
-            _bots.rectTransform.anchorMin = new Vector2(0, 1); _bots.rectTransform.anchorMax = new Vector2(1, 1); _bots.rectTransform.pivot = new Vector2(1, 1);
-            _bots.rectTransform.anchoredPosition = new Vector2(0, -Dp.Px(24f)); _bots.rectTransform.sizeDelta = new Vector2(0, Dp.Px(16f));
-            _fps.rectTransform.anchorMin = new Vector2(0, 1); _fps.rectTransform.anchorMax = new Vector2(1, 1); _fps.rectTransform.pivot = new Vector2(1, 1);
-            _fps.rectTransform.anchoredPosition = new Vector2(0, -Dp.Px(40f)); _fps.rectTransform.sizeDelta = new Vector2(0, Dp.Px(14f));
-            _fps.enabled = false;
+            MontarTopo();
 
             // reticulo + hitmarker (SEM area segura: marca o centro da camera)
             _reticulo = Formas.Imagem(_raiz, "Reticulo", Formas.Anel(), new Color(1, 1, 1, 0.8f));
@@ -327,12 +331,16 @@ namespace Arkana.UI
             _numeros = Formas.No(_raiz, "Numeros");
             AreaSegura.Esticar(_numeros);
 
-            // altimetro (queda)
+            // altimetro (queda): a placa, seta de queda a esquerda e os metros em negrito (era retangulo chapado na foto 07)
             _altimetroBox = Formas.No(_raiz, "Altimetro");
-            var altFundo = Formas.Imagem(_altimetroBox, "Fundo", null, new Color(0, 0, 0, 0.35f));
-            AreaSegura.Esticar(altFundo.rectTransform);
-            _altimetro = Formas.Texto(_altimetroBox, "Texto", "", 16f, Color.white, TextAnchor.MiddleRight);
+            AreaSegura.Esticar(Placa(_altimetroBox, "Fundo", Dp.Px(8f)).rectTransform);
+            var seta = Formas.Imagem(_altimetroBox, "Seta", Formas.Seta(), CorIcone);
+            Fixar(seta.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(Dp.Px(17f), 0f), Vector2.one * Dp.Px(14f));
+            seta.rectTransform.localRotation = Quaternion.Euler(0, 0, 180f);   // aponta para o chao
+            _altimetro = Formas.Texto(_altimetroBox, "Texto", "", 18f, Color.white, TextAnchor.MiddleRight);
+            _altimetro.fontStyle = FontStyle.Bold;
             AreaSegura.Esticar(_altimetro.rectTransform);
+            _altimetro.rectTransform.offsetMax = new Vector2(-Dp.Px(12f), 0f);
             _altimetroBox.gameObject.SetActive(false);
 
             // controles
@@ -465,6 +473,152 @@ namespace Arkana.UI
             }
         }
 
+        /// <summary>
+        /// A PLACA da HUD — o idioma das barras: fio dourado fosco de cantos redondos + miolo escuro recuado 1dp. Devolve
+        /// o fio (raiz): filhos novos desenham por cima do miolo; quem quer outra cor de fio pinta o .color (o aviso pinta
+        /// na cor da prioridade). Usada pelo relogio, kill feed, altimetro, carrossel e avisos.
+        /// </summary>
+        internal static Image Placa(Transform pai, string nome, float raioPx)
+        {
+            float fio = Mathf.Max(Dp.Px(1f), 1f);
+            var borda = Formas.Arredondada(pai, nome, CorFio, raioPx);
+            var miolo = Formas.Arredondada(borda.transform, "Miolo", CorMiolo, Mathf.Max(raioPx - fio, 0.5f));
+            AreaSegura.Esticar(miolo.rectTransform);
+            miolo.rectTransform.offsetMin = new Vector2(fio, fio); miolo.rectTransform.offsetMax = new Vector2(-fio, -fio);
+            return borda;
+        }
+
+        /// <summary>Ancora num PONTO do pai (ancora 0..1) com pivo, posicao e tamanho em px.</summary>
+        static void Fixar(RectTransform rt, Vector2 ancora, Vector2 pivo, Vector2 pos, Vector2 tam)
+        {
+            rt.anchorMin = ancora; rt.anchorMax = ancora; rt.pivot = pivo;
+            rt.anchoredPosition = pos; rt.sizeDelta = tam;
+        }
+
+        const float TopoLinha1Dp = 32f, TopoLinha2Dp = 20f;   // 52dp = a altura do HudLayout.Topo
+
+        /// <summary>
+        /// Topo direito: relogio e BOTS numa PLACA (foto de 12/09: texto branco solto sumia no ceu claro). Linha 1: icone de
+        /// relogio + tempo grande em negrito; fio; linha 2: icone de gente + BOTS. Encosta no canto e a largura segue o texto
+        /// (PintarTopo mede so' quando ele muda). No TREINO vira uma linha so', sem icone.
+        /// </summary>
+        void MontarTopo()
+        {
+            var supDir = new Vector2(1f, 1f);
+            var supEsq = new Vector2(0f, 1f);
+            var meio = new Vector2(0.5f, 0.5f);
+            _topo = Formas.No(_raiz, "Topo");
+            _placaTopo = Placa(_topo, "Placa", Dp.Px(7f));
+            Fixar(_placaTopo.rectTransform, supDir, supDir, Vector2.zero, new Vector2(Dp.Px(100f), Dp.Px(TopoLinha1Dp + TopoLinha2Dp)));
+            var placa = _placaTopo.transform;
+            // relogio de 14dp: aro + ponteiros nas 12h e 3h (retangulo sem sprite: nitido em qualquer dpi)
+            var ir = Formas.No(placa, "IconeRelogio");
+            Fixar(ir, supEsq, meio, new Vector2(Dp.Px(15f), -Dp.Px(TopoLinha1Dp * 0.5f)), Vector2.one * Dp.Px(14f));
+            AreaSegura.Esticar(Formas.Imagem(ir, "Aro", Formas.Anel(0.72f), CorIcone).rectTransform);
+            float haste = Mathf.Max(Dp.Px(1.6f), 1f);
+            Fixar(Formas.Imagem(ir, "Minutos", null, CorIcone).rectTransform, meio, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(haste, Dp.Px(4.4f)));
+            Fixar(Formas.Imagem(ir, "Horas", null, CorIcone).rectTransform, meio, new Vector2(0f, 0.5f), Vector2.zero, new Vector2(Dp.Px(3.4f), haste));
+            _iconeRelogio = ir.gameObject;
+            _relogio = Formas.Texto(placa, "Relogio", "0:00", 22f, Color.white, TextAnchor.MiddleLeft);
+            _relogio.fontStyle = FontStyle.Bold;
+            Fixar(_relogio.rectTransform, supEsq, supEsq, Vector2.zero, new Vector2(Dp.Px(150f), Dp.Px(TopoLinha1Dp)));
+            // linha 2 (some no treino): divisor, icone de gente (cabeca + meio disco de ombros), BOTS
+            var lb = Formas.No(placa, "LinhaBots");
+            AreaSegura.Esticar(lb);
+            _linhaBots = lb.gameObject;
+            var div = Formas.Imagem(lb, "Divisor", null, Formas.ComAlfa(Estilo.OuroFosco, 0.5f));
+            div.rectTransform.anchorMin = supEsq; div.rectTransform.anchorMax = supDir;
+            div.rectTransform.offsetMin = new Vector2(Dp.Px(6f), -Dp.Px(TopoLinha1Dp) - Mathf.Max(Dp.Px(1f), 1f));
+            div.rectTransform.offsetMax = new Vector2(-Dp.Px(6f), -Dp.Px(TopoLinha1Dp));
+            var ib = Formas.No(lb, "IconeBots");
+            Fixar(ib, supEsq, meio, new Vector2(Dp.Px(15f), -Dp.Px(TopoLinha1Dp + TopoLinha2Dp * 0.5f)), Vector2.one * Dp.Px(11f));
+            Fixar(Formas.Imagem(ib, "Cabeca", Formas.Disco(), CorIcone).rectTransform, meio, meio, new Vector2(0f, Dp.Px(3f)), Vector2.one * Dp.Px(5f));
+            var ombros = Formas.Imagem(ib, "Ombros", Formas.Disco(), CorIcone);
+            Fixar(ombros.rectTransform, meio, meio, new Vector2(0f, -Dp.Px(5.5f)), Vector2.one * Dp.Px(11f));
+            ombros.type = Image.Type.Filled; ombros.fillMethod = Image.FillMethod.Vertical;
+            ombros.fillOrigin = (int)Image.OriginVertical.Top; ombros.fillAmount = 0.5f;
+            _bots = Formas.Texto(lb, "Bots", "", 13f, new Color(0.86f, 0.9f, 0.97f), TextAnchor.MiddleLeft);
+            _bots.fontStyle = FontStyle.Bold;
+            Fixar(_bots.rectTransform, supEsq, supEsq, new Vector2(0f, -Dp.Px(TopoLinha1Dp)), new Vector2(Dp.Px(150f), Dp.Px(TopoLinha2Dp)));
+            // FPS (config): a esquerda da placa, na altura do relogio (PintarTopo acompanha a largura)
+            _fps = Formas.Texto(_topo, "Fps", "", 12f, new Color(0.6f, 1f, 0.7f, 0.85f), TextAnchor.MiddleRight);
+            Fixar(_fps.rectTransform, supDir, supDir, new Vector2(-Dp.Px(106f), 0f), new Vector2(Dp.Px(70f), Dp.Px(TopoLinha1Dp)));
+            _fps.enabled = false;
+        }
+
+        /// <summary>Relogio e BOTS: texto e largura da placa so' mudam quando o SEGUNDO (ou a contagem) muda — era string.Format por frame.</summary>
+        void PintarTopo()
+        {
+            int seg = _treino ? -1 : Mathf.Max(Mathf.CeilToInt(_restante), 0);
+            int bots = _treino ? -1 : _botsVivos;
+            if (seg == _topoSeg && bots == _topoBots) return;
+            _topoSeg = seg; _topoBots = bots;
+            _relogio.text = HudLogica.TextoRelogio(_restante, _treino, T_TREINO);
+            _bots.text = _treino ? "" : string.Format(T_BOTS, _botsVivos);
+            _iconeRelogio.SetActive(!_treino);
+            _linhaBots.SetActive(!_treino);
+            float x0 = Dp.Px(_treino ? 10f : 28f);   // sem icone, o texto centraliza na placa
+            _relogio.rectTransform.anchoredPosition = new Vector2(x0, 0f);
+            _bots.rectTransform.anchoredPosition = new Vector2(x0, -Dp.Px(TopoLinha1Dp));
+            float w = Mathf.Ceil(x0 + Mathf.Max(_relogio.preferredWidth, _treino ? 0f : _bots.preferredWidth) + Dp.Px(10f));
+            _placaTopo.rectTransform.sizeDelta = new Vector2(w, Dp.Px(_treino ? TopoLinha1Dp : TopoLinha1Dp + TopoLinha2Dp));
+            _fps.rectTransform.anchoredPosition = new Vector2(-w - Dp.Px(6f), 0f);
+        }
+
+        /// <summary>
+        /// Uma linha do kill feed: placa pequena, X vermelho e "Nome derrubado". Texto e largura so' sao refeitos quando o
+        /// abate da linha muda; por frame so' o alfa (entra em EntraS deslizando da esquerda, esvaece nos ultimos SaiS).
+        /// </summary>
+        sealed class AbateLinha
+        {
+            const float AlturaDp = 16f, PassoDp = 18f;   // 4 linhas = 70dp: cabem nos 72dp do HudLayout.KillFeed
+            const float EntraS = 0.18f, SaiS = 0.6f;
+            readonly Image _placa;
+            readonly Text _texto;
+            readonly CanvasGroup _grupo;
+            readonly float _y;
+            HudLogica.Abate _abate;
+            float _alfa = -1f, _dx = 1f;   // ultimo valor aplicado (1 = nunca): por frame so' toca se mudou
+
+            public AbateLinha(RectTransform pai, int i)
+            {
+                var supEsq = new Vector2(0f, 1f);
+                _y = -Dp.Px(PassoDp) * i;
+                _placa = Placa(pai, "Abate" + i, Dp.Px(5f));
+                Fixar(_placa.rectTransform, supEsq, supEsq, new Vector2(0f, _y), new Vector2(Dp.Px(120f), Dp.Px(AlturaDp)));
+                _grupo = _placa.gameObject.AddComponent<CanvasGroup>();   // o fade pega placa, X e texto de uma vez
+                var xis = Formas.Imagem(_placa.transform, "Xis", Formas.Xis(), CorAbate);
+                Fixar(xis.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(Dp.Px(10f), 0f), Vector2.one * Dp.Px(12f));
+                _texto = Formas.Texto(_placa.transform, "Texto", "", 11f, new Color(1f, 1f, 1f, 0.95f), TextAnchor.MiddleLeft);
+                _texto.fontStyle = FontStyle.Bold;
+                AreaSegura.Esticar(_texto.rectTransform);
+                _texto.rectTransform.offsetMin = new Vector2(Dp.Px(18f), 0f);
+                _placa.gameObject.SetActive(false);
+            }
+
+            public void Pintar(HudLogica.Abate ab, float agora, float larguraMax)
+            {
+                if (ab != _abate)
+                {
+                    _abate = ab;
+                    _placa.gameObject.SetActive(ab != null);
+                    if (ab != null)
+                    {
+                        _texto.text = string.Format(T_ABATE, ab.Nome);
+                        float w = Mathf.Min(Mathf.Ceil(Dp.Px(26f) + _texto.preferredWidth), larguraMax);
+                        _placa.rectTransform.sizeDelta = new Vector2(w, Dp.Px(AlturaDp));
+                    }
+                }
+                if (ab == null) return;
+                float idade = agora - (ab.Ate - HudLogica.KillFeedS);
+                float a = Mathf.Min(Mathf.Clamp01(idade / EntraS), Mathf.Clamp01((ab.Ate - agora) / SaiS));
+                if (a != _alfa) { _alfa = a; _grupo.alpha = a; }
+                float e = 1f - Mathf.Clamp01(idade / EntraS);
+                float dx = -Dp.Px(12f) * e * e;
+                if (dx != _dx) { _dx = dx; _placa.rectTransform.anchoredPosition = new Vector2(dx, _y); }
+            }
+        }
+
         void MontarFim()
         {
             _fim = Formas.No(_raiz, "Fim");
@@ -503,7 +657,7 @@ namespace Arkana.UI
             Margens m = AreaSegura.Atual();
             HudLayout l = HudLayout.Calcular(tela, m, Dp.Px(1f));
             AreaSegura.NoRect(_barras, l.Barras);
-            AreaSegura.NoRect((RectTransform)_relogio.transform.parent, l.Topo);
+            AreaSegura.NoRect(_topo, l.Topo);
             AreaSegura.NoRect((RectTransform)Pausa.transform, l.Pausa);
             AreaSegura.NoRect((RectTransform)Joystick.transform, l.Joystick);
             AreaSegura.NoRect((RectTransform)Disparo.transform, l.Disparo);
@@ -515,7 +669,7 @@ namespace Arkana.UI
             AreaSegura.NoRect(_armaRotulo.rectTransform, l.ArmaRotulo);
             AreaSegura.NoRect((RectTransform)Pegar.transform, l.Pegar);
             AreaSegura.NoRect(_altimetroBox, l.Altimetro);
-            AreaSegura.NoRect(_killFeed.rectTransform, l.KillFeed);
+            AreaSegura.NoRect(_killFeed, l.KillFeed);
             // olhar livre: da fronteira do joystick (35%) ate' a borda direita
             _olhar.anchorMin = new Vector2(0.35f, 0); _olhar.anchorMax = Vector2.one; _olhar.offsetMin = Vector2.zero; _olhar.offsetMax = Vector2.zero;
             _aviso.Layout(tela, m);
@@ -864,8 +1018,7 @@ namespace Arkana.UI
             Logica.Tick(dt);
             if (Screen.width != (int)_telaAtual.x || Screen.height != (int)_telaAtual.y) Layout();
             // relogio / bots / fps
-            _relogio.text = HudLogica.TextoRelogio(_restante, _treino, T_TREINO);
-            _bots.text = _treino ? "" : string.Format(T_BOTS, _botsVivos);
+            PintarTopo();
             if (_mostraFps) _fps.text = string.Format(T_FPS, Mathf.RoundToInt(1f / Mathf.Max(dt, 0.0001f)));
             // rotulo da arma: pulso -> espera -> apaga
             _armaRotulo.enabled = Logica.ArmaRotuloVisivel;
@@ -887,10 +1040,9 @@ namespace Arkana.UI
                 float carga = kit.SupremaCargaS;
                 Suprema.Logica.Cooldown(kit.FracSuprema * carga, carga);
             }
-            // kill feed
-            var sb = new System.Text.StringBuilder();
-            foreach (var ab in Logica.KillFeed) sb.AppendLine(string.Format(T_ABATE, ab.Nome));
-            _killFeed.text = sb.ToString();
+            // kill feed: linhas fixas, o texto so' e' refeito quando o abate da linha muda (era um StringBuilder por frame)
+            float feedMax = _killFeed.sizeDelta.x;
+            for (int i = 0; i < _abates.Length; i++) _abates[i].Pintar(i < Logica.KillFeed.Count ? Logica.KillFeed[i] : null, Logica.Agora, feedMax);
             // numeros de dano: sobem e somem
             var mortos = new List<HudLogica.Numero>();
             foreach (var kv in _labels)

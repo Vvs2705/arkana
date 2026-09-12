@@ -4,6 +4,7 @@
     "references": [
         "Arkana",
         "Unity.RenderPipelines.Core.Runtime",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -33,6 +33,11 @@ namespace Arkana.Core
         public const string SelFuncao = "Função";
         public const string SelRaca = "Raça";
         public const string SelADefinir = "a definir";
+        /// <summary>Cartao do mago escolhido (a vitrine do Elenco): elemento · porte · altura, e o kit em numeros da ficha.</summary>
+        public const string SelPorte = "{0} · {1} · {2} m";
+        public const string SelTatica = HudTatica + HudSep + "recarga {0} s";
+        public const string SelSuprema = HudSuprema + HudSep + "carga {0} s";
+        public const string SelKitEmBreve = PerfilKit + " " + SelEmBreve;
 
         // ---------------------------------------------------------------- perfil do mago
         public const string PerfilHistoria = "HISTÓRIA";

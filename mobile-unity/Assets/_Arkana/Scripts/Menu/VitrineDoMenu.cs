@@ -8,30 +8,34 @@ namespace Arkana.Menu
     /// O FUNDO VIVO do menu: o mago escolhido em guarda no topo do PICO (neve, torres escuras, o por do sol atras) e a
     /// camera do menu orbitando devagar em volta dele. Mora na camera do menu; o Main liga/desliga junto com ela.
     /// O mago e' so' o Visual (Mago, nunca Pawn) e SOME no OnDisable: o treino nasce justamente no pico.
-    /// Trocou o mago no Elenco = mago novo no pico. Sem ilha, nao faz nada (fiacao defensiva, sem log).
+    /// Trocou o mago no Elenco = mago novo no pico NO MESMO QUADRO (SelecaoPersonagem.MagoTrocou). Sem ilha, nao faz nada
+    /// (fiacao defensiva, sem log).
     /// </summary>
     public sealed class VitrineDoMenu : MonoBehaviour
     {
         // KNOB: o enquadramento inteiro, por foto (a referencia e' a 03-mago-de-perto: camera a ~4-5 m, um pouco acima)
         public const float Raio = 4.8f, Altura = 1.7f, Velocidade = 0.06f;   // m do mago, m acima do pe', rad/s (~105 s por volta)
-        /// <summary>O olhar mira ~1 m acima do pe' e 1,3 m a ESQUERDA da tela: o mago cai no terco direito (a UI e' centrada).</summary>
+        /// <summary>O olhar mira ~1 m acima do pe' e 1,3 m a ESQUERDA da tela: o mago cai no terco direito (a UI e' centrada;
+        /// no Elenco o painel dos retratos e' a esquerda e o cartao, a direita dele).</summary>
         public const float OlharY = 1f, OlharLado = 1.3f;
-        /// <summary>A escolha mora no PlayerPrefs (no Android, JNI): relida 2x por segundo, nao todo quadro.</summary>
-        const float ReleituraS = 0.5f;
 
         Mago _mago;
         string _slug;
         float _ang = 0.6f;   // comeca no angulo da foto 03 (camera a +x,+z do mago)
-        float _relogio;
+        /// <summary>A escolha mora no PlayerPrefs (no Android, JNI): relida so' quando o setter avisa, nunca por quadro.</summary>
+        bool _reler;
+
+        void OnEnable() { SelecaoPersonagem.MagoTrocou += Reler; }
+
+        void Reler() { _reler = true; }
 
         void LateUpdate()
         {
             Ilha ilha = Ilha.Atual;
             if (ilha == null || ilha.Relevo == null) return;
-            _relogio -= Time.unscaledDeltaTime;
-            if (_mago == null || _relogio <= 0f)
+            if (_mago == null || _reler)
             {
-                _relogio = ReleituraS;
+                _reler = false;
                 string slug = SelecaoPersonagem.MagoEscolhido;
                 if (_mago == null || slug != _slug)
                 {
@@ -52,7 +56,7 @@ namespace Arkana.Menu
             _mago.transform.SetPositionAndRotation(pe, Quaternion.LookRotation(volta));   // de frente para a camera (+Z do modelo)
         }
 
-        void OnDisable() { Soltar(); }
+        void OnDisable() { SelecaoPersonagem.MagoTrocou -= Reler; Soltar(); }
 
         void OnDestroy() { Soltar(); }
 

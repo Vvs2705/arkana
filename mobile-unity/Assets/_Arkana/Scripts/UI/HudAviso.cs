@@ -179,7 +179,13 @@ namespace Arkana.UI
 
         RectTransform _raiz;
         Text _faixa;
+        Image _faixaPlaca;
+        Image[] _faixaLosangos;
+        string _faixaTexto;     // o que a placa mediu por ultimo: remede so' quando o texto muda (1x/s na contagem)
+        Color _faixaCor;
+        float _faixaMax;
         Text[] _badges;
+        GameObject[] _chips;
         Image[] _vinheta;
         Image[] _arcos;
         readonly List<Image> _setas = new List<Image>();
@@ -213,14 +219,32 @@ namespace Arkana.UI
                 _arcos[i].rectTransform.sizeDelta = new Vector2(Dp.Px(14f), Dp.Px(14f));
                 _arcos[i].enabled = false;
             }
+            // faixa: PLACA escura atras do texto (fotos 08/10: o roxo solto sumia no verde e no ceu claro) com fio e dois
+            // losangos na cor da PRIORIDADE; o texto segue a cor da prioridade. Largura = texto (medida so' quando ele muda).
+            _faixaPlaca = Hud.Placa(_raiz, "FaixaFundo", Dp.Px(8f));
+            var pr = _faixaPlaca.rectTransform;
+            pr.anchorMin = Vector2.zero; pr.anchorMax = Vector2.zero; pr.pivot = new Vector2(0.5f, 0.5f);
+            _faixaLosangos = new Image[2];
+            for (int i = 0; i < 2; i++)
+            {
+                var l = Formas.Imagem(pr, "Losango" + i, Formas.Losango(), Color.white);
+                l.rectTransform.anchorMin = new Vector2(i, 0.5f); l.rectTransform.anchorMax = new Vector2(i, 0.5f);
+                l.rectTransform.sizeDelta = new Vector2(Dp.Px(7f), Dp.Px(7f));
+                l.rectTransform.anchoredPosition = new Vector2((i == 0 ? 1f : -1f) * Dp.Px(11f), 0f);
+                _faixaLosangos[i] = l;
+            }
+            _faixaPlaca.gameObject.SetActive(false);
             _faixa = Formas.Texto(_raiz, "Faixa", "", 17f, Color.white);
+            _faixa.fontStyle = FontStyle.Bold;
             _badges = new Text[AvisoLogica.MAX_BADGES];
+            _chips = new GameObject[_badges.Length];
             for (int i = 0; i < _badges.Length; i++)
             {
-                var chip = Formas.Imagem(_raiz, "Badge" + i, null, new Color(0.05f, 0.06f, 0.09f, 0.55f));
+                var chip = Hud.Placa(_raiz, "Badge" + i, Dp.Px(10f));   // capsula: raio = meia altura (20dp)
                 _badges[i] = Formas.Texto(chip.transform, "Txt", "", 10f, new Color(0.92f, 0.96f, 1f, 0.95f));
                 AreaSegura.Esticar(_badges[i].rectTransform);
-                chip.enabled = false;
+                _chips[i] = chip.gameObject;
+                _chips[i].SetActive(false);
             }
             _canalFundo = Formas.Imagem(_raiz, "CanalFundo", Formas.Anel(), new Color(0, 0, 0, 0.45f));
             _canalArco = Formas.Imagem(_raiz, "CanalArco", Formas.Anel(), Color.white);
@@ -259,7 +283,11 @@ namespace Arkana.UI
         {
             _m = m;
             float px = Dp.Px(1f);
-            AreaSegura.NoRect(_faixa.rectTransform, RectFaixa(tela, m, px));
+            Rect rf = RectFaixa(tela, m, px);
+            AreaSegura.NoRect(_faixa.rectTransform, rf);
+            _faixaPlaca.rectTransform.anchoredPosition = rf.center;   // pivo no meio: a largura cresce para os dois lados
+            _faixaMax = rf.width;
+            _faixaTexto = null;   // tela nova: remede
             Rect rb = RectBadges(tela, m, px);
             float x = rb.xMin;
             for (int i = 0; i < _badges.Length; i++)
@@ -289,16 +317,30 @@ namespace Arkana.UI
             // vinheta
             Color vc = Formas.ComAlfa(Logica.VinhetaCor, 0.42f * Logica.Vinheta);
             for (int i = 0; i < 4; i++) { _vinheta[i].enabled = Logica.Vinheta > 0f; _vinheta[i].color = vc; }
-            // faixa
+            // faixa: texto e largura da placa so' quando o texto muda; cor (texto, fio, losangos) so' quando a prioridade troca
             var f = Logica.FaixaVencedora();
-            _faixa.text = f == null ? "" : f.Texto;
-            if (f != null) _faixa.color = f.Cor;
+            string txt = f != null && f.Texto != null ? f.Texto : "";
+            if (txt != _faixaTexto)
+            {
+                _faixaTexto = txt;
+                _faixa.text = txt;
+                _faixaPlaca.gameObject.SetActive(txt.Length > 0);
+                if (txt.Length > 0)
+                    _faixaPlaca.rectTransform.sizeDelta = new Vector2(Mathf.Min(Mathf.Ceil(_faixa.preferredWidth + Dp.Px(46f)), _faixaMax), Dp.Px(30f));
+            }
+            if (f != null && f.Cor != _faixaCor)
+            {
+                _faixaCor = f.Cor;
+                _faixa.color = f.Cor;
+                _faixaPlaca.color = Formas.ComAlfa(f.Cor, 0.85f);
+                _faixaLosangos[0].color = f.Cor; _faixaLosangos[1].color = f.Cor;
+            }
             // badges
             for (int i = 0; i < _badges.Length; i++)
             {
                 bool on = i < Logica.Badges.Count;
-                ((Image)_badges[i].transform.parent.GetComponent<Image>()).enabled = on;
-                _badges[i].text = on ? RotuloEstado(Logica.Badges[i]) : "";
+                if (_chips[i].activeSelf != on) _chips[i].SetActive(on);
+                if (on) _badges[i].text = RotuloEstado(Logica.Badges[i]);
             }
             // arcos e bussola: angulos giram com a camera
             float raioArco = Mathf.Min(tela.x, tela.y) * 0.42f;

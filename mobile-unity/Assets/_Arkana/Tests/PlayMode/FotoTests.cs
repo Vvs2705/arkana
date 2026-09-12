@@ -356,6 +356,41 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), antes + " visuais depois=" + runner.Visuais.Count + "\n");
         }
 
+        /// <summary>A ESCOLHA DE MAGO sobre a vitrine 3D: a grade a' esquerda, o mago tocado troca NA HORA no pico a' direita.</summary>
+        [UnityTest]
+        public IEnumerator Foto_Elenco_Escolha()
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Tocar("TapTitulo");
+                yield return null;
+                Tocar("BtnElenco");
+                yield return null;
+                Tocar("Card03-veu/Toque");
+                yield return null;
+                var mago = Object.FindFirstObjectByType<Arkana.Characters.Mago>();
+                Assert.IsNotNull(mago, "a vitrine tem mago");
+                Assert.AreEqual("Mago 03-veu", mago.name, "o toque no retrato troca o mago da vitrine na hora");
+                yield return Esperar(1.2f);
+                Foto(main.CameraDoMenu, "21-elenco", true);
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        static void Tocar(string caminho)
+        {
+            GameObject go = GameObject.Find(caminho);
+            Assert.IsNotNull(go, "sem " + caminho + " na tela");
+            go.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+        }
+
         /// <summary>Os outros dois kits implementados (Veu e Tessa) em acao, pelo mesmo roteiro da Pyra: tatica e suprema no treino.</summary>
         [UnityTest]
         public IEnumerator Foto_Kit_VeuTessa([Values("03-veu", "10-tessa")] string slug)

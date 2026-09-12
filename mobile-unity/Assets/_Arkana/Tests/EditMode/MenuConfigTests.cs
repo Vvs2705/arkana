@@ -118,5 +118,21 @@ namespace Arkana.Tests
             Assert.AreEqual(SelecaoPersonagem.CorDoMago("01-pyra"), SelecaoPersonagem.CorDoMago("01-pyra"));
             Assert.AreNotEqual(SelecaoPersonagem.CorDoMago("01-pyra"), SelecaoPersonagem.CorDoMago("02-ceifadora"));
         }
+
+        [Test]
+        public void ElencoBustoECartaoSaoContasPuras()
+        {
+            // o busto da celula: a metade de CIMA do retrato 512x768, centrada, na proporcao do quadrado (uv 1 = topo)
+            Rect b = SelecaoPersonagem.Busto(512, 768);
+            Assert.AreEqual(0.75f, b.width, 1e-4f); Assert.AreEqual(0.5f, b.height, 1e-4f);
+            Assert.AreEqual(0.125f, b.x, 1e-4f); Assert.AreEqual(1f, b.yMax, 1e-4f);
+            Rect estreito = SelecaoPersonagem.Busto(100, 400);
+            Assert.AreEqual(1f, estreito.width, 1e-4f, "retrato estreito demais: largura inteira, uv nunca sai de 0..1");
+            Assert.AreEqual(1f, estreito.yMax, 1e-4f);
+            // o cartao le' a ficha (IdentidadeMago + Kits), com virgula PT-BR em qualquer cultura do aparelho
+            Assert.AreEqual("FOGO · Robusto · 1,78 m", Elenco.Porte("01-pyra"));
+            CollectionAssert.AreEqual(new[] { "TÁTICA · recarga 9 s", "SUPREMA · carga 50 s" }, Elenco.Kit("01-pyra"));
+            Assert.AreEqual(Arkana.Core.Textos.SelKitEmBreve, Elenco.Kit("02-ceifadora")[0], "sem kit: EM BREVE, nunca numero inventado");
+        }
     }
 }
