@@ -139,7 +139,9 @@ namespace Arkana.World
         public static readonly Color CorChaoDeMata = Hex(0x5f7742);
         public static readonly Color CorMusgo = Hex(0x74a06a);
         public static readonly Color CorSeixo = Hex(0x8d8a84);
-        public static readonly Color CorPico = Hex(0xdfe3ee);
+        /// <summary>Cume do pico: pedra clara QUENTE, nao neve. O #dfe3ee de antes (branco-lilas) saia liso e o Diretor leu
+        /// placeholder (fotos 02/05/18 de 12/09). KNOB: por foto — com a leitura aerea (pico x ruinas) acima de 0,10.</summary>
+        public static readonly Color CorPico = Hex(0xbdb6aa);
         public static readonly Color CorDuna = Hex(0xe8d6a4);
 
         public readonly float Escala;
@@ -411,11 +413,14 @@ namespace Arkana.World
                 c = Color.Lerp(c, CorPedra, wrk * Suave(0.46f, 0.88f, fine) * 0.42f);
                 c = Color.Lerp(c, CorLama, wrk * Suave(0.62f, 0.20f, big) * 0.20f);
             }
-            // 5b) cume do pico: so' na tampa, e fraco. A faixa ACOMPANHA o topo da mesa (PicoH +
+            // 5b) cume do pico: so' na tampa. A faixa ACOMPANHA o topo da mesa (PicoH +
             // sope' de ~7 m): medido aqui, a mesa fica em ~25,7 m — com a faixa cravada em 24-28
             // o cume saia com 0,05 de diferenca das ruinas e os dois POIs viravam a mesma mancha
-            // vistos de 200 m (o teste de leitura aerea barra em 0,10).
-            c = Color.Lerp(c, CorPico, Suave(PicoH + 4f, PicoH + 8f, h) * 0.72f);
+            // vistos de 200 m (o teste de leitura aerea barra em 0,10). A mancha de regiao puxa
+            // parte da tampa para terra quente: variacao que se le' do alto. A de perto (pedra
+            // gasta, liquen, fissura, estrato) e' do shader (_Chao), por cima desta.
+            Color tampa = Color.Lerp(CorPico, CorLama, Suave(0.40f, 0.75f, fine) * 0.25f);
+            c = Color.Lerp(c, tampa, Suave(PicoH + 4f, PicoH + 8f, h) * 0.78f);
             // 6) praia em dois degraus, limiar puxado por ruido; a lama (ao quadrado) suprime
             float beach = 4.6f + 1.4f * ruido.Amostra(x * invEscala * 2.6f - 55f, z * invEscala * 2.6f + 210f);
             float dry = (1f - w.Lama) * (1f - w.Lama);

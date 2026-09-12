@@ -398,13 +398,16 @@ namespace Arkana.Gameplay
         {
             _morto = true;
             Stick = Vector2.zero; EncararDir = Vector3.zero; YawAlvo = null;
-            Tocar("idle");
+            Tocar("derrubado");   // deitado: o VisualDoAbate afunda o corpo, e em pe' ele descia como elevador
             if (Visual != null) Visual.SetTint(TINT_MORTO);
+            // o corpo afunda e some (VisualDoAbate): o colisor em pe' viraria parede invisivel para o passo, a camera e a mira
+            if (_cc != null) _cc.enabled = false;
         }
 
         private void Reviver()
         {
             _morto = false;
+            if (_cc != null) _cc.enabled = true;
             if (Visual != null) Visual.SetTint(_tint);
         }
     }

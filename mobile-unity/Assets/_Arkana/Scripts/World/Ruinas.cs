@@ -158,8 +158,8 @@ namespace Arkana.World
             if (rocha == null) Filho("Rochedos", b.ParaMesh("Rochedos", linear), pedra, ShadowCastingMode.Off);
         }
 
-        /// <summary>Limites do molde na origem, sem giro (o que o glb traz de hierarquia conta junto).</summary>
-        static Bounds Limites(GameObject prefab)
+        /// <summary>Limites do molde na origem, sem giro (o que o glb traz de hierarquia conta junto). Os pedregulhos da Vegetacao medem por aqui.</summary>
+        internal static Bounds Limites(GameObject prefab)
         {
             GameObject tmp = Instantiate(prefab);
             Renderer[] rs = tmp.GetComponentsInChildren<Renderer>();

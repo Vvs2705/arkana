@@ -5,7 +5,8 @@ using Arkana.UI;
 
 namespace Arkana.Tests
 {
-    /// <summary>HUD pura: rotulo da arma some em 2,5 s; maos nuas escondem o carrossel; kill feed com nome; TREINO no relogio;
+    /// <summary>HUD pura: rotulo da arma some em 2,5 s; maos nuas escondem o carrossel; kill feed com nome; faixa do abate que
+    /// carimba e some; TREINO no relogio;
     /// numeros com merge; prioridade da faixa; cooldown interpolado; pausa DENTRO da tela; alvos &gt;= 48dp; daltonismo.</summary>
     public class UiHudLogicaTests
     {
@@ -106,6 +107,31 @@ namespace Arkana.Tests
             Assert.IsFalse(novo);
             Assert.IsTrue(HudLogica.Grande(n), "a soma passou do limiar: golpe grande");
             Assert.AreEqual(HudLogica.PuloPicoGrande, HudLogica.Pulo(n, _h.Agora), 1e-4f, "o golpe somado pula de novo, e o grande pula mais");
+        }
+
+        [Test]
+        public void FaixaDoAbateCarimbaLeESome()
+        {
+            Assert.IsFalse(_h.EliminadoVisivel, "sem abate, sem faixa");
+            _h.Abater("Pyra");
+            Assert.IsTrue(_h.EliminadoVisivel);
+            Assert.AreEqual("Pyra", _h.Eliminado);
+            Assert.AreEqual(HudLogica.EliminadoPico, _h.EliminadoEscala, 1e-4f, "nasce no pico (o carimbo)");
+            _h.Tick(HudLogica.EliminadoPuloS);
+            Assert.AreEqual(1f, _h.EliminadoEscala, 1e-4f, "assenta em 1");
+            Assert.AreEqual(1f, _h.EliminadoAlfa, 1e-4f, "no meio le' inteira");
+            _h.Tick(HudLogica.EliminadoS - HudLogica.EliminadoPuloS - HudLogica.EliminadoSaiS * 0.5f);
+            Assert.Greater(_h.EliminadoAlfa, 0f);
+            Assert.Less(_h.EliminadoAlfa, 1f, "esvaece no fim");
+            _h.Abater("Tessa");
+            Assert.AreEqual("Tessa", _h.Eliminado, "abate seguido reescreve");
+            Assert.AreEqual(HudLogica.EliminadoPico, _h.EliminadoEscala, 1e-4f, "e carimba de novo");
+            _h.Tick(HudLogica.EliminadoS + 0.01f);
+            Assert.IsFalse(_h.EliminadoVisivel, "some sozinha");
+            Assert.AreEqual(0f, _h.EliminadoAlfa);
+            _h.Abater("Veu");
+            _h.MaosNuas();
+            Assert.IsFalse(_h.EliminadoVisivel, "partida nova nao herda a faixa");
         }
 
         [Test]

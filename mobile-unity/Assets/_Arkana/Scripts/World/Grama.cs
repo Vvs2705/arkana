@@ -265,7 +265,9 @@ namespace Arkana.World
             return lista;
         }
 
-        /// <summary>Seixo: o degrau de escala entre a lamina (0,5 m) e o rochedo (2 m) — sem ele o chao parece maquete.</summary>
+        /// <summary>Seixo: o degrau de escala entre a lamina (0,5 m) e o rochedo (2 m) — sem ele o chao parece maquete.
+        /// O CUME do pico ganha leva propria (onda 5B): acima de 12,5 m nao nasce grama e acima de 13 nao nascia seixo, e e'
+        /// la' que o treino acontece — a tampa lisa de 9 mil m2 lia como gesso (fotos 02 e 18).</summary>
         public static List<Tufo> Seixos(GradeDoChao g, int seed = 81)
         {
             Relevo r = g.Relevo;
@@ -280,18 +282,37 @@ namespace Arkana.World
                 if (p.magnitude > L || Vector2.Distance(p, r.Lago) < r.LagoR - 1f) continue;
                 float h = g.AlturaNaMalha(p.x, p.y);
                 if (h < 0.15f || h > 13f) continue;
-                float sc = rng.Faixa(0.09f, 0.26f);
-                var giro = new Vector3(rng.Faixa(-23f, 23f), rng.Faixa(0f, 360f), rng.Faixa(-23f, 23f));
-                float v = rng.Faixa(-0.18f, 0.18f);
-                lista.Add(new Tufo
-                {
-                    Pos = new Vector3(p.x, h + sc * 0.15f, p.y),
-                    Giro = giro,
-                    Escala = new Vector3(sc * rng.Faixa(1f, 1.8f), sc * 0.6f, sc),
-                    Tinta = new Color(1f + v, 1f + v * 0.9f, 1f + v * 0.7f, 1f),
-                });
+                lista.Add(Seixo(rng, p, h, 0.09f, 0.26f));
+            }
+            // o cume: no disco do pico, so' na TAMPA (o corte do Bioma.Pico), maiores para ler da camera de 3a pessoa
+            int alvo = lista.Count + (int)(250 * area);   // KNOB: ~1 seixo a cada 3 m, por foto
+            tentativas = 0;
+            while (lista.Count < alvo && tentativas < (int)(4000 * area))
+            {
+                tentativas++;
+                Vector2 p = r.Pico + new Vector2(rng.Faixa(-1f, 1f), rng.Faixa(-1f, 1f)) * r.PicoR;
+                float h = g.AlturaNaMalha(p.x, p.y);
+                if (h < Relevo.PicoH + 4f || g.NormalY(p.x, p.y) < 0.8f) continue;
+                Tufo s = Seixo(rng, p, h, 0.1f, 0.34f);
+                // basalto, da familia da rocha da Meshy ao lado: o cinza claro sumia na tampa clara e lia como lasca de papel (foto 28)
+                s.Tinta = new Color(s.Tinta.r * 0.5f, s.Tinta.g * 0.48f, s.Tinta.b * 0.46f, 1f);
+                lista.Add(s);
             }
             return lista;
+        }
+
+        static Tufo Seixo(Sorteio rng, Vector2 p, float h, float min, float max)
+        {
+            float sc = rng.Faixa(min, max);
+            var giro = new Vector3(rng.Faixa(-23f, 23f), rng.Faixa(0f, 360f), rng.Faixa(-23f, 23f));
+            float v = rng.Faixa(-0.18f, 0.18f);
+            return new Tufo
+            {
+                Pos = new Vector3(p.x, h + sc * 0.15f, p.y),
+                Giro = giro,
+                Escala = new Vector3(sc * rng.Faixa(1f, 1.8f), sc * 0.6f, sc),
+                Tinta = new Color(1f + v, 1f + v * 0.9f, 1f + v * 0.7f, 1f),
+            };
         }
     }
 

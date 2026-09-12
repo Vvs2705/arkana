@@ -187,12 +187,17 @@ namespace Arkana.World
     /// origem, o corte por distancia era tudo-ou-nada e so' funcionava na vertical. Aqui o
     /// frustum corta pelo bounds da celula e a distancia corta a moita a 95 m, na horizontal.
     /// Arvore e' dado VIVO: o terreno reativo queima a floresta (GDD §14) por MarcarQueimada(i).
+    /// PEDREGULHO (onda 5B): a rocha da Meshy no lugar do blob marrom ("piramide de papelao" na foto 02), um
+    /// GameObject por pedra no load, filho da celula; sem o .glb, volta o blob na malha da celula.
     /// </summary>
     public sealed class Vegetacao : MonoBehaviour
     {
         /// <summary>Moita e' cobertura de combate: some so' a 95 m. Arvore e rocha nunca somem (leem-se da queda).</summary>
         public const float CorteMoitas = 95f;
         const float RaioTronco = 0.38f, AlturaTronco = 3f;
+        /// <summary>A rocha dos pedregulhos: a 18 (Emberstone Outcrop) SOLDADA e decimada a 1K tris. Sem ela, a de 3K dos
+        /// rochedos do mar (Ruinas.RochaDoMar); sem as duas, o blob.</summary>
+        public const string RochaDoPedregulho = "18-pedregulho";
 
         sealed class Celula
         {
@@ -220,8 +225,12 @@ namespace Arkana.World
         readonly List<bool> arvQueimada = new List<bool>();
         readonly List<CapsuleCollider> arvColisor = new List<CapsuleCollider>();
         readonly List<Matrix4x4> rocM = new List<Matrix4x4>();
+        readonly List<Matrix4x4> rocVis = new List<Matrix4x4>();   // a matriz do MOLDE da Meshy, por rocha (vazia = blob)
         readonly List<Matrix4x4> moiM = new List<Matrix4x4>();
         readonly List<Color> moiTinta = new List<Color>();
+        GameObject rocha;
+        Bounds moldeRocha;
+        static readonly Material[] matRocha = new Material[9];   // um por Bioma: 6 materiais para as 232 pedras (SRP Batcher)
         float relogio;
 
         public int ContarArvores() => arvPos.Count;
@@ -229,6 +238,8 @@ namespace Arkana.World
         public bool EstaQueimada(int i) => i >= 0 && i < arvQueimada.Count && arvQueimada[i];
         public int ContarRochas() => rocM.Count;
         public int ContarMoitas() => moiM.Count;
+        /// <summary>De onde saiu a pedra: RochaDoPedregulho, Ruinas.RochaDoMar ou "blob" (diag da foto).</summary>
+        public string MoldeDasRochas { get; private set; }
 
         /// <summary>Fogo consumiu a arvore `i`: a copa SOME, sobra o toco e o tronco deixa de colidir. `false` restaura (restart).</summary>
         public void MarcarQueimada(int i, bool queimada = true)
@@ -248,8 +259,10 @@ namespace Arkana.World
             protoToco = ProtoToco();
             protoRocha = ProtoBlob(13, Vector3.zero, new Vector3(1f, 0.75f, 1f), Relevo.CorPedregulho, 0.3f);
             protoMoita = ProtoMoita();
+            rocha = MoldeDaRocha(out moldeRocha);
+            MoldeDasRochas = rocha != null ? rocha.name : "blob";
             arvPos.Clear(); arvM.Clear(); arvTinta.Clear(); arvQueimada.Clear(); arvColisor.Clear();
-            rocM.Clear(); moiM.Clear(); moiTinta.Clear();
+            rocM.Clear(); rocVis.Clear(); moiM.Clear(); moiTinta.Clear();
             PlantarArvores();
             PlantarRochas();
             PlantarMoitas();
@@ -315,11 +328,25 @@ namespace Arkana.World
 
         void PlantarRochas()
         {
+            rocM.AddRange(PlantioDasRochas(relevo));
+            if (rocha == null) return;
+            // sorteio proprio: a variacao da pedra nao mexe no lugar de nenhuma (o rng 51 segue o de sempre)
+            var rng = new Sorteio(52);
+            for (int i = 0; i < rocM.Count; i++) rocVis.Add(AssentarRocha(relevo, rocM[i], moldeRocha, rng));
+        }
+
+        /// <summary>
+        /// Os pedregulhos da ilha, PURO por seed: a matriz do blob (centro em h + 0,1, giro em Y, escala (s, 0,75 s, s)).
+        /// E' ela que manda no colisor (esfera de 0,8 s acima de s = 1,4) e na celula; a rocha da Meshy so' veste.
+        /// </summary>
+        public static List<Matrix4x4> PlantioDasRochas(Relevo relevo)
+        {
+            var lista = new List<Matrix4x4>();
             var rng = new Sorteio(51);
             float area = relevo.Escala * relevo.Escala;
             float L = relevo.RaioTerra;
             int tries = 0;
-            while (rocM.Count < (int)(58 * area) && tries < (int)(3200 * area))
+            while (lista.Count < (int)(58 * area) && tries < (int)(3200 * area))
             {
                 tries++;
                 Vector2 p = new Vector2(rng.Faixa(-L, L), rng.Faixa(-L, L));
@@ -330,9 +357,63 @@ namespace Arkana.World
                 bool praia = h > 0.25f && h < 1f;
                 if (!(morro || praia)) continue;
                 float s = rng.Faixa(0.5f, 2.2f);
-                rocM.Add(Matrix4x4.TRS(new Vector3(p.x, h + 0.1f, p.y), Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f),
+                lista.Add(Matrix4x4.TRS(new Vector3(p.x, h + 0.1f, p.y), Quaternion.Euler(0f, rng.Faixa(0f, 360f), 0f),
                     new Vector3(s, s * 0.75f, s)));
             }
+            return lista;
+        }
+
+        /// <summary>
+        /// A ROCHA DA MESHY assentada no lugar do blob, PURA: a matriz do molde (`molde` = limites do .glb na origem) a partir
+        /// da matriz do blob `rocha`. Ocupa a CAIXA do blob (largura 2 s, altura 1,5 x 0,75 s — a conta dos rochedos do mar),
+        /// variando por eixo; a base deita 70% na encosta larga (+ ate' ~5 graus sorteados) e TODA a base (3x3 pontos) fica
+        /// `afunda` abaixo do chao DESENHADO. Pousada pelo centro, a pedra da encosta mostra fresta sob a quina de baixo.
+        /// </summary>
+        public static Matrix4x4 AssentarRocha(Relevo relevo, Matrix4x4 rocha, Bounds molde, Sorteio rng)
+        {
+            Vector3 pos = rocha.GetColumn(3);
+            float s = rocha.GetColumn(0).magnitude;
+            // KNOB: variacao por eixo (+-15% na largura, +-20% na altura), afundamento e tombo, por foto
+            var caixa = new Vector3(2f * s * rng.Faixa(0.85f, 1.15f), 1.5f * rocha.GetColumn(1).magnitude * rng.Faixa(0.8f, 1.2f),
+                2f * s * rng.Faixa(0.85f, 1.15f));
+            float afunda = caixa.y * rng.Faixa(0.15f, 0.35f);
+            var tombo = new Vector3(rng.Faixa(-0.08f, 0.08f), 0f, rng.Faixa(-0.08f, 0.08f));
+
+            // a encosta pela PEGADA inteira (+-s), nao pela normal do vertice, que pula nas cristas do pico
+            float dx = ChaoDesenhado(relevo, pos.x - s, pos.z) - ChaoDesenhado(relevo, pos.x + s, pos.z);
+            float dz = ChaoDesenhado(relevo, pos.x, pos.z - s) - ChaoDesenhado(relevo, pos.x, pos.z + s);
+            Vector3 cima = (Vector3.Lerp(Vector3.up, new Vector3(dx, 2f * s, dz).normalized, 0.7f) + tombo).normalized;
+            Vector3 lado = Vector3.Cross(cima, rocha.GetColumn(2)).normalized;   // o giro em Y do blob continua mandando
+            Vector3 frente = Vector3.Cross(lado, cima);
+            Matrix4x4 rs = new Matrix4x4(lado, cima, frente, new Vector4(0f, 0f, 0f, 1f))
+                * Matrix4x4.Scale(new Vector3(caixa.x / molde.size.x, caixa.y / molde.size.y, caixa.z / molde.size.z));
+
+            // o centro do molde cai no lugar do blob; a altura sai da base: o ponto menos enterrado fica `afunda` abaixo
+            Vector3 c = rs.MultiplyPoint3x4(molde.center);
+            float x0 = pos.x - c.x, z0 = pos.z - c.z, y0 = float.MaxValue;
+            for (int i = 0; i < 3; i++)
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 o = rs.MultiplyPoint3x4(new Vector3(Mathf.Lerp(molde.min.x, molde.max.x, i * 0.5f), molde.min.y,
+                        Mathf.Lerp(molde.min.z, molde.max.z, k * 0.5f)));
+                    y0 = Mathf.Min(y0, ChaoDesenhado(relevo, x0 + o.x, z0 + o.z) - o.y);
+                }
+            return Matrix4x4.Translate(new Vector3(x0, y0 - afunda, z0)) * rs;
+        }
+
+        /// <summary>Altura do chao DESENHADO (a malha de Ilha.Quads, a divisao de triangulo da Ilha, que o GradeDoChao repete)
+        /// sem montar a grade: 4 Altura() por consulta. Nos sitios das rochas a Altura() exata passa ate' 0,23 m da malha (medido).</summary>
+        static float ChaoDesenhado(Relevo r, float x, float z)
+        {
+            int q = Ilha.Quads;
+            float fx = Mathf.Clamp((x / r.Lado + 0.5f) * q, 0f, q - 1e-4f), fz = Mathf.Clamp((z / r.Lado + 0.5f) * q, 0f, q - 1e-4f);
+            int ix = (int)fx, iz = (int)fz;
+            float u = fx - ix, v = fz - iz;
+            float xa = ((float)ix / q - 0.5f) * r.Lado, xb = ((float)(ix + 1) / q - 0.5f) * r.Lado;
+            float za = ((float)iz / q - 0.5f) * r.Lado, zc = ((float)(iz + 1) / q - 0.5f) * r.Lado;
+            float ha = r.Altura(xa, za), hb = r.Altura(xb, za), hc = r.Altura(xa, zc), hd = r.Altura(xb, zc);
+            if (u + v <= 1f) return ha + (hb - ha) * u + (hc - ha) * v;
+            return hd + (hc - hd) * (1f - u) + (hb - hd) * (1f - v);
         }
 
         void PlantarMoitas()
@@ -417,6 +498,7 @@ namespace Arkana.World
                 }
                 for (int j = 0; j < c.Rochas.Count; j++)
                 {
+                    if (rocha != null) Pedregulho(c.Go.transform, c.Rochas[j]);
                     Matrix4x4 m = rocM[c.Rochas[j]];
                     float s = m.GetColumn(0).magnitude;
                     if (s <= 1.4f) continue;
@@ -454,7 +536,67 @@ namespace Arkana.World
             return cels[k];
         }
 
-        /// <summary>Arvores (ou tocos, se queimadas) + rochas da celula numa malha so', em coordenada local.</summary>
+        /// <summary>A rocha `i` da Meshy, filha da celula: nasce no load (nunca por evento), com o material do bioma dela.</summary>
+        void Pedregulho(Transform celula, int i)
+        {
+            Matrix4x4 m = rocVis[i];
+            GameObject go = Instantiate(rocha, celula);
+            go.name = "Pedregulho";
+            go.transform.SetPositionAndRotation(m.GetColumn(3), Quaternion.LookRotation(m.GetColumn(2), m.GetColumn(1)));
+            go.transform.localScale = Vector3.Scale(go.transform.localScale,
+                new Vector3(m.GetColumn(0).magnitude, m.GetColumn(1).magnitude, m.GetColumn(2).magnitude));
+            Vector3 p = rocM[i].GetColumn(3);
+            Bioma b = relevo.BiomaEm(p.x, p.z);
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>())
+            {
+                Material tom = MaterialDaRocha(b, r.sharedMaterial);
+                if (tom != null) r.sharedMaterial = tom;
+                r.shadowCastingMode = ShadowCastingMode.On;   // o blob fazia sombra (malha da celula); a pedra continua fazendo
+            }
+        }
+
+        /// <summary>
+        /// O material da Meshy com o TOM DO BIOMA (multiplica a textura, que e' o basalto quase preto do kit: mediana 0,11)
+        /// e fosco: o 0,5 de rugosidade do .glb deixa pedra com cara de plastico, o kit usa 0,25 de liso (KitCenario.Domado).
+        /// Copia do importado — nunca altera o asset. KNOB: os tons, por foto.
+        /// </summary>
+        static Material MaterialDaRocha(Bioma b, Material original)
+        {
+            if (original == null) return null;
+            // ponytail: cache por bioma, nao por original — um material por .glb (a Meshy entrega um); peca multi-material pediria a chave dupla
+            if (matRocha[(int)b] != null) return matRocha[(int)b];
+            var m = new Material(original) { name = "Pedregulho" + b };
+            Color tom;
+            switch (b)
+            {
+                case Bioma.Pico: tom = new Color(1.3f, 1.36f, 1.48f); break;     // cume frio e claro: pedra preta na tampa branca vira buraco
+                case Bioma.Praia: case Bioma.Dunas: tom = new Color(1.5f, 1.36f, 1.12f); break;   // lavada de sol e de sal
+                case Bioma.Campina: case Bioma.Floresta: tom = new Color(1.12f, 1.32f, 0.98f); break;   // musgo
+                case Bioma.Ruinas: tom = new Color(1.36f, 1.3f, 1.2f); break;   // o cinza quente das colunas (CorRuina)
+                default: tom = new Color(1.25f, 1.25f, 1.25f); break;             // encosta: o basalto do kit, um tom acima
+            }
+            if (m.HasProperty("baseColorFactor")) m.SetColor("baseColorFactor", tom);   // glTFast
+            else if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", tom);
+            if (m.HasProperty("roughnessFactor")) m.SetFloat("roughnessFactor", 0.75f);
+            else if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.25f);
+            return matRocha[(int)b] = m;
+        }
+
+        /// <summary>O .glb da rocha e os limites dele na origem; null = nenhum dos dois em Resources (fica o blob).</summary>
+        static GameObject MoldeDaRocha(out Bounds molde)
+        {
+            foreach (string nome in new[] { RochaDoPedregulho, Ruinas.RochaDoMar })
+            {
+                GameObject g = Resources.Load<GameObject>(nome);
+                if (g == null) continue;
+                molde = Ruinas.Limites(g);
+                if (molde.size.x > 0.001f && molde.size.y > 0.001f && molde.size.z > 0.001f) return g;
+            }
+            molde = new Bounds();
+            return null;
+        }
+
+        /// <summary>Arvores (ou tocos, se queimadas) + rochas-blob da celula numa malha so', em coordenada local.</summary>
         void RemontarCelula(int k)
         {
             Celula c = cels != null && k >= 0 && k < cels.Length ? cels[k] : null;
@@ -477,7 +619,7 @@ namespace Arkana.World
                     buf.Adicionar(protoArvore, m, arvTinta[i]);
                 }
             }
-            for (int j = 0; j < c.Rochas.Count; j++)
+            for (int j = 0; j < c.Rochas.Count && rocha == null; j++)
             {
                 Matrix4x4 m = rocM[c.Rochas[j]];
                 m.SetColumn(3, m.GetColumn(3) - off);

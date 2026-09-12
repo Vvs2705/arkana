@@ -206,6 +206,47 @@ namespace Arkana.Tests
             Assert.AreNotEqual(PlantioDaGrama.Flores(Grade, 72)[0].Pos, a[0].Pos, "seed diferente, flor diferente");
         }
 
+        // ---------------------------------------------------------------- pedregulhos (onda 5B)
+
+        [Test]
+        public void Pedregulho_RochaDaMeshyAssentaNaMalha_DentroDaCaixaDoBlob()
+        {
+            // defeitos: assentar pelo centro (na encosta de 0,6 a quina de baixo boia: fresta sob a pedra); pela Altura() exata
+            // (ate' 0,23 m acima da malha nas cristas); escalar so' pelo molde (pedra gigante, ou seixo onde o colisor de 0,8 s
+            // promete obstaculo); afundar demais (a pedra some no morro)
+            var molde = new Bounds(new Vector3(0.003f, 0.2365f, 0f), new Vector3(0.952f, 0.473f, 1f));   // o 18-pedregulho.glb no Unity
+            List<Matrix4x4> rochas = Vegetacao.PlantioDasRochas(Relevo2);
+            Assert.AreEqual(232, rochas.Count, "58 x AREA na ilha de 600 m");
+            var rng = new Sorteio(52);
+            foreach (Matrix4x4 r in rochas)
+            {
+                Matrix4x4 m = Vegetacao.AssentarRocha(Relevo2, r, molde, rng);
+                Vector3 pos = r.GetColumn(3);
+                float s = r.GetColumn(0).magnitude, altura = m.GetColumn(1).magnitude * molde.size.y;
+                for (int i = 0; i < 3; i++)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        Vector3 b = m.MultiplyPoint3x4(new Vector3(Mathf.Lerp(molde.min.x, molde.max.x, i * 0.5f), molde.min.y,
+                            Mathf.Lerp(molde.min.z, molde.max.z, k * 0.5f)));
+                        Assert.LessOrEqual(b.y, Grade.AlturaNaMalha(b.x, b.z) - 0.1f * altura, "base boiando na pedra de " + pos);
+                    }
+                Vector3 topo = m.MultiplyPoint3x4(new Vector3(molde.center.x, molde.max.y, molde.center.z));
+                Assert.Greater(topo.y - Grade.AlturaNaMalha(topo.x, topo.z), 0.15f * altura, "pedra engolida pelo chao em " + pos);
+                Assert.That(m.GetColumn(0).magnitude * molde.size.x / (2f * s), Is.InRange(0.84f, 1.16f), "largura fora do blob em " + pos);
+                Assert.That(altura / (1.125f * s), Is.InRange(0.79f, 1.21f), "altura fora do blob em " + pos);
+            }
+        }
+
+        [Test]
+        public void Seixo_ATampaDoPicoTemSeixo()
+        {
+            // defeito: o teto de 13 m do seixo (e o de 12,5 da grama) deixava lisa a tampa do pico, onde o treino acontece
+            int cume = 0;
+            foreach (Tufo t in PlantioDaGrama.Seixos(Grade))
+                if (t.Pos.y > Relevo.PicoH + 4f) cume++;
+            Assert.Greater(cume, 800, "seixos na tampa do pico: " + cume);
+        }
+
         // ---------------------------------------------------------------- culling
 
         [Test]

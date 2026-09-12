@@ -51,10 +51,22 @@ razao = min(1.0, tris_alvo / max(tris_atual, 1))
 print(f"[otimizar] {entrada}: {tris_atual} tris -> alvo {tris_alvo} (razao {razao:.4f})")
 
 if tris_alvo > 0:
+    # SOLDA antes de decimar (onda 5B, 12/09): o glb do remesh chega em ~900 ILHAS soltas (o glTF duplica o vertice em
+    # toda costura de UV/normal e o importador nao junta, nem com merge_vertices=True). O COLLAPSE decima cada ilha
+    # sozinha: era ISSO que estilhacava a rocha, nao a razao. Solda por distancia, limpa a normal importada, decima e
+    # refaz a normal por angulo. So' quando decima: com tris_alvo = 0 a normal do remesh fica como veio.
+    import bmesh, math
+    bm = bmesh.new(); bm.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    bm.to_mesh(obj.data); bm.free()
+    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    tris_atual = sum(len(p.vertices) - 2 for p in obj.data.polygons)
+    razao = min(1.0, tris_alvo / max(tris_atual, 1))
     mod = obj.modifiers.new("Decimar", "DECIMATE")
     mod.decimate_type = "COLLAPSE"
     mod.ratio = razao
     bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))   # KNOB: aresta de pedra viva x face lisa
 
 if tex_max > 0:
     # so' a cor base (e o que `manter` pedir) fica ligada no BSDF; o resto sai do export

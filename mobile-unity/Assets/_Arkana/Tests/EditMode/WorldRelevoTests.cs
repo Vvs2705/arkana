@@ -284,6 +284,31 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void Cor_CumeDoPico_EhPedraQuente_ComMancha_NaoNeveLisa()
+        {
+            // DEFEITO (fotos 02/05/18 de 12/09): o cume saia branco-lilas e LISO (CorPico #dfe3ee a 0,72 por cima de tudo)
+            // e o Diretor leu placeholder. Medido: antes r-b = -0,05 e spread 0,04; agora +0,06 e 0,12. O cume e' pedra
+            // clara QUENTE com mancha de regiao — a de perto (fissura, liquen, estrato) e' do shader, fora do alcance daqui.
+            var r = Nova();
+            float sr = 0f, sb = 0f, lo = 9f, hi = 0f;
+            int n = 0;
+            for (float dx = -r.PicoTopo; dx <= r.PicoTopo; dx += 2f)
+                for (float dz = -r.PicoTopo; dz <= r.PicoTopo; dz += 2f)
+                {
+                    float x = r.Pico.x + dx, z = r.Pico.y + dz, h = r.Altura(x, z);
+                    if (h < Relevo.PicoH + 8f) continue;   // so' a tampa cheia
+                    Color c = r.Cor(x, z, h);
+                    sr += c.r; sb += c.b; n++;
+                    float s = c.r + c.g + c.b;
+                    lo = Mathf.Min(lo, s);
+                    hi = Mathf.Max(hi, s);
+                }
+            Assert.Greater(n, 50, "a tampa do pico existe");
+            Assert.Greater((sr - sb) / n, 0.03f, "cume quente (pedra e terra), nao neve azulada");
+            Assert.Greater(hi - lo, 0.09f, "o cume tem mancha que se le' do alto, nao e' uma chapa lisa");
+        }
+
+        [Test]
         public void Sorteio_EhDeterministico_EDiferePorSeed()
         {
             var a = new Sorteio(21);

@@ -10,8 +10,8 @@ namespace Arkana.UI
 {
     /// <summary>
     /// Logica PURA do que a HUD mostra e que nao e' "aviso": rotulo da arma que SOME em 2,5 s, carrossel escondido de
-    /// maos nuas e com luva travada, botao de ataque desarmado, kill feed com o NOME do mago, relogio ("TREINO" no
-    /// treino), numeros de dano com merge e hitmarker. Tick(dt) e' o relogio; nada aqui decide jogo.
+    /// maos nuas e com luva travada, botao de ataque desarmado, kill feed com o NOME do mago, faixa "ELIMINADO" que pula,
+    /// relogio ("TREINO" no treino), numeros de dano com merge e hitmarker. Tick(dt) e' o relogio; nada aqui decide jogo.
     /// </summary>
     public sealed class HudLogica
     {
@@ -25,6 +25,9 @@ namespace Arkana.UI
         public const float NumeroGrande = 25f;
         /// <summary>O PULO do numero: nasce na escala de pico a cada golpe somado e assenta em 1 em PuloS. KNOB por foto.</summary>
         public const float PuloS = 0.12f, PuloPico = 1.45f, PuloPicoGrande = 1.8f;
+        /// <summary>A FAIXA DO ABATE ("ELIMINADO: nome", centro da tela): quanto fica, entrada, saida e o PULO (nasce no pico e
+        /// assenta em 1 em EliminadoPuloS). Abate seguido reescreve e pula de novo. KNOB por foto.</summary>
+        public const float EliminadoS = 1.8f, EliminadoEntraS = 0.06f, EliminadoSaiS = 0.4f, EliminadoPuloS = 0.2f, EliminadoPico = 1.6f;
 
         /// <summary>`Golpe` = Agora do ultimo dano somado (o pulo recomeca nele).</summary>
         public sealed class Numero { public float Total; public float Nasceu; public float Ate; public float Golpe; public bool EmEscudo; public Elemento Elemento; }
@@ -38,8 +41,11 @@ namespace Arkana.UI
         /// <summary>Abates da partida inteira: o feed esquece em KillFeedS, a tela de fim nao.</summary>
         public int Abates { get; private set; }
         public float Agora { get; private set; }
+        /// <summary>Quem o jogador acabou de eliminar ("" = ninguem): a faixa central le' daqui.</summary>
+        public string Eliminado { get; private set; } = "";
 
         float _armaT = -1f;   // < 0 = sem rotulo na tela
+        float _eliminadoDesde = -99f;
         readonly Dictionary<int, Numero> _numeros = new Dictionary<int, Numero>();
         readonly List<int> _mortos = new List<int>();   // reusadas no Tick: zero lixo por quadro
         readonly Predicate<Abate> _expirou;
@@ -58,6 +64,8 @@ namespace Arkana.UI
             Abates = 0;
             _numeros.Clear();
             Hitmarker = 0f;
+            Eliminado = "";
+            _eliminadoDesde = -99f;
         }
 
         /// <summary>Equipar ACENDE o ataque; o rotulo (ja' formatado: nome + ELEMENTO) aparece e depois some.
@@ -87,6 +95,31 @@ namespace Arkana.UI
             KillFeed.Add(new Abate { Nome = nomeDoMago, Ate = Agora + KillFeedS });
             while (KillFeed.Count > KillFeedMax) KillFeed.RemoveAt(0);
             Abates++;
+            Eliminado = nomeDoMago ?? "";
+            _eliminadoDesde = Agora;
+        }
+
+        public bool EliminadoVisivel => Agora - _eliminadoDesde < EliminadoS;
+
+        /// <summary>Entra num piscar, le' inteira e esvaece nos ultimos EliminadoSaiS.</summary>
+        public float EliminadoAlfa
+        {
+            get
+            {
+                float i = Agora - _eliminadoDesde;
+                if (i >= EliminadoS) return 0f;
+                return Mathf.Min(Mathf.Clamp01(i / EliminadoEntraS), Mathf.Clamp01((EliminadoS - i) / EliminadoSaiS));
+            }
+        }
+
+        /// <summary>O CARIMBO: nasce em EliminadoPico e assenta em 1 (saida quadratica, a mesma do numero de dano).</summary>
+        public float EliminadoEscala
+        {
+            get
+            {
+                float f = Mathf.Clamp01((Agora - _eliminadoDesde) / EliminadoPuloS);
+                return 1f + (EliminadoPico - 1f) * (1f - f) * (1f - f);
+            }
         }
 
         /// <summary>Colocacao final: vencer = 1; cair com N bots de pe' = N + 1 (quem ainda esta' vivo ficou na frente).</summary>
@@ -210,6 +243,7 @@ namespace Arkana.UI
         public const string T_PAUSA_TITULO = Textos.PausaTitulo, T_RETOMAR = Textos.PausaRetomar, T_CONFIG = Textos.MenuConfig, T_ABANDONAR = Textos.PausaAbandonar;
         public const string T_ALTITUDE = "{0} m";            // ponytail: mover para Textos quando o CORE quiser
         public const string T_ABATE = "{0} derrubado";
+        public const string T_ELIMINADO = "<color=#FF6B5C>ELIMINADO:</color> {0}";   // o rotulo no vermelho do X do kill feed, o nome em branco
         public const string T_COLOCACAO = "COLOCAÇÃO", T_COLOCACAO_NUM = "#{0}", T_ABATES = "ABATES";   // idem (Textos.cs e' de outra frente hoje)
         public static IReadOnlyDictionary<string, string> Estados => Textos.HudEstados;
         static readonly Color CorZona = new Color(0.55f, 0.35f, 1f);
@@ -298,6 +332,19 @@ namespace Arkana.UI
         int _escudoNivel;
         bool _numerosDano = true;
         bool _mostraFps;
+        // faixa do abate e vinheta do caido
+        RectTransform _eliminado;
+        CanvasGroup _eliminadoGrupo;
+        Text _eliminadoTexto;
+        string _eliminadoNome;   // o nome que a placa mediu por ultimo: remede so' quando muda
+        Image _vinhetaCaido;
+        static Sprite _spriteVinheta;
+        /// <summary>dp: a faixa do abate ACIMA da mira (entre ela e a faixa de aviso do topo) e a altura da placa.</summary>
+        const float EliminadoYDp = 86f, EliminadoAlturaDp = 36f;
+        /// <summary>VINHETA DO CAIDO: alfa das bordas com o esvaecimento cheio -> quase apagado (a luz indo embora engrossa a
+        /// borda) e o pulso em Hz. Sutil de proposito: a mira e o painel de DERRUBADO continuam lendo. KNOB por foto.</summary>
+        const float VinhetaCaidoMin = 0.22f, VinhetaCaidoMax = 0.45f, VinhetaCaidoHz = 0.9f;   // 0,4-0,72 tomava a tela (foto 29)
+        static readonly Color CorVinhetaCaido = new Color(0.78f, 0.05f, 0.04f);
 
         public static Hud Criar()
         {
@@ -322,6 +369,11 @@ namespace Arkana.UI
             var gBaixo = Formas.Imagem(_raiz, "GradeBaixo", Formas.Degrade(false), new Color(0.02f, 0.025f, 0.04f, 0.26f));
             gBaixo.raycastTarget = false;
             gBaixo.rectTransform.anchorMin = Vector2.zero; gBaixo.rectTransform.anchorMax = new Vector2(1, 0.28f); gBaixo.rectTransform.offsetMin = Vector2.zero; gBaixo.rectTransform.offsetMax = Vector2.zero;
+            // vinheta do CAIDO: borda vermelha macia que pulsa e engrossa com o esvaecimento. Por BAIXO de tudo (controles e
+            // textos por cima) e na tela CHEIA: e' a borda do vidro, nao a area segura.
+            _vinhetaCaido = Formas.Imagem(_raiz, "VinhetaCaido", SpriteVinheta(), CorVinhetaCaido);
+            AreaSegura.Esticar(_vinhetaCaido.rectTransform);
+            _vinhetaCaido.enabled = false;
 
             // olhar livre: metade direita, ATRAS dos botoes (irmao anterior = raycast por baixo)
             _olhar = Formas.No(_raiz, "Olhar");
@@ -370,6 +422,7 @@ namespace Arkana.UI
             _numeros = Formas.No(_raiz, "Numeros");
             _numeros.anchorMin = Vector2.zero; _numeros.anchorMax = Vector2.one;
             _numeros.offsetMin = Vector2.zero; _numeros.offsetMax = Vector2.zero;
+            MontarEliminado();   // depois dos numeros: o carimbo do abate fica por cima do "37" que o matou
 
             // altimetro (queda): a placa, seta de queda a esquerda e os metros em negrito (era retangulo chapado na foto 07)
             _altimetroBox = Formas.No(_raiz, "Altimetro");
@@ -659,6 +712,73 @@ namespace Arkana.UI
             }
         }
 
+        // ---------- faixa do ABATE e vinheta do CAIDO ----------
+
+        /// <summary>
+        /// A faixa do ABATE no centro, acima da mira: PLACA da HUD (fio de ouro + miolo escuro) com losangos de ouro nas pontas
+        /// (a lingua da faixa de aviso), "ELIMINADO:" no vermelho do X do kill feed e o NOME em branco, e um brilho vermelho
+        /// macio atras. Entra como CARIMBO (escala de pico -> 1, HudLogica.EliminadoEscala) e esvaece. Texto e largura so'
+        /// sao refeitos quando o nome muda; por quadro, so' escala e alfa (CanvasGroup: placa, texto e brilho de uma vez).
+        /// </summary>
+        void MontarEliminado()
+        {
+            var meio = new Vector2(0.5f, 0.5f);
+            _eliminado = Formas.No(_raiz, "Eliminado");
+            Fixar(_eliminado, meio, meio, new Vector2(0f, Dp.Px(EliminadoYDp)), new Vector2(Dp.Px(200f), Dp.Px(EliminadoAlturaDp)));
+            _eliminadoGrupo = _eliminado.gameObject.AddComponent<CanvasGroup>();
+            _eliminadoGrupo.blocksRaycasts = false;   // o toque passa para o olhar livre atras
+            var brilho = Formas.Imagem(_eliminado, "Brilho", Formas.Sombra(), Formas.ComAlfa(CorAbate, 0.32f));
+            AreaSegura.Esticar(brilho.rectTransform);
+            brilho.rectTransform.offsetMin = new Vector2(-Dp.Px(46f), -Dp.Px(26f));
+            brilho.rectTransform.offsetMax = new Vector2(Dp.Px(46f), Dp.Px(26f));
+            var placa = Placa(_eliminado, "Placa", Dp.Px(9f));
+            AreaSegura.Esticar(placa.rectTransform);
+            for (int i = 0; i < 2; i++)
+            {
+                var l = Formas.Imagem(placa.transform, "Losango" + i, Formas.Losango(), Estilo.Ouro);
+                Fixar(l.rectTransform, new Vector2(i, 0.5f), meio, new Vector2((i == 0 ? 1f : -1f) * Dp.Px(13f), 0f), Vector2.one * Dp.Px(8f));
+            }
+            _eliminadoTexto = Formas.Texto(placa.transform, "Texto", "", 19f, Color.white);
+            _eliminadoTexto.fontStyle = FontStyle.Bold;
+            _eliminadoTexto.supportRichText = true;
+            _eliminadoTexto.GetComponent<Shadow>().effectDistance = new Vector2(Dp.Px(1.2f), -Dp.Px(1.2f));   // 1px some a 395 ppi
+            AreaSegura.Esticar(_eliminadoTexto.rectTransform);
+            _eliminado.gameObject.SetActive(false);
+        }
+
+        /// <summary>Nome novo na faixa: texto em MAIUSCULAS e a largura da placa segue o texto (1x por abate).</summary>
+        void PintarEliminado()
+        {
+            _eliminadoNome = Logica.Eliminado;
+            _eliminadoTexto.text = string.Format(T_ELIMINADO, _eliminadoNome.ToUpperInvariant());
+            _eliminado.sizeDelta = new Vector2(Mathf.Ceil(_eliminadoTexto.preferredWidth + Dp.Px(58f)), Dp.Px(EliminadoAlturaDp));
+        }
+
+        /// <summary>
+        /// A vinheta 64x64 gerada 1x (zero arquivo): centro VAZIO, borda cheia em superelipse (os cantos pesam mais, como a
+        /// lente escurece), smoothstep sem degrau. Branca: a cor vem da Image; esticada na tela 20:9 as laterais ficam mais
+        /// largas que o topo — e' onde o olho nao esta' lendo nada.
+        /// </summary>
+        internal static Sprite SpriteVinheta()
+        {
+            if (_spriteVinheta != null) return _spriteVinheta;
+            const int n = 64;
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "VinhetaCaido", wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float dx = Mathf.Abs((x + 0.5f) / n * 2f - 1f), dy = Mathf.Abs((y + 0.5f) / n * 2f - 1f);
+                    float d = Mathf.Sqrt(Mathf.Sqrt(dx * dx * dx * dx + dy * dy * dy * dy));
+                    float a = Mathf.Clamp01((d - 0.78f) / 0.26f);   // borda mais fina: o miolo da tela fica limpo
+                    a = a * a * (3f - 2f * a);
+                    px[y * n + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+            t.SetPixels32(px);
+            t.Apply(false, true);
+            return _spriteVinheta = Sprite.Create(t, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f);
+        }
+
         // ---------- tela de FIM (veredito) ----------
         const float FimL = 500f, FimA = 252f;   // dp da placa grande: cabe nos ~437dp de altura do Poco F4 deitado
         const float FimTituloY = 52f, FimOrnamentoY = 94f, FimChipsY = 108f, FimChipX = 72f;   // dp a partir do topo da placa
@@ -940,7 +1060,8 @@ namespace Arkana.UI
         void OnMatchStarted() { _fim.gameObject.SetActive(false); }
         void OnMatchOver(bool vitoria) { MostrarFim(vitoria); }
         void OnAbate(string nome) { Logica.Abater(nome); }
-        void OnMorreu(IEntidade e) { }
+        /// <summary>Morto nao esta' mais caido (a costura sai sem EntityReerguida): painel e vinheta saem, a tela de FIM assume.</summary>
+        void OnMorreu(IEntidade e) { if (EhJogador(e)) Aviso.Derrubar(false); }
         void OnElemento(Elemento e)
         {
             Carrossel.Selecionar(e);
@@ -1236,6 +1357,24 @@ namespace Arkana.UI
             // kill feed: linhas fixas, o texto so' e' refeito quando o abate da linha muda (era um StringBuilder por frame)
             float feedMax = _killFeed.sizeDelta.x;
             for (int i = 0; i < _abates.Length; i++) _abates[i].Pintar(i < Logica.KillFeed.Count ? Logica.KillFeed[i] : null, Logica.Agora, feedMax);
+            // faixa do abate: o carimbo (escala) e o alfa so' enquanto ela esta' no ar
+            bool elim = Logica.EliminadoVisivel;
+            if (_eliminado.gameObject.activeSelf != elim) _eliminado.gameObject.SetActive(elim);
+            if (elim)
+            {
+                if (_eliminadoNome != Logica.Eliminado) PintarEliminado();
+                float s = Logica.EliminadoEscala;
+                _eliminado.localScale = new Vector3(s, s, 1f);
+                _eliminadoGrupo.alpha = Logica.EliminadoAlfa;
+            }
+            // vinheta do caido: pulsa devagar e engrossa conforme a luz esvaece (alfa pelo CanvasRenderer: nao refaz malha)
+            bool caido = Aviso.Caido;
+            if (_vinhetaCaido.enabled != caido) _vinhetaCaido.enabled = caido;
+            if (caido)
+            {
+                float bate = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * VinhetaCaidoHz * 2f * Mathf.PI);
+                _vinhetaCaido.canvasRenderer.SetAlpha(Mathf.Lerp(VinhetaCaidoMin, VinhetaCaidoMax, 1f - Aviso.Esvaecimento) * (0.8f + 0.2f * bate));
+            }
             // numeros de dano: PULAM a cada golpe (HudLogica.Pulo), sobem FREANDO (rapido no nascimento, param no fim) e so'
             // somem na fracao final. Alfa pelo CanvasRenderer e pulo pela escala: nao refaz a malha do texto + contorno por quadro.
             float vidaS = Mathf.Max((float)Balance.Feedback.NumLifeS, 0.01f);

@@ -597,5 +597,248 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), "25-estouros: particulas vivas=" + n + "\n");
             Assert.Greater(n, 0, "os estouros nascem");
         }
+
+        /// <summary>
+        /// Os PEDREGULHOS da Meshy (onda 5B) no lugar dos blobs marrons: o quadro do treino (a "piramide de papelao" da foto
+        /// 02), o grupo de pedras mais cheio perto do jogador com a camera baixa (onde pedra boiando ou estilhacada aparece ou
+        /// nao aparece) e o chao do cume do pico com os seixos novos.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Pedras_TreinoPertoECume()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Assert.IsNotNull(ilha.Vegetacao, "sem vegetacao");
+
+            // 1) o quadro do jogador, o mesmo da foto 02
+            Foto(main.Player.Camera.Cam, "27-pedras-treino", true);
+            Diagnostico(main, "27-pedras-treino");
+
+            // 2) o grupo mais cheio perto do jogador: vizinhos a 12 m valem 25 m de distancia cada
+            var pedras = new System.Collections.Generic.List<Renderer>();
+            foreach (Transform t in ilha.Vegetacao.GetComponentsInChildren<Transform>())
+            {
+                if (t.name != "Pedregulho") continue;
+                Renderer r = t.GetComponentInChildren<Renderer>();   // o glTFast poe o renderer na raiz ou num filho
+                if (r != null) pedras.Add(r);
+            }
+            var sb = new System.Text.StringBuilder("27-pedras: molde=" + ilha.Vegetacao.MoldeDasRochas + " pedregulhos=" + pedras.Count
+                + " rochas=" + ilha.Vegetacao.ContarRochas() + " seixos=" + (ilha.Grama != null ? ilha.Grama.Contar("Seixos") : 0) + "\n");
+            Assert.Greater(pedras.Count, 0, "nenhum pedregulho da Meshy (molde " + ilha.Vegetacao.MoldeDasRochas + ")");
+            Vector3 p = main.Player.Pawn.Pos;
+            Renderer melhor = null;
+            float nota = float.MinValue;
+            foreach (Renderer a in pedras)
+            {
+                int viz = 0;
+                foreach (Renderer b in pedras) if ((a.bounds.center - b.bounds.center).sqrMagnitude < 144f) viz++;
+                float n = viz * 25f - Vector3.Distance(a.bounds.center, p);
+                if (n > nota) { nota = n; melhor = a; }
+            }
+            Bounds lim = melhor.bounds;
+            MeshFilter mf = melhor.GetComponent<MeshFilter>();
+            sb.AppendLine("  grupo: centro=" + lim.center.ToString("F1") + " tam=" + lim.size.ToString("F1") + " dist ao jogador="
+                + Vector3.Distance(lim.center, p).ToString("F0") + " tris do molde=" + (mf != null && mf.sharedMesh != null ? mf.sharedMesh.GetIndexCount(0) / 3 : 0)
+                + " mat=" + (melhor.sharedMaterial != null ? melhor.sharedMaterial.name + " / " + melhor.sharedMaterial.shader.name : "NULL")
+                + " sombra=" + melhor.shadowCastingMode);
+            // do lado do centro da ilha olhando para fora: a pedra recorta contra o ceu e o mar
+            Vector3 praCentro = new Vector3(-lim.center.x, 0f, -lim.center.z).normalized;
+            if (praCentro.sqrMagnitude < 0.5f) praCentro = Vector3.right;
+            Vector3 olho = lim.center + praCentro * Mathf.Max(6f, lim.extents.magnitude * 3f);
+            olho.y = Mathf.Max(Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.8f, lim.center.y + 0.6f);
+            Camera cam = CameraTemporaria("CamFotoPedras", olho, lim.center, Color.gray);
+            Foto(cam, "27-pedras-perto", false);
+            Object.Destroy(cam.gameObject);
+
+            // 3) o chao do cume: os seixos quebram a tampa lisa (a camera do ombro, um pouco mais baixa e mais perto)
+            cam = CameraTemporaria("CamFotoCume", p + new Vector3(-3f, 1.9f, -3.5f), p + new Vector3(2f, 0f, 4f), Color.gray);
+            Foto(cam, "27-pedras-cume", false);
+            Object.Destroy(cam.gameObject);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
+        /// <summary>
+        /// SOMBRA E PROFUNDIDADE (onda 5C): a sombra do mago pela camera do jogador no treino, o pe' dele de perto (o mago
+        /// tem de PISAR na sombra, sem vao) e as ruinas com sombra e SSAO. As tres cameras olham a ~60 graus do sol, com a
+        /// sombra caindo para a DIREITA do quadro: inteira na foto, longe do joystick e sem se esconder atras do mago.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Sombra_PertoPeCenario()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);   // e da' tempo de o editor compilar as variantes novas (cascata + macia)
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Assert.IsNotNull(sol, "sem sol");
+            Vector3 l = sol.transform.forward; l.y = 0f; l.Normalize();                    // para onde a sombra cai
+            Vector3 v = (l * 0.5f + new Vector3(-l.z, 0f, l.x) * 0.87f).normalized;        // olhar a 60 graus do sol
+
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(v.x, v.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            yield return Esperar(1f);   // a camera assenta no yaw novo
+            Foto(main.Player.Camera.Cam, "28-sombra-perto", true);
+            Diagnostico(main, "28-sombra-perto");
+
+            Vector3 p = main.Player.Pawn.Pos;
+            Camera pe = CameraTemporaria("CamFotoSombraPe", p - v * 3.2f + Vector3.up * 1.3f, p + v * 0.6f + Vector3.up * 0.3f, Color.gray);
+            Foto(pe, "28-sombra-pe", false);
+            Object.Destroy(pe.gameObject);
+
+            // o ARCO das ruinas (5 m: sombra de ~9 m com o sol a 30 graus) a 16 m, dentro da 3a cascata; sem arco, o centro
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            if (ilha.Kit != null)
+                foreach (Renderer r in ilha.Kit.GetComponentsInChildren<Renderer>(true)) r.enabled = true;   // o corte mede a camera do jogador
+            GameObject arco = GameObject.Find("22-arco-partido");
+            Vector2 ru = ilha.Relevo.Ruinas;
+            Vector3 alvo = arco != null ? arco.transform.position : new Vector3(ru.x, Arkana.World.Ilha.AlturaDoChao(ru.x, ru.y), ru.y);
+            Vector3 c = alvo - v * 16f;
+            c.y = Arkana.World.Ilha.AlturaDoChao(c.x, c.z) + 5f;
+            Camera cen = CameraTemporaria("CamFotoSombraCenario", c, alvo + Vector3.up * 1.5f, Color.gray);
+            Foto(cen, "28-sombra-cenario", false);
+            Object.Destroy(cen.gameObject);
+
+            Light luz = sol.GetComponent<Light>();
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), "28-sombra: " + Arkana.World.Sol.Estado()
+                + " alcance=" + QualitySettings.shadowDistance.ToString("F0") + "m luz=" + luz.shadows + " forca=" + luz.shadowStrength.ToString("F2")
+                + " queda-da-sombra=" + l.ToString("F2") + " pawn=" + p.ToString("F1")
+                + " cenario: " + (arco != null ? "arco" : "centro das ruinas (sem arco)") + " alvo=" + alvo.ToString("F1") + " cam=" + c.ToString("F1") + "\n");
+        }
+
+        /// <summary>
+        /// DERRUBADO E ELIMINADO no TREINO: deterministico (sem castelo, sem pouso por hora — a versao na partida normal
+        /// dependia de onde o castelo estava e uma rodada pousou os dois no convés, a 262 m). O boneco morre de um tiro de
+        /// verdade (Projetil -> Combat -> EntityDied + PlayerKilledBot) e o treino o levanta; depois cai pela porta do estado
+        /// (bot solo nao cai pela regra: sem esquadrao). O corpo que AFUNDA fica com o AbateVisualTests (partida normal).
+        /// 29-eliminado: coluna de alma, faiscas e a faixa ELIMINADO. 29-derrubado: anel vermelho, losango e o anel do tempo.
+        /// 29-jogador-derrubado: a vinheta nas bordas, o painel da HUD e o anel sob o proprio jogador.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Combate_DerrubadoEliminado()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            var alvo = (Gameplay.Pawn)main.Partida.Bonecos[0];
+            Vector3 d = alvo.Pos - eu.Pos; d.y = 0f;
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(d.x, d.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            yield return Esperar(0.3f);
+            var vis = Object.FindFirstObjectByType<Gameplay.VisualDoAbate>();
+            Assert.IsNotNull(vis, "o abate tem quem desenhe");
+            var sb = new System.Text.StringBuilder();
+
+            // ELIMINADO: escudo zerado (senao o escudo N1 do boneco segura o tiro) e a vida no fim; o tiro de fogo fecha
+            alvo.Vital.Escudo = 0f;
+            alvo.Vital.Hp = 3f;
+            main.Partida.Registrar(Gameplay.Projetil.Lancar(eu, alvo.Pos + Vector3.up * 1.1f - d.normalized * 1.5f, d.normalized, Elemento.Fogo));
+            float t = 0f;
+            while (main.Hud.Logica.Eliminado.Length == 0 && t < 2f) { yield return null; t += Time.deltaTime; }
+            yield return Esperar(0.2f);   // a coluna ja' subiu, as faiscas no ar, a faixa assentando
+            Foto(main.Player.Camera.Cam, "29-eliminado", true);
+            int part = 0;
+            foreach (var ps in vis.GetComponentsInChildren<ParticleSystem>()) part += ps.particleCount;
+            sb.AppendLine("29-eliminado: alvo=" + alvo.Nome + " faixa='" + main.Hud.Logica.Eliminado + "' visivel=" + main.Hud.Logica.EliminadoVisivel
+                + " particulas=" + part + " t=" + t.ToString("F2"));
+            Assert.AreEqual(alvo.Nome, main.Hud.Logica.Eliminado, "a faixa diz QUEM caiu");
+
+            // DERRUBADO: o treino ja' levantou o boneco; ele cai pela porta do estado e um golpe drena o anel do tempo
+            yield return Esperar(0.5f);
+            new Gameplay.Derrubado(alvo).Cair(eu);
+            Combat.AplicarDano(alvo, 35f, Elemento.Terra, eu);
+            yield return Esperar(1.2f);
+            Gameplay.Derrubado dd = Gameplay.Derrubado.De(alvo);
+            Foto(main.Player.Camera.Cam, "29-derrubado", true);
+            sb.AppendLine("29-derrubado: caido=" + (dd != null) + " esvaecimento=" + (dd != null ? dd.Esvaecimento.ToString("F2") : "-")
+                + " aneis=" + vis.CaidosNaTela + " clipe=" + alvo.Clipe);
+
+            // O JOGADOR DERRUBADO: a vinheta, o painel da HUD e o anel sob ele; o golpe tira luz e engrossa a vinheta
+            new Gameplay.Derrubado(eu).Cair(null);
+            Combat.AplicarDano(eu, 45f, Elemento.Terra, null);   // terra: sem queimadura, a vinheta da foto e' so' a do caido
+            yield return Esperar(1f);
+            Foto(main.Player.Camera.Cam, "29-jogador-derrubado", true);
+            sb.AppendLine("29-jogador-derrubado: caido=" + main.Hud.Aviso.Caido + " esvaecimento=" + main.Hud.Aviso.Esvaecimento.ToString("F2") + " aneis=" + vis.CaidosNaTela);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.IsNotNull(dd, "o boneco caiu");
+        }
+
+        /// <summary>
+        /// O CHAO VIVO do pico (onda 5A): de perto, onde o treino nasce e se pousa (pedra gasta, terra quente e liquen; fissura
+        /// e seixo), e a ENCOSTA mais ingreme do pico de frente (estrato). Camera fixa: a foto de hoje se compara com a de ontem.
+        /// Guarda junto o isolamento do shader: so' o material do TERRENO liga o chao de pedra (arvore e ruina usam o mesmo).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Chao_PicoEEncosta()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Assert.AreEqual(1f, Arkana.World.Ilha.MaterialTerreno().GetFloat("_Chao"), "o terreno liga o chao de pedra (sem shader Arkana, cai aqui)");
+            Assert.AreEqual(0f, Arkana.World.Ilha.MaterialToon().GetFloat("_Chao"), "arvore e moita nao viram pedra");
+            Assert.AreEqual(0f, Arkana.World.Ilha.MaterialPedra().GetFloat("_Chao"), "ruina nao vira chao");
+            var r = ilha.Relevo;
+            var sb = new System.Text.StringBuilder();
+
+            // PICO de perto: atras e ao lado do mago, 3,2 m acima do chao, olhando para o centro da ilha — o planalto na
+            // frente, a rampa descendo para a grama ao fundo
+            Vector3 p = main.Player.Pawn.Pos;
+            Vector3 frente = new Vector3(-p.x, 0f, -p.z).normalized, lado = new Vector3(frente.z, 0f, -frente.x);
+            Vector3 c = p - frente * 4f + lado * 2.2f;
+            c.y = Arkana.World.Ilha.AlturaDoChao(c.x, c.z) + 3.2f;
+            Camera cam = CameraTemporaria("CamFotoChaoPico", c, p + frente * 7f, Color.gray);
+            Foto(cam, "26-chao-pico", false);
+            Object.Destroy(cam.gameObject);
+            float hp = r.Altura(p.x, p.z);
+            sb.AppendLine("26-chao-pico: pawn=" + p.ToString("F1") + " cam=" + c.ToString("F1") + " bioma=" + r.BiomaEm(p.x, p.z)
+                + " alfa(rocha)=" + r.Cor(p.x, p.z, hp).a.ToString("F2") + " cor=" + r.Cor(p.x, p.z, hp).ToString("F2"));
+
+            // ENCOSTA: o ponto mais ingreme do anel do pico com peso de rocha, visto de baixo e de frente para o declive
+            Vector3 q = Vector3.zero;
+            float ny = 2f;
+            for (float rr = 0.3f; rr <= 0.8f; rr += 0.05f)
+                for (int k = 0; k < 48; k++)
+                {
+                    float a = Mathf.PI * 2f * k / 48f;
+                    float x = r.Pico.x + Mathf.Cos(a) * r.PicoR * rr, z = r.Pico.y + Mathf.Sin(a) * r.PicoR * rr;
+                    float h = r.Altura(x, z), v = r.NormalY(x, z);
+                    if (v < ny && r.Cor(x, z, h).a > 0.8f) { ny = v; q = new Vector3(x, h, z); }
+                }
+            Assert.Less(ny, 0.95f, "o pico tem encosta de rocha de verdade");
+            Vector3 nq = r.Normal(q.x, q.z);
+            Vector3 desce = new Vector3(nq.x, 0f, nq.z).normalized;   // a normal aponta morro abaixo
+            Vector3 e = q + desce * 13f;
+            e.y = Mathf.Max(Mathf.Max(Arkana.World.Ilha.AlturaDoChao(e.x, e.z), 0f) + 3f, q.y - 1.5f);
+            cam = CameraTemporaria("CamFotoChaoEncosta", e, q + Vector3.up * 1.5f, Color.gray);
+            Foto(cam, "26-chao-encosta", false);
+            Object.Destroy(cam.gameObject);
+            sb.AppendLine("26-chao-encosta: ponto=" + q.ToString("F1") + " ny=" + ny.ToString("F3") + " cam=" + e.ToString("F1"));
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }

@@ -162,7 +162,7 @@ namespace Arkana.UI
     }
 
     /// <summary>
-    /// Casca: desenha a faixa, badges, vinheta (4 tarjas — o meio fica livre para a mira), arcos (marcas no anel),
+    /// Casca: desenha a faixa, badges, vinheta (macia, o mesmo sprite do caido — as 4 tarjas chapadas davam moldura de borda dura na foto 29), arcos (marcas no anel),
     /// setas de bussola, anel/X de canalizacao e o painel de DERRUBADO. UMA atualizacao por frame.
     /// </summary>
     public sealed class HudAviso : MonoBehaviour
@@ -209,8 +209,8 @@ namespace Arkana.UI
 
         void Montar()
         {
-            _vinheta = new Image[4];
-            for (int i = 0; i < 4; i++) { _vinheta[i] = Formas.Imagem(_raiz, "Vinheta" + i, null, Color.clear); _vinheta[i].enabled = false; }
+            _vinheta = new[] { Formas.Imagem(_raiz, "Vinheta", Hud.SpriteVinheta(), Color.clear) };   // borda cheia, miolo vazio: a mira fica livre
+            _vinheta[0].enabled = false;
             _arcos = new Image[Logica.ArcoMax];
             for (int i = 0; i < _arcos.Length; i++)
             {
@@ -302,11 +302,7 @@ namespace Arkana.UI
             AreaSegura.NoRect(_canalXis.rectTransform, rc);
             Rect rd = RectDerrubado(tela, m, px);
             AreaSegura.NoRect(_painelDerrubado, rd);
-            float e = Mathf.Min(tela.x, tela.y) * 0.13f;
-            AreaSegura.NoRect(_vinheta[0].rectTransform, new Rect(0, tela.y - e, tela.x, e));
-            AreaSegura.NoRect(_vinheta[1].rectTransform, new Rect(0, 0, tela.x, e));
-            AreaSegura.NoRect(_vinheta[2].rectTransform, new Rect(0, 0, e, tela.y));
-            AreaSegura.NoRect(_vinheta[3].rectTransform, new Rect(tela.x - e, 0, e, tela.y));
+            AreaSegura.NoRect(_vinheta[0].rectTransform, new Rect(0, 0, tela.x, tela.y));
         }
 
         void Update()
@@ -315,8 +311,8 @@ namespace Arkana.UI
             Logica.Tick(Time.deltaTime);
             Vector2 tela = new Vector2(Screen.width, Screen.height);
             // vinheta
-            Color vc = Formas.ComAlfa(Logica.VinhetaCor, 0.42f * Logica.Vinheta);
-            for (int i = 0; i < 4; i++) { _vinheta[i].enabled = Logica.Vinheta > 0f; _vinheta[i].color = vc; }
+            Color vc = Formas.ComAlfa(Logica.VinhetaCor, 0.55f * Logica.Vinheta);   // o sprite macio cobre menos que a tarja: alfa maior
+            for (int i = 0; i < _vinheta.Length; i++) { _vinheta[i].enabled = Logica.Vinheta > 0f; _vinheta[i].color = vc; }
             // faixa: texto e largura da placa so' quando o texto muda; cor (texto, fio, losangos) so' quando a prioridade troca
             var f = Logica.FaixaVencedora();
             string txt = f != null && f.Texto != null ? f.Texto : "";

@@ -320,6 +320,7 @@ namespace Arkana
             VisualDoTerreno.Criar(_arena);            // fogo, carvao, gelo, eletrico, lama, muro
             VisualDosKits.Criar(_arena, Partida);     // muralha, fio, poca, eco, tear + o aviso da suprema no chao
             VisualDoImpacto.Criar(_arena, Partida);   // o PESO do acerto: estouro onde o tiro para, piscada no corpo, bolha no escudo
+            VisualDoAbate.Criar(_arena, Partida);     // derrubado (anel no chao, losango do tempo) e eliminado (alma, corpo que afunda)
         }
 
         void Desmontar()

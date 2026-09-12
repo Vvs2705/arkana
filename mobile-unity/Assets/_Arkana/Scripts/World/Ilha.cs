@@ -491,6 +491,9 @@ namespace Arkana.World
         /// Chao: mais bandas e mais macias (superficie enorme e continua), mancha grande + oitava de perto e
         /// as duas texturas de detalhe a 0,55 — a textura QUEBRA a superficie, nao pinta o chao: a cor
         /// continua vindo do vertice, e e' ela que garante praia, lama, musgo e cume legiveis de 200 m.
+        /// _Chao liga a PEDRA DO CHAO do shader (so' aqui: arvore e ruina usam o mesmo shader e nao viram pedra):
+        /// onde o alfa do vertice diz rocha, manchas de pedra gasta/terra/liquen, estrato na encosta, fissura e
+        /// seixo de perto. KNOBs (tons, escalas, _Fissura) nos defaults do ArkanaToon.shader; _Fissura 0 corta o custo.
         /// </summary>
         public static Material MaterialTerreno()
         {
@@ -505,6 +508,7 @@ namespace Arkana.World
             m.SetFloat("_Grao", 0.085f);
             m.SetFloat("_EscalaGrao", 0.65f);
             m.SetFloat("_Rim", 0.06f);   // chao nao tem silhueta
+            m.SetFloat("_Chao", 1f);
             Texture2D chao = Resources.Load<Texture2D>("detalhe-chao");
             Texture2D rocha = Resources.Load<Texture2D>("detalhe-rocha");
             if (chao != null && rocha != null)
