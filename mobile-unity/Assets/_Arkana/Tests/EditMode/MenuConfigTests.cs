@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using Arkana.Core;
 using Arkana.Menu;
 
 namespace Arkana.Tests
@@ -120,7 +121,7 @@ namespace Arkana.Tests
         }
 
         [Test]
-        public void ElencoBustoECartaoSaoContasPuras()
+        public void ElencoBustoEContaPura()
         {
             // o busto da celula: a metade de CIMA do retrato 512x768, centrada, na proporcao do quadrado (uv 1 = topo)
             Rect b = SelecaoPersonagem.Busto(512, 768);
@@ -129,10 +130,65 @@ namespace Arkana.Tests
             Rect estreito = SelecaoPersonagem.Busto(100, 400);
             Assert.AreEqual(1f, estreito.width, 1e-4f, "retrato estreito demais: largura inteira, uv nunca sai de 0..1");
             Assert.AreEqual(1f, estreito.yMax, 1e-4f);
-            // o cartao le' a ficha (IdentidadeMago + Kits), com virgula PT-BR em qualquer cultura do aparelho
-            Assert.AreEqual("FOGO · Robusto · 1,78 m", Elenco.Porte("01-pyra"));
-            CollectionAssert.AreEqual(new[] { "TÁTICA · recarga 9 s", "SUPREMA · carga 50 s" }, Elenco.Kit("01-pyra"));
-            Assert.AreEqual(Arkana.Core.Textos.SelKitEmBreve, Elenco.Kit("02-ceifadora")[0], "sem kit: EM BREVE, nunca numero inventado");
+        }
+
+        /// <summary>O CARTAO do Elenco (onda 9C): a ficha certa por mago, a descricao da habilidade seguindo o NUMERO do kit,
+        /// EM BREVE sem kit (nunca numero inventado) e as abas de elemento cobrindo os 20 sem repetir.</summary>
+        [Test]
+        public void CartaoLeAFichaEOKitDeCadaMago()
+        {
+            Assert.AreEqual("A Chama de Guerra", Elenco.Titulo("01-pyra"));
+            Assert.AreEqual("Vanguarda · Ataque", Elenco.Papel("01-pyra"));
+            Assert.AreEqual("Muito longo", Elenco.AlcanceRotulo("11-aelion"));
+            Assert.AreEqual(1f, Elenco.Alcance("11-aelion"), 1e-4f, "o sniper enche a barra");
+            Assert.Less(Elenco.Alcance("18-basalto"), Elenco.Alcance("01-pyra"), "o golem de corpo a corpo fica abaixo da Pyra");
+            Assert.AreEqual("1,78 m", Elenco.Altura("01-pyra"), "virgula PT-BR em qualquer cultura do aparelho");
+            Assert.Greater(Elenco.Porte("18-basalto"), Elenco.Porte("20-pip"));
+
+            // a descricao troca {chave} pelo numero do kit: mexer no Kits muda a tela (o texto nao e' copia do numero)
+            var tatica = Kits.De("01-pyra").Tatica;
+            float antes = tatica["comprimento"];
+            try
+            {
+                string[] h = Elenco.Habilidade("01-pyra", false);
+                Assert.AreEqual("Muralha de Brasas", h[0]);
+                StringAssert.Contains("8 m de fogo por 5 s", h[1]);
+                Assert.AreEqual("recarga 9 s", h[2]);
+                tatica["comprimento"] = 11f;
+                StringAssert.Contains("11 m de fogo", Elenco.Habilidade("01-pyra", false)[1], "a descricao segue o Kits");
+            }
+            finally { tatica["comprimento"] = antes; }
+            Assert.AreEqual("carga 50 s", Elenco.Habilidade("01-pyra", true)[2]);
+            StringAssert.StartsWith("1,5 s no plano espectral", Elenco.Habilidade("03-veu", false)[1]);
+            // sem kit: EM BREVE no tempo (slug fora do elenco fica sem kit para sempre; os 17 ganham kit sozinhos)
+            Assert.AreEqual(Textos.SelEmBreve, Elenco.Habilidade("99-ninguem", false)[2]);
+            Assert.AreEqual(Textos.SelEmBreve, Elenco.Habilidade("99-ninguem", true)[2]);
+
+            foreach (string s in Kits.Slugs)
+            {
+                Assert.IsNotEmpty(Elenco.Titulo(s), s + " sem titulo");
+                Assert.IsNotEmpty(Elenco.Papel(s), s + " sem papel");
+                Assert.Greater(Elenco.Alcance(s), 0f, s + ": alcance fora da escala Textos.SelAlcances");
+                foreach (bool suprema in new[] { false, true })
+                {
+                    string[] h = Elenco.Habilidade(s, suprema);
+                    Assert.IsNotEmpty(h[0], s + " sem nome de habilidade");
+                    Assert.IsFalse(string.IsNullOrEmpty(h[1]) || h[1].Contains("{"), s + ": descricao vazia ou {chave} sem numero: " + h[1]);
+                    Assert.LessOrEqual(h[1].Length, 80, s + ": descricao nao cabe nas 2 linhas do cartao: " + h[1]);
+                }
+            }
+
+            // as abas: TODOS mostra os 20; cada elemento so' os afins dele, e a soma das cinco fecha 20
+            int soma = 0;
+            foreach (Elemento e in Elementos.Todos)
+                foreach (string s in Kits.Slugs)
+                {
+                    Assert.IsTrue(Elenco.NoFiltro(s, Elenco.FiltroTodos));
+                    if (Elenco.NoFiltro(s, (int)e)) soma++;
+                }
+            Assert.AreEqual(Kits.Slugs.Length, soma, "cada mago cai em UMA aba de elemento");
+            Assert.IsTrue(Elenco.NoFiltro("01-pyra", (int)Elemento.Fogo));
+            Assert.IsFalse(Elenco.NoFiltro("03-veu", (int)Elemento.Fogo));
         }
     }
 }

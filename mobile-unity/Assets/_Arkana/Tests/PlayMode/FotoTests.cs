@@ -1364,5 +1364,49 @@ namespace Arkana.Tests
             Assert.AreSame(alvo, marcas.Visiveis[0].Alvo, "a mais perto primeiro");
             Assert.IsTrue(longeNaMira, "o de longe esta' sob a mira (sem acerto)");
         }
+
+        // ---- COLAR em FotoTests.cs logo depois de Foto_Elenco_Escolha (antes do `static void Tocar`). Onda 9C.
+
+        /// <summary>A ESCOLHA DE MAGO com cara de jogo (onda 9C): cartao rico, CONFIRMAR dourado, disco de luz no pe' do
+        /// escolhido (38-elenco); depois a aba RAIO ligada e a Tessa escolhida (38-elenco-filtro); o CONFIRMAR sai com ela.</summary>
+        [UnityTest]
+        public IEnumerator Foto_Elenco_Cartao()
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Tocar("TapTitulo");
+                yield return null;
+                Tocar("BtnElenco");
+                yield return null;
+                Tocar("Card01-pyra/Toque");
+                yield return null;
+                var mago = Object.FindFirstObjectByType<Arkana.Characters.Mago>();
+                Assert.IsNotNull(mago, "a vitrine tem mago");
+                Assert.AreEqual("Mago 01-pyra", mago.name, "o toque no retrato troca o mago da vitrine na hora");
+                Assert.IsNotNull(GameObject.Find("DiscoDoEscolhido"), "o escolhido tem o disco de luz no pe'");
+                yield return Esperar(1.2f);   // a camera desliza para o vao entre o painel e o cartao
+                Foto(main.CameraDoMenu, "38-elenco", true);
+
+                Tocar("AbaRaio");
+                yield return null;
+                Assert.IsNull(GameObject.Find("Card01-pyra"), "a aba RAIO esconde quem nao e' de raio");
+                Tocar("Card10-tessa/Toque");
+                yield return Esperar(1.2f);
+                Foto(main.CameraDoMenu, "38-elenco-filtro", true);
+
+                Tocar("BtnConfirmar");
+                yield return null;
+                Assert.AreEqual("10-tessa", Arkana.Menu.SelecaoPersonagem.MagoEscolhido, "o CONFIRMAR sai com o escolhido");
+                Assert.IsNull(GameObject.Find("Selecao"), "e volta ao menu");
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
     }
 }

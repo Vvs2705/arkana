@@ -9,8 +9,9 @@ namespace Arkana.Menu
 {
     /// <summary>
     /// A vitrine dos 20 magos: a MESMA grade da selecao (uma tela, dois lugares, zero divergencia) e as leituras puras
-    /// que o menu precisa (quem tem kit, ordem 01..20, o texto do cartao). Os dados moram em Core.Kits e na
-    /// IdentidadeMago; nada aqui e' inventado (a "Funcao" da ficha ainda nao tem dado: fica fora, nunca "a definir").
+    /// que o cartao precisa (quem tem kit, ordem 01..20, abas por elemento, ficha, barras, habilidades). Os dados moram
+    /// em Core.Kits (numeros, Implementado), na IdentidadeMago (elemento, altura) e em Textos.SelFichas (o resumo das
+    /// fichas de design/personagens). Kit que ganha Implementado aparece sozinho: nada aqui lista quem tem kit.
     /// Retratos: Resources/Retratos/NN (importar de mobile-godot/godot/menu/art/NN.png, 512 px, como Sprite).
     /// </summary>
     public static class Elenco
@@ -38,22 +39,60 @@ namespace Arkana.Menu
             return slug ?? "";
         }
 
-        /// <summary>"FOGO · Robusto · 1,78 m" (ficha da IdentidadeMago). Slug desconhecido cai no mago generico, nunca vazio.</summary>
-        public static string Porte(string slug)
+        /// <summary>A aba TODOS; as outras abas sao (int)Elemento.</summary>
+        public const int FiltroTodos = -1;
+
+        /// <summary>O mago aparece na aba? TODOS mostra os 20; cada elemento, so' os afins dele (IdentidadeMago).</summary>
+        public static bool NoFiltro(string slug, int filtro) => filtro == FiltroTodos || (int)IdentidadeMago.De(slug).Elemento == filtro;
+
+        /// <summary>"FOGO", "ÁGUA"... (o nome que a HUD usa, com acento).</summary>
+        public static string NomeDo(Elemento e)
         {
-            IdentidadeMago id = IdentidadeMago.De(slug);
-            string el;
-            if (!Textos.HudElementos.TryGetValue(Elementos.Id(id.Elemento), out el)) el = Elementos.Nome(id.Elemento);
-            // ponytail: o nome do enum vai direto para a tela (ja' e' portugues); tabela em Textos quando o EN entrar
-            return string.Format(Textos.SelPorte, el, id.Silhueta, Num(id.AlturaM, "0.00"));
+            string n;
+            return Textos.HudElementos.TryGetValue(Elementos.Id(e), out n) ? n : Elementos.Nome(e);
         }
 
-        /// <summary>O kit em duas linhas (recarga da tatica, carga da suprema) ou "KIT EM BREVE" + vazio para quem nao tem.</summary>
-        public static string[] Kit(string slug)
+        public static string Titulo(string slug) => Ficha(slug)[0];
+        public static string Papel(string slug) => Ficha(slug)[1];
+        public static string AlcanceRotulo(string slug) => Ficha(slug)[2];
+
+        /// <summary>0..1 na escala Textos.SelAlcances (Muito curto = 1/6 ... Muito longo = 1); fora da escala = 0.</summary>
+        public static float Alcance(string slug) => (Array.IndexOf(Textos.SelAlcances, AlcanceRotulo(slug)) + 1f) / Textos.SelAlcances.Length;
+
+        /// <summary>KNOB: a barra de PORTE vai do menor ao maior corpo do elenco (Pip 0,6 m, Basalto 2,3 m).</summary>
+        public const float PorteMinM = 0.5f, PorteMaxM = 2.3f;
+
+        /// <summary>0..1: o tamanho do alvo que o mago oferece (altura da ficha).</summary>
+        public static float Porte(string slug) => Mathf.InverseLerp(PorteMinM, PorteMaxM, IdentidadeMago.De(slug).AlturaM);
+
+        /// <summary>"1,78 m" (virgula PT-BR em qualquer cultura do aparelho).</summary>
+        public static string Altura(string slug) => string.Format(Textos.SelAltura, Num(IdentidadeMago.De(slug).AlturaM, "0.00"));
+
+        /// <summary>
+        /// Tatica ou suprema no cartao: { nome, descricao, tempo }. A descricao troca cada `{chave}` pelo numero do bloco do
+        /// Kits (o texto segue o balanceamento); o tempo e' a recarga/carga do kit, ou EM BREVE sem kit — nunca numero
+        /// inventado. Le' Kits.De(slug).Implementado na hora: o kit que chegar aparece sem mexer aqui.
+        /// </summary>
+        public static string[] Habilidade(string slug, bool suprema)
         {
+            string[] f = Ficha(slug);
             Kits.KitDef k = Kits.De(slug);
-            if (!k.Implementado) return new[] { Textos.SelKitEmBreve, "" };
-            return new[] { string.Format(Textos.SelTatica, Num(k.TaticaCd, "0.#")), string.Format(Textos.SelSuprema, Num(k.SupremaCarga, "0.#")) };
+            string desc = f[suprema ? 6 : 4];
+            var dados = suprema ? k.Suprema : k.Tatica;
+            if (dados != null)
+                foreach (var kv in dados) desc = desc.Replace("{" + kv.Key + "}", Num(kv.Value, "0.#"));
+            string tempo = !k.Implementado ? Textos.SelEmBreve
+                : string.Format(suprema ? Textos.SelCarga : Textos.SelRecarga, Num(suprema ? k.SupremaCarga : k.TaticaCd, "0.#"));
+            return new[] { f[suprema ? 5 : 3], desc, tempo };
+        }
+
+        static readonly string[] SemFicha = { "", "", "", "", "", "", "" };
+
+        /// <summary>A ficha de tela (Textos.SelFichas) ou vazia: slug fora do elenco nunca derruba o cartao.</summary>
+        static string[] Ficha(string slug)
+        {
+            string[] f;
+            return slug != null && Textos.SelFichas.TryGetValue(slug, out f) && f != null && f.Length >= SemFicha.Length ? f : SemFicha;
         }
 
         /// <summary>Numero com virgula (PT-BR) sem depender da cultura do aparelho.</summary>

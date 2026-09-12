@@ -33,11 +33,87 @@ namespace Arkana.Core
         public const string SelFuncao = "Função";
         public const string SelRaca = "Raça";
         public const string SelADefinir = "a definir";
-        /// <summary>Cartao do mago escolhido (a vitrine do Elenco): elemento · porte · altura, e o kit em numeros da ficha.</summary>
-        public const string SelPorte = "{0} · {1} · {2} m";
-        public const string SelTatica = HudTatica + HudSep + "recarga {0} s";
-        public const string SelSuprema = HudSuprema + HudSep + "carga {0} s";
-        public const string SelKitEmBreve = PerfilKit + " " + SelEmBreve;
+        /// <summary>Cartao do mago escolhido (a vitrine do Elenco): abas, barras, o tempo do kit e o botao.</summary>
+        public const string SelTodos = "TODOS";
+        public const string SelConfirmar = "CONFIRMAR";
+        public const string SelAlcance = "ALCANCE";
+        public const string SelPorte = "PORTE";
+        public const string SelAltura = "{0} m";
+        public const string SelRecarga = "recarga {0} s";
+        public const string SelCarga = "carga {0} s";
+        /// <summary>A escala de ALCANCE das fichas, do mais curto ao mais longo: a barra do cartao enche por aqui.</summary>
+        public static readonly string[] SelAlcances = { "Muito curto", "Curto", "Curto-médio", "Médio", "Longo", "Muito longo" };
+
+        /// <summary>
+        /// A FICHA DE TELA de cada mago, resumida de design/personagens/NN-*.md (a mesma fonte que os kits seguem):
+        /// { titulo, papel (classe ou raca · funcao), alcance (um de SelAlcances), tatica, descricao, suprema, descricao }.
+        /// Descricao curta: cabe em 2 linhas do cartao. `{chave}` = numero do bloco Tatica/Suprema do Kits DAQUELE mago —
+        /// o Elenco troca pelo valor e o texto acompanha o balanceamento (kit novo pode trocar o numero escrito pela chave).
+        /// ponytail: o alcance de 02/03/04/07/08 foi lido do kit (a ficha deles nao tem a linha Alcance); o Diretor corrige aqui.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string[]> SelFichas = new Dictionary<string, string[]>
+        {
+            { "01-pyra", new[] { "A Chama de Guerra", "Vanguarda · Ataque", "Médio",
+                "Muralha de Brasas", "Risca {comprimento} m de fogo por {duracao} s: quem cruza queima e sai aceso.",
+                "Braço Livre", "Solta o braço de chama por {duracao} s: lança-chamas em leque e dash em fogo." } },
+            { "02-ceifadora", new[] { "A Voz do Vazio", "Vanguarda · Perseguição", "Curto-médio",
+                "Mão do Vazio", "Uma mão de sombra irrompe a até 12 m e agarra o inimigo por 1,2 s.",
+                "Travessia", "Rasga o Vazio até 60 m à frente: ela e o grupo atravessam juntos." } },
+            { "03-veu", new[] { "A Andarilha", "Errante · Fuga", "Curto",
+                "Atravessar", "{duracao} s no plano espectral: invulnerável, veloz, passa paredes de {parede_max} m.",
+                "Maré Espectral", "Por {duracao} s, ela e quem estiver a {raio} m entram juntos no plano espectral." } },
+            { "04-corvus", new[] { "O Caçador", "Errante · Perseguição", "Curto",
+                "Uivo de Caça", "Uivo de 25 m: quem se move fica com o cheiro aceso por 4 s.",
+                "Forma de Lobisomem", "30 s como besta: 40% mais rápido, cura ao abater e vê todos os rastros." } },
+            { "05-corvomante", new[] { "O Olho Distante", "Vidente · Longa distância", "Longo",
+                "Voo do Olho", "Voa com o corvo para vasculhar, ou o pousa num aliado como sentinela.",
+                "Grasnido do Fim", "Pulso antimagia: 50 de dano em escudo e destrói armadilhas na área." } },
+            { "06-olho-de-eter", new[] { "O Observador", "Vidente · Longa distância", "Longo",
+                "Enxame Perscrutador", "Enxame em linha: interrompe conjuração e cura, e revela por 6 s.",
+                "Crisálida", "Casulo que eclode em 2 s: mariposas pousam nos inimigos e os revelam." } },
+            { "07-vitalis", new[] { "A Mão que Cura", "Guardião · Suporte / Vida", "Médio",
+                "Vai, Lúmen", "Envia Lúmen a um aliado a até 30 m: cura 8 de vida/s por 12 s.",
+                "Jardim da Aurora", "Círculo de luz por 10 s: aliados curam 8/s; inimigos não curam nada." } },
+            { "08-ilusionista", new[] { "O Espelho", "Guardião · Engano", "Médio",
+                "Espelho de Mão", "Espelho por 2 s que devolve até 3 projéteis mágicos a quem atirou.",
+                "Baile de Espelhos", "5 reflexos imitam cada passo dele, e ele some por 2,5 s." } },
+            { "09-vex", new[] { "O Alquimista da Peste", "Dominador · Área", "Curto",
+                "Frascos de Reagente", "Até 6 frascos viram poças: quem pisa detona nuvem de dano e lentidão.",
+                "A Grande Obra", "Névoa enorme por 12 s: desacelera e ninguém dentro usa cura ou poção." } },
+            { "10-tessa", new[] { "A Tecelã de Raios", "Dominadora · Defesa", "Curto",
+                "Fio do Tear", "Fio de raio de {comprimento} m (até {max_fios}): quem toca leva dano, fica lento e revelado.",
+                "Tear-Mãe", "Tear de {raio} m por {duracao} s: absorve projéteis e os tece em escudo do grupo." } },
+            { "11-aelion", new[] { "O Arco do Crepúsculo", "Alto Elfo · Longa distância", "Muito longo",
+                "Flecha de Éter", "Flecha muito rápida que fura 1 obstáculo fino; carregada, bate mais.",
+                "Chuva do Crepúsculo", "Dispara ao céu: 3 s depois, flechas caem numa linha longa à frente." } },
+            { "12-umbra", new[] { "A Lâmina da Noite", "Drow · Perseguição", "Curto",
+                "Véu Umbrio", "2,5 s em penumbra, quase invisível; o 1º golpe saindo dela bate +50%.",
+                "Dança das Sombras", "Por 6 s, cada esquiva teleporta 8 m e deixa uma sombra que explode." } },
+            { "13-brok", new[] { "O Ferreiro de Runas", "Anão · Proteção", "Curto-médio",
+                "Runa-Escudo", "Ergue uma muralha rúnica curva de 4 m que segura projéteis por 6 s.",
+                "Forja Viva", "Bigorna-totem por 12 s: aliados perto regeneram escudo e ganham runa." } },
+            { "14-gromm", new[] { "O Xamã da Tempestade", "Orc · Suporte / Vida", "Médio",
+                "Totem das Chuvas", "Totem de chuva que cura 6 de vida/s por 8 s e apaga o fogo em volta.",
+                "Espírito do Trovão", "Um bisão-espírito cruza o campo empurrando inimigos e derrubando muros." } },
+            { "15-maris", new[] { "A Voz das Marés", "Nereida · Controle", "Longo",
+                "Onda Prisão", "Esfera lenta que ergue uma coluna d'água e suspende o inimigo 1,2 s.",
+                "Maré Cheia", "Inunda uma área por 10 s: aliados deslizam, inimigos afundam lentos." } },
+            { "16-fizz", new[] { "O Artífice de Bolso", "Gnomo · Armadilhas", "Longo",
+                "Torreta Faísca", "Mini-torreta que atira faíscas em quem entra no cone; até 2 ativas.",
+                "MEGABOBINA", "Em 2 s, a bobina gigante fulmina o inimigo marcado mais próximo." } },
+            { "17-sylva", new[] { "A Filha da Floresta", "Dríade · Suporte / Vida", "Médio",
+                "Broto Guardião", "Broto que cura 5 de vida/s por 6 s; plantado na grama, vira moita.",
+                "Coração da Mata", "Raízes por 8 s: aliados curam vida e escudo; inimigos são agarrados." } },
+            { "18-basalto", new[] { "O Desperto", "Golem · Tanque", "Muito curto",
+                "Punho Sísmico", "Onda de pedra em cone que empurra e, na terra, ergue 3 pedras.",
+                "Monólito", "6 s como torre: +60% de resistência e 15% do dano volta em estilhaços." } },
+            { "19-noctus", new[] { "O Sedento de Éter", "Vampiro · Perseguição", "Curto-médio",
+                "Mordida do Vazio", "Investida de 6 m que drena 20 de mana do alvo e o marca.",
+                "Forma de Névoa", "4 s de névoa: imune a projéteis e atravessa inimigos, mas não conjura." } },
+            { "20-pip", new[] { "A Centelha Selvagem", "Fada · Perseguição", "Curto",
+                "Zip-Zag", "Três dashes em zigue-zague; quem ela atravessa leva uma faísca.",
+                "Supercélula", "Uma nuvem de tempestade a segue por 8 s, raiando o inimigo mais perto." } },
+        };
 
         // ---------------------------------------------------------------- perfil do mago
         public const string PerfilHistoria = "HISTÓRIA";
