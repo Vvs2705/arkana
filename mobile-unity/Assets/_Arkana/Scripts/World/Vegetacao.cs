@@ -96,7 +96,9 @@ namespace Arkana.World
                 }
             }
 
-            /// <summary>Blob icosaedrico facetado com jitter — copa de arvore, rocha, moita.</summary>
+            /// <summary>Blob icosaedrico facetado com jitter — copa de arvore, rocha, moita. A cor desce em DEGRADE por vertice:
+            /// escura embaixo (a massa faz sombra em si mesma), clara em cima (o sol). Com cor chapada a copa lia como pirulito
+            /// e a rocha como bloco solto (fotos 14 e 15 de 12/09); o degrade custa zero triangulo.</summary>
             public void Blob(Vector3 centro, Vector3 escala, Color col, Sorteio rng, float jit)
             {
                 var vs = new Vector3[IcoV.Length];
@@ -106,10 +108,12 @@ namespace Arkana.World
                     Vector3 n = IcoV[i].normalized;
                     vs[i] = centro + new Vector3(n.x * f * escala.x, n.y * f * escala.y, n.z * f * escala.z);
                 }
+                Color baixo = Relevo.Escurecer(col, 0.38f), alto = Relevo.Clarear(col, 0.10f);   // KNOB: por foto
+                Color Degrade(Vector3 p) => Color.Lerp(baixo, alto, Mathf.InverseLerp(centro.y - escala.y, centro.y + escala.y, p.y));
                 for (int f = 0; f < IcoF.Length; f += 3)
                 {
                     Vector3 a = vs[IcoF[f]], b = vs[IcoF[f + 1]], c = vs[IcoF[f + 2]];
-                    Tri(a, b, c, col, (a + b + c) / 3f - centro);
+                    TriCores(a, b, c, Degrade(a), Degrade(b), Degrade(c), (a + b + c) / 3f - centro);
                 }
             }
 
@@ -519,9 +523,13 @@ namespace Arkana.World
         {
             var b = new MalhaProc.Construtor();
             var rng = new Sorteio(11);
-            b.Tronco(Vector3.zero, 0.32f, 0.22f, 3.35f, 5, Relevo.CorTronco, Relevo.Clarear(Relevo.CorTronco, 0.12f));
-            b.Blob(new Vector3(0f, 4.35f, 0f), new Vector3(1.9f, 1.35f, 1.9f), Relevo.CorFolhaA, rng, 0.20f);
-            b.Blob(new Vector3(0.62f, 5.05f, 0.35f), new Vector3(1.08f, 0.82f, 1.08f), Relevo.CorFolhaB, rng, 0.18f);
+            // tronco mais escuro (o CorTronco puro saia laranja no sol do entardecer) e copa em CACHO: a massa grande e tres
+            // menores em volta — duas pecas redondas liam como pirulito (foto 15 de 12/09). ~90 triangulos por arvore.
+            b.Tronco(Vector3.zero, 0.32f, 0.22f, 3.35f, 5, Relevo.Escurecer(Relevo.CorTronco, 0.2f), Relevo.CorTronco);
+            b.Blob(new Vector3(0f, 4.3f, 0f), new Vector3(1.8f, 1.3f, 1.8f), Relevo.CorFolhaA, rng, 0.20f);
+            b.Blob(new Vector3(1.0f, 4.0f, 0.45f), new Vector3(1.05f, 0.85f, 1.05f), Relevo.CorFolhaA, rng, 0.18f);
+            b.Blob(new Vector3(-0.85f, 4.1f, -0.6f), new Vector3(1.0f, 0.8f, 1.0f), Relevo.CorFolhaB, rng, 0.18f);
+            b.Blob(new Vector3(0.25f, 5.2f, 0.15f), new Vector3(1.05f, 0.8f, 1.05f), Relevo.CorFolhaB, rng, 0.18f);
             return b;
         }
 

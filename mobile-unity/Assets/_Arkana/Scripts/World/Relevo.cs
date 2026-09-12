@@ -126,6 +126,9 @@ namespace Arkana.World
         /// <summary>Pedra SOLTA (rocha da vegetacao, rochedo do mar): da familia do basalto do kit da Meshy. O lilas do CorRocha e'
         /// cor de CHAO; no pedregulho facetado, ao lado da rocha texturizada, lia como bloco de gelo (foto 03 de 12/09). KNOB: por foto.</summary>
         public static readonly Color CorPedregulho = Hex(0x6a615a);
+        /// <summary>Pedra LAVRADA das ruinas (colunas e muralha de Ruinas.cs): o cinza quente e gasto dos arcos e estatuas da Meshy
+        /// plantados em volta. O CorPedra azulado, ao lado deles, lia como cano de PVC (foto 14 de 12/09). KNOB: por foto.</summary>
+        public static readonly Color CorRuina = Hex(0x958d82);
         public static readonly Color CorLama = Hex(0xa8763e);
         public static readonly Color CorTronco = Hex(0x8a7259);
         public static readonly Color CorFolhaA = Hex(0x3fa85c);

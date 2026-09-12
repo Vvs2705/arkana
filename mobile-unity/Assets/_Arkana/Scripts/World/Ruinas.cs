@@ -158,15 +158,15 @@ namespace Arkana.World
         static MalhaProc.Construtor ProtoColuna()
         {
             var b = new MalhaProc.Construtor();
-            b.Tronco(Vector3.zero, 0.72f, 0.6f, AltColuna, 6, Relevo.CorPedra);
-            b.Tampa(new Vector3(0f, AltColuna, 0f), 0.6f, 6, Relevo.CorPedra);
+            b.Tronco(Vector3.zero, 0.72f, 0.6f, AltColuna, 6, Relevo.CorRuina);
+            b.Tampa(new Vector3(0f, AltColuna, 0f), 0.6f, 6, Relevo.CorRuina);
             return b;
         }
 
         static MalhaProc.Construtor ProtoBloco()
         {
             var b = new MalhaProc.Construtor();
-            b.Caixa(Vector3.zero, new Vector3(1.1f, 0.45f, 0.5f), Relevo.Escurecer(Relevo.CorPedra, 0.1f));
+            b.Caixa(Vector3.zero, new Vector3(1.1f, 0.45f, 0.5f), Relevo.Escurecer(Relevo.CorRuina, 0.1f));
             return b;
         }
     }
