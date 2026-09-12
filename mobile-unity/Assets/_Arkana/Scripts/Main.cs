@@ -150,11 +150,18 @@ namespace Arkana
             if (_camMenu != null) _camMenu.enabled = true;
             Sfx = Sfx.Criar();
             _meus.Add(Sfx.gameObject);
+#if !UNITY_EDITOR
+            gameObject.AddComponent<MedidorDeFps>();   // so' no aparelho: FPS no logcat (a medicao que faltava desde 25/08)
+#endif
             Menu = ArkMenu.Criar();
             _meus.Add(Menu.gameObject);
             Fluxo = new FluxoDeJogo(Montar, Desmontar);
             Fluxo.Ligar();
+            _pedidoAdb = PartidaPeloAdb.Pedido();   // teste sem dedo (MIUI recusa toque pelo adb); null = jogo normal
         }
+
+        string _pedidoAdb;
+        float _relogioAdb;
 
         void OnDestroy()
         {
@@ -168,6 +175,16 @@ namespace Arkana
         {
             float dt = Time.deltaTime;
             Fluxo.Tick(dt);
+            if (_pedidoAdb != null && Fluxo.Atual == FluxoDeJogo.Estado.Menu)
+            {
+                _relogioAdb += dt;
+                if (_relogioAdb >= 1.5f)   // o menu chega a desenhar um quadro: a foto do aparelho mostra o boot
+                {
+                    ArkMenu.PedidoDeTreino = _pedidoAdb == "treino";
+                    _pedidoAdb = null;
+                    Bus.EmitGameStartRequested();
+                }
+            }
             if (Partida == null) return;
             Partida.Tick(dt);
             if (Hud != null && !Partida.Treino) Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);

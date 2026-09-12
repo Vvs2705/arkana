@@ -4,6 +4,9 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/_Arkana/Scenes/Main.unity
+    guid: 44387ace94f8bb54b81072ff7518be65
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
