@@ -11,8 +11,15 @@ namespace Arkana.Core
     /// Os LIMITADORES (o preco de cada poder) moram no MESMO bloco do poder que pagam.
     /// Bool vira 1/0 (ex.: "sino"); tudo aqui e' numero.
     /// </summary>
-    public static class Kits
+    public static partial class Kits
     {
+        // OS 17 (12/09): cada GRUPO de magos poe a ficha num arquivo PROPRIO (Kits.GrupoX.cs) — ninguem edita este para
+        // implementar um kit. Grupo sem arquivo: o compilador apaga a chamada e os magos dele seguem inertes.
+        static partial void GrupoA(Dictionary<string, KitDef> m);
+        static partial void GrupoB(Dictionary<string, KitDef> m);
+        static partial void GrupoC(Dictionary<string, KitDef> m);
+        static partial void GrupoD(Dictionary<string, KitDef> m);
+
         /// <summary>Piso e teto da telegrafia. O KitRunner GRAMPEIA nesta faixa em runtime: dado ruim nao burla a lei.</summary>
         public const float TelegrafiaMin = 1f;
         public const float TelegrafiaMax = 4f;
@@ -150,7 +157,8 @@ namespace Arkana.Core
                 { "zona_morta", 2f }, { "max_simultaneo", 1f },
             };
 
-            // Os outros 17: declarados e inertes (nome + PADRAO). Ficha em texto: menu/Elenco e GDD §3.
+            // Os outros 17: declarados e inertes (nome + PADRAO) ate' o grupo deles escrever a ficha. Texto: design/personagens.
+            GrupoA(m); GrupoB(m); GrupoC(m); GrupoD(m);
             Magos = m;
         }
     }

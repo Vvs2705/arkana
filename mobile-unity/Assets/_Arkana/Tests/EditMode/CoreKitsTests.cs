@@ -7,7 +7,11 @@ namespace Arkana.Tests
     /// <summary>As leis de gameplay/selftest_kits.gd (_test_registro): os 20, sem mana, telegrafia 1-4 s, taticas 5-10 s.</summary>
     public class CoreKitsTests
     {
-        private static readonly string[] Implementados = { "01-pyra", "03-veu", "10-tessa" };
+        /// <summary>Os implementados, lidos da FICHA: a lista cresce com os grupos dos 17 (12/09) e as leis valem para todos.</summary>
+        private static IEnumerable<string> Implementados()
+        {
+            foreach (string s in Kits.Slugs) if (Kits.De(s).Implementado) yield return s;
+        }
 
         [SetUp]
         public void SetUp() { Bus.Reset(); }
@@ -29,22 +33,24 @@ namespace Arkana.Tests
         }
 
         [Test]
-        public void Tres_Implementados_Os_Outros_Declarados_E_Inertes()
+        public void Implementados_SaoOsRegistrados_OsOutrosInertes()
         {
-            List<string> impl = new List<string>();
+            foreach (string s in new[] { "01-pyra", "03-veu", "10-tessa" }) Assert.IsTrue(Kits.De(s).Implementado, s);
             foreach (string s in Kits.Slugs)
-                if (Kits.De(s).Implementado) impl.Add(s);
-            CollectionAssert.AreEqual(Implementados, impl);
-
-            Kits.KitDef pip = Kits.De("20-pip");
-            Assert.IsFalse(pip.Implementado);
-            Assert.AreEqual("Pip", pip.Nome);
-            Assert.AreEqual(Kits.PadraoTaticaCd, pip.TaticaCd);
-            Assert.AreEqual(Kits.PadraoSupremaCarga, pip.SupremaCarga);
-            Assert.AreEqual(Kits.PadraoTelegrafia, pip.Telegrafia);
-            Assert.IsNotNull(pip.Passiva, "mago nao implementado responde a ficha inteira");
-            Assert.IsNotNull(pip.Tatica);
-            Assert.IsNotNull(pip.Suprema);
+                Assert.AreEqual(Arkana.Gameplay.KitRunner.Registro.ContainsKey(s), Kits.De(s).Implementado, "ficha e registro andam juntos: " + s);
+            foreach (string s in Kits.Slugs)
+            {
+                Kits.KitDef k = Kits.De(s);
+                if (k.Implementado) continue;   // ainda sem grupo: o padrao inerte
+                Assert.AreEqual(Kits.PadraoTaticaCd, k.TaticaCd, s);
+                Assert.AreEqual(Kits.PadraoSupremaCarga, k.SupremaCarga, s);
+                Assert.AreEqual(Kits.PadraoTelegrafia, k.Telegrafia, s);
+            }
+            Kits.KitDef nada = Kits.De("99-ninguem");
+            Assert.IsFalse(nada.Implementado);
+            Assert.IsNotNull(nada.Passiva, "mago nao implementado responde a ficha inteira");
+            Assert.IsNotNull(nada.Tatica);
+            Assert.IsNotNull(nada.Suprema);
         }
 
         [Test]
@@ -80,7 +86,7 @@ namespace Arkana.Tests
         {
             Assert.AreEqual(1f, Kits.TelegrafiaMin);
             Assert.AreEqual(4f, Kits.TelegrafiaMax);
-            foreach (string s in Implementados)
+            foreach (string s in Implementados())
             {
                 float t = Kits.De(s).Telegrafia;
                 Assert.IsTrue(t >= Kits.TelegrafiaMin && t <= Kits.TelegrafiaMax, s + " avisa fora da faixa: " + t);
@@ -90,7 +96,7 @@ namespace Arkana.Tests
         [Test]
         public void Taticas_DosImplementados_Entre5e10s()
         {
-            foreach (string s in Implementados)
+            foreach (string s in Implementados())
             {
                 float cd = Kits.De(s).TaticaCd;
                 Assert.IsTrue(cd >= 5f && cd <= 10f, s + " tatica fora da faixa 5-10 s: " + cd);

@@ -89,13 +89,14 @@ namespace Arkana.Tests
         [Test]
         public void Registro_TresImplementados_SlugSemKit_KitBoundFalse_EUsarNaoFazNada()
         {
-            Assert.AreEqual(3, KitRunner.Registro.Count);
-            foreach (string s in new[] { "01-pyra", "03-veu", "10-tessa" })
-                Assert.IsTrue(KitRunner.Registro.ContainsKey(s) && Kits.De(s).Implementado, "registrado e marcado: " + s);
-            var vex = new FakeConjurador("vex", Vector3.zero);
-            var k = new KitRunner("09-vex", vex);
+            Assert.GreaterOrEqual(KitRunner.Registro.Count, 3, "os tres de sempre + os grupos dos 17");
+            foreach (string s in KitRunner.Registro.Keys)
+                Assert.IsTrue(Kits.De(s).Implementado, "registrado e marcado: " + s);
+            // slug SEM kit: um que nao existe (os 17 ganham kit por grupo; o Vex deixou de servir de exemplo)
+            var vex = new FakeConjurador("ninguem", Vector3.zero);
+            var k = new KitRunner("99-ninguem", vex);
             Assert.AreEqual(1, _bounds.Count);
-            Assert.AreEqual("09-vex", _bounds[0][0]); Assert.IsFalse((bool)_bounds[0][1], "KitBound(slug, false): botao apagado");
+            Assert.AreEqual("99-ninguem", _bounds[0][0]); Assert.IsFalse((bool)_bounds[0][1], "KitBound(slug, false): botao apagado");
             Assert.IsNull(k.Impl);
             Assert.IsFalse(k.ProntoTatica); Assert.IsFalse(k.UsarTatica(), "mago sem kit nao tem tatica");
             Carregar(k);

@@ -337,8 +337,25 @@ namespace Arkana.Gameplay
     /// (Bus.KitTelegraph, GDD §4.3: "se mata rapido, avisa antes") — um anel que se ENCHE ate' o efeito sair.
     /// Opacidade/escala seguem LeituraDosKits.EscalaPorRestante. Zero luz dinamica: o projeto ilumina com COR.
     /// </summary>
-    public sealed class VisualDosKits : MonoBehaviour
+    public sealed partial class VisualDosKits : MonoBehaviour
     {
+        // KITS DOS 17 (12/09): cada GRUPO de magos desenha num arquivo PROPRIO (VisualDosKits.GrupoX.cs) pelos ganchos
+        // parciais abaixo — ninguem edita este arquivo para por um kit novo. Grupo sem arquivo: o compilador apaga a chamada.
+        // Novo: cria o Item do tipo (feito = true se o tipo era do grupo). Desenho: atualiza. Estado: leitura por mago (como o
+        // braco da Pyra), chamada por quadro para todo corpo com kit.
+        partial void NovoGrupoA(Item it, Transform raiz, string tipo, ref bool feito);
+        partial void NovoGrupoB(Item it, Transform raiz, string tipo, ref bool feito);
+        partial void NovoGrupoC(Item it, Transform raiz, string tipo, ref bool feito);
+        partial void NovoGrupoD(Item it, Transform raiz, string tipo, ref bool feito);
+        partial void DesenhoGrupoA(Item it, EfeitoVisual v, float e, Pawn dono, ref bool feito);
+        partial void DesenhoGrupoB(Item it, EfeitoVisual v, float e, Pawn dono, ref bool feito);
+        partial void DesenhoGrupoC(Item it, EfeitoVisual v, float e, Pawn dono, ref bool feito);
+        partial void DesenhoGrupoD(Item it, EfeitoVisual v, float e, Pawn dono, ref bool feito);
+        partial void EstadoGrupoA(Pawn dono);
+        partial void EstadoGrupoB(Pawn dono);
+        partial void EstadoGrupoC(Pawn dono);
+        partial void EstadoGrupoD(Pawn dono);
+
         const int PontosFio = 12;
         /// <summary>O fio corre na cintura: a logica mede nos pes, o olho le' no corpo.</summary>
         const float AlturaFio = 1f;
@@ -385,6 +402,8 @@ namespace Arkana.Gameplay
             public LineRenderer Linha;
             public Vector3[] Pontos;
             public int Quadro;
+            /// <summary>Pecas a mais de um kit dos grupos (o que nao cabe em R/R2/Ps/Ps2/Linha). Null = nenhuma.</summary>
+            public Component[] Extra;
         }
 
         sealed class Aviso
@@ -444,6 +463,7 @@ namespace Arkana.Gameplay
                     IReadOnlyList<EfeitoVisual> vs = dono.Runner.Visuais;
                     for (int j = 0; j < vs.Count; j++) Desenhar(vs[j], dono);
                     if (dono.Runner.Impl is Pyra) BracoDaPyra(dono);
+                    if (dono.Runner.Impl != null) { EstadoGrupoA(dono); EstadoGrupoB(dono); EstadoGrupoC(dono); EstadoGrupoD(dono); }
                 }
             Recolher();
             Avisos(Time.deltaTime);
@@ -469,6 +489,13 @@ namespace Arkana.Gameplay
                 case "revelado": Revelado(it, v, e); break;
                 case "braco_livre": Chama(it, v, 110f, 36f); break;
                 case "fornalha": Chama(it, v, 18f, 0f); break;
+                default:
+                    bool feito = false;
+                    DesenhoGrupoA(it, v, e, dono, ref feito);
+                    if (!feito) DesenhoGrupoB(it, v, e, dono, ref feito);
+                    if (!feito) DesenhoGrupoC(it, v, e, dono, ref feito);
+                    if (!feito) DesenhoGrupoD(it, v, e, dono, ref feito);
+                    break;
             }
         }
 
@@ -837,6 +864,13 @@ namespace Arkana.Gameplay
                     it.Ps = ParticulaVfx.Novo(raiz, "Brasas", new Color(1f, 0.8f, 0.35f), CorFogo, 18f,
                         new Vector2(0.5f, 1f), new Vector2(0.05f, 0.3f), new Vector2(0.04f, 0.09f), true, 1f, 24);
                     Subir(it.Ps, 0.15f);
+                    break;
+                default:
+                    bool feito = false;
+                    NovoGrupoA(it, raiz, tipo, ref feito);
+                    if (!feito) NovoGrupoB(it, raiz, tipo, ref feito);
+                    if (!feito) NovoGrupoC(it, raiz, tipo, ref feito);
+                    if (!feito) NovoGrupoD(it, raiz, tipo, ref feito);
                     break;
             }
             return it;

@@ -33,15 +33,25 @@ namespace Arkana.Gameplay
     ///  2. TELEGRAFIA (§4.3): UsarSuprema NAO executa o efeito, AGENDA — grampeado em Kits.TelegrafiaMin..Max.
     /// Mago sem kit registrado joga normal (ataque), sem tatica/suprema: KitBound(slug, false).
     /// </summary>
-    public sealed class KitRunner
+    public sealed partial class KitRunner
     {
-        /// <summary>O REGISTRO: slug -> fabrica do kit. Os 17 fora daqui sao declarados em Kits e inertes.</summary>
+        /// <summary>O REGISTRO: slug -> fabrica do kit. Os 17 entram pelos GRUPOS (KitRunner.GrupoX.cs), um arquivo cada.</summary>
         public static readonly Dictionary<string, Func<IHabilidade>> Registro = new Dictionary<string, Func<IHabilidade>>
         {
             { "01-pyra", () => new Pyra() },
             { "03-veu", () => new Veu() },
             { "10-tessa", () => new Tessa() },
         };
+
+        static partial void RegistrarGrupoA(Dictionary<string, Func<IHabilidade>> r);
+        static partial void RegistrarGrupoB(Dictionary<string, Func<IHabilidade>> r);
+        static partial void RegistrarGrupoC(Dictionary<string, Func<IHabilidade>> r);
+        static partial void RegistrarGrupoD(Dictionary<string, Func<IHabilidade>> r);
+
+        static KitRunner()
+        {
+            RegistrarGrupoA(Registro); RegistrarGrupoB(Registro); RegistrarGrupoC(Registro); RegistrarGrupoD(Registro);
+        }
 
         public readonly string Slug;
         public readonly Kits.KitDef Dados;
