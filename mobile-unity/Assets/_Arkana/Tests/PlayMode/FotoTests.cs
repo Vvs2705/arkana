@@ -840,5 +840,65 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// ONDA 6A — o MAPA. 30-minimapa-castelo: no castelo o minimapa mostra a ilha INTEIRA com a rota tracejada e a seta no
+        /// portao. 30-minimapa: depois do pouso, com a tempestade formada — a janela local em volta do jogador, a borda violeta
+        /// da zona, o proximo circulo branco, o bau e a BUSSOLA no topo central. 30-mapa-grande: o toque no minimapa (o
+        /// caminho do dedo) abre a ilha inteira com os nomes dos POIs, sem pausar. 30-mapa-grande-fechando: a zona cravada
+        /// na fase 1 pelo ForcarCirculo (depuracao da Zona) — a tinta roxa fora dela e os dois circulos no mapa aberto.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Mapa_MinimapaBussolaEMapaGrande()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);   // o castelo emitiu a rota (Start) e a ilha foi pintada na Task (~0,5 s)
+            Assert.IsNotNull(main.Player, "partida sem jogador");
+            Assert.IsNotNull(main.Hud.Mapa, "a HUD tem mapa");
+            Assert.IsTrue(Arkana.UI.Minimapa.IlhaPintada, "a textura da ilha subiu (a Task da pintura terminou)");
+            Foto(main.Player.Camera.Cam, "30-minimapa-castelo", true);
+
+            // o roteiro do 06-08: salta com o castelo sobre a ilha e espera o pouso
+            float t = 0f;
+            while (main.Castelo != null && main.Castelo.Progresso < 0.42f && t < 15f) { yield return null; t += Time.deltaTime; }
+            main.Player.Saltar();
+            t = 0f;
+            while (main.Player != null && main.Player.Pawn.Queda.NoAr && t < 20f) { yield return null; t += Time.deltaTime; }
+            // 70 s de abertura + 10 s de formacao: a tempestade existe e o proximo circulo esta' anunciado; o bau caiu aos 51 s
+            yield return Esperar(Gameplay.Zona.ABERTURA_S + Gameplay.Zona.FORMACAO_S + 2f);
+            OlharParaOCentro(main);
+            yield return Esperar(1f);   // o zoom do minimapa ja' mergulhou na janela local e a camera assentou
+            Foto(main.Player.Camera.Cam, "30-minimapa", true);
+            Diagnostico(main, "30-minimapa");
+            var sb = new System.Text.StringBuilder();
+            Gameplay.Zona z = main.Partida.Zona;
+            Gameplay.BauCelestial bau = main.Partida.Bau;
+            Gameplay.Zona.Circulo prox;
+            bool temProx = Gameplay.ZonaVisual.Proximo(z, out prox);
+            sb.AppendLine("30-minimapa: zona=" + z.EstadoAtual + " fase=" + z.FaseAtual + " centro=" + z.Centro.ToString("F0") + " raio=" + z.Raio.ToString("F0")
+                + " proximo=" + (temProx ? prox.Centro.ToString("F0") + " r=" + prox.Raio.ToString("F0") : "-")
+                + " bau=" + (bau != null ? bau.FaseAtual + " " + bau.Pos.ToString("F0") : "-")
+                + " jogador=" + main.Player.Pawn.Pos.ToString("F0") + " yaw=" + (main.Player.Camera.Logica.Yaw * Mathf.Rad2Deg).ToString("F0"));
+
+            Tocar("Minimapa");   // o caminho do dedo: o Button do minimapa
+            Assert.IsTrue(main.Hud.Mapa.Aberto, "tocar no minimapa abre o mapa grande");
+            Assert.AreEqual(1f, Time.timeScale, "o mapa grande NAO pausa o jogo");
+            yield return null;
+            Foto(main.Player.Camera.Cam, "30-mapa-grande", true);
+
+            // a zona cravada na fase 1 (Plano[0]) parada em espera: o proximo passa a ser o Plano[1]
+            z.ForcarCirculo(1, z.Plano[0].Centro, z.Plano[0].Raio);
+            yield return null;
+            Foto(main.Player.Camera.Cam, "30-mapa-grande-fechando", true);
+            sb.AppendLine("30-mapa-grande-fechando: zona=" + z.EstadoAtual + " fase=" + z.FaseAtual + " raio=" + z.Raio.ToString("F0")
+                + " proximo=" + z.Plano[1].Centro.ToString("F0") + " r=" + z.Plano[1].Raio.ToString("F0") + " aberto=" + main.Hud.Mapa.Aberto);
+            Tocar("PlacaDoMapa");   // tocar de novo (no mapa aberto) fecha
+            Assert.IsFalse(main.Hud.Mapa.Aberto, "tocar de novo fecha o mapa grande");
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }

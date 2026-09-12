@@ -190,7 +190,10 @@ namespace Arkana.UI
     /// </summary>
     public struct HudLayout
     {
-        public Rect Barras, Topo, Pausa, Joystick, Disparo, Esquiva, Tatica, Suprema, Salto, Carrossel, ArmaRotulo, Pegar, Altimetro, KillFeed;
+        public Rect Barras, Topo, Pausa, Minimapa, Bussola, MapaGrande, Joystick, Disparo, Esquiva, Tatica, Suprema, Salto, Carrossel, ArmaRotulo, Pegar, Altimetro, KillFeed;
+
+        /// <summary>Lado do minimapa em dp: o teto e o piso (tela baixa encolhe o mapa ate' o piso, nunca o empilha). KNOB por foto.</summary>
+        public const float MinimapaDp = 124f, MinimapaMinDp = 72f;
 
         public static HudLayout Calcular(Vector2 tela, Margens m, float px)
         {
@@ -199,9 +202,8 @@ namespace Arkana.UI
             float g = 24f * px;     // respiro de dedo
             l.Barras = new Rect(m.Esq + mm, tela.y - m.Topo - mm - 56f * px, 190f * px, 56f * px);
             l.Topo = new Rect(tela.x - m.Dir - mm - 180f * px, tela.y - m.Topo - mm - 52f * px, 180f * px, 52f * px);
-            // pausa: canto superior direito, ABAIXO do relogio, dentro da tela (o teste cobra o retangulo)
-            float pz = 44f * px;
-            l.Pausa = new Rect(tela.x - m.Dir - g - pz, tela.y - m.Topo - g - 58f * px - pz, pz, pz);
+            // bussola: faixa fina no topo central, ACIMA da faixa de aviso (que comeca 44dp abaixo do topo)
+            l.Bussola = new Rect(tela.x * 0.5f - 120f * px, tela.y - m.Topo - 8f * px - 26f * px, 240f * px, 26f * px);
             float js = 150f * px;
             l.Joystick = new Rect(m.Esq + g, m.Baixo + g, js, js);
             float fb = 88f * px;
@@ -220,14 +222,27 @@ namespace Arkana.UI
             l.Pegar = new Rect(tela.x / 2f - pb / 2f, m.Baixo + 40f * px, pb, pb);
             l.Altimetro = new Rect(tela.x - m.Dir - mm - 120f * px, tela.y / 2f - 20f * px, 120f * px, 40f * px);
             l.KillFeed = new Rect(m.Esq + mm, l.Barras.yMin - 8f * px - 72f * px, 260f * px, 72f * px);
+            // MINIMAPA: logo abaixo do relogio, encostado na borda direita; o lado cabe entre o relogio e o que mora embaixo
+            // na coluna (altimetro da queda, rotulo da arma)
+            float mapaTopo = l.Topo.yMin - 8f * px;
+            float piso = Mathf.Max(l.Altimetro.yMax, l.ArmaRotulo.yMax) + 8f * px;
+            float lado = Mathf.Clamp(mapaTopo - piso, MinimapaMinDp * px, MinimapaDp * px);
+            l.Minimapa = new Rect(tela.x - m.Dir - mm - lado, mapaTopo - lado, lado, lado);
+            // pausa: a ESQUERDA do minimapa, na altura do topo dele — continua ABAIXO do relogio e dentro da tela (o teste cobra)
+            float pz = 44f * px;
+            l.Pausa = new Rect(l.Minimapa.xMin - 12f * px - pz, l.Minimapa.yMax - pz, pz, pz);
+            // mapa grande: o maior quadrado que cabe na area segura, com respiro de leitura
+            float mg = Mathf.Min(tela.y - m.Topo - m.Baixo, tela.x - m.Esq - m.Dir) - 2f * mm;
+            l.MapaGrande = new Rect((m.Esq + tela.x - m.Dir - mg) * 0.5f, (m.Baixo + tela.y - m.Topo - mg) * 0.5f, mg, mg);
             return l;
         }
     }
 
     /// <summary>
     /// HUD de partida — OBSERVA o Bus e encaminha toque. Nada aqui decide jogo. Montada por codigo (zero prefab).
-    /// Mapa (paisagem): sup-esq vida/mana/escudo + kill feed; sup-dir relogio/bots/FPS + PAUSA; faixa de aviso no alto;
-    /// inf-esq joystick; inf-dir Fogo, Esquiva, TATICA, SUPREMA, SALTO e o carrossel; inf-meio PEGAR.
+    /// Mapa (paisagem): sup-esq vida/mana/escudo + kill feed; sup-dir relogio/bots/FPS, o MINIMAPA embaixo (toque = mapa
+    /// grande) e a PAUSA ao lado dele; topo central a BUSSOLA e, abaixo, a faixa de aviso; inf-esq joystick; inf-dir Fogo,
+    /// Esquiva, TATICA, SUPREMA, SALTO e o carrossel; inf-meio PEGAR.
     /// </summary>
     public sealed class Hud : MonoBehaviour
     {
@@ -284,6 +299,8 @@ namespace Arkana.UI
         public BotaoAcao Pegar { get; private set; }
         public BotaoAcao Pausa { get; private set; }
         public CarrosselElementos Carrossel { get; private set; }
+        /// <summary>Minimapa, mapa grande e bussola (Minimapa.cs).</summary>
+        public Minimapa Mapa { get; private set; }
         public IEntidade Jogador { get; private set; }
         public bool Pausado { get; private set; }
         public bool SegurandoSalto => Salto != null && Salto.Segurando;
@@ -453,6 +470,7 @@ namespace Arkana.UI
             Carrossel.Escolheu += e => ElementoEscolhido?.Invoke(e);
             Carrossel.Visivel(false);
             _armaRotulo = Formas.Texto(_raiz, "ArmaRotulo", "", 11f, Color.white, TextAnchor.MiddleRight);
+            Mapa = new Minimapa(_raiz);   // depois dos controles (o mapa grande cobre o meio), antes do FIM (o veredito cobre tudo)
 
             MontarFim();
             Layout();
@@ -914,6 +932,7 @@ namespace Arkana.UI
             AreaSegura.NoRect((RectTransform)Pegar.transform, l.Pegar);
             AreaSegura.NoRect(_altimetroBox, l.Altimetro);
             AreaSegura.NoRect(_killFeed, l.KillFeed);
+            Mapa.Layout(l.Minimapa, l.Bussola, l.MapaGrande);
             // olhar livre: da fronteira do joystick (35%) ate' a borda direita
             _olhar.anchorMin = new Vector2(0.35f, 0); _olhar.anchorMax = Vector2.one; _olhar.offsetMin = Vector2.zero; _olhar.offsetMax = Vector2.zero;
             _aviso.Layout(tela, m);
@@ -951,6 +970,7 @@ namespace Arkana.UI
             Bus.DerrubadoProgresso += OnDerrubadoProgresso;
             Bus.QuedaFase += OnQuedaFase;
             Bus.QuedaAltura += OnQuedaAltura;
+            Bus.CasteloRota += OnCasteloRota;
             Bus.MatchStarted += OnMatchStarted;
             Bus.MatchOver += OnMatchOver;
         }
@@ -964,7 +984,7 @@ namespace Arkana.UI
             Bus.ZonaEstado -= OnZonaEstado; Bus.BauAnunciado -= OnBauAnunciado; Bus.BauPousou -= OnBauPousou; Bus.BauCanalizando -= OnBauCanalizando;
             Bus.BauAberto -= OnBauAberto; Bus.LootPrompt -= OnLoot; Bus.WeaponEquipped -= OnArma; Bus.ElementChanged -= OnElemento;
             Bus.EntityDerrubada -= OnDerrubada; Bus.EntityReerguida -= OnReerguida; Bus.DerrubadoProgresso -= OnDerrubadoProgresso;
-            Bus.QuedaFase -= OnQuedaFase; Bus.QuedaAltura -= OnQuedaAltura; Bus.MatchStarted -= OnMatchStarted; Bus.MatchOver -= OnMatchOver;
+            Bus.QuedaFase -= OnQuedaFase; Bus.QuedaAltura -= OnQuedaAltura; Bus.CasteloRota -= OnCasteloRota; Bus.MatchStarted -= OnMatchStarted; Bus.MatchOver -= OnMatchOver;
             ConfigLogica.Mudou -= AplicarConfig;
             if (Pausado) Time.timeScale = 1f;
         }
@@ -979,6 +999,7 @@ namespace Arkana.UI
             Carrossel.Visivel(false);
             Pegar.gameObject.SetActive(false);
             _armaRotulo.text = "";
+            Mapa.Zerar();   // a rota nova chega no Start do castelo, depois daqui
             // O KitBound sai no Pawn.Montar, que pode acontecer ANTES desta HUD existir (ordem da cena).
             // Sem isto os botoes de tatica/suprema ficariam apagados para sempre — costura de 11/09/2026.
             var pawn = jogador as Arkana.Gameplay.Pawn;
@@ -1011,6 +1032,7 @@ namespace Arkana.UI
         public void MostrarFim(bool vitoria)
         {
             _fimVitoria = vitoria;
+            Mapa.Fechar();
             Color cor = vitoria ? Estilo.Ouro : CorDerrota;
             _fimTexto.text = vitoria ? T_VITORIA : T_DERROTA;
             _fimTexto.color = cor;
@@ -1258,6 +1280,7 @@ namespace Arkana.UI
 
         void OnQuedaFase(string fase) { _altimetroBox.gameObject.SetActive(fase == "caindo" || fase == "planando"); }
         void OnQuedaAltura(float metros, float vel) { _altimetro.text = string.Format(T_ALTITUDE, Mathf.RoundToInt(metros)); }
+        void OnCasteloRota(Vector3 inicio, Vector3 fim, float dur) { Mapa.Rota(inicio, fim); }
 
         // ---------- pausa (GDD §12: Retomar / Configuracoes / Abandonar) ----------
         void AbrirPausa()
@@ -1332,6 +1355,8 @@ namespace Arkana.UI
             if (Screen.width != (int)_telaAtual.x || Screen.height != (int)_telaAtual.y) Layout();
             // relogio / bots / fps
             PintarTopo();
+            // minimapa, mapa grande e bussola: leem a partida, o jogador e o yaw da camera (Minimapa.cs)
+            Mapa.Pintar(dt, Jogador, _pawn != null ? _pawn.Queda.Fase : null);
             if (_fim.gameObject.activeSelf) PintarFim(dt);
             if (_mostraFps) _fps.text = string.Format(T_FPS, Mathf.RoundToInt(1f / Mathf.Max(dt, 0.0001f)));
             // rotulo da arma: pulso -> espera -> apaga

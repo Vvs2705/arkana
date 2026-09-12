@@ -7,7 +7,8 @@ namespace Arkana.Tests
 {
     /// <summary>HUD pura: rotulo da arma some em 2,5 s; maos nuas escondem o carrossel; kill feed com nome; faixa do abate que
     /// carimba e some; TREINO no relogio;
-    /// numeros com merge; prioridade da faixa; cooldown interpolado; pausa DENTRO da tela; alvos &gt;= 48dp; daltonismo.</summary>
+    /// numeros com merge; prioridade da faixa; cooldown interpolado; pausa DENTRO da tela; alvos &gt;= 48dp; daltonismo;
+    /// minimapa e bussola sem cobrir nada, mundo -&gt; mapa, bussola que gira com a camera e a ilha pintada.</summary>
     public class UiHudLogicaTests
     {
         HudLogica _h;
@@ -289,6 +290,104 @@ namespace Arkana.Tests
             Assert.IsFalse(l.Pegar.Overlaps(l.Suprema), "PEGAR nao briga com a fileira");
             var l2 = HudLayout.Calcular(tela, m, px);
             Assert.AreEqual(l.Suprema.xMin, l2.Suprema.xMin, 1e-4f, "layout repetido e' estavel");
+        }
+
+        [Test]
+        public void MinimapaEBussolaNaoCobremNada()
+        {
+            // a tela do teste (px = 1, com entalhe) e a do Poco F4 deitado (2400x1080 a 395 ppi = 437dp: o caso apertado)
+            var telas = new[] { new Vector2(1600, 720), new Vector2(2400, 1080) };
+            var margens = new[] { new Margens(80, 40, 90, 60), new Margens(0, 0, 0, 0) };
+            var pxs = new[] { 1f, 395f / 160f };
+            for (int i = 0; i < telas.Length; i++)
+            {
+                Vector2 tela = telas[i]; Margens m = margens[i]; float px = pxs[i];
+                var l = HudLayout.Calcular(tela, m, px);
+                Rect mapa = l.Minimapa;
+                Assert.LessOrEqual(mapa.yMax, l.Topo.yMin, "minimapa ABAIXO do relogio");
+                Assert.LessOrEqual(mapa.xMax, tela.x - m.Dir, "minimapa dentro da area segura");
+                Assert.AreEqual(mapa.width, mapa.height, 1e-3f, "quadrado");
+                Assert.GreaterOrEqual(mapa.width / px, HudLayout.MinimapaMinDp - 1e-3f, "e' alvo de toque (abre o mapa grande)");
+                foreach (var r in new[] { l.Pausa, l.Topo, l.Altimetro, l.ArmaRotulo, l.Salto, l.Carrossel, l.Disparo })
+                    Assert.IsFalse(mapa.Overlaps(r), "o minimapa nao cobre nada da coluna direita (" + tela + ")");
+                Assert.Less(l.Pausa.yMax, l.Topo.yMin + 0.01f, "a pausa segue abaixo do relogio");
+                Assert.GreaterOrEqual(l.Pausa.xMin, m.Esq);
+                Assert.GreaterOrEqual(l.Bussola.yMin, HudAviso.RectFaixa(tela, m, px).yMax, "a bussola mora ACIMA da faixa de aviso");
+                Assert.LessOrEqual(l.Bussola.yMax, tela.y - m.Topo);
+                Assert.AreEqual(tela.x * 0.5f, l.Bussola.center.x, 1e-3f, "bussola centrada na mira");
+                Assert.IsFalse(l.Bussola.Overlaps(l.Barras) || l.Bussola.Overlaps(l.Topo));
+                Assert.GreaterOrEqual(l.MapaGrande.xMin, m.Esq); Assert.LessOrEqual(l.MapaGrande.xMax, tela.x - m.Dir);
+                Assert.GreaterOrEqual(l.MapaGrande.yMin, m.Baixo); Assert.LessOrEqual(l.MapaGrande.yMax, tela.y - m.Topo, "mapa grande na area segura");
+            }
+        }
+
+        // ---------- mapa e bussola ----------
+        [Test]
+        public void MapaLevaMundoAJanelaEBussolaGiraComACamera()
+        {
+            // mundo -> janela: o jogador no meio, norte (+z) EM CIMA, leste (+x) a direita
+            Vector3 eu = new Vector3(40f, 3f, -20f);
+            float escala = 240f / MapaLogica.VistaLocalM;   // janela de 240 px: 1 px por metro
+            Assert.AreEqual(Vector2.zero, MapaLogica.NaJanela(eu, eu, escala), "o jogador no meio da janela");
+            Vector2 zona = MapaLogica.NaJanela(new Vector3(100f, 0f, 60f), eu, escala);
+            Assert.AreEqual(60f, zona.x, 1e-3f, "60 m a leste = 60 px a direita");
+            Assert.AreEqual(80f, zona.y, 1e-3f, "80 m ao norte = 80 px acima");
+            // a textura: origem da ilha no meio; a janela uv do minimapa tem vista/extensao de lado
+            float ext = 660f;
+            Assert.AreEqual(new Vector2(0.5f, 0.5f), MapaLogica.Uv(Vector3.zero, ext));
+            Assert.AreEqual(1f, MapaLogica.Uv(new Vector3(330f, 0f, 330f), ext).y, 1e-4f, "o canto norte da textura");
+            Rect uv = MapaLogica.UvDaJanela(eu, MapaLogica.VistaLocalM, ext);
+            Assert.AreEqual(MapaLogica.VistaLocalM / ext, uv.width, 1e-4f);
+            Assert.AreEqual(MapaLogica.Uv(eu, ext).x, uv.center.x, 1e-4f, "a janela segue o jogador");
+            // zoom: ilha inteira (castelo) = centro da ilha; perto (no chao) = o jogador
+            Assert.AreEqual(0f, MapaLogica.CentroDaJanela(eu, ext, ext).magnitude, 1e-4f);
+            Assert.AreEqual(eu.x, MapaLogica.CentroDaJanela(eu, MapaLogica.VistaLocalM, ext).x, 1e-3f);
+            // rumo e bussola: olhando o norte, o L esta' na borda direita; olhando o leste, no meio; o N cruza o zero
+            Assert.AreEqual(0f, MapaLogica.Rumo(Vector3.zero, new Vector3(0f, 0f, 10f)), 1e-3f);
+            Assert.AreEqual(90f, MapaLogica.Rumo(Vector3.zero, new Vector3(10f, 0f, 0f)), 1e-3f);
+            Assert.AreEqual(1f, MapaLogica.NaBussola(90f, 0f), 1e-4f);
+            Assert.AreEqual(0f, MapaLogica.NaBussola(90f, 90f), 1e-4f);
+            Assert.AreEqual(10f / MapaLogica.MeiaBussola, MapaLogica.NaBussola(0f, 350f), 1e-4f, "o N 10 graus a direita, cruzando o zero");
+            Assert.AreEqual(1f, MapaLogica.AlfaNaBussola(0f), 1e-4f);
+            Assert.AreEqual(0f, MapaLogica.AlfaNaBussola(1f), 1e-4f, "a marca some na borda, nao corta seco");
+            // a seta: o sprite aponta para cima; yaw 90 (leste) = seta para a DIREITA na tela
+            float giro = MapaLogica.GiroDaSeta(90f) * Mathf.Deg2Rad;
+            Assert.AreEqual(1f, -Mathf.Sin(giro), 1e-4f, "yaw 90 = leste = seta para a direita");
+            Assert.AreEqual(0f, Mathf.Cos(giro), 1e-4f);
+            // o bau 30 m a sudoeste: embaixo e a esquerda no mapa; olhando o norte, a bussola o poe ATRAS (fora da faixa)
+            Vector3 bau = eu + new Vector3(-30f, 0f, -30f);
+            Vector2 pb = MapaLogica.NaJanela(bau, eu, escala);
+            Assert.Less(pb.x, 0f); Assert.Less(pb.y, 0f);
+            Assert.AreEqual(225f, Mathf.Repeat(MapaLogica.Rumo(eu, bau), 360f), 1e-3f);
+            Assert.Greater(Mathf.Abs(MapaLogica.NaBussola(MapaLogica.Rumo(eu, bau), 0f)), 1f);
+        }
+
+        [Test]
+        public void MapaDaIlhaPintaMarChaoLagoESombra()
+        {
+            // o sombreado: plano = 1; encosta virada para o NOROESTE (sobe para leste/sul) acende, a de costas apaga
+            Assert.AreEqual(1f, MapaLogica.Sombra(0f, 0f), 1e-4f);
+            Assert.Greater(MapaLogica.Sombra(0.8f, -0.8f), 1f, "virada para a luz");
+            Assert.Less(MapaLogica.Sombra(-0.8f, 0.8f), 1f, "de costas para a luz");
+            var r = new Arkana.World.Relevo();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Color32[] px = MapaLogica.PintarIlha(r, MapaLogica.TexturaLado);
+            long ms = sw.ElapsedMilliseconds;
+            int n = MapaLogica.TexturaLado;
+            float ext = MapaLogica.Extensao(r);
+            Color32 Em(float x, float z)
+            {
+                Vector2 uv = MapaLogica.Uv(new Vector3(x, 0f, z), ext);
+                return px[Mathf.FloorToInt(uv.y * n) * n + Mathf.FloorToInt(uv.x * n)];
+            }
+            Color32 mar = px[0], vale = Em(0f, 0f), lago = Em(r.Lago.x, r.Lago.y), mata = Em(r.Floresta.x, r.Floresta.y);
+            Assert.IsTrue(mar.b > mar.g && mar.b > mar.r, "o canto da textura e' mar: azul");
+            Assert.IsTrue(vale.g > vale.b && vale.g > vale.r, "o vale e' campina: verde");
+            Assert.IsTrue(lago.b > lago.r && lago.b > lago.g, "o lago e' agua");
+            Assert.Less(mata.g + mata.r, vale.g + vale.r, "a floresta e' copa ESCURA, nao campina");
+            // ponytail: a pintura roda numa Task (Minimapa.Textura); a thread principal so' sobe ~1 MB uma vez. Teto frouxo de
+            // regressao: se ele estourar, o mapa demora a aparecer — baixar TexturaLado para 256 corta 4x.
+            Assert.Less(ms, 4000, "pintura de " + n + "x" + n + " levou " + ms + " ms");
         }
 
         [Test]

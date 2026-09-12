@@ -128,6 +128,16 @@ namespace Arkana.Core
         public const string ZonaFora = "VOLTE PARA A ZONA";
         public const string ZonaDps = "{0}/s";
 
+        // MAPA E BUSSOLA. Rumos de 45 em 45 graus a partir do norte (L = leste, O = oeste: o PT-BR, nao o E/W).
+        public static readonly string[] MapaRumos = { "N", "NE", "L", "SE", "S", "SO", "O", "NO" };
+        public const string MapaFechar = "TOQUE PARA FECHAR";
+        /// <summary>Nome de cada POI no mapa grande (chave = Poi.Nome do Relevo). POI sem nome aqui fica sem rotulo.</summary>
+        public static readonly IReadOnlyDictionary<string, string> MapaPois = new Dictionary<string, string>
+        {
+            { "alagado", "ALAGADO" }, { "floresta", "FLORESTA" }, { "lago", "LAGO" }, { "ruinas", "RUÍNAS" },
+            { "dunas", "DUNAS" }, { "pico", "PICO" }, { "vale", "VALE" },
+        };
+
         // DERRUBADO (vocabulario 10+: DERRUBADO e ESVAECER, nunca mutilacao).
         public const string DerrubadoVoce = "VOCÊ FOI DERRUBADO";
         public const string DerrubadoEsvaecendo = "ESVAECENDO {0}s";

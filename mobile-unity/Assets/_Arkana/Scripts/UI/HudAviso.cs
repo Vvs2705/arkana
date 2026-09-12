@@ -288,6 +288,7 @@ namespace Arkana.UI
             _faixaPlaca.rectTransform.anchoredPosition = rf.center;   // pivo no meio: a largura cresce para os dois lados
             _faixaMax = rf.width;
             _faixaTexto = null;   // tela nova: remede
+            if (_faixa.text.Length > 0) MedirFaixa();   // ja', nao no proximo Update: a foto (e a rotacao) desenham antes dele
             Rect rb = RectBadges(tela, m, px);
             float x = rb.xMin;
             for (int i = 0; i < _badges.Length; i++)
@@ -303,6 +304,12 @@ namespace Arkana.UI
             Rect rd = RectDerrubado(tela, m, px);
             AreaSegura.NoRect(_painelDerrubado, rd);
             AreaSegura.NoRect(_vinheta[0].rectTransform, new Rect(0, 0, tela.x, tela.y));
+        }
+
+        /// <summary>A placa abraca o texto (+46 dp de losangos e folga), no teto da largura da faixa.</summary>
+        void MedirFaixa()
+        {
+            _faixaPlaca.rectTransform.sizeDelta = new Vector2(Mathf.Min(Mathf.Ceil(_faixa.preferredWidth + Dp.Px(46f)), _faixaMax), Dp.Px(30f));
         }
 
         void Update()
@@ -321,8 +328,7 @@ namespace Arkana.UI
                 _faixaTexto = txt;
                 _faixa.text = txt;
                 _faixaPlaca.gameObject.SetActive(txt.Length > 0);
-                if (txt.Length > 0)
-                    _faixaPlaca.rectTransform.sizeDelta = new Vector2(Mathf.Min(Mathf.Ceil(_faixa.preferredWidth + Dp.Px(46f)), _faixaMax), Dp.Px(30f));
+                if (txt.Length > 0) MedirFaixa();
             }
             if (f != null && f.Cor != _faixaCor)
             {
