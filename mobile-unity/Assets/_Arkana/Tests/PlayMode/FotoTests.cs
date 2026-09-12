@@ -1013,5 +1013,63 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             Assert.AreNotEqual("procedural", veg.MoldeDasArvores, "as arvores da Meshy nao carregaram (faltam os .glb em Resources?)");
         }
+
+
+        /// <summary>
+        /// ONDA 7C — o VOO como espetaculo. 34-castelo-vivo: camera de LADO, a ~40 m do casco (60 m do eixo: o castelo tem
+        /// 35,8 m de envergadura e 52 de altura, mais perto a torre sai do quadro), 10 m abaixo do eixo e mirando 18 m atras
+        /// dele, com o FOV do jogador (62): o castelo num terco, a esteira dourada e as brasas cruzando o resto, as runas
+        /// girando sob a base (elipse vista de cima) e as rochas em orbita. Depois o roteiro do 06-08
+        /// (salta com o castelo sobre a ilha): 34-queda pela camera do jogador em queda livre (vento na camera, rastro fino nas
+        /// maos e pes), 34-planeio (as fitas nas maos e o brilho) e 34-pouso no instante do pouso (anel de poeira, onda e
+        /// faiscas: 0,12 s depois, o anel ja' abriu ~1,5 m).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Voo_CasteloQuedaPlaneioPouso()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(3f);   // a esteira (2,4 s) e as brasas (2,4-4 s) enchem o rastro
+            Assert.IsNotNull(main.Player, "partida sem jogador");
+            Assert.IsNotNull(main.Castelo, "partida sem castelo");
+            var voo = Object.FindFirstObjectByType<Gameplay.VisualDoVoo>();
+            Assert.IsNotNull(voo, "o voo tem quem desenhe");
+            Arkana.World.Castelo cas = main.Castelo;
+            Vector3 c = cas.transform.position, dir = cas.Rota.Direcao;
+            Vector3 lado = Vector3.Cross(Vector3.up, dir).normalized;
+            Camera cam = CameraTemporaria("CamFotoCasteloVivo", c + lado * 60f - dir * 4f + Vector3.down * 10f, c - dir * 18f + Vector3.down * 6f, Color.gray);
+            cam.fieldOfView = 62f;
+            Foto(cam, "34-castelo-vivo", false);
+            Object.Destroy(cam.gameObject);
+            var sb = new System.Text.StringBuilder("34-castelo-vivo: castelo=" + c.ToString("F0") + " progresso=" + cas.Progresso.ToString("F2")
+                + " vivo=" + voo.CasteloVivo + " rastro=" + voo.RastroDoCastelo + " rochas=" + voo.Rochas + " brasas=" + voo.Brasas + "\n");
+
+            float t = 0f;
+            while (main.Castelo != null && main.Castelo.Progresso < 0.42f && t < 15f) { yield return null; t += Time.deltaTime; }
+            main.Player.Saltar();
+            yield return Esperar(2.5f);   // terminal (55 m/s) desde 1,4 s: o vento no maximo
+            Gameplay.Pawn eu = main.Player.Pawn;
+            Foto(main.Player.Camera.Cam, "34-queda", true);
+            sb.AppendLine("34-queda: fase=" + eu.Queda.Fase + " vy=" + eu.Queda.Vy.ToString("F1") + " altura=" + eu.Queda.Altura.ToString("F0")
+                + " vento=" + voo.Vento + " rastro=" + voo.RastroAceso(eu));
+
+            t = 0f;
+            while (eu.Queda.NoAr && eu.Queda.Fase != Gameplay.Queda.PLANANDO && t < 15f) { yield return null; t += Time.deltaTime; }
+            yield return Esperar(0.7f);   // as fitas crescem (0,9 s de vida) e o brilho sai das maos
+            Foto(main.Player.Camera.Cam, "34-planeio", true);
+            sb.AppendLine("34-planeio: fase=" + eu.Queda.Fase + " vy=" + eu.Queda.Vy.ToString("F1") + " vento=" + voo.Vento + " rastro=" + voo.RastroAceso(eu));
+
+            t = 0f;
+            while (eu.Queda.NoAr && t < 20f) { yield return null; t += Time.deltaTime; }
+            yield return Esperar(0.12f);
+            Foto(main.Player.Camera.Cam, "34-pouso", true);
+            sb.AppendLine("34-pouso: pousos=" + voo.Pousos + " ultimo=" + voo.UltimoPouso.ToString("F1") + " pawn=" + eu.Pos.ToString("F1"));
+            Diagnostico(main, "34-pouso");
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Greater(voo.Pousos, 0, "o pouso estalou");
+        }
     }
 }

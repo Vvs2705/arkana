@@ -321,6 +321,7 @@ namespace Arkana
             VisualDosKits.Criar(_arena, Partida);     // muralha, fio, poca, eco, tear + o aviso da suprema no chao
             VisualDoImpacto.Criar(_arena, Partida);   // o PESO do acerto: estouro onde o tiro para, piscada no corpo, bolha no escudo
             VisualDoAbate.Criar(_arena, Partida);     // derrubado (anel no chao, losango do tempo) e eliminado (alma, corpo que afunda)
+            VisualDoVoo.Criar(_arena, Partida, Castelo);   // o voo: castelo vivo (runas, rochas, rastro), rastro e vento na queda, estalo no pouso
         }
 
         void Desmontar()
