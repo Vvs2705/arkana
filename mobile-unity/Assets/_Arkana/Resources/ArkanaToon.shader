@@ -48,6 +48,14 @@ Shader "Arkana/Toon"
         _CorTerraBatida("Cor: terra batida", Color) = (0.55, 0.48, 0.40, 1)
         _TomMolhada("Tom: areia molhada", Color) = (0.80, 0.78, 0.80, 1)
         _Pintado("Pintado de perto (trevo, flor, folha, concha)", Range(0, 1)) = 1
+        // PRACA DAS RUINAS (onda 9B, o mesmo _Chao): o calcamento do plato. _Ruinas = centro x, centro z, raio e a borda (fracao
+        // do raio onde a lingua comeca) — a Ilha grava do Relevo (Ilha.PracaDasRuinas); raio 0 = sem praca. Cores em sRGB,
+        // EXPLICITAS (a praca passa da borda do disco de cor do vertice, por cima do verde).
+        _Ruinas("Praca das ruinas (x, z, raio, borda)", Vector) = (0, 0, 0, 0.92)
+        _CorLaje("Cor: laje", Color) = (0.58, 0.565, 0.54, 1)
+        _CorJunta("Cor: junta", Color) = (0.24, 0.21, 0.17, 1)
+        _CorMusgoRuina("Cor: musgo da praca", Color) = (0.36, 0.48, 0.26, 1)
+        _CorPoeira("Cor: poeira", Color) = (0.80, 0.74, 0.64, 1)
     }
 
     SubShader
@@ -89,6 +97,11 @@ Shader "Arkana/Toon"
             float4 _CorTerraBatida;
             float4 _TomMolhada;
             float _Pintado;
+            float4 _Ruinas;
+            float4 _CorLaje;
+            float4 _CorJunta;
+            float4 _CorMusgoRuina;
+            float4 _CorPoeira;
         CBUFFER_END
         ENDHLSL
 
@@ -185,13 +198,15 @@ Shader "Arkana/Toon"
                 return 1.0 + (t - 1.0) * s;
             }
 
-            // Voronoi F2-F1, em unidade de celula: ~0 na BORDA entre duas celulas, que e' onde a pedra racha
-            float BordaDeCelula(float2 p)
+            // Voronoi F2-F1, em unidade de celula: ~0 na BORDA entre duas celulas, que e' onde a pedra racha. `centro` = o ponto
+            // da celula mais perto (o miolo da laje da praca; a fissura nao usa e o compilador corta).
+            float BordaDeCelula(float2 p, out float2 centro)
             {
                 float2 i = floor(p);
                 float2 f = p - i;
                 float d1 = 8.0;
                 float d2 = 8.0;
+                centro = p;
                 [unroll] for (int y = -1; y <= 1; y++)
                 {
                     [unroll] for (int x = -1; x <= 1; x++)
@@ -201,6 +216,7 @@ Shader "Arkana/Toon"
                         float2 r = g + 0.15 + 0.7 * H22(i + g) - f;
                         float d = dot(r, r);
                         d2 = min(d2, max(d1, d));
+                        centro = d < d1 ? p + r : centro;
                         d1 = min(d1, d);
                     }
                 }
@@ -267,7 +283,8 @@ Shader "Arkana/Toon"
                 {
                     float2 cf = xz * 0.5 + (grao - 0.5) * float2(0.5, -0.4);
                     // F2-F1 ~ 2x a distancia ate' a borda: 0,05 = fissura de ~5 cm (3-4 px a 5 m do olho; 2 px some a 395 ppi)
-                    float e = BordaDeCelula(cf) / 0.5;
+                    float2 nada;
+                    float e = BordaDeCelula(cf, nada) / 0.5;
                     float larg = max(0.05, pegada * 1.5);
                     float linha = (1.0 - smoothstep(0.0, larg, e)) * (0.05 / larg);
                     // rede inteira = piso de ladrilho/lama seca (visto na previa): so' em cacho (campo do liquen) e em
@@ -284,6 +301,101 @@ Shader "Arkana/Toon"
                     tom *= 1.0 + seixo * (frac(sh.x * 13.7) > 0.5 ? 0.28 : -0.54);
                 }
                 return tom;
+            }
+
+            // PRACA DAS RUINAS (_Chao, onda 9B): o plato das ruinas era um disco cinza liso do alto e cinza chapado entre os arcos.
+            // Agora: lajes irregulares de ~0,9 m (a rede de Voronoi da fissura, com o miolo de cada laje), junta escura, laje que
+            // falta (terra e capim), musgo entrando pela junta e tomando laje na borda, poeira clara e um medalhao gasto no centro
+            // (disco e anel claros, estrela de 8 raios, meio-fio). A cor e' EXPLICITA: o calcamento passa da borda do disco de cor
+            // do vertice (Relevo: ate' 0,90 do raio) em lingua por cima do verde; a do vertice so' vale no minimapa e sem o shader
+            // (Relevo.CorPraca e' a media disto). `borda` = onde a lingua comeca (em raios, >= _Ruinas.w: so' vai para fora);
+            // `laje` = quanto o pixel e' praca. Longe (pegada > ~0,45 m) nada de laje: tom, junta, chanfro, musgo e buraco viram a
+            // FRACAO media (sem moire'); de perto, cada laje sorteia (tres sorteios tirados do mesmo hash) contra essa fracao.
+            // `v` = o ruido de 5 m do _Mancha lido no miolo da laje de perto e no pixel longe: a mesma mancha nas duas distancias.
+            // ponytail: com _Mancha 0 (m = 0) a praca de longe perde buraco e musgo de mancha; o terreno liga 0,10 — se desligar, ler v aqui.
+            // Custo (fxc, passe com sombra: 1552 -> 2032 slots no total): fora de 1,5 raio das ruinas so' o teste de distancia (~6);
+            // perto delas +22 (a borda); o pixel da praca longe ~840 e perto ~1110 (o Voronoi 3x3 com o miolo + o ruido no miolo:
+            // +271), acima da pedra perto da 5A (~985). _Fissura 0 corta o perto (a praca inteira fica na versao de longe).
+            float3 PisoDasRuinas(float3 col, float2 xz, float pegada, float grao, float m, float a, float borda, out float laje)
+            {
+                float2 c = _Ruinas.xy;
+                // _Fissura 0 (o corte de custo da 5A) tira TODO Voronoi do chao: a praca fica com a versao de longe
+                float fino = _Fissura > 0.0 ? 1.0 - smoothstep(0.18, 0.45, pegada) : 0.0;
+                float2 pc = xz;
+                float v = m, h = 0.5, em = 0.45, tom = 1.0, jun = 0.12, bev = 0.95;   // as medias (longe)
+                [branch] if (fino > 0.0)
+                {
+                    float2 miolo;
+                    // a dobra do grao (+-15 cm) entorta a junta: laje assentada ha' seculos nao e' regua
+                    float f21 = BordaDeCelula(xz / 0.9 + (grao - 0.5) * 0.35, miolo);
+                    em = f21 * 0.45;                                        // metros ate' a junta (F2-F1 ~ 2x, celula de 0,9 m)
+                    pc = miolo * 0.9;
+                    v = Ruido(pc * _EscalaMancha);
+                    h = H21(miolo + 71.0);
+                    tom = lerp(0.80, 1.16, h);
+                    float jl = max(0.03, pegada * 0.9);                     // meia junta de 3 cm: alarga e clareia com a pegada
+                    jun = (1.0 - smoothstep(jl * 0.5, jl, em)) * (0.03 / jl);
+                    bev = 1.0 - 0.22 * (1.0 - smoothstep(0.0, 0.16, em));   // quina gasta: a laje escurece na beira
+                }
+                v = lerp(m, v, fino);
+                pc = lerp(xz, pc, fino);
+                float2 oc = pc - c;
+                float rm = length(oc);
+                float d = rm / _Ruinas.z;
+                // 1) BORDA: de perto decide por laje inteira (com sorteio: laje solta na grama, falha na beira); longe, rampa de ~4 m
+                float sw = lerp(0.05, 0.004, fino);
+                laje = 1.0 - smoothstep(-sw, sw, d + (h - 0.5) * 0.06 * fino - borda - 0.05);
+
+                // 2) O TEMPO: musgo pela borda e pela mancha fria da campina (a baixo), laje que falta onde a mancha de 5 m sobe e
+                //    na beira, poeira na mancha quente e no miolo pisado. O medalhao (0,23 do raio) fica limpo. KNOB: as fracoes.
+                float med = 1.0 - smoothstep(0.21, 0.25, d);
+                float musgoReg = saturate(smoothstep(0.55, 1.0, d + (0.5 - a) * 0.35 + (m - 0.5) * 0.25) * 0.85 + (0.42 - a) * 1.2) * (1.0 - med);
+                float poeira = saturate(smoothstep(0.52, 0.70, a) * 0.6 + med * 0.35) * (1.0 - musgoReg);
+                float pb = saturate((v - 0.58) * 0.75 + smoothstep(0.65, 1.1, d) * 0.2) * (1.0 - med);   // fracao de laje que falta
+                float pm = saturate((v - 0.5) * 0.9 + musgoReg * 0.7) * (1.0 - med);                   // fracao de musgo
+                float entra = 0.12 * pm;                                                                // o musgo que entra pela junta (m)
+                float buraco = lerp(pb, step(1.0 - pb, frac(h * 13.7 + 0.31)), fino);
+                // de perto: o fio que entra pela junta e a mancha do grao (~1 m) que cresce a partir dela — laje inteira verde lia azulejo
+                float musgo = lerp(saturate(pm * 0.55 + entra * 3.5),
+                                   max(1.0 - smoothstep(0.0, 0.03, em - entra + (grao - 0.5) * 0.06),
+                                       smoothstep(0.66, 0.74, grao * 0.6 + pm * 0.5 - em * 0.6)), fino);
+
+                // 3) MEDALHAO (8,5 m): disco e anel claros, estrela de 8 raios sobre fundo escuro — por laje de perto, gasto em trecho
+                //    (o mesmo v), some longe. cos(8 ang) sem atan2: tres duplicacoes de angulo. O meio-fio e' curva: raio do PIXEL.
+                float2 u = oc / max(rm, 1e-3);
+                float c2 = u.x * u.x - u.y * u.y;
+                float c4 = 2.0 * c2 * c2 - 1.0;
+                float c8 = 2.0 * c4 * c4 - 1.0;
+                float ea = lerp(0.35, 0.02, fino);
+                float disco = 1.0 - smoothstep(2.1 - ea, 2.1 + ea, rm);
+                float anel = smoothstep(4.0 - ea, 4.0 + ea, rm) * (1.0 - smoothstep(5.2 - ea, 5.2 + ea, rm));
+                float estrela = smoothstep(2.1 - ea, 2.1 + ea, rm) * (1.0 - smoothstep(7.7 - ea, 7.7 + ea, rm)) * (1.0 - anel);
+                float raio8 = smoothstep(0.2, 0.5, c8);   // raio de ~17 graus: cabe laje inteira
+                float vis = (1.0 - smoothstep(0.6, 1.2, pegada)) * (1.0 - 0.45 * smoothstep(0.5, 0.8, v));
+                float claro = (disco + anel + estrela * raio8) * vis;   // pedra clara: disco, anel e os raios
+                float escuro = estrela * (1.0 - raio8) * vis;           // o campo da estrela, em pedra escura e fria
+                tom = lerp(1.0, tom, 1.0 - 0.6 * med) * (1.0 + 0.30 * claro - 0.40 * escuro);   // laje do medalhao mais parelha
+                float mf = abs(length(xz - c) - 8.3);
+                float jmf = max(0.03, pegada * 0.9);
+                float fio = (1.0 - smoothstep(0.25, 0.25 + jmf, mf)) * (1.0 - smoothstep(0.3, 0.6, pegada));
+                tom = lerp(tom, 1.15, fio);
+                bev = lerp(bev, 1.0, fio);
+                jun = lerp(jun, (1.0 - smoothstep(jmf * 0.5, jmf, abs(mf - 0.25))) * (0.03 / jmf), fio);
+
+                // 4) a COR: laje (tom x chanfro, matiz frio/quente por laje), poeira, musgo, junta (musgo e poeira entram nela) e o
+                //    buraco (terra com capim)
+                float3 verde = _CorMusgoRuina.rgb * (0.7 + 0.6 * grao);
+                float3 p = _CorLaje.rgb * (tom * bev) * lerp(float3(0.95, 0.98, 1.05), float3(1.04, 1.0, 0.94), frac(h * 5.3))
+                         * lerp(1.0, float3(0.90, 0.95, 1.08), escuro);
+                p = lerp(p, _CorPoeira.rgb, poeira * (0.2 + 0.4 * grao));
+                p = lerp(p, verde, musgo);
+                float3 junta = lerp(_CorJunta.rgb, verde * 0.75, saturate(musgoReg * 1.2 + (v - 0.5) * 1.5));
+                junta = lerp(junta, verde, musgo * saturate(pm * 2.0 - 0.6));   // musgo fechado cobre a junta: sem azulejo verde
+                junta = lerp(junta, _CorPoeira.rgb * 0.75, poeira * 0.4);
+                p = lerp(p, junta, saturate(jun));
+                float3 terra = _CorTerraBatida.rgb * (0.62 + 0.3 * grao) * (0.7 + 0.3 * smoothstep(0.0, 0.15, em));   // afundada: a beira na sombra da laje
+                p = lerp(p, lerp(terra, verde, smoothstep(0.55, 0.8, grao + musgoReg * 0.25)), buraco);
+                return lerp(col, p, laje);
             }
 
             // SOLO VIVO (_Chao, onda 7B): o chao que NAO e' pedra — campina, borda e chao da mata, praia e duna, e o chao
@@ -311,6 +423,16 @@ Shader "Arkana/Toon"
                 float3 tom = Tom(_TomFria.rgb, fria) * Tom(_TomQuente.rgb, quente);
                 tom = lerp(tom, Tom(_TomFria.rgb, 0.3) * Tom(_TomQuente.rgb, 0.3), longe);
                 float3 t = Tom(tom, k.a);
+                // a PRACA das ruinas (onda 9B): a borda anda em lingua entre _Ruinas.w e w + 0,4 do raio, pela mancha de 25 m (a)
+                // e a de 5 m (m), ja' pagas. `praca` < 0 = dentro da lingua; onde a praca e' certa o pisado nem roda. Alem de 1,5
+                // raio (a lingua mais comprida + a rampa acaba em ~1,45) nao se paga nada; raio 0 (sem praca) tambem cai fora.
+                float praca = 1.0, bordaPraca = 1.0;
+                float2 op = xz - _Ruinas.xy;
+                [branch] if (dot(op, op) < _Ruinas.z * _Ruinas.z * 2.25)
+                {
+                    bordaPraca = _Ruinas.w + 0.40 * smoothstep(0.25, 0.75, saturate(a * 1.4 - 0.2) * 0.55 + m * 0.45);
+                    praca = length(op) / _Ruinas.z - bordaPraca;
+                }
 
                 // 2) MATA: a borda entra na campina em lingua (a mancha de 5 m quebra o anel da regiao); dentro, humus mais
                 //    escuro x musgo claro, na mistura da mancha de 25 m com a de 5 m — nenhum ruido novo.
@@ -349,7 +471,7 @@ Shader "Arkana/Toon"
                 //    media (nada de fio piscando). So' na grama e na mata: areia, lama e pedra nao se pisam aqui.
                 float chao = saturate(k.a + k.r);
                 float terra = 0.0;
-                [branch] if (k.b * chao > 0.01)
+                [branch] if (k.b * chao > 0.01 && praca > -0.12)
                 {
                     float n = m * 0.45 + lerp(0.5, grao, nitido) * 0.55;
                     float lb = 0.64 + (1.0 - k.b) * 0.6;   // o miolo abre ~1/5 do chao em trecho; a 15 m do nascimento, quase nada
@@ -367,10 +489,17 @@ Shader "Arkana/Toon"
                     col = lerp(col, _CorTerraBatida.rgb * (0.85 + 0.3 * grao) * (1.0 - 0.45 * mata), terra * 0.92);
                 }
 
+                // 4b) PRACA DAS RUINAS por cima de tudo (a cor dela e' propria). Custo no comentario do PisoDasRuinas.
+                float laje = 0.0;
+                [branch] if (praca < 0.13)
+                {
+                    col = PisoDasRuinas(col, xz, pegada, grao, m, a, bordaPraca, laje);
+                }
+
                 // 5) DE PERTO, pintado a mao: trevo (tres folhas de ~4 cm a 120 graus) em cacho de ~3 m e flor miuda na grama,
                 //    folha caida na mata, concha na areia — a MESMA celula de 0,4 m, a cor sai da composicao. Some a ~15 m do
-                //    olho. _Pintado 0 pula o bloco inteiro: corte de custo se o FPS cair no aparelho.
-                float perto = saturate(1.0 - pegada * 10.0) * (1.0 - terra);
+                //    olho. _Pintado 0 pula o bloco inteiro: corte de custo se o FPS cair no aparelho. Na laje da praca, nada.
+                float perto = saturate(1.0 - pegada * 10.0) * (1.0 - terra) * (1.0 - laje);
                 [branch] if (perto * _Pintado > 0.0)
                 {
                     float2 sc = xz / 0.4;

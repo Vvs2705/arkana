@@ -1502,5 +1502,64 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             Assert.Greater(voltaram, 0, "nenhum material do mago estava no Arkana/Mago");
         }
+
+        /// <summary>
+        /// A PRACA DAS RUINAS (onda 9B): o plato das ruinas deixa de ser o disco cinza liso. 37-ruinas-chao: a camera do JOGADOR no
+        /// piso, a 0,45 do raio, olhando para o arco da Meshy do anel (lajes, junta, musgo entrando, laje que falta, as colunas de
+        /// Ruinas.cs e a borda em lingua ao fundo). 37-ruinas-alto: ~150 m sobre as ruinas, inclinada (o medalhao no meio, a borda
+        /// roida pela campina). Treino: deterministico. Guarda junto o contrato: o terreno leva o _Ruinas do Relevo, a ruina nao.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Chao_Ruinas()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Relevo r = ilha.Relevo;
+            Vector4 praca = Arkana.World.Ilha.MaterialTerreno().GetVector("_Ruinas");
+            Assert.AreEqual(r.RuinasR, praca.z, 1e-3f, "o terreno leva o _Ruinas do Relevo (sem ele, nada de praca)");
+            Assert.AreEqual(0f, Arkana.World.Ilha.MaterialPedra().GetVector("_Ruinas").z, 1e-6f, "a pedra lavrada (colunas, muralha) nao vira praca");
+            var sb = new System.Text.StringBuilder();
+
+            // 1) NO PISO: o arco partido da Meshy (o primeiro do anel); sem kit, o noroeste (o lado do miolo da ilha)
+            Vector2 c = r.Ruinas;
+            Vector2 dir = new Vector2(-0.62f, 0.78f).normalized;
+            Vector3 arco = Vector3.zero;
+            if (ilha.Kit != null)
+                foreach (Transform t in ilha.Kit.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "22-arco-partido") { arco = t.position; dir = (new Vector2(arco.x, arco.z) - c).normalized; break; }
+            Vector2 p2 = c + dir * r.RuinasR * 0.45f;
+            LevarJogador(main, new Vector3(p2.x, 0f, p2.y));
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(dir.x, dir.y);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            yield return Esperar(1.5f);   // a camera assenta; grama e kit reclassificam (4 Hz) em volta dele
+            Foto(main.Player.Camera.Cam, "37-ruinas-chao", false);
+            Diagnostico(main, "37-ruinas-chao");
+            Vector3 pe = main.Player.Pawn.Pos;
+            sb.AppendLine("37-ruinas-chao: pawn=" + pe.ToString("F1") + " arco=" + arco.ToString("F1") + " raio=" + (new Vector2(pe.x, pe.z) - c).magnitude.ToString("F1")
+                + "/" + r.RuinasR.ToString("F0") + " bioma=" + r.BiomaEm(pe.x, pe.z) + " solo=" + r.Solo(pe.x, pe.z, r.Altura(pe.x, pe.z)).ToString("F2")
+                + " _Ruinas=" + praca.ToString("F2"));
+
+            // 2) DO ALTO: 150 m acima do plato, 60 m ao sul, olhando o centro (~68 graus para baixo). O corte do kit e da grama mede o
+            //    jogador (no plato): liga o kit inteiro e da' o olho da vegetacao para esta camera.
+            float hc = Arkana.World.Ilha.AlturaDoChao(c.x, c.y);
+            Camera cam = CameraTemporaria("CamFotoRuinasAlto", new Vector3(c.x, hc + 150f, c.y - 60f), new Vector3(c.x, hc, c.y), Color.gray);
+            if (ilha.Kit != null) foreach (Renderer rr in ilha.Kit.GetComponentsInChildren<Renderer>(true)) rr.enabled = true;
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "37-ruinas-alto", false);
+            Object.Destroy(cam.gameObject);
+            if (veg != null) veg.Olho = null;
+            sb.AppendLine("37-ruinas-alto: cam=" + new Vector3(c.x, hc + 150f, c.y - 60f).ToString("F1") + " centro=" + new Vector3(c.x, hc, c.y).ToString("F1"));
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }

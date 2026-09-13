@@ -367,6 +367,37 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void Ruinas_Praca_CorDoVerticeCabeNoCalcamento_EEhPedraQuente()
+        {
+            // A PRACA de pedra (onda 9B): o shader calca o plato ate' Relevo.BordaDaPraca do raio com cor PROPRIA (a lingua so' vai
+            // para fora) e a cor do vertice e' so' a media dele (alto, minimapa, sem shader). Guarda o que so' a foto pegaria:
+            // (1) o disco de cor acaba antes da borda do calcamento — senao sobra um anel de cinza liso em volta da praca; (2) o
+            // miolo e' praca e pedra QUENTE (o CorRocha lilas de antes era o disco de plastico); (3) a Ilha entrega ao shader o
+            // centro, o raio e a borda deste Relevo.
+            var r = Nova();
+            Vector4 praca = Ilha.PracaDasRuinas(r);
+            Assert.AreEqual(r.Ruinas.x, praca.x, 1e-4f, "centro x da praca");
+            Assert.AreEqual(r.Ruinas.y, praca.y, 1e-4f, "centro z da praca");
+            Assert.AreEqual(r.RuinasR, praca.z, 1e-4f, "raio da praca");
+            Assert.AreEqual(Relevo.BordaDaPraca, praca.w, 1e-6f, "borda do calcamento");
+            float quente = 0f;
+            for (int k = 0; k < 36; k++)
+            {
+                float ang = Mathf.PI * 2f * k / 36f;
+                var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                Vector2 b = r.Ruinas + dir * r.RuinasR * Relevo.BordaDaPraca;
+                Color sb = r.Solo(b.x, b.y, r.Altura(b.x, b.y));
+                Assert.Greater(sb.r + sb.g + sb.a, 0.97f, "na borda do calcamento a cor do vertice ja' e' o chao de volta, nao a praca, em " + b);
+                Vector2 q = r.Ruinas + dir * r.RuinasR * 0.5f;
+                float h = r.Altura(q.x, q.y);
+                Assert.Less(r.Solo(q.x, q.y, h).a, 0.1f, "o miolo e' praca, nao campina, em " + q);
+                Color c = r.Cor(q.x, q.y, h);
+                quente += (c.r - c.b) / 36f;
+            }
+            Assert.Greater(quente, 0.03f, "a praca e' pedra quente, nao o lilas frio do disco liso");
+        }
+
+        [Test]
         public void Sorteio_EhDeterministico_EDiferePorSeed()
         {
             var a = new Sorteio(21);

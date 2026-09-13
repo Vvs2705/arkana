@@ -131,6 +131,13 @@ namespace Arkana.World
         /// <summary>Pedra LAVRADA das ruinas (colunas e muralha de Ruinas.cs): o cinza quente e gasto dos arcos e estatuas da Meshy
         /// plantados em volta. O CorPedra azulado, ao lado deles, lia como cano de PVC (foto 14 de 12/09). KNOB: por foto.</summary>
         public static readonly Color CorRuina = Hex(0x958d82);
+        /// <summary>Chao da PRACA das ruinas (onda 9B): a MEDIA do calcamento que o shader desenha de perto (laje quente, junta escura,
+        /// musgo, terra da laje que falta) — e' o que o vertice mostra no minimapa, sem o shader e na leitura aerea. O CorRocha lilas
+        /// de antes era o disco cinza liso das fotos 04/09. KNOB: por foto, junto com os tons da praca no ArkanaToon.</summary>
+        public static readonly Color CorPraca = Hex(0x928680);
+        /// <summary>Fracao do raio das ruinas onde o calcamento do shader comeca a soltar em lingua (so' para FORA, ate' ~1,3). O disco
+        /// de cor do vertice acaba ANTES (0,90): nunca sobra cinza sem pedra por cima. A Ilha grava no _Ruinas.w do terreno.</summary>
+        public const float BordaDaPraca = 0.92f;
         public static readonly Color CorLama = Hex(0xa8763e);
         public static readonly Color CorTronco = Hex(0x8a7259);
         public static readonly Color CorFolhaA = Hex(0x3fa85c);
@@ -434,9 +441,12 @@ namespace Arkana.World
             c = Color.Lerp(c, CorChaoDeMata, w.Floresta * (0.42f + 0.34f * fine));
             Cobrir(ref k, w.Floresta);
             k.r += w.Floresta;
-            // 3) ruinas: piso de pedra frio tomado por musgo
-            c = Color.Lerp(c, Color.Lerp(CorRocha, CorMusgo, 0.05f + 0.32f * fine), w.Ruinas * 0.95f);
-            Cobrir(ref k, w.Ruinas * 0.95f);
+            // 3) ruinas: a PRACA de pedra (onda 9B). O calcamento e' do shader (cor propria, _Ruinas); aqui, a media dele com o
+            //    musgo da regiao, num disco que acaba DENTRO da borda do calcamento (0,70-0,90 do raio < BordaDaPraca). O bioma
+            //    (w.Ruinas: grama, vegetacao, terreno reativo) nao muda.
+            float wp = (1f - Suave(RuinasR * 0.70f, RuinasR * 0.90f, Dist(x, z, Ruinas))) * 0.95f;
+            c = Color.Lerp(c, Color.Lerp(CorPraca, CorMusgo, 0.05f + 0.20f * fine), wp);
+            Cobrir(ref k, wp);
             // 4) alagado: lama so' na cota baixa
             c = Color.Lerp(c, Escurecer(CorLama, 0.2f), w.Lama);
             Cobrir(ref k, w.Lama);

@@ -211,11 +211,16 @@ namespace Arkana.World
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var mr = go.AddComponent<MeshRenderer>();
+            mat.SetVector("_Ruinas", PracaDasRuinas(Relevo));   // o material e' estatico: a praca vem do Relevo desta ilha
             mr.sharedMaterial = mat;
             mr.shadowCastingMode = ShadowCastingMode.On;
             // colisao exata da malha: corpo estatico, 34.848 faces (ok no mobile — medido no Godot)
             go.AddComponent<MeshCollider>().sharedMesh = mesh;
         }
+
+        /// <summary>O _Ruinas do terreno (onda 9B): centro (x, z), raio e a borda do calcamento (fracao do raio) da praca que o
+        /// ArkanaToon desenha no plato das ruinas. Raio 0 = sem praca.</summary>
+        public static Vector4 PracaDasRuinas(Relevo r) => new Vector4(r.Ruinas.x, r.Ruinas.y, r.RuinasR, Relevo.BordaDaPraca);
 
         // ------------------------------------------------------------------ agua
 
@@ -513,8 +518,9 @@ namespace Arkana.World
         /// onde o alfa do vertice diz rocha, manchas de pedra gasta/terra/liquen, estrato na encosta, fissura e
         /// seixo de perto (onda 5A); no resto, pela composicao do UV0 (Relevo.Solo), manchas fria/quente na campina,
         /// humus e musgo na mata, areia molhada e duna clara, terra batida e trilha nos nascimentos e nas ruinas,
-        /// trevo e flor de perto (onda 7B). KNOBs (tons, _Fissura, _Pintado) nos defaults do ArkanaToon.shader;
-        /// _Fissura 0 e _Pintado 0 cortam o custo.
+        /// trevo e flor de perto (onda 7B); no plato das ruinas, a praca de lajes com junta, musgo, laje que falta e o
+        /// medalhao do centro (onda 9B, _Ruinas gravado em MontarTerreno). KNOBs (tons, _Fissura, _Pintado, cores da praca)
+        /// nos defaults do ArkanaToon.shader; _Fissura 0 e _Pintado 0 cortam o custo.
         /// </summary>
         public static Material MaterialTerreno()
         {
