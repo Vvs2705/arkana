@@ -2089,5 +2089,119 @@ namespace Arkana.Tests
             Foto(main.CameraDoMenu, "42-carregando", true);
         }
 
+        // ONDA 13A — colar no FIM da classe FotoTests (antes do "}" que fecha a classe). Rodar: .\foto.ps1 "Foto_Costa"
+
+        /// <summary>
+        /// A COSTA DO MAR (onda 13A): a faixa rasa turquesa abracando a ilha, a espuma branca na linha d'agua que RESPIRA (a frente
+        /// vai e volta, ~6,7 s por onda) e a linha rala ao largo entrando — tudo do `_Costa` que a Ilha assa e so' o mar le'.
+        /// 42-costa-aerea: a altura da queda (200 m), 220 m ao largo da praia das dunas, olhando a costa. 42-costa-praia e
+        /// 42-costa-praia-b (3 s depois: a espuma andou): a altura da camera do jogo na areia seca, olhando o mar na diagonal da praia.
+        /// 42-costa-enseada: 70 m atras do fundo do fiorde, olhando a boca (raso nas duas margens, mar aberto la' fora).
+        /// Treino: deterministico. Guarda junto o contrato: o mar le' a costa; o lago e o alagado nao (neles nada muda).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Costa_AereaPraiaEnseada()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Relevo r = ilha.Relevo;
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            var sb = new System.Text.StringBuilder();
+
+            // o contrato: so' o MAR recebe a costa assada
+            GameObject mar = GameObject.Find("Ilha/Gerado/Mar");
+            Assert.IsNotNull(mar, "sem mar");
+            Material mm = mar.GetComponent<Renderer>().sharedMaterial;
+            if (mm.shader.name == "Arkana/Agua")
+            {
+                Texture tc = mm.GetTexture("_Costa");
+                Assert.IsNotNull(tc, "o mar le' a costa assada (_Costa)");
+                Assert.AreEqual(Arkana.World.Ilha.CostaTexels, tc.width);
+                Vector4 ret = mm.GetVector("_CostaRet");
+                Assert.Greater(ret.z, 0f, "_CostaRet sem escala: o mar inteiro amostraria um texel so'");
+                Assert.LessOrEqual(ret.x, -0.5f * r.Lado, "o retangulo da costa cobre a ilha");
+                Assert.AreEqual(1f + Arkana.World.Ilha.CostaSeco, ret.w, 1e-5f, "o shader decodifica a costa pelo _CostaRet.w");
+                foreach (string poca in new[] { "Lago", "Alagado" })
+                {
+                    GameObject g = GameObject.Find("Ilha/Gerado/" + poca);
+                    Assert.IsNotNull(g, "sem " + poca);
+                    Assert.IsNull(g.GetComponent<Renderer>().sharedMaterial.GetTexture("_Costa"), poca + " nao le' a costa: nada muda nele");
+                }
+                sb.AppendLine("42-costa: textura " + tc.width + "x" + tc.height + " ret=" + ret.ToString("F5") + " turquesa=" + mm.GetColor("_Turquesa")
+                    + " raso=" + mm.GetFloat("_CostaRaso").ToString("F2") + " espuma=" + mm.GetFloat("_CostaEspuma").ToString("F2") + " vel=" + mm.GetFloat("_CostaVel").ToString("F2"));
+            }
+            else sb.AppendLine("42-costa: SEM Arkana/Agua (cadeia antiga): " + mm.shader.name);
+
+            // a linha de cota `cota` de FORA no rumo `ang` (varre de fora para dentro: o lago e o fiorde nao contam); cota < 0 = no mar
+            Vector3 Beira(float ang, float cota)
+            {
+                var d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                float m = r.RaioTerra + 160f;
+                while (m > 0f && r.Altura(d.x * m, d.z * m) < cota) m -= 0.25f;
+                return new Vector3(d.x * m, 0f, d.z * m);
+            }
+            void Diag(string nome, Vector3 de, Vector3 para)
+            {
+                bool tapa = Physics.Linecast(de, para, out RaycastHit h);
+                sb.AppendLine(nome + ": cam=" + de.ToString("F1") + " alvo=" + para.ToString("F1") + " costa no alvo=" + Arkana.World.Ilha.Costa(r, para.x, para.z).ToString("F2")
+                    + " no caminho: " + (tapa ? Caminho(h.collider.transform) + " a " + h.distance.ToString("F1") + " m" : "nada"));
+            }
+            float eixo = Mathf.Atan2(r.Dunas.y, r.Dunas.x);   // a praia das dunas (sul)
+            Vector3 fora = new Vector3(Mathf.Cos(eixo), 0f, Mathf.Sin(eixo));
+
+            // 1) DO ALTO: 200 m acima do mar, 220 m ao largo da praia, olhando 30 m terra adentro (~42 graus para baixo)
+            Vector3 praia = Beira(eixo, 0f);
+            Vector3 olho = praia + fora * 220f + Vector3.up * 200f, alvo = praia - fora * 30f;
+            Camera cam = CameraTemporaria("CamFotoCostaAerea", olho, alvo, Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "42-costa-aerea", false);
+            Object.Destroy(cam.gameObject);
+            Diag("42-costa-aerea", olho, alvo);
+
+            // 2) NA PRAIA: a altura da camera do jogo (3,6 m) sobre a areia seca de 1 m de cota, olhando o mar na DIAGONAL da praia
+            //    (60% ao largo, 80% ao longo), 14 graus para baixo: a espuma da beira embaixo, o turquesa no meio, o fundo e o horizonte
+            //    em cima. Duas fotos, 3 s entre elas: a frente da espuma e a linha ao largo andaram.
+            Vector3 pe = Beira(eixo - 3f * Mathf.Deg2Rad, 1f);
+            olho = new Vector3(pe.x, Arkana.World.Ilha.AlturaDoChao(pe.x, pe.z) + 3.6f, pe.z);
+            Vector3 aoLongo = new Vector3(-fora.z, 0f, fora.x);
+            Vector3 dir = (fora * 0.6f + aoLongo * 0.8f).normalized;
+            const float pitch = 14f * Mathf.Deg2Rad;
+            alvo = olho + dir * (olho.y / Mathf.Tan(pitch)) + Vector3.down * olho.y;   // onde o centro do quadro toca a lamina (y 0)
+            LevarJogador(main, olho - dir * 4f);   // o corpo atras da camera: a grama e o kit cortam pela camera DELE
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoCostaPraia", olho, alvo, Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "42-costa-praia", false);
+            yield return Esperar(3f);
+            Foto(cam, "42-costa-praia-b", false);
+            Object.Destroy(cam.gameObject);
+            Diag("42-costa-praia", olho, alvo);
+
+            // 3) O FIORDE: 70 m de altura, 40 m atras do fundo dele, olhando o meio do canal e a boca. As pontas sao o BEnseadaA/B do
+            //    Relevo (privados, metros-base x Escala)
+            Vector2 fundo = new Vector2(-84f, -4f) * r.Escala, boca = new Vector2(-142f, 30f) * r.Escala;
+            Vector2 eixoF = (boca - fundo).normalized, meio = (fundo + boca) * 0.5f;
+            olho = new Vector3(fundo.x - eixoF.x * 40f, 70f, fundo.y - eixoF.y * 40f);
+            alvo = new Vector3(meio.x, 0f, meio.y);
+            cam = CameraTemporaria("CamFotoCostaEnseada", olho, alvo, Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "42-costa-enseada", false);
+            Object.Destroy(cam.gameObject);
+            if (veg != null) veg.Olho = null;
+            Diag("42-costa-enseada", olho, alvo);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
     }
 }

@@ -247,6 +247,12 @@ namespace Arkana.World
                 mMar.SetFloat("_Reflexo", 0.06f);
                 mMar.SetFloat("_Brilho", 0.6f);
                 mMar.SetFloat("_BrilhoDuro", 2000f);
+                // COSTA (onda 13A): a faixa rasa turquesa e a espuma que lambe a areia. O mar segue a camera e grava cor de vertice
+                // constante: a costa vem de uma textura assada UMA vez pela profundidade do fundo, lida no fragmento por XZ de
+                // mundo. Lago e alagado nao a recebem (a preta padrao = mar fundo): neles nada muda.
+                mMar.SetTexture("_Costa", TexturaCosta(Relevo, out Vector4 ret));
+                mMar.SetVector("_CostaRet", ret);
+                mMar.SetColor("_Turquesa", Relevo.Hex(0x36c2b4));   // KNOB: a cor da agua rasa, por foto
             }
 
             mar = Agua(parent, mMar, MalhaMar(nova ? new Color(0f, 0f, 0f, 1f) : CorCrua(0x2f8fe0)),
@@ -267,6 +273,58 @@ namespace Arkana.World
                     new Vector3(Relevo.Alagado.x + 1.5f, 1.75f, Relevo.Alagado.y - 1f), "Bruma2");
                 b2.transform.localRotation = Quaternion.Euler(0f, 109f, 0f);
             }
+        }
+
+        /// <summary>Lado da textura da costa: texel de 3,3 m no mapa de escala 2 (mais fino que o quad de 4,5 m do terreno; 256 nao
+        /// muda o quadro e custa o dobro no load).</summary>
+        public const int CostaTexels = 192;
+        /// <summary>Fundo (m) onde a faixa rasa acaba: dali para fora e' mar fundo (~26 m da linha d'agua na media medida; 11-48 m
+        /// conforme a encosta). Tem de ficar ABAIXO do plato do mar aberto (3,2 m, a borda que mergulha em Relevo.Altura), senao o
+        /// mar inteiro sai turquesa. KNOB: a largura da faixa rasa, por foto.</summary>
+        public const float CostaFundo = 2.6f;
+        /// <summary>Quanta TERRA (fracao do fundo, acima da linha d'agua) a textura ainda guarda: o bilinear cruza a linha d'agua no
+        /// lugar certo e a espuma nasce na beira DESENHADA. O ArkanaAgua desfaz pelo _CostaRet.w (= 1 + CostaSeco): numero num lugar so'.</summary>
+        public const float CostaSeco = 0.25f;
+        /// <summary>A textura passa 20 m da malha do terreno: o anel de fora (forcado a mar fundo) cai em agua que ja' e' funda.</summary>
+        const float CostaMargem = 20f;
+
+        /// <summary>
+        /// A COSTA em (x, z), 0..1 = (1 - profundidade/CostaFundo) / (1 + CostaSeco): 0 = mar fundo, 1/(1 + CostaSeco) = linha d'agua,
+        /// 1 = terra a 0,65 m ou mais acima do mar. Pela Altura analitica: na linha d'agua ela e a malha de 4,5 m diferem por centimetros.
+        /// </summary>
+        public static float Costa(Relevo r, float x, float z)
+        {
+            float prof = Relevo.AguaY - r.Altura(x, z);
+            return Mathf.Clamp01((1f - prof / CostaFundo) / (1f + CostaSeco));
+        }
+
+        /// <summary>
+        /// A textura da costa, PURA: n x n texels (Costa no canal R) sobre o quadrado da ilha + CostaMargem, amostrada no CENTRO do
+        /// texel como a GPU le'. O anel de fora fica 0 (mar fundo): o clamp do sampler o estende pelo resto do mar de 6 km. `ret` =
+        /// (x minimo, z minimo, 1/lado, 1 + CostaSeco): o shader faz uv = (xz - ret.xy) x ret.z e q = 1 - costa x ret.w (q =
+        /// profundidade/CostaFundo). 192^2 Altura: ~15 ms no editor, 30-50 ms com a maquina a 100% (o teste cobra < 60).
+        /// </summary>
+        public static Color32[] AssarCosta(Relevo r, int n, out Vector4 ret)
+        {
+            float lado = r.Lado + 2f * CostaMargem, min = -0.5f * lado, passo = lado / n;
+            ret = new Vector4(min, min, 1f / lado, 1f + CostaSeco);
+            var px = new Color32[n * n];
+            for (int j = 1; j < n - 1; j++)
+                for (int i = 1; i < n - 1; i++)
+                    px[j * n + i].r = (byte)(Costa(r, min + (i + 0.5f) * passo, min + (j + 0.5f) * passo) * 255f + 0.5f);
+            return px;
+        }
+
+        static Texture2D TexturaCosta(Relevo r, out Vector4 ret)
+        {
+            // RGBA32: o formato que o jogo inteiro usa (GLES3, Vulkan e o -nographics do portao). linear = DADO, sem sRGB no caminho.
+            var t = new Texture2D(CostaTexels, CostaTexels, TextureFormat.RGBA32, false, true)
+            {
+                name = "Costa", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear
+            };
+            t.SetPixels32(AssarCosta(r, CostaTexels, out ret));
+            t.Apply(false, true);   // sobe para a GPU e solta a copia da CPU
+            return t;
         }
 
         Color CorCrua(int hex)

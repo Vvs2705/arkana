@@ -14,6 +14,10 @@
 //     mar visto do alto (a "borda fantasma" do Godot). Sem depth texture, sem luz (le' como cartoon).
 //   * `_SemMar0/1`: discos (x, z, raio) onde a lamina nao desenha. So' o MAR usa: ele passa por baixo da
 //     ilha inteira (y = 0) e o fundo do lago e a poca do alagado descem abaixo dele.
+//   * COSTA (onda 13A, so' o mar): o mar e' uma grade que segue a camera, sem cor de vertice util — a costa vem de
+//     `_Costa`, a profundidade do fundo que a Ilha assa UMA vez (Ilha.AssarCosta), lida por XZ de mundo. Faixa rasa
+//     turquesa, espuma na linha d'agua que respira (a frente vai e volta) e uma linha rala ao largo entrando. Lago e
+//     alagado ficam com a textura PRETA padrao (= mar fundo): neles cada termo novo da' zero.
 Shader "Arkana/Agua"
 {
     Properties
@@ -33,6 +37,12 @@ Shader "Arkana/Agua"
         _Contraste("Contraste da banda", Range(0, 1)) = 1
         _SemMar0("Disco sem lamina 0 (x, z, raio)", Vector) = (0, 0, 0, 0)
         _SemMar1("Disco sem lamina 1 (x, z, raio)", Vector) = (0, 0, 0, 0)
+        _Costa("Costa assada (R: profundidade; so' o mar)", 2D) = "black" {}
+        _CostaRet("Costa: xz minimo, 1/lado, 1 + seco", Vector) = (0, 0, 0, 0)
+        _Turquesa("Agua rasa da costa", Color) = (0.21, 0.76, 0.71, 1)
+        _CostaRaso("Forca do raso da costa", Range(0, 1)) = 0.85
+        _CostaEspuma("Espuma da costa", Range(0, 1)) = 0.9
+        _CostaVel("Ondas por segundo na costa", Float) = 0.15
     }
 
     SubShader
@@ -71,7 +81,15 @@ Shader "Arkana/Agua"
                 float _Contraste;
                 float4 _SemMar0;
                 float4 _SemMar1;
+                float4 _CostaRet;
+                float4 _Turquesa;
+                float _CostaRaso;
+                float _CostaEspuma;
+                float _CostaVel;
             CBUFFER_END
+
+            TEXTURE2D(_Costa);
+            SAMPLER(sampler_Costa);
 
             struct Atributos
             {
@@ -140,12 +158,47 @@ Shader "Arkana/Agua"
                 // Abaixo de ~6 px por celula o desenho vira moire e cede ao tom medio: o corte das bandas (0,14 de
                 // largura) nunca chega a ficar mais fino que o pixel. `vivo` = perto E resolvido. KNOB: 0,12-0,4.
                 float2 fw = fwidth(pb);
-                float vivo = i.detalhe * (1.0 - smoothstep(0.12, 0.4, max(fw.x, fw.y)));
+                float resolvido = 1.0 - smoothstep(0.12, 0.4, max(fw.x, fw.y));
+                float vivo = i.detalhe * resolvido;
                 // 3 tons em banda (o vocabulario do toon), smoothstep e nao step: sem serrilha rastejando
                 float faixa = smoothstep(0.38, 0.52, b) * 0.55 + smoothstep(0.62, 0.78, b) * 0.45;
                 faixa = lerp(0.5, faixa, vivo * _Contraste);
                 float margem = smoothstep(0.25, 1.0, i.anel) * _Espuma;
                 float3 cor = lerp(_Funda.rgb, _Rasa.rgb, saturate(faixa * 0.62 + margem * 0.42));
+
+                // COSTA (so' o mar). q = profundidade / Ilha.CostaFundo: < 0 na terra, 0 na linha d'agua, 1 no mar fundo. A textura
+                // guarda um pouco de terra acima da linha (_CostaRet.w = 1 + Ilha.CostaSeco): o bilinear cruza o zero na beira
+                // DESENHADA. Textura preta (lago, alagado, fora do retangulo pelo clamp) = costa 0: o if pula e nada muda neles.
+                // Custo: 1 amostra por pixel; a conta so' roda na faixa da costa (o mar fundo, quase todo o quadro, pula).
+                float costa = SAMPLE_TEXTURE2D(_Costa, sampler_Costa, (pw.xz - _CostaRet.xy) * _CostaRet.z).r;
+                float q = 1.0 - costa * _CostaRet.w;
+                float px = max(fwidth(q), 1e-4);
+                float espumaCosta = 0.0, ralaCosta = 1.0;
+                // o if USA o px de proposito: assim a derivada fica antes dele (o fxc a afundava para dentro, e derivada em
+                // fluxo divergente = pixel branco solto na borda de fora da faixa). Entra onde ha' costa no pixel OU no vizinho;
+                // o mar fundo, o lago e o alagado (q = 1 constante: px = 1e-4) pulam.
+                [branch] if (costa + px > 2e-4)
+                {
+                    // faixa rasa: turquesa cheio ate' ~8 m da beira, degrade ate' o fundo (~25 m); a marola continua por baixo
+                    cor = lerp(cor, _Turquesa.rgb * (0.9 + 0.2 * faixa), (1.0 - smoothstep(0.35, 1.0, q)) * _CostaRaso);
+                    // ESPUMA. Uma onda a cada 1/_CostaVel s, defasada ao longo da costa (a frente chega obliqua, ~63 m entre
+                    // cristas) e, de perto, pela marola (frente irregular). (1) BEIRA: faixa branca da linha d'agua ate' `larg`,
+                    // que respira — larga quando a onda chega (fase 0/1), estreita no refluxo (0,5): a espuma lambe a areia; a
+                    // frente e' o mais branco. (2) LINHA rala ao largo: nasce a q 0,75 (~17 m), entra ate' 0,12 e se funde na
+                    // beira; picotada pela marola. Largura minima de ~1 px (px) com a forca dividida pelo excesso: do alto nao
+                    // cintila, rasante nao vira faixa. KNOB: 0,04/0,12 (largura/respiro da beira: ~0,8 a ~3,3 m), 0,75 (de onde
+                    // a linha nasce), 0,03 (meia largura da linha), 0,013/0,009 (obliquidade da frente).
+                    float fase = frac(t * _CostaVel + dot(pw.xz, float2(0.013, 0.009)) + b * 0.25 * resolvido);
+                    float larg = (0.04 + 0.12 * (0.5 + 0.5 * cos(fase * 6.2832))) * lerp(1.0, 0.7 + 0.6 * b, resolvido);
+                    float beira = (1.0 - smoothstep(larg * 0.7, larg + px, q)) * lerp(0.75, 1.0, smoothstep(larg * 0.3, larg * 0.7, q));
+                    float qc = lerp(0.75, 0.12, fase);
+                    float linha = (1.0 - smoothstep(0.03 - px, 0.03 + px, abs(q - qc))) * saturate(0.06 / px)
+                                * smoothstep(0.0, 0.2, fase) * (1.0 - smoothstep(0.75, 1.0, fase))
+                                * lerp(0.6, smoothstep(0.3, 0.62, b), resolvido);
+                    espumaCosta = saturate(max(beira, linha * 0.7)) * _CostaEspuma;
+                    // lamina rala na beira (q 0,3 ~ 6 m): a areia molhada aparece por baixo — a conta do lago, pelo q
+                    ralaCosta = 1.0 - _Rala * (1.0 - smoothstep(0.0, 0.3, q));
+                }
 
                 // REFLEXO do ceu. Lamina plana: a direcao refletida sobe o quanto o olhar desce (R.y = V.y). Rasante =
                 // o horizonte quente (a conta de antes: pow 5 ate' 0,45); do alto = o ceu alto do entardecer, com o piso
@@ -171,13 +224,17 @@ Shader "Arkana/Agua"
                 espuma += smoothstep(1.0 - largura + wob, 1.0 + wob, i.anel) * _Espuma * lerp(0.5, 1.0, vivo);
                 espuma = saturate(espuma);
                 cor = lerp(cor, lerp(_Rasa.rgb, float3(0.95, 0.99, 1.0), 0.6), espuma * 0.6);
+                // a espuma da costa vai por cima do reflexo e do brilho: espuma e' fosca
+                cor = lerp(cor, float3(0.95, 0.99, 1.0), espumaCosta * 0.85);
+
                 // nevoa POR PIXEL (a do URP): no mar de quads de 100 m, o fator por vertice interpolava
                 // ate' o far e o mar chegava ao horizonte com cor de mar, cortado contra o ceu
                 cor = MixFog(cor, InitializeInputDataFog(float4(pw, 1.0), i.fog));
                 // na beira (pouca agua) a lamina fica rala: a margem se funde com a areia molhada em vez de cortar.
-                // Perto a espuma devolve o corpo (a linha branca na areia); longe fica so' o degrade.
-                float rala = 1.0 - _Rala * smoothstep(0.7, 1.0, i.anel) * _Espuma;
-                float alfa = max(lerp(1.0, _Alfa, i.detalhe) * rala, espuma * 0.8 * vivo);
+                // Perto a espuma devolve o corpo (a linha branca na areia); longe fica so' o degrade. Na costa do mar (ralaCosta),
+                // a espuma da costa devolve o corpo de perto E do alto: e' ela que desenha a ilha vista da queda.
+                float rala = (1.0 - _Rala * smoothstep(0.7, 1.0, i.anel) * _Espuma) * ralaCosta;
+                float alfa = max(lerp(1.0, _Alfa, i.detalhe) * rala, max(espuma * 0.8 * vivo, espumaCosta * 0.9));
                 // discos sem lamina (o mar sob o lago e o alagado): alfa 0, sem discard — discard custa o early-Z
                 float2 d0 = pw.xz - _SemMar0.xy;
                 float2 d1 = pw.xz - _SemMar1.xy;
