@@ -2280,5 +2280,133 @@ namespace Arkana.Tests
             Object.Destroy(cam.gameObject);
         }
 
+        // ONDA 13C — colar em FotoTests.cs, dentro da classe (no fim, antes do fecha-chave). Rodar: .\foto.ps1 "Foto_Praia"
+
+        /// <summary>
+        /// A PRAIA deixou de ser areia vazia (foto 33: um tronco e uma pedrinha) e o CUME perdeu as lascas claras chapadas (fotos 27 e
+        /// 41). 44-cume-seixos: o quadro da 27-pedras-treino (a camera do jogador 2,5 s depois do treino comecar, com a HUD) com o
+        /// seixo de basalto da Meshy no chao. 44-praia-barco: o barco naufragado da costa das dunas a 8 m, do lado da terra, a agua
+        /// atras (o angulo sem pedra nem tronco na frente e com o sol mais nas costas). 44-praia-costa: o MESMO quadro da 33-praia (antes x depois): troncos, rochas, capim
+        /// e o barco no fundo. 44-praia-alto: a faixa de praia do barco a ~60 m de altura. O jogador e' levado para perto de cada
+        /// camera (a grama e o kit cortam pela camera DELE); o LOD e o corte da praia, pela camera da foto (Vegetacao.Olho).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Praia_BarcoCostaAltoECume()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            Assert.IsNotNull(veg, "sem vegetacao");
+            Arkana.World.Praia praia = veg.Praia;
+            Assert.IsNotNull(praia, "a vegetacao nao montou a praia");
+            Arkana.World.Relevo r = ilha.Relevo;
+            int cume = ilha.Grama != null ? ilha.Grama.Contar("SeixosCume") : 0;
+            var sb = new System.Text.StringBuilder("44-praia: moldes=" + praia.Moldes + " barcos=" + praia.Contar(Arkana.World.Praia.Peca.Barco)
+                + " troncos=" + praia.Contar(Arkana.World.Praia.Peca.Tronco) + " rochas=" + praia.Contar(Arkana.World.Praia.Peca.Rocha)
+                + " capim=" + praia.Contar(Arkana.World.Praia.Peca.Capim) + " seixos-cume=" + cume
+                + " seixos=" + (ilha.Grama != null ? ilha.Grama.Contar("Seixos") : 0) + "\n");
+
+            // 1) O CUME: o quadro da 27-pedras-treino, antes de mexer no jogador
+            Foto(main.Player.Camera.Cam, "44-cume-seixos", true);
+            Diagnostico(main, "44-cume-seixos");
+
+            // 2) O BARCO de perto: o primeiro (costa das dunas), a 8 m do lado da terra, olhando o casco com o mar atras
+            int ib = -1;
+            for (int i = 0; i < praia.Total && ib < 0; i++) if (praia.Plantada(i).Tipo == Arkana.World.Praia.Peca.Barco) ib = i;
+            Assert.GreaterOrEqual(ib, 0, "nenhum barco (falta o 45-barco-naufragado.glb em Resources?)");
+            Arkana.World.Praia.PecaPlantada barco = praia.Plantada(ib);
+            Vector3 b = barco.M.GetColumn(3);
+            var mar = new Vector3(barco.Mar.x, 0f, barco.Mar.y);
+            var ao = new Vector3(-mar.z, 0f, mar.x);
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Vector3 l = sol != null ? sol.transform.forward : new Vector3(0.6f, -0.5f, 0.6f);
+            l.y = 0f;
+            l.Normalize();
+            // do lado da terra, a 8 m, de -60 a +60 graus: o angulo sem pedra nem tronco na frente do casco (a cena do barco encosta
+            // nele) e com o sol mais nas costas do fotografo
+            Vector3 olho = b - mar * 8f;
+            float nota = float.MinValue;
+            for (int k = -4; k <= 4; k++)
+            {
+                float a = k * 15f * Mathf.Deg2Rad;
+                Vector3 d = -mar * Mathf.Cos(a) + ao * Mathf.Sin(a), c = b + d * 8f;
+                if (Arkana.World.Ilha.SuperficieDaAgua(c.x, c.z) != Arkana.World.Relevo.Seco) continue;
+                float n = Vector3.Dot(-d, l);
+                for (int i = 0; i < praia.Total; i++)
+                {
+                    Arkana.World.Praia.PecaPlantada q = praia.Plantada(i);
+                    if (q.Tipo == Arkana.World.Praia.Peca.Barco || q.Tipo == Arkana.World.Praia.Peca.Capim) continue;
+                    Vector3 w = (Vector3)q.M.GetColumn(3) - c, ab = b - c;
+                    w.y = ab.y = 0f;
+                    float t = Mathf.Clamp01(Vector3.Dot(w, ab) / ab.sqrMagnitude);
+                    if (t > 0.1f && t < 0.9f && (w - ab * t).magnitude < 1.2f + q.Escala) n -= 10f;
+                }
+                if (n > nota) { nota = n; olho = c; }
+            }
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.7f;
+            Vector3 ver = b - olho;   // o sentido camera -> barco: o corpo fica 4 m atras da camera
+            ver.y = 0f;
+            ver.Normalize();
+            LevarJogador(main, olho - ver * 4f);
+            yield return Esperar(1.2f);
+            Camera cam = CameraTemporaria("CamFotoBarco", olho, b + Vector3.up * 0.9f, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "44-praia-barco", false);
+            sb.AppendLine("  44-praia-barco: barco em " + b.ToString("F1") + " mar=" + mar.ToString("F2") + " cam=" + olho.ToString("F1") + " nota=" + nota.ToString("F2")
+                + " dist=" + Vector3.Distance(olho, b).ToString("F1") + " sol-nas-costas=" + Vector3.Dot((b - olho).normalized, l).ToString("F2")
+                + " lotes=" + praia.LotesEnviados + " tris-enviados=" + praia.TrisEnviados);
+            foreach (Collider k in Physics.OverlapSphere(b, 3f)) sb.AppendLine("    colisor no barco: " + Caminho(k.transform) + " (" + k.GetType().Name + ")");
+            Object.Destroy(cam.gameObject);
+
+            // 3) A COSTA: o quadro da 33-praia (a costa sul, onde as dunas descem ao mar), para comparar antes e depois
+            float eixo = Mathf.Atan2(r.Dunas.y, r.Dunas.x);
+            Vector3 PontoDaCosta(float ang, float cota)
+            {
+                var d = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                float m = r.Dunas.magnitude;
+                while (m < r.RaioTerra + 60f && r.Altura(d.x * m, d.z * m) > cota) m += 0.5f;
+                return new Vector3(d.x * m, cota, d.z * m);
+            }
+            olho = PontoDaCosta(eixo - 16f * Mathf.Deg2Rad, 1.4f);
+            Vector3 alvo = PontoDaCosta(eixo + 4f * Mathf.Deg2Rad, 0.3f);
+            Vector3 praTras = olho - alvo;
+            praTras.y = 0f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.9f;
+            LevarJogador(main, olho + praTras.normalized * 4f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoCosta", olho, alvo, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "44-praia-costa", false);
+            sb.AppendLine("  44-praia-costa: cam=" + olho.ToString("F1") + " alvo=" + alvo.ToString("F1") + " barco a " + Vector3.Distance(olho, b).ToString("F0")
+                + " m lotes=" + praia.LotesEnviados + " tris-enviados=" + praia.TrisEnviados);
+            Object.Destroy(cam.gameObject);
+
+            // 4) DO ALTO: 60 m sobre a areia, 45 m para dentro da terra, olhando a beira d'agua do barco (a faixa atravessa o quadro)
+            olho = b - mar * 45f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 60f;
+            LevarJogador(main, b - mar * 18f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoPraiaAlto", olho, b + mar * 8f, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "44-praia-alto", false);
+            sb.AppendLine("  44-praia-alto: cam=" + olho.ToString("F1") + " lotes=" + praia.LotesEnviados + " tris-enviados=" + praia.TrisEnviados);
+            Object.Destroy(cam.gameObject);
+            veg.Olho = null;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Greater(praia.Contar(Arkana.World.Praia.Peca.Capim), 0, "o capim da Meshy nao nasceu (falta o 48-capim-duna.glb?)");
+            Assert.Greater(cume, 0, "o seixo do cume da Meshy nao carregou (falta o 49-seixos-cume.glb?)");
+        }
+
     }
 }

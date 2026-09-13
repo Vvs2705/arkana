@@ -334,6 +334,8 @@ namespace Arkana.World
         public Especie EspecieDe(int i) => arvEsp[i];
         public int ContarRochas() => rocM.Count;
         public int ContarMoitas() => moiM.Count;
+        /// <summary>A praia (barco, troncos, rochas da costa, capim de duna), montada junto: onda 13C.</summary>
+        public Praia Praia { get; private set; }
         /// <summary>De onde saiu a pedra: RochaDoPedregulho, Ruinas.RochaDoMar ou "blob" (diag da foto).</summary>
         public string MoldeDasRochas { get; private set; }
         /// <summary>De onde saiu a arvore: "35-arvore-copa + 36-pinheiro" ou "procedural" (diag da foto).</summary>
@@ -349,7 +351,7 @@ namespace Arkana.World
         public Camera Olho
         {
             get => cameraDoLod;
-            set { cameraDoLod = value; relogio = Periodo; }
+            set { cameraDoLod = value; relogio = Periodo; if (Praia != null) Praia.Olho = value; }
         }
 
         /// <summary>A arvore em `arvore` vista de `olho` vai no LOD1? Distancia 3D: do castelo (320 m) a mata inteira e' LOD1.</summary>
@@ -388,7 +390,21 @@ namespace Arkana.World
             PlantarMoitas();
             MontarCelulas();
             MontarBlocos();
+            MontarPraia();
             relogio = Periodo;   // o primeiro Update ja' enche os lotes
+        }
+
+        /// <summary>A PRAIA (onda 13C) pendurada aqui: a Ilha monta a Vegetacao, e a praia foge das pedras e arvores dela.
+        /// ponytail: so' o que esta' perto da costa (cota < 4 m) vai para os ocupados; a mata e o morro nunca cruzam com a areia.</summary>
+        void MontarPraia()
+        {
+            var ocupados = new List<Vector4>();
+            foreach (Matrix4x4 m in rocM) { Vector3 p = m.GetColumn(3); if (p.y < 4f) ocupados.Add(new Vector4(p.x, p.z, 0f, m.GetColumn(0).magnitude)); }
+            foreach (Vector3 p in arvPos) if (p.y < 4f) ocupados.Add(new Vector4(p.x, p.z, 0f, 1f));
+            Praia = new GameObject("Praia").AddComponent<Praia>();
+            Praia.transform.SetParent(transform, false);
+            Praia.Olho = cameraDoLod;
+            Praia.Montar(relevo, ocupados);
         }
 
         // ---------------------------------------------------------------- scatter
@@ -571,7 +587,7 @@ namespace Arkana.World
 
         /// <summary>Altura do chao DESENHADO (a malha de Ilha.Quads, a divisao de triangulo da Ilha, que o GradeDoChao repete)
         /// sem montar a grade: 4 Altura() por consulta. Nos sitios das rochas a Altura() exata passa ate' 0,23 m da malha (medido).</summary>
-        static float ChaoDesenhado(Relevo r, float x, float z)
+        internal static float ChaoDesenhado(Relevo r, float x, float z)
         {
             int q = Ilha.Quads;
             float fx = Mathf.Clamp((x / r.Lado + 0.5f) * q, 0f, q - 1e-4f), fz = Mathf.Clamp((z / r.Lado + 0.5f) * q, 0f, q - 1e-4f);
@@ -884,7 +900,7 @@ namespace Arkana.World
 
         /// <summary>A malha e a textura de cor do .glb em Resources. ponytail: a Meshy entrega UM no' sem transformacao
         /// (conferido nos quatro .glb); peca com hierarquia pediria a matriz do no' junto.</summary>
-        static Mesh MalhaDoGlb(string nome, out Texture tex)
+        internal static Mesh MalhaDoGlb(string nome, out Texture tex)
         {
             tex = null;
             GameObject g = Resources.Load<GameObject>(nome);
@@ -923,7 +939,7 @@ namespace Arkana.World
         /// de instancing so' vai pro APK se algum material-ASSET a pede — o ArkanaArvoreInstancing (Lit + GPU Instancing, como
         /// o ArkanaGramaInstancing da grama); sem ele, o Lit dos Always Included Shaders. Copia: nunca altera o asset.
         /// </summary>
-        static Material MaterialDaMeshy(ref Material cache, string nome, Texture tex, Color tinta)
+        internal static Material MaterialDaMeshy(ref Material cache, string nome, Texture tex, Color tinta)
         {
             if (cache != null) return cache;
             Material molde = Resources.Load<Material>("ArkanaArvoreInstancing");

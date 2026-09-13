@@ -267,8 +267,9 @@ namespace Arkana.World
 
         /// <summary>Seixo: o degrau de escala entre a lamina (0,5 m) e o rochedo (2 m) — sem ele o chao parece maquete.
         /// O CUME do pico ganha leva propria (onda 5B): acima de 12,5 m nao nasce grama e acima de 13 nao nascia seixo, e e'
-        /// la' que o treino acontece — a tampa lisa de 9 mil m2 lia como gesso (fotos 02 e 18).</summary>
-        public static List<Tufo> Seixos(GradeDoChao g, int seed = 81)
+        /// la' que o treino acontece — a tampa lisa de 9 mil m2 lia como gesso (fotos 02 e 18). `cume` = false quando o cume e' do
+        /// seixo da Meshy (SeixosDoCume, onda 13C): a leva procedural do cume sai, a da ilha nao muda (o sorteio dela vem antes).</summary>
+        public static List<Tufo> Seixos(GradeDoChao g, int seed = 81, bool cume = true)
         {
             Relevo r = g.Relevo;
             var rng = new Sorteio(seed);
@@ -284,6 +285,7 @@ namespace Arkana.World
                 if (h < 0.15f || h > 13f) continue;
                 lista.Add(Seixo(rng, p, h, 0.09f, 0.26f));
             }
+            if (!cume) return lista;
             // o cume: no disco do pico, so' na TAMPA (o corte do Bioma.Pico), maiores para ler da camera de 3a pessoa
             int alvo = lista.Count + (int)(250 * area);   // KNOB: ~1 seixo a cada 3 m, por foto
             tentativas = 0;
@@ -297,6 +299,53 @@ namespace Arkana.World
                 // basalto, da familia da rocha da Meshy ao lado: o cinza claro sumia na tampa clara e lia como lasca de papel (foto 28)
                 s.Tinta = new Color(s.Tinta.r * 0.5f, s.Tinta.g * 0.48f, s.Tinta.b * 0.46f, 1f);
                 lista.Add(s);
+            }
+            return lista;
+        }
+
+        /// <summary>O seixo do CUME da Meshy (onda 13C): lajes de basalto escuro com liquen oliva, 300 tris, 0,6 m, base em y = 0.</summary>
+        public const string SeixoDaMeshy = "49-seixos-cume";
+        /// <summary>Seixos do cume por AREA (360 na ilha de 600 m, ~1 a cada 25 m2 da tampa, em grupos) e a faixa de escala. KNOB: por
+        /// foto e FPS — 300 tris cada: ~250 dentro do corte de 55 m do treino, ~75K tris antes do frustum (com 130, 107K).</summary>
+        public const int SeixosDoCumeRef = 90;
+        public const float SeixoCumeMin = 0.5f, SeixoCumeMax = 1.4f;
+
+        /// <summary>
+        /// O CUME com o seixo da Meshy (onda 13C) no lugar da leva procedural: as lascas claras e chapadas das fotos 27 e 41 viram
+        /// basalto de verdade, em grupos de 1-4 (pedra solta se ajunta), escala 0,5-1,4, giro Y livre, tombo de ate' 6 graus. So' na
+        /// TAMPA (o corte do Bioma.Pico, fora de ladeira), como a leva de antes. Assentado pelo chao MAIS BAIXO da pegada, 2-4 cm
+        /// abaixo: na ladeira o lado de cima enterra, nenhum lado boia.
+        /// </summary>
+        public static List<Tufo> SeixosDoCume(GradeDoChao g, int seed = 82)
+        {
+            Relevo r = g.Relevo;
+            var rng = new Sorteio(seed);
+            float area = Area(r);
+            int alvo = (int)(SeixosDoCumeRef * area), tentativas = 0;
+            var lista = new List<Tufo>(alvo);
+            while (lista.Count < alvo && tentativas++ < (int)(4000 * area))
+            {
+                Vector2 c = r.Pico + new Vector2(rng.Faixa(-1f, 1f), rng.Faixa(-1f, 1f)) * r.PicoR;
+                int n = 1 + rng.Int(4);
+                for (int k = 0; k < n && lista.Count < alvo; k++)
+                {
+                    Vector2 p = k == 0 ? c : c + new Vector2(rng.Faixa(-1.3f, 1.3f), rng.Faixa(-1.3f, 1.3f));
+                    float s = rng.Faixa(SeixoCumeMin, SeixoCumeMax), giro = rng.Faixa(0f, 360f);
+                    var tombo = new Vector2(rng.Faixa(-6f, 6f), rng.Faixa(-6f, 6f));
+                    float afunda = rng.Faixa(0.02f, 0.04f) * s;
+                    float h = g.AlturaNaMalha(p.x, p.y);
+                    if (h < Relevo.PicoH + 4f || g.NormalY(p.x, p.y) < 0.8f) continue;
+                    float raio = 0.28f * s;   // meia pegada do .glb (0,6 m) x escala
+                    h = Mathf.Min(Mathf.Min(h, Mathf.Min(g.AlturaNaMalha(p.x + raio, p.y), g.AlturaNaMalha(p.x - raio, p.y))),
+                        Mathf.Min(g.AlturaNaMalha(p.x, p.y + raio), g.AlturaNaMalha(p.x, p.y - raio)));
+                    lista.Add(new Tufo
+                    {
+                        Pos = new Vector3(p.x, h - afunda, p.y),
+                        Giro = new Vector3(tombo.x, giro, tombo.y),
+                        Escala = new Vector3(s, s, s),
+                        Tinta = Color.white,
+                    });
+                }
             }
             return lista;
         }
@@ -355,13 +404,17 @@ namespace Arkana.World
         }
 
         static readonly int IdTinta = Shader.PropertyToID("_Tinta");
+        /// <summary>A tinta do seixo do cume (multiplica a textura, sRGB): o basalto do .glb e' quase preto e na tampa clara viraria
+        /// buraco (a licao do pedregulho do Pico, Vegetacao.MaterialDaRocha). KNOB: por foto.</summary>
+        static readonly Color TintaSeixoCume = new Color(1.3f, 1.28f, 1.2f);
+        static Material matSeixoCume;
 
         readonly List<Camada> camadas = new List<Camada>();
         float tetoDoColapso;   // o maior FimDoFade entre as camadas
         float topoDoChao;      // o tufo mais alto da ilha
         float relogio;
 
-        /// <summary>Quantas instancias a camada tem ("Grama", "Flores", "Juncos", "Seixos"); 0 se nao montou.</summary>
+        /// <summary>Quantas instancias a camada tem ("Grama", "Flores", "Juncos", "Seixos", "SeixosCume"); 0 se nao montou.</summary>
         public int Contar(string nome)
         {
             for (int i = 0; i < camadas.Count; i++) if (camadas[i].Nome == nome) return camadas[i].Total;
@@ -395,9 +448,17 @@ namespace Arkana.World
                 PlantioDaGrama.Flores(grade), PlantioDaGrama.CorteFlor, lado, passo, relevo.Lado, true, linear);
             Adicionar("Juncos", MalhaJunco(linear), Mat(s, molde, "Juncos", 0.07f, 1.5f, 0.6f, PlantioDaGrama.CorteJunco, passo),
                 PlantioDaGrama.Juncos(grade), PlantioDaGrama.CorteJunco, lado, passo, relevo.Lado, false, linear);
+            // o CUME e' do seixo da Meshy (onda 13C), Lit instanciado com a textura; sem o .glb (ou sem o Lit), a leva procedural de antes
+            Mesh seixoCume = Vegetacao.MalhaDoGlb(PlantioDaGrama.SeixoDaMeshy, out Texture texCume);
+            Material matCume = seixoCume != null && texCume != null
+                ? Vegetacao.MaterialDaMeshy(ref matSeixoCume, "ArkanaSeixoCume", texCume, TintaSeixoCume) : null;
+            if (matCume == null) seixoCume = null;
             // seixo nao balanca e guarda mais da normal: e' pedra, nao folha
             Adicionar("Seixos", MalhaSeixo(linear), Mat(s, molde, "Seixos", 0f, 1f, 0.3f, PlantioDaGrama.CorteSeixo, passo),
-                PlantioDaGrama.Seixos(grade), PlantioDaGrama.CorteSeixo, lado, passo, relevo.Lado, false, linear);
+                PlantioDaGrama.Seixos(grade, 81, seixoCume == null), PlantioDaGrama.CorteSeixo, lado, passo, relevo.Lado, false, linear);
+            if (seixoCume != null)
+                Adicionar("SeixosCume", seixoCume, matCume, PlantioDaGrama.SeixosDoCume(grade), PlantioDaGrama.CorteSeixo, lado, passo,
+                    relevo.Lado, false, linear);
 
             tetoDoColapso = 0f;
             for (int i = 0; i < camadas.Count; i++)
