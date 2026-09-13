@@ -750,6 +750,18 @@ namespace Arkana.Gameplay
             if (it.R != null) it.R.enabled = on;
             if (it.R2 != null) it.R2.enabled = on;
             if (it.Linha != null) it.Linha.enabled = on;
+            // as pecas a mais dos grupos: sem isto a peca devolvida ao pool seguia na tela (aviso do grupo D)
+            if (it.Extra != null)
+                for (int i = 0; i < it.Extra.Length; i++)
+                {
+                    Component c = it.Extra[i];
+                    if (c is Renderer r) r.enabled = on;
+                    else if (c is ParticleSystem ps)
+                    {
+                        if (on) ps.Play(true);
+                        else ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                    }
+                }
             if (it.Ps == null) return;
             if (on) it.Ps.Play(true);
             else it.Ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);

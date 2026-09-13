@@ -1672,5 +1672,83 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// Os kits do GRUPO D (Fizz, Sylva, Basalto, Noctus, Pip) em acao, no roteiro da Veu/Tessa (treino, tatica e suprema) —
+        /// mas de FRENTE para o Boneco1: torreta, bobina, mordida, punho, zigue-zague e nuvem precisam de alguem para acertar.
+        /// A Pip mira 35 graus de lado: o 1o dash (zig) atravessa o boneco e a faisca salta para o Boneco2 (3 m ao lado).
+        /// Esperas por kit (KNOB por foto): o quadro cai no meio do efeito, nao antes nem depois dele.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_GrupoD([Values("16-fizz", "17-sylva", "18-basalto", "19-noctus", "20-pip")] string slug)
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                GameObject boneco = GameObject.Find("Boneco1");
+                Assert.IsNotNull(boneco, "o treino tem boneco");
+                Vector3 b = boneco.transform.position, p0 = main.Player.Pawn.Pos;
+                Vector3 dir = new Vector3(b.x - p0.x, 0f, b.z - p0.z).normalized;
+                bool pip = slug == "20-pip";
+                LevarJogador(main, b - dir * (pip ? 3f : 4f));
+                Vector3 mira = pip ? Gameplay.ApoioGrupoD.Girar(dir, -Kits.De(slug).Tatica["zig_graus"]) : dir;
+                main.Player.Camera.Logica.Yaw = Mathf.Atan2(mira.x, mira.z);
+                main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+                float esperaT = 0.9f, esperaS = 2f;
+                switch (slug)
+                {
+                    case "16-fizz": esperaT = 1.1f; esperaS = 2.15f; break;     // a 2a faisca no ar; o raio da bobina no lampejo
+                    case "17-sylva": esperaT = 1.4f; esperaS = 2.6f; break;     // o broto aberto com polen; as raizes cheias
+                    case "18-basalto": esperaT = 0.5f; esperaS = 2.3f; break;   // a crista + as pedras; as placas de pe'
+                    case "19-noctus": esperaT = 0.6f; esperaS = 2f; break;      // o fio de eter no boneco; a nevoa
+                    case "20-pip": esperaT = 0.65f; esperaS = 2.2f; break;      // a faisca saltando; o 2o raio da nuvem
+                }
+                yield return Esperar(0.3f);
+                main.Player.Tatica();
+                yield return Esperar(esperaT);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-tatica", true);
+                DiagKitGrupoD(main, "39-kit-" + slug + "-tatica", b);
+                yield return Esperar(1.2f);
+                Gameplay.KitRunner runner = main.Player.Pawn.Runner;
+                string pre = "39-kit-" + slug + "-suprema: carga=" + runner.CargaSuprema.ToString("F2") + " pronto=" + runner.ProntoSuprema + "\n";
+                main.Player.Suprema();
+                yield return Esperar(esperaS);   // a suprema e' TELEGRAFADA: o efeito so' sai quando o aviso no chao enche
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-suprema", true);
+                File.AppendAllText(Path.Combine(Pasta, "diag.txt"), pre);
+                DiagKitGrupoD(main, "39-kit-" + slug + "-suprema", b);
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        /// <summary>O que o kit escreveu (visuais, com alvo) e o que a casca desenhou (renderers LIGADOS): quadro sem dado vira palpite.</summary>
+        static void DiagKitGrupoD(Main main, string nome, Vector3 boneco)
+        {
+            Gameplay.Pawn pawn = main.Player.Pawn;
+            var sb = new System.Text.StringBuilder(nome + ": pawn=" + pawn.Pos.ToString("F1") + " boneco=" + boneco.ToString("F1")
+                + " hp=" + pawn.Vital.Hp.ToString("F0") + " mana=" + pawn.Mana.ToString("F0") + " visuais=" + pawn.Runner.Visuais.Count + "\n");
+            foreach (Gameplay.EfeitoVisual v in pawn.Runner.Visuais)
+                sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " restante=" + v.Restante.ToString("F2")
+                    + (v.Alvo != null ? " alvo=" + v.Alvo.Nome : ""));
+            var vk = Object.FindFirstObjectByType<Gameplay.VisualDosKits>();
+            if (vk == null) sb.AppendLine("  SEM VisualDosKits");
+            else
+                foreach (Renderer r in vk.GetComponentsInChildren<Renderer>(true))
+                    if (r.enabled && r.gameObject.activeInHierarchy)
+                        sb.AppendLine("  desenho " + Caminho(r.transform) + " bounds=" + r.bounds.center.ToString("F1") + " tam=" + r.bounds.size.ToString("F1")
+                            + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.shader.name : "NULL"));
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }
