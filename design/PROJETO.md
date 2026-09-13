@@ -53,6 +53,31 @@ aparelho apareceu em `adb devices`.
 
 ### >>> COMECE POR AQUI — ondas em paralelo: o jogo ganhou peso, chão, pedra e sombra (12/09/2026, tarde)
 
+**OS 20 MAGOS TÊM KIT (12/09, noite).** Os 17 que eram "declarados e inertes" ganharam passiva, tática e suprema com limitador e VFX, seguindo as fichas de `design/personagens/`. O trabalho foi feito por 4 agentes em paralelo (grupos A–D) e **só com arquivos novos**. Para isso, o coordenador tornou `Kits`, `KitRunner` e `VisualDosKits` classes `partial` com ganchos `GrupoA..D` (métodos parciais; grupo sem arquivo some na compilação). As leis dos kits (sem mana, telegrafia de 1 a 4 s, tática de 5 a 10 s, ficha = registro) valem para todos. São 50 testes novos, com ~140 mutantes mortos.
+
+| Grupo | Magos | Foto |
+|---|---|---|
+| A | Ceifadora (Mão do Vazio, Travessia), Corvus (Uivo, Lobisomem), Corvomante (corvo, Grasnido), Olho-de-Éter (Enxame, Crisálida) | 39-kit-* |
+| B | Vitalis (Lúmen, Jardim da Aurora), Ilusionista (espelho, Baile de Espelhos), Vex (frascos, Grande Obra), Aelion (flecha carregada, chuva) | 39-kit-* |
+| C | Umbra (Véu Umbrio, Dança das Sombras), Brok (Runa-Escudo, Forja Viva), Gromm (Totem das Chuvas, Espírito do Trovão), Maris (Onda Prisão, Maré Cheia) | 39-kit-* |
+| D | Fizz (torreta, Megabobina), Sylva (broto, Coração), Basalto (onda de pedra, Monólito), Noctus (mordida, névoa), Pip (zigue-zague, supercélula) | 39-kit-* |
+
+**O que ficou simplificado por falta de motor** (cada caso tem `ponytail:` no código e a mudança certa no relatório do grupo):
+- `IConjurador.Teleportar`/`Impulso`: o dash e a travessia deslizam ou movem o transform.
+- Invisibilidade de verdade: o bot ainda vê.
+- Esquadrão: passivas de aliado dormem em solo.
+- `Textos.HudEstados`: os estados novos não viram chip.
+- Estruturas de kit na `Partida.Acerto`: torreta, bobina e bigorna são protegidas pelo próprio kit.
+
+**Ondas 9–11:**
+- **9A:** contorno quente e frio nos magos (toon próprio).
+- **9B:** calçamento das ruínas.
+- **9C:** tela de seleção com cartão, abas e habilidades descritas.
+- **10A:** colunas e blocos das ruínas pela Meshy.
+- **11:** muro de terra, torreta/bobina, placas do Basalto e escudo do Brok pela Meshy, no lugar das caixas.
+
+**Portão:** 420 testes, 0 falhas. **Créditos Meshy:** ~620.
+
 **Próximo passo, na ordem:**
 1. **Medir FPS no Poco F4** com o APK mais novo (pasta de testes de sempre). O aparelho não estava no `adb devices` em 12/09 à tarde. As ondas 5 a 8 são as mais caras até aqui:
    - sombra 4096 com 4 cascatas e SSAO;
@@ -62,7 +87,7 @@ aparelho apareceu em `adb devices`.
    - VFX do voo.
 
    Se cair, os KNOBs pela ordem: `m_RenderScale` 0,85; SSAO `m_Active` 0; `_Pintado`/`_Fissura` 0; sombra 2048; `DistanciaLod1` 30.
-2. Aplicar as ondas 9A (contorno de luz nos magos) e 9B (piso das ruínas), que estavam em andamento.
+2. Aplicar as ondas 10A (ruínas) e 11 (peças dos kits), se ainda não entraram. Depois: HudEstados com os estados novos dos kits, os verbos de motor que os grupos pediram (Teleportar, Impulso, invisível para o bot) e bots usando kit (decisão do Diretor).
 
 **Ondas 6 a 8 (12/09, fim de tarde), mesmo método:**
 
@@ -134,7 +159,7 @@ de engine do projeto.
 | | |
 |---|---|
 | **Projeto** | `mobile-unity/` — Unity 6000.3.23f1, URP, Input System, uGUI, Test Framework; Android IL2CPP/ARM64, minSdk 26, `br.com.vstack.arkana` |
-| **Portão** | `powershell -File mobile-unity\portao.ps1` → **347 testes, 0 falhas** (12/09, fim de tarde) (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
+| **Portão** | `powershell -File mobile-unity\portao.ps1` → **420 testes, 0 falhas** (12/09, noite) (285 EditMode sobre classes puras, com a altura de cada um dos 20 magos medida na malha deformada + 30 PlayMode: os que montam a arena inteira e rodam 3 s sem um log sequer, e as fotos) |
 | **Fotos** | `powershell -File mobile-unity\foto.ps1 [filtro]` → as fotos do jogo rodando em `mobile-unity/Logs/fotos/` + `diag.txt` (o que a câmera, o corpo e os kits tocam). Sem filtro roda todas (~15 min, as 20 folhas de clipes pesam); com filtro, só o que a leva mexeu, ex. `.\foto.ps1 "Foto_Kit\|Foto_Menu"`. **Toda leva visual termina olhando as fotos** |
 | **Sistemas reescritos** | Core (Balance com todos os números, Kits dos 20, Combat num ponto só, Velocidade como produto único, Vitalidade, Textos, Bus) · Mundo (Relevo procedural de 600 m com 7 POIs em fração do raio e 14 nascimentos, Ilha com malha e colisor, Vegetação por célula, Castelo com N passageiros por seed, Sol) · Partida (Zona que nasce inerte e liga no pouso, Queda, luvas/loot/Baú Celestial, Derrubado/esvaecer/reerguer, Projétil, Efeitos, Água, Locomoção com dodge/pulo/flutuar, Pawn/Player/Bot com percepção de 4 canais, câmera no ombro, loop de partida e TREINO) · Kits (KitRunner com carga da suprema e telegrafia grampeada; Pyra, Véu, Tessa) · Terreno reativo (fogo por orçamento com 1 rolagem por aresta, carvão, gelo, elétrico por água conectada, muro, lama, vento) · Personagem (mago procedural com 10 clipes por código, identidade dos 20, luva visual) · UI (gesto único em dp, joystick, HUD completa observando o Bus, avisos, menu, config persistida, seleção dos 20, selo) · 48 timbres sintetizados |
 | **APK** | **GERADO E JOGADO no Poco F4 em 12/09.** `build_apk.ps1` → 176 MB, 5 min 20 s a primeira vez, 1 min 33 s incremental; cópia datada em `mobile-unity/Builds/testes/` (fora do git) |
