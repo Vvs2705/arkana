@@ -1561,5 +1561,116 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+
+        /// <summary>
+        /// Os kits do GRUPO A (Ceifadora, Corvus, Corvomante, Olho-de-Eter) em acao no treino, pelo roteiro da Veu/Tessa: tatica
+        /// e suprema pela camera do jogador. O boneco 1 ANDA em circulo (Pawn cru obedece o Stick): o Corvus so' fareja e so'
+        /// acende quem se mexe. A mira vai no boneco (a mao agarra, o corvo passa por cima, o enxame o atravessa); a Travessia
+        /// vai para o centro da ilha e a foto OLHA PARA TRAS (o rasgo fica atras dela). Cada quadro tem o seu diag.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_GrupoA([Values("02-ceifadora", "04-corvus", "05-corvomante", "06-olho-de-eter")] string slug)
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(0.5f);
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                Gameplay.Pawn eu = main.Player.Pawn;
+                Gameplay.Pawn boneco = main.Partida.Bonecos.Count > 0 ? main.Partida.Bonecos[0] as Gameplay.Pawn : null;
+                Assert.IsNotNull(boneco, "treino sem boneco");
+                yield return GrupoAAndando(boneco, Gameplay.Partida.SUPREMA_TREINO_S + 1f);   // a suprema enche em 5 s no treino
+
+                GrupoAMirar(main, boneco.Pos);
+                yield return GrupoAAndando(boneco, 0.3f);
+                main.Player.Tatica();
+                // o quadro de cada tatica: o uivo aos 0,45 s (o anel ainda aceso), o enxame depois do atraso de 1,4 s
+                float tTatica = slug == "04-corvus" ? 0.45f : slug == "06-olho-de-eter" ? 1.9f : 0.9f;
+                yield return GrupoAAndando(boneco, tTatica);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-tatica", true);
+                GrupoADiag(main, "39-kit-" + slug + "-tatica");
+
+                // o Voo do Olho deixa o corpo sem conjurar 4 s: espera a suprema ficar PRONTA de verdade
+                float t = 0f;
+                while (!eu.Runner.ProntoSuprema && t < 8f) { boneco.Stick = GrupoAStick(Time.time); yield return null; t += Time.deltaTime; }
+                yield return GrupoAAndando(boneco, 0.3f);
+                if (slug == "02-ceifadora") OlharParaOCentro(main); else GrupoAMirar(main, boneco.Pos);
+                yield return GrupoAAndando(boneco, 0.3f);
+                string carga = "carga=" + eu.Runner.CargaSuprema.ToString("F2") + " pronto=" + eu.Runner.ProntoSuprema;
+                main.Player.Suprema();
+                // a suprema e' TELEGRAFADA (2-2,5 s): o quadro sai logo depois do efeito
+                float tSuprema = slug == "05-corvomante" ? 2.8f : slug == "04-corvus" ? 2.4f : 2.3f;
+                yield return GrupoAAndando(boneco, tSuprema);
+                if (slug == "02-ceifadora")
+                {
+                    var ceifa = eu.Runner.Impl as Gameplay.Ceifadora;
+                    if (ceifa != null && ceifa.RasgoAberto != null) GrupoAMirar(main, ceifa.RasgoAberto.A);   // olha o rasgo
+                    yield return GrupoAAndando(boneco, 0.35f);
+                }
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-suprema", true);
+                GrupoADiag(main, "39-kit-" + slug + "-suprema " + carga);
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        /// <summary>Circulo de ~4 m (0,5 de stick, 1 rad/s): o boneco se MEXE sem sair do quadro.</summary>
+        static Vector2 GrupoAStick(float t) => new Vector2(Mathf.Cos(t), Mathf.Sin(t)) * 0.5f;
+
+        static IEnumerator GrupoAAndando(Gameplay.Pawn boneco, float segundos)
+        {
+            float t = 0f;
+            int frames = 0, teto = Mathf.CeilToInt(segundos * 400f) + 100;
+            while (t < segundos && frames < teto)
+            {
+                if (boneco != null) boneco.Stick = GrupoAStick(Time.time);
+                yield return null;
+                t += Time.deltaTime;
+                frames++;
+            }
+        }
+
+        /// <summary>Vira a camera do jogador para `alvo` (o kit sai na MIRA: a camera e' a mira).</summary>
+        static void GrupoAMirar(Main main, Vector3 alvo)
+        {
+            Vector3 d = alvo - main.Player.Pawn.Pos;
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(d.x, d.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+        }
+
+        /// <summary>O que o kit escreveu (Visuais) e o que a casca desenhou (renderers do VisualDosKits) no quadro.</summary>
+        static void GrupoADiag(Main main, string nome)
+        {
+            var runner = main.Player.Pawn.Runner;
+            var sb = new System.Text.StringBuilder(nome + ": pawn=" + main.Player.Pawn.Pos.ToString("F1")
+                + " cam=" + main.Player.Camera.Cam.transform.position.ToString("F1") + " telegrafia=" + runner.Telegrafia.ToString("F2")
+                + " silencio=" + runner.Silencio.ToString("F2") + " escala=" + (main.Player.Pawn.Visual != null ? main.Player.Pawn.Visual.transform.localScale.x.ToString("F2") : "-")
+                + " visuais=" + runner.Visuais.Count + "\n");
+            foreach (var v in runner.Visuais)
+                sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " raio=" + v.Raio.ToString("F1")
+                    + " restante=" + v.Restante.ToString("F2") + (v.Alvo != null ? " alvo=" + v.Alvo.Nome : ""));
+            var vk = Object.FindFirstObjectByType<Gameplay.VisualDosKits>();
+            if (vk != null)
+            {
+                foreach (Renderer r in vk.GetComponentsInChildren<Renderer>(true))
+                    if (r.enabled && r.gameObject.name.Length > 0)
+                        sb.AppendLine("  desenho " + Caminho(r.transform) + " bounds=" + r.bounds.center.ToString("F1") + " tam=" + r.bounds.size.ToString("F1")
+                            + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.shader.name : "NULL"));
+                foreach (ParticleSystem ps in vk.GetComponentsInChildren<ParticleSystem>(false))
+                    if (ps.isPlaying && ps.particleCount > 0) sb.AppendLine("  particula " + Caminho(ps.transform) + " n=" + ps.particleCount);
+            }
+            else sb.AppendLine("  SEM VisualDosKits");
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }
