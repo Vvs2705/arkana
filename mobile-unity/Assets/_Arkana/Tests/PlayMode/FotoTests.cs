@@ -1887,5 +1887,84 @@ namespace Arkana.Tests
                 if (on > 0) sb.AppendLine("  desenho " + t.name + " " + t.position.ToString("F1") + " renderers " + on + "/" + total);
             }
         }
+
+        // ONDA 10A — colar em FotoTests.cs, depois de Foto_Chao_Ruinas. Rodar: .\foto.ps1 "Foto_Ruinas_PedraDaMeshy"
+
+        /// <summary>
+        /// A PEDRA DAS RUINAS (onda 10A): colunas, colunas caidas, as duas muralhas e o altar de Ruinas.cs viram a coluna canelada
+        /// e o bloco rachado da Meshy (38/39-*.glb) no lugar dos prismas bege lisos da foto 37. 40-ruinas-perto: camera temporaria
+        /// a 2,2 m do chao, 9 m de lado para a coluna caida (as de pe' do anel atras dela, a muralha leste ao fundo). 40-ruinas-alto:
+        /// ~28 m sobre o noroeste do plato (o quadro da 14, mais alto), olhando o centro: o anel, as caidas, as duas muralhas, o altar.
+        /// Treino: deterministico. Guarda junto o contrato: a Meshy entrou (uma malha por .glb, com colisor) e o prisma nao sobrou.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Ruinas_PedraDaMeshy()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Ruinas ru = ilha.Ruinas;
+            Assert.IsNotNull(ru, "sem ruinas");
+            var sb = new System.Text.StringBuilder("40-ruinas: colunas=" + ru.Colunas + " blocos=" + ru.Blocos + " pegadas=" + ru.Pegadas.Count);
+            foreach (string nome in new[] { "Colunas", "Blocos" })
+            {
+                Transform t = ru.transform.Find(nome);
+                Assert.IsNotNull(t, "a malha " + nome + " da Meshy nao entrou (sem o .glb volta o prisma)");
+                Assert.IsNotNull(t.GetComponent<MeshCollider>(), nome + " sem colisor: a Queda e o corpo atravessam");
+                Mesh m = t.GetComponent<MeshFilter>().sharedMesh;
+                Material mat = t.GetComponent<MeshRenderer>().sharedMaterial;
+                sb.Append(" | " + nome + ": tris=" + m.GetIndexCount(0) / 3 + " vert=" + m.vertexCount + " bounds=" + m.bounds.size.ToString("F0")
+                    + " mat=" + (mat != null ? mat.name + " / " + mat.shader.name : "NULL"));
+            }
+            Assert.IsNull(ru.transform.Find("Ruinas"), "sobrou prisma procedural junto com a Meshy");
+            sb.AppendLine();
+
+            // 1) PERTO: a coluna caida DE LADO (fuste canelado, capitel quebrado no chao) a 9 m, olho de gente, o anel de pe' e a
+            //    muralha leste atras. O anel do kit (arco, estatua) cai perto dali: o olho vai para o primeiro ponto livre, de 30 em 30
+            //    graus em volta da caida. Depois o jogador vai para la': o corte do kit e da grama mede a camera DELE
+            Arkana.World.Relevo r = ilha.Relevo;
+            Vector2 c = r.Ruinas;
+            Vector4 caida = ru.Pegadas[0];
+            foreach (Vector4 q in ru.Pegadas) if (q.w > caida.w) caida = q;   // a pegada larga e' a da coluna caida
+            Vector2 alvo = new Vector2(caida.x, caida.y), dir = (alvo - c).normalized, lado = new Vector2(-dir.y, dir.x);
+            Vector3 olho = Vector3.zero;
+            for (int k = 0; k < 12; k++)
+            {
+                float a = k * Mathf.PI / 6f;
+                Vector2 o = alvo + (lado * Mathf.Cos(a) + dir * Mathf.Sin(a)) * 9f;
+                olho = new Vector3(o.x, Arkana.World.Ilha.AlturaDoChao(o.x, o.y) + 2.2f, o.y);
+                if (Physics.OverlapSphere(olho, 1.5f, ~0, QueryTriggerInteraction.Ignore).Length == 0) break;
+            }
+            LevarJogador(main, olho);
+            if (ilha.Kit != null) foreach (Renderer rr in ilha.Kit.GetComponentsInChildren<Renderer>(true)) rr.enabled = true;
+            yield return Esperar(1f);   // grama e kit reclassificam (4 Hz) em volta dele
+            float ha = Arkana.World.Ilha.AlturaDoChao(alvo.x, alvo.y);
+            Camera cam = CameraTemporaria("CamFotoRuinasPerto", olho, new Vector3(alvo.x, ha + 1f, alvo.y), Color.gray);
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "40-ruinas-perto", false);
+            Object.Destroy(cam.gameObject);
+            sb.AppendLine("40-ruinas-perto: olho=" + olho.ToString("F1") + " caida=" + caida.ToString("F1"));
+
+            // 2) DO ALTO: 28 m sobre o noroeste do plato (a um raio do centro em x e em z), olhando o centro
+            float hc = Arkana.World.Ilha.AlturaDoChao(c.x, c.y), raio = r.RuinasR;
+            var de = new Vector3(c.x - raio, hc + 28f, c.y + raio);
+            cam = CameraTemporaria("CamFotoRuinasAlto40", de, new Vector3(c.x + 4f, hc, c.y - 4f), Color.gray);
+            if (veg != null) veg.Olho = cam;
+            yield return null;
+            Foto(cam, "40-ruinas-alto", false);
+            Object.Destroy(cam.gameObject);
+            if (veg != null) veg.Olho = null;
+            sb.AppendLine("40-ruinas-alto: cam=" + de.ToString("F1") + " centro=" + new Vector3(c.x, hc, c.y).ToString("F1"));
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }

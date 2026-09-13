@@ -247,6 +247,78 @@ namespace Arkana.Tests
             Assert.Greater(cume, 800, "seixos na tampa do pico: " + cume);
         }
 
+        // ---------------------------------------------------------------- ruinas da Meshy (onda 10A)
+
+        [Test]
+        public void Ruinas_PedraDaMeshy_NoLugarDeSempre_PeNaMalha_DentroDaPegada()
+        {
+            // defeitos: sorteio a mais no rng 31 (a coluna muda de altura e giro); pegada nova, maior ou fora do lugar (o KitCenario,
+            // que planta pelas pegadas, muda a ilha inteira); a Meshy maior que a pegada (arco do kit dentro da coluna); pe' pela
+            // Altura() exata ou so' pelo centro (fresta sob o plinto na encosta); enterrar demais (muralha engolida); coluna achatada
+            // ate' o sy do prisma (capitel panqueca); bloco de cima da ponta boiando ou atravessado no de baixo
+            var coluna = new Bounds(new Vector3(0.00228f, 2.1f, -0.00203f), new Vector3(1.36748f, 4.2f, 1.37316f));   // o 38-coluna-ruina.glb no Unity
+            var bloco = new Bounds(new Vector3(0.00248f, 0.69253f, 0.00461f), new Vector3(1.8f, 1.38506f, 0.88905f));   // o 39-bloco-ruina.glb
+            var pegadas = new List<Vector4>();
+            List<Ruinas.PedraDaRuina> pedras = Ruinas.Plantio(Relevo2, coluna, bloco, pegadas);
+
+            // o registro de ANTES da Meshy (o prisma de 12/09, medido): contagem, pegadas e o sorteio 31 nao se mexem
+            var n = new int[4];
+            foreach (Ruinas.PedraDaRuina p in pedras) n[(int)p.Tipo]++;
+            Assert.AreEqual(new[] { 22, 2, 1, 34 }, n, "colunas em pe', caidas, toco do altar, blocos");
+            Assert.AreEqual(53, pegadas.Count, "22 colunas + 2 caidas + 29 trechos de muralha");
+            Assert.Less(Vector4.Distance(new Vector4(152f, -146f, 0f, 0.9f), pegadas[0]), 1e-3f, "pegada 0: " + pegadas[0]);
+            Assert.Less(Vector4.Distance(new Vector4(152.153961f, -130.9f, 0f, 2.31f), pegadas[2]), 1e-3f, "a coluna caida: " + pegadas[2]);
+            Assert.Less(Vector4.Distance(new Vector4(166.720078f, -115.119705f, 0f, 1.3f), pegadas[52]), 1e-3f, "a ponta da muralha leste: " + pegadas[52]);
+            Assert.AreEqual(0.92689544f, pedras[0].Proc.GetColumn(1).magnitude, 1e-4f, "altura sorteada da coluna 0");
+            Assert.AreEqual(0.5804657f, pedras[23].Proc.GetColumn(1).magnitude, 1e-4f, "altura sorteada da ultima coluna");
+            Vector4 z = pedras[55].Proc.GetColumn(2);
+            Assert.AreEqual(-71.5932f, Mathf.Atan2(z.x, z.z) * Mathf.Rad2Deg, 0.01f, "giro sorteado do ultimo bloco da muralha");
+
+            // a Meshy: dentro da pegada DELA (o altar, no miolo que o KitCenario ja' reserva), a base inteira abaixo da malha
+            // desenhada, parte a mostra; o bloco de cima sentado no de baixo
+            Vector3 Pe(Vector4 q) => new Vector3(q.x, 0f, q.y);
+            Vector2 c = Relevo2.Ruinas;
+            int emCima = 0;
+            float topoAnterior = 0f;
+            foreach (Ruinas.PedraDaRuina p in pedras)
+            {
+                Bounds m = p.Tipo == Ruinas.TipoDePedra.Bloco ? bloco : coluna;
+                var pts = new Vector3[27];
+                float baixo = float.MaxValue, alto = float.MinValue;
+                for (int i = 0; i < 27; i++)
+                {
+                    pts[i] = p.Meshy.MultiplyPoint3x4(m.min + Vector3.Scale(m.size, new Vector3(i % 3, i / 3 % 3, i / 9) * 0.5f));
+                    baixo = Mathf.Min(baixo, pts[i].y);
+                    alto = Mathf.Max(alto, pts[i].y);
+                }
+                Vector3 centro = p.Meshy.MultiplyPoint3x4(m.center);
+                var dona = new Vector4(c.x, c.y, 0f, Relevo2.RuinasR * 0.7f);
+                if (DistH(centro, Pe(dona)) > 6f)
+                {
+                    foreach (Vector4 q in pegadas) if (DistH(centro, Pe(q)) < DistH(centro, Pe(dona))) dona = q;
+                    Assert.Less(DistH(centro, Pe(dona)), 0.01f, p.Tipo + " fora do centro da pegada em " + centro);
+                }
+                foreach (Vector3 o in pts) Assert.LessOrEqual(DistH(o, Pe(dona)), dona.w, p.Tipo + " maior que a pegada em " + centro);
+
+                float chao = Grade.AlturaNaMalha(centro.x, centro.z);
+                if (baixo > chao + 0.3f)
+                {
+                    emCima++;
+                    Assert.That(topoAnterior - baixo, Is.InRange(0.05f, 0.3f), "bloco de cima boiando ou atravessado em " + centro);
+                }
+                else
+                {
+                    foreach (Vector3 o in pts)
+                        if (o.y < baixo + 0.01f) Assert.LessOrEqual(o.y, Grade.AlturaNaMalha(o.x, o.z) - 0.05f, p.Tipo + " com fresta sob a base em " + centro);
+                    Assert.Greater(alto - chao, 0.6f * (alto - baixo), p.Tipo + " engolida pelo chao em " + centro);
+                    if (p.Tipo == Ruinas.TipoDePedra.Coluna || p.Tipo == Ruinas.TipoDePedra.Toco)
+                        Assert.That(alto - baixo, Is.InRange(2.8f, 4.4f), "coluna achatada ou esticada em " + centro);
+                }
+                topoAnterior = alto;
+            }
+            Assert.AreEqual(4, emCima, "a 2a camada das 3 pontas da muralha e o bloco de cima do altar");
+        }
+
         // ---------------------------------------------------------------- arvores da Meshy (onda 6B)
 
         [Test]
