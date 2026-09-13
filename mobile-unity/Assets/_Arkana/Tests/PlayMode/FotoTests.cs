@@ -1815,5 +1815,77 @@ namespace Arkana.Tests
             }
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// Os kits do GRUPO B (Vitalis, Ilusionista, Vex, Aelion) em acao no treino, pelo roteiro do Foto_Kit_VeuTessa: tatica
+        /// e suprema pela camera do jogador. A espera e' a de cada mago: a flecha do Aelion so' sai cheia em 1,5s, a poca do Vex
+        /// so' acende armada (1s depois de pousar), e a suprema fotografa DEPOIS do aviso (1,5 a 3s) com o efeito ja' aberto.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_GrupoB([Values("07-vitalis", "08-ilusionista", "09-vex", "11-aelion")] string slug)
+        {
+            ExigirGpu();
+            // a escolha do mago mora nos PlayerPrefs (persiste no editor): guarda e devolve, a foto nao troca o mago de ninguem
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);   // no treino a suprema enche em 5 s
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                Assert.AreEqual(slug, main.Player.Pawn.Slug, "o treino entrou com o mago escolhido");
+                Gameplay.KitRunner runner = main.Player.Pawn.Runner;
+                Assert.IsNotNull(runner.Impl, "o kit do " + slug + " nao registrou (a HUD apagaria os botoes)");
+                OlharParaOCentro(main);
+                yield return Esperar(0.3f);
+                var sb = new System.Text.StringBuilder();
+
+                main.Player.Tatica();
+                float espera = slug == "11-aelion" ? Kits.De(slug).Tatica["carga"] + 0.15f : slug == "09-vex" ? 1.7f : 0.9f;
+                yield return Esperar(espera);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-tatica", true);
+                DiagKitGrupoB(sb, "39-kit-" + slug + "-tatica", main);
+
+                yield return Esperar(1.2f);
+                string carga = " (carga=" + runner.CargaSuprema.ToString("F2") + " pronto=" + runner.ProntoSuprema + ")";
+                main.Player.Suprema();
+                float depois = slug == "09-vex" ? 1.5f : slug == "11-aelion" ? 0.3f : slug == "07-vitalis" ? 0.8f : 0.7f;
+                yield return Esperar(Kits.De(slug).Telegrafia + depois);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-suprema", true);
+                DiagKitGrupoB(sb, "39-kit-" + slug + "-suprema" + carga, main);
+                Directory.CreateDirectory(Pasta);
+                File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        /// <summary>O que o kit escreveu e o que a casca desenhou na hora da foto (um quadro sem efeito, sem dado, vira palpite):
+        /// os visuais do runner, os desenhos LIGADOS do VisualDosKits por tipo e quantos renderers do mago estao acesos (o
+        /// Ilusionista invisivel tem de dar 0).</summary>
+        static void DiagKitGrupoB(System.Text.StringBuilder sb, string nome, Main main)
+        {
+            Gameplay.Pawn pawn = main.Player.Pawn;
+            Gameplay.KitRunner runner = pawn.Runner;
+            int ligados = 0;
+            foreach (Renderer r in pawn.GetComponentsInChildren<Renderer>()) if (r.enabled) ligados++;
+            sb.AppendLine(nome + ": pawn=" + pawn.Pos.ToString("F1") + " cam=" + main.Player.Camera.Cam.transform.position.ToString("F1")
+                + " telegrafia=" + runner.Telegrafia.ToString("F2") + " visuais=" + runner.Visuais.Count + " renderers do mago ligados=" + ligados);
+            foreach (Gameplay.EfeitoVisual v in runner.Visuais)
+                sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " raio=" + v.Raio.ToString("F1") + " restante=" + v.Restante.ToString("F2"));
+            var vk = Object.FindFirstObjectByType<Gameplay.VisualDosKits>();
+            if (vk == null) { sb.AppendLine("  SEM VisualDosKits"); return; }
+            foreach (Transform t in vk.transform)
+            {
+                int on = 0, total = 0;
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>(true)) { total++; if (r.enabled && r.gameObject.activeInHierarchy) on++; }
+                if (on > 0) sb.AppendLine("  desenho " + t.name + " " + t.position.ToString("F1") + " renderers " + on + "/" + total);
+            }
+        }
     }
 }
