@@ -447,7 +447,7 @@ namespace Arkana.World
         /// O GRAMPO DO METAL (a licao do mago preto): a Meshy entrega metallicFactor 1,0 e metal sem probe
         /// vira breu. Copia, nao altera o material importado (em Play no editor isso sujaria o asset).
         /// </summary>
-        static Material Domado(Material original)
+        internal static Material Domado(Material original)
         {
             // DOIS LADOS (foto de 11/09): a malha decimada da Meshy tem triangulo com a volta trocada, e o glTFast so'
             // desenha os dois lados quando o .glb pede — a peca saia ESTILHACADA, com o chao aparecendo por dentro.

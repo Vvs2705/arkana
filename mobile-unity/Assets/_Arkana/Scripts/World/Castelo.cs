@@ -227,6 +227,14 @@ namespace Arkana.World
                 GameObject m = Instantiate(prefab, Vector3.zero, Quaternion.identity);
                 m.name = "ModeloCastelo";
                 Renderer[] rs = m.GetComponentsInChildren<Renderer>();
+                // o grampo do metal (KitCenario.Domado): o castelo e' Meshy com metallicFactor 1 e espelhava o ceu — com o
+                // zenite limpo da onda 13B ele saiu AZUL inteiro (foto 43-ceu-castelo)
+                foreach (Renderer r in rs)
+                {
+                    Material[] ms = r.sharedMaterials;
+                    for (int i = 0; i < ms.Length; i++) if (ms[i] != null) ms[i] = KitCenario.Domado(ms[i]);
+                    r.sharedMaterials = ms;
+                }
                 Bounds b = rs.Length > 0 ? rs[0].bounds : new Bounds(m.transform.position, Vector3.zero);
                 for (int i = 1; i < rs.Length; i++) b.Encapsulate(rs[i].bounds);
                 float k = EscalaDoModelo(b.size);

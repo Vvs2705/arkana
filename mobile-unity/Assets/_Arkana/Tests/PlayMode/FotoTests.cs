@@ -2203,5 +2203,82 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
 
+
+        // ONDA 13B — colar em FotoTests.cs, no fim da classe. Rodar: .\foto.ps1 "Foto_Ceu"
+
+        /// <summary>Direcao pelo azimute (graus, 0 = +z, positivo gira para +x) e pela elevacao (graus, positivo = para cima).</summary>
+        static Vector3 DirecaoCeu(float azimute, float elevacao)
+        {
+            float a = azimute * Mathf.Deg2Rad, e = elevacao * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Sin(a) * Mathf.Cos(e), Mathf.Sin(e), Mathf.Cos(a) * Mathf.Cos(e));
+        }
+
+        /// <summary>
+        /// O CEU (onda 13B): a banda de cumulos em couve-flor no horizonte (base reta, 3 faixas toon, borda de luz dourada do
+        /// lado do sol) e os cirros finos no alto, no lugar das manchas bege de borda mole das fotos 34/40. Do chao do treino,
+        /// olho a 3,6 m (a altura da camera do jogo): 43-ceu-horizonte olhando o sol (15 graus a' esquerda dele, 12 para cima:
+        /// o sol, o halo e os cumulos CONTRA a luz — silhueta lilas com a borda de prata), 43-ceu-contra de costas para o sol (6
+        /// para cima: os cumulos acesos, creme no topo e rosa na base) e 43-ceu-alto a 45 graus, de lado para o sol (os cirros
+        /// e o degrade lilas -> azul-violeta). Treino: deterministico. Guarda junto o contrato: o skybox e' o Arkana/Ceu (se o
+        /// shader nao compilar a cadeia antiga assume calada) e as propriedades que o Ilha.cs e os KNOBs usam existem.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Ceu_HorizonteContraAlto()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Material ceu = RenderSettings.skybox;
+            Assert.IsNotNull(ceu, "sem skybox");
+            Assert.AreEqual("Arkana/Ceu", ceu.shader.name, "o ceu nao e' o Arkana/Ceu (o shader nao compilou e a cadeia antiga assumiu?)");
+            foreach (string p in new[] { "_Topo", "_Meio", "_Horizonte", "_Nuvem", "_NuvemMeio", "_NuvemSombra", "_NuvemRim", "_Cirro",
+                                         "_NevoaNoHorizonte", "_NevoaNaNuvem", "_Cobertura", "_AlturaBanda", "_TamanhoNuvem", "_Vento", "_RimForca", "_CirroForca" })
+                Assert.IsTrue(ceu.HasProperty(p), "o ceu perdeu a propriedade " + p);
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Assert.IsNotNull(sol, "sem sol");
+            Vector3 paraSol = -sol.transform.forward;
+            float azSol = Mathf.Atan2(paraSol.x, paraSol.z) * Mathf.Rad2Deg;
+            float elSol = Mathf.Asin(Mathf.Clamp(paraSol.y, -1f, 1f)) * Mathf.Rad2Deg;
+
+            Vector3 olho = main.Player.Pawn.Pos + Vector3.up * 3.6f;
+            var tomadas = new[] { ("43-ceu-horizonte", azSol - 15f, 12f), ("43-ceu-contra", azSol + 180f, 6f), ("43-ceu-alto", azSol + 120f, 45f) };
+            foreach (var (nome, az, el) in tomadas)
+            {
+                Camera cam = CameraTemporaria("CamFotoCeu", olho, olho + DirecaoCeu(az, el) * 100f, Color.gray);
+                Foto(cam, nome, false);
+                Object.Destroy(cam.gameObject);
+            }
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), "43-ceu: skybox=" + ceu.name + " / " + ceu.shader.name + " suportado=" + ceu.shader.isSupported
+                + " sol az=" + azSol.ToString("F0") + " el=" + elSol.ToString("F0") + " olho=" + olho.ToString("F1")
+                + " cobertura=" + ceu.GetFloat("_Cobertura").ToString("F2") + " vento=" + ceu.GetFloat("_Vento").ToString("F3") + "\n");
+        }
+
+        /// <summary>
+        /// 43-ceu-castelo: o MESMO quadro da 34-castelo-vivo (partida, seed das fotos, 3 s de voo), para comparar lado a lado
+        /// o ceu de manchas de antes com a banda de cumulos atras do castelo e os cirros por cima.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Ceu_Castelo()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(3f);
+            Assert.IsNotNull(main.Castelo, "partida sem castelo");
+            Arkana.World.Castelo cas = main.Castelo;
+            Vector3 c = cas.transform.position, dir = cas.Rota.Direcao;
+            Vector3 lado = Vector3.Cross(Vector3.up, dir).normalized;
+            Camera cam = CameraTemporaria("CamFotoCeuCastelo", c + lado * 60f - dir * 4f + Vector3.down * 10f, c - dir * 18f + Vector3.down * 6f, Color.gray);
+            cam.fieldOfView = 62f;
+            Foto(cam, "43-ceu-castelo", false);
+            Object.Destroy(cam.gameObject);
+        }
+
     }
 }
