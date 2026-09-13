@@ -167,7 +167,7 @@ namespace Arkana.Gameplay
                         if (!ApoioGrupoD.NoCone(Origem, Dir, e.Pos, _t["cone_graus"])) continue;
                         _atingidos.Add(e);
                         Combat.AplicarDano(e, _t["dano"], Elemento.Terra, k.Dono);
-                        ApoioGrupoD.Impulso(e, e.Pos - Origem, _t["empurrao"]);
+                        ApoioGrupoD.Empurrar(e, e.Pos - Origem, _t["empurrao"]);
                     }
                 }
                 if (f < alcance) return true;

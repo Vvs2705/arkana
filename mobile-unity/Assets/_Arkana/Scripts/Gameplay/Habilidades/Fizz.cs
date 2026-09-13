@@ -23,6 +23,7 @@ namespace Arkana.Gameplay
         private readonly List<ApoioGrupoD.RaioGuiado> _raios = new List<ApoioGrupoD.RaioGuiado>();
         private Bobina _bobina;
         private bool _proprio;
+        private int _pulos;
 
         public IReadOnlyList<Torreta> Torretas => _torretas;
         public IReadOnlyList<ApoioGrupoD.RaioGuiado> Raios => _raios;
@@ -34,7 +35,14 @@ namespace Arkana.Gameplay
 
         public void Tick(KitRunner k, float dt)
         {
-            if (ApoioGrupoD.PuloComMola(k.Dono, FatorDoPulo(k))) k.Visual("fizz_mola", k.Pos, k.Pos, 0.6f, 0.45f);
+            // a MOLA e' do corpo (o pulo sai na altura certa); a faisca dos calcanhares, na borda da decolagem
+            float mola = FatorDoPulo(k);
+            k.Dono.FatorDePulo = mola;
+            if (k.Dono.Pulos != _pulos)
+            {
+                _pulos = k.Dono.Pulos;
+                if (mola > 1f) k.Visual("fizz_mola", k.Pos, k.Pos, 0.6f, 0.45f);
+            }
             // a MEGABOBINA nasce no 1o tique da telegrafia (o motor avisa, o Fizz monta) e so' dispara quando o aviso acaba
             if (k.Telegrafia > 0f && _bobina == null) _bobina = new Bobina(k);
             if (_bobina != null) _bobina.Tick(k, dt);

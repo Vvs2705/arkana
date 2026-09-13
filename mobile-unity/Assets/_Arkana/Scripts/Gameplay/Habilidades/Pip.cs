@@ -13,7 +13,8 @@ namespace Arkana.Gameplay
     /// OS LIMITADORES SAO PARTE DO KIT: o SINO do tornozelo denuncia (onda visivel a cada 1,2 s — o counter tambem e' visual);
     /// definha parada; a rota inteira aparece em faisca no toque; a nuvem prioriza o mais PERTO (mirar e' impossivel, a
     /// distancia e' a contra-jogada) e ao acabar chove NELA — encharcada e lenta 2 s, e molhada CONDUZ raio.
-    /// ponytail: "ignora lama/agua" e os 55 de vida da ficha nao entraram — velocidade de terreno e vida base sao do Pawn.
+    /// Os 55 de vida da ficha sao do CORPO (IdentidadeMago.VidaBase: valem ate' para a Pip bot, que nao tem kit).
+    /// ponytail: "ignora lama/agua" nao entrou — o fator de terreno e' do Pawn (Pawn.VelocidadeMaxima), fora do kit.
     /// </summary>
     public sealed class Pip : IHabilidade
     {
@@ -93,11 +94,10 @@ namespace Arkana.Gameplay
             _dashI++;
             if (_dashI >= _dashes) { _dashI = -1; _dash = null; return; }
             Vector3 a = _rota[_dashI], b = _rota[_dashI + 1];
-            _dash = new ApoioGrupoD.Investida(k, null, a, (b - a).normalized, t["dash_dist"], 0f);
+            _dash = new ApoioGrupoD.Investida(k, null, a, (b - a).normalized, t["dash_dist"], 0f);   // o dash leva o corpo junto
             _cruzados.Clear();
             _dashAcc = 0f;
             _toqueAcc = 0f;
-            ApoioGrupoD.Impulso(k.Dono, b - a, t["dash_dist"]);
         }
 
         private void ZipZag(KitRunner k, float dt)

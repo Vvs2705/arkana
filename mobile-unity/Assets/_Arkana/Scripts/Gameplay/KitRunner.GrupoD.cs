@@ -22,9 +22,9 @@ namespace Arkana.Gameplay
     /// O APOIO DO GRUPO D — o que os 5 kits dividem, FORA do motor (ninguem edita o KitRunner para por um kit):
     ///  - LADO: quem e' inimigo/aliado. Hoje o unico esquadrao e' o do player (a mesma regra do Combat.Creditar); SOLO, aliado
     ///    nao existe e os efeitos "em aliado" caem no proprio mago.
-    ///  - CORPO: impulso e pulo pelo Pawn — o que o IConjurador ainda nao expoe. O fake do teste nao anda: a logica mede na
-    ///    ROTA (o lance), nunca no corpo; o corpo e' EMPURRADO pela mesma conta (Percorrido), entao os dois andam juntos.
-    ///    ponytail: `as Pawn` ate' o IConjurador ganhar Impulso(dir, m) e FatorDePulo (a troca esta' no relatorio do grupo D).
+    ///  - CORPO: o dash de kit e' o verbo IConjurador.Impulso; a logica mede na ROTA (Investida), que anda a MESMA integral
+    ///    do dash do corpo (Locomocao.PercorridoNoDash), entao os dois andam juntos. O fake do teste nao anda. O empurrao de
+    ///    INIMIGO (onda do Basalto) segue no canal do knockback: tranco que desliza e' o certo para quem foi empurrado.
     ///  - ESTRUTURA de kit (torreta, bobina): apanha de projetil INIMIGO que a toca (engolido como o Tear-Mae engole) e de
     ///    TerrainHit perto (o dano do muro: Dmg x Estrutura do elemento).
     /// </summary>
@@ -91,43 +91,15 @@ namespace Arkana.Gameplay
 
         // ------------------------------------------------------------------ corpo
 
-        /// <summary>v0 que anda `metros` no canal de empurrao (Locomocao.Knockback decai a KNOCK_DECAY): d = v0^2 / 2a.</summary>
-        public static float VelocidadeDoImpulso(float metros) => Mathf.Sqrt(2f * Locomocao.KNOCK_DECAY * Mathf.Max(metros, 0f));
-
-        public static float DuracaoDoImpulso(float metros) => VelocidadeDoImpulso(metros) / Locomocao.KNOCK_DECAY;
-
-        /// <summary>Metros andados `t` s depois do impulso — a MESMA conta do knockback: a rota da logica anda junto do corpo.</summary>
-        public static float Percorrido(float metros, float t)
-        {
-            float v0 = VelocidadeDoImpulso(metros), a = Locomocao.KNOCK_DECAY;
-            t = Mathf.Clamp(t, 0f, v0 / a);
-            return v0 * t - 0.5f * a * t * t;
-        }
-
-        /// <summary>Empurra o CORPO `metros` na direcao (so' Pawn; o stick soma por cima). ponytail: canal do knockback — o
-        /// arranque e' forte e a cauda desliza (~1 s para 6 m); o dash seco pede Impulso proprio na Locomocao.</summary>
-        public static void Impulso(IEntidade e, Vector3 dir, float metros)
+        /// <summary>EMPURRA um corpo inimigo `metros` pelo canal do knockback (decai a KNOCK_DECAY: v0 = raiz de 2ad). O tranco
+        /// que desliza e' o de quem apanhou; dash de quem conjura e' IConjurador.Impulso.
+        /// ponytail: `as Pawn` — o IConjurador nao tem Empurrar (o Gromm usa a mesma porta pela casca dele).</summary>
+        public static void Empurrar(IEntidade e, Vector3 dir, float metros)
         {
             Pawn p = e as Pawn;
             dir = Plano(dir);
             if (p == null || dir.sqrMagnitude < 1e-6f) return;
-            p.Empurrar(dir.normalized * VelocidadeDoImpulso(metros));
-        }
-
-        /// <summary>Pulo com mola, PURO: no quadro da decolagem (o Pular escreve Vy = JumpV exato, e o kit tica antes da
-        /// Locomocao) a ALTURA sobe `mult` vezes (h = v^2/2g, logo v x sqrt(mult)). Fora da decolagem, nao mexe.</summary>
-        public static float VyComMola(float vy, float mult) => vy == Balance.Player.JumpV && mult > 1f ? vy * Mathf.Sqrt(mult) : vy;
-
-        /// <summary>Aplica a mola no corpo. True = decolou com mola neste tique (a casca solta a faisca dos calcanhares).
-        /// ponytail: escreve Loc.Vy do Pawn — o dia em que o pulo for por mago, e' um fator na Locomocao.Pular.</summary>
-        public static bool PuloComMola(IEntidade e, float mult)
-        {
-            Pawn p = e as Pawn;
-            if (p == null || p.Loc == null) return false;
-            float vy = VyComMola(p.Loc.Vy, mult);
-            if (vy == p.Loc.Vy) return false;
-            p.Loc.Vy = vy;
-            return true;
+            p.Empurrar(dir.normalized * Mathf.Sqrt(2f * Locomocao.KNOCK_DECAY * Mathf.Max(metros, 0f)));
         }
 
         // ------------------------------------------------------------------ vida
@@ -208,26 +180,29 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>
-        /// A ROTA de uma investida de kit (Mordida do Noctus, cada dash do Zip-Zag): segmento cuja FRENTE anda a mesma conta do
-        /// empurrao que leva o corpo (ApoioGrupoD.Percorrido). Quem esta' a `raio` m do trecho JA' percorrido foi tocado — a
-        /// investida viaja, nao nasce no alvo (GDD §4.1).
+        /// A ROTA de uma investida de kit (Mordida do Noctus, cada dash do Zip-Zag) — e o DASH que leva o corpo por ela: nascer
+        /// a investida pede IConjurador.Impulso com a mesma distancia e o mesmo tempo, e a FRENTE anda a mesma integral do dash
+        /// (Locomocao.PercorridoNoDash). Quem esta' a `raio` m do trecho JA' percorrido foi tocado — a investida viaja, nao
+        /// nasce no alvo (GDD §4.1).
         /// </summary>
         public sealed class Investida
         {
             public readonly Vector3 Origem, Dir;
-            public readonly float Alcance;
+            public readonly float Alcance, Duracao;
             /// <summary>Null = sem desenho proprio (o Zip-Zag desenha a rota inteira no toque).</summary>
             public readonly EfeitoVisual Visual;
             public float Idade { get; private set; }
 
-            public float Frente => ApoioGrupoD.Percorrido(Alcance, Idade);
+            public float Frente => Locomocao.PercorridoNoDash(Alcance, Duracao, Idade);
             public Vector3 Ponta => Origem + Dir * Frente;
-            public bool Acabou => Idade >= ApoioGrupoD.DuracaoDoImpulso(Alcance);
+            public bool Acabou => Idade >= Duracao;
 
             public Investida(KitRunner k, string tipo, Vector3 origem, Vector3 dir, float alcance, float largura)
             {
                 Origem = origem; Dir = dir; Alcance = alcance;
-                if (tipo != null) Visual = k.Visual(tipo, origem, origem, largura, ApoioGrupoD.DuracaoDoImpulso(alcance) + 0.35f);
+                Duracao = Locomocao.DuracaoDoImpulso(alcance);
+                k.Dono.Impulso(dir, alcance, Duracao);
+                if (tipo != null) Visual = k.Visual(tipo, origem, origem, largura, Duracao + 0.35f);
             }
 
             public void Andar(float dt)

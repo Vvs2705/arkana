@@ -9,7 +9,8 @@ namespace Arkana.Characters
 
     /// <summary>
     /// IDENTIDADE VISUAL dos 20 magos — espelho de mobile-godot/godot/characters/mage_identity.gd,
-    /// com os numeros tirados de design/personagens/NN-*.md ("## Paleta" e "## Aparencia fisica").
+    /// com os numeros tirados de design/personagens/NN-*.md ("## Paleta" e "## Aparencia fisica") — e o CORPO que a ficha
+    /// fixa fora do kit (vida base: vale para player e bot, que nao tem passiva).
     /// DADOS, nao malhas: um corpo base, 20 fichas. Classe PURA (testa sem cena).
     /// </summary>
     public sealed class IdentidadeMago
@@ -19,6 +20,9 @@ namespace Arkana.Characters
         public float AlturaM;
         /// <summary>Metros acima do chao para quem nunca pousa (Pip voa a ~1,2 m).</summary>
         public float FlutuaM;
+        /// <summary>Vida com que o corpo nasce (Pawn.Montar), da ficha: a Pip tem 55 ("a mais fragil do elenco"); o resto, a
+        /// regua (Balance.Player.Hp). O escudo nao muda: e' do nivel (GDD §5).</summary>
+        public float VidaBase = Balance.Player.Hp;
         /// <summary>Hex sem '#'. Primaria = manto (o que SetTint sobrescreve); Marca = a que brilha.</summary>
         public string CorPrimaria, CorSecundaria, CorMarca;
         public Elemento Elemento;
@@ -88,9 +92,12 @@ namespace Arkana.Characters
             };
         }
 
-        static void Add(string slug, float altura, string p, string s, string m, Elemento e, Silhueta sil, float flutua = 0f)
+        static void Add(string slug, float altura, string p, string s, string m, Elemento e, Silhueta sil, float flutua = 0f,
+            float vida = Balance.Player.Hp)
         {
-            _tabela[slug] = Nova(slug, Kits.De(slug).Nome, altura, p, s, m, e, sil, flutua);
+            IdentidadeMago i = Nova(slug, Kits.De(slug).Nome, altura, p, s, m, e, sil, flutua);
+            i.VidaBase = vida;
+            _tabela[slug] = i;
         }
 
         static IdentidadeMago()
@@ -115,7 +122,7 @@ namespace Arkana.Characters
             Add("17-sylva",        1.75f, "3E7A3A", "E48AB0", "F0C75E", Elemento.Terra, Silhueta.Esguio);
             Add("18-basalto",      2.30f, "4A4A50", "F0C75E", "FF5A2A", Elemento.Terra, Silhueta.Alto);      // golem: o maior alvo do jogo
             Add("19-noctus",       1.88f, "8B1E2E", "E8E4EC", "8A5CF0", Elemento.Vento, Silhueta.Esguio);
-            Add("20-pip",          0.60f, "2AA7FF", "8A5CF0", "F5D90A", Elemento.Raio,  Silhueta.Flutuante, 1.2f); // nunca pousa
+            Add("20-pip",          0.60f, "2AA7FF", "8A5CF0", "F5D90A", Elemento.Raio,  Silhueta.Flutuante, 1.2f, 55f); // nunca pousa; 55 de vida
         }
     }
 }

@@ -12,10 +12,14 @@ namespace Arkana.Gameplay
     /// DISPARO (&lt;30 m, Bus.Disparo — conjurar denuncia), REVIDE (tomar dano ensina quem bateu, sem limite).
     /// FFA: qualquer mago e' presa. Memoria curta: alvo morto ou alem de MEMORIA e' esquecido.
     /// So' procura alvo NOVO quando esta' sem nenhum (senao vira pinball entre passantes).
+    /// OCULTO (invisivel, penumbra parada — o corpo decide): a visao so' o pega colado (VISAO_OCULTO, o brilho de perto) e os
+    /// passos nao o localizam; o alvo que some e' largado e o bot vai ate' onde o viu. DISPARO e REVIDE continuam valendo.
     /// </summary>
     public sealed class PercepcaoBot
     {
         public const float VISAO = 12f, AUDICAO_PASSOS = 18f, AUDICAO_DISPARO = 30f, MEMORIA = 30f;
+        /// <summary>m em que o oculto ainda se ve' (o brilho do invisivel, o vulto da penumbra colado) — KNOB.</summary>
+        public const float VISAO_OCULTO = 2.5f;
         /// <summary>s entre varreduras — 12 bots a 2 Hz custa nada.</summary>
         public const float PERCEPCAO_S = 0.5f;
         /// <summary>m/s acima do qual os passos entregam.</summary>
@@ -52,18 +56,21 @@ namespace Arkana.Gameplay
 
         public bool AlvoVivo => Alvo != null && Alvo.Vital != null && Alvo.Vital.Viva;
 
-        /// <summary>Relogio: varre a cada PERCEPCAO_S. `velocidadeDe` = m/s horizontal de cada mago (passos).</summary>
-        public void Tick(float dt, IList<IEntidade> magos, Func<IEntidade, float> velocidadeDe)
+        /// <summary>Relogio: varre a cada PERCEPCAO_S. `velocidadeDe` = m/s horizontal de cada mago (passos); `ocultoDe` = a
+        /// visao nao o pega (null = ninguem oculto).</summary>
+        public void Tick(float dt, IList<IEntidade> magos, Func<IEntidade, float> velocidadeDe, Func<IEntidade, bool> ocultoDe = null)
         {
             _acc += dt;
             if (_acc < PERCEPCAO_S) return;
             _acc = 0f;
-            Varrer(magos, velocidadeDe);
+            Varrer(magos, velocidadeDe, ocultoDe);
         }
 
-        public void Varrer(IList<IEntidade> magos, Func<IEntidade, float> velocidadeDe)
+        public void Varrer(IList<IEntidade> magos, Func<IEntidade, float> velocidadeDe, Func<IEntidade, bool> ocultoDe = null)
         {
             if (Alvo != null && (!AlvoVivo || Dist(Alvo.Pos) > MEMORIA)) Alvo = null;
+            // sumiu da vista: larga o alvo e vai ate' onde o viu por ultimo (disparo e revide o devolvem)
+            if (Alvo != null && ocultoDe != null && ocultoDe(Alvo) && Dist(Alvo.Pos) >= VISAO_OCULTO) { Pista = Alvo.Pos; Alvo = null; }
             if (Alvo != null || magos == null) return;
             IEntidade melhor = null;
             float melhorD = float.PositiveInfinity;
@@ -73,8 +80,9 @@ namespace Arkana.Gameplay
                 if (p == null || p == _eu || p.Vital == null || !p.Vital.Viva) continue;
                 float d = Dist(p.Pos);
                 if (d >= melhorD) continue;
-                bool visto = d < VISAO;
-                bool ouvido = d < AUDICAO_PASSOS && velocidadeDe != null && velocidadeDe(p) > PASSOS_V;
+                bool oculto = ocultoDe != null && ocultoDe(p);
+                bool visto = d < (oculto ? VISAO_OCULTO : VISAO);
+                bool ouvido = !oculto && d < AUDICAO_PASSOS && velocidadeDe != null && velocidadeDe(p) > PASSOS_V;
                 if (visto || ouvido) { melhor = p; melhorD = d; }
             }
             if (melhor != null) Alvo = melhor;
@@ -273,7 +281,7 @@ namespace Arkana.Gameplay
             }
             Partida m = Partida.Atual;
             IList<IEntidade> arena = m != null ? m.Arena : null;
-            Percepcao.Tick(Time.deltaTime, arena, VelocidadeDe);
+            Percepcao.Tick(Time.deltaTime, arena, VelocidadeDe, OcultoDe);
             IList<LootItem> loot = m != null && m.Loot != null ? m.Loot.Itens : null;
             if (m != null && m.Loot != null) m.Loot.TentarAutoUpgrade(Pawn.Slot);   // loot no caminho: so' tier maior
             Vector3? bau = m != null && m.Bau != null && m.Bau.PodeAbrir ? m.Bau.Pos : (Vector3?)null;
@@ -286,10 +294,17 @@ namespace Arkana.Gameplay
             if (s.Atirar) Pawn.Atirar(s.DirTiro);
         }
 
+        /// <summary>O que os passos entregam: nada de quem anda sem som (Passo de Veludo).</summary>
         private static float VelocidadeDe(IEntidade e)
         {
             var p = e as Pawn;
-            return p != null ? p.VelocidadeHorizontal : 0f;
+            return p != null && !p.SemPassos ? p.VelocidadeHorizontal : 0f;
+        }
+
+        private static bool OcultoDe(IEntidade e)
+        {
+            var p = e as Pawn;
+            return p != null && p.Oculto;
         }
     }
 }

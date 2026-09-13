@@ -12,15 +12,17 @@ namespace Arkana.Gameplay
     /// OS LIMITADORES: o espelho so' pega PROJETIL que chega pela FRENTE (area e corpo a corpo passam) e QUEBRA na 3a
     /// devolucao (vidro alto); reflexo nao fere e anda INVERTIDO; invisivel QUEBRA ao conjurar (ataque ou tatica); o flash do
     /// reflexo quebrado so' ofusca (0,5s sem conjurar) quem estava a `flash_dist` m; no fim do Baile a ultima nota REVELA ele 1s.
-    /// Invisivel e' do CORPO (IConjurador.AplicarEstado("invisivel")) — ponytail: o Pawn ainda ignora esse estado (o bot
-    /// continua vendo); o que se VE hoje e' a casca apagando o modelo e o brilho de vidro no lugar (VisualDosKits.GrupoB).
+    /// Invisivel e' do CORPO (IConjurador.AplicarEstado("invisivel")): a percepcao do bot deixa de ve'-lo (so' o brilho colado;
+    /// o disparo continua denunciando) e o kit o APAGA quando ele aparece. Para o dono, a casca apaga o modelo e poe o
+    /// vidro tremendo no lugar (VisualDosKits.GrupoB).
     /// SOLO: ninguem cai (Derrubado.SOLO_DERRUBA) — a passiva espera o esquadrao.
     /// </summary>
     public sealed class Ilusionista : IHabilidade
     {
         public const string ESPELHO = "espelho";
         public const string ESPELHO_QUEBRADO = "espelho_quebrado";
-        public const string INVISIVEL = "invisivel";
+        /// <summary>O estado do corpo E o chip da HUD (o mesmo nome).</summary>
+        public const string INVISIVEL = Pawn.INVISIVEL;
         public const string BAILE = "baile";
         public const string REVELADO = "revelado";
         /// <summary>s do estouro de cacos (sumir, voltar, quebrar).</summary>
@@ -94,10 +96,11 @@ namespace Arkana.Gameplay
             k.Visual("ilusionista_cacos", k.Pos, k.Pos, 1f, CACOS);
         }
 
-        /// <summary>Volta a ser visto: recompoe em cacos de luz.</summary>
+        /// <summary>Volta a ser visto: recompoe em cacos de luz e o corpo volta para a visao dos bots.</summary>
         void Aparecer(KitRunner k)
         {
             _invisivel = 0f;
+            k.Dono.AplicarEstado(INVISIVEL, 0f);
             k.Visual("ilusionista_cacos", k.Pos, k.Pos, 1f, CACOS);
             k.AvisarEstado(INVISIVEL, false);
         }

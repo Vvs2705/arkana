@@ -145,11 +145,14 @@ namespace Arkana.Tests
 
             Andar(k, k.Dados.TaticaCd);
             Assert.IsTrue(k.UsarTatica());
+            Assert.AreEqual(t["duracao"], p.Estados[Pawn.PENUMBRA], 0.001f, "a penumbra e' do CORPO (o bot deixa de ve'-la parada)");
             k.Tick(0.2f);
             Assert.IsTrue(umbra.NoVeu);
             k.NotificarAtaque();   // CONJUROU (o ataque basico)
             k.Tick(0.05f);
             Assert.IsFalse(umbra.NoVeu, "o veu QUEBRA ao conjurar (o limitador)");
+            Assert.AreEqual(0f, p.Estados[Pawn.PENUMBRA], "e o corpo volta a ser visto na hora");
+            Assert.IsTrue(p.Estados.ContainsKey(Pawn.SEM_PASSOS), "Passo de Veludo: os passos dela nao entregam");
         }
 
         [Test]
@@ -174,13 +177,14 @@ namespace Arkana.Tests
             Assert.IsTrue(k.EstadoAtivo(Umbra.DANCA), "a danca comeca DEPOIS do aviso");
 
             int disparos = _disparos;
+            p.DirecaoDaEsquiva = Vector3.back;   // esquivou para tras
             k.DashIniciou = true;
             k.Tick(0.01f);
             Assert.AreEqual(1, umbra.Sombras.Count, "a esquiva deixa a sombra-isca");
             Assert.AreEqual(Vector3.zero, umbra.Sombras[0].Pos, "ONDE ELA ESTAVA");
             Assert.AreEqual(disparos + 1, _disparos, "o salto SUSSURRA (os bots ouvem)");
-            Assert.IsTrue(k.Visuais.Any(v => v.Tipo == "umbra_tinta"), "o corte de tinta preta");
-            p.Pos = new Vector3(0f, 0f, 5f);   // a esquiva levou o corpo
+            Assert.AreEqual(new Vector3(0f, 0f, -Umbra.TELEPORTE_M), p.Pos, "a esquiva TELEPORTA 8 m na direcao dela (ficha 12)");
+            Assert.AreEqual(2, k.Visuais.Count(v => v.Tipo == "umbra_tinta"), "o corte de tinta preta na saida e na chegada");
             float ehpPerto = Ehp(perto), ehpLonge = Ehp(longe), ehpEla = Ehp(p);
             Andar(k, s["sombra_espera"] + 0.1f);
             Assert.AreEqual(0, umbra.Sombras.Count, "a isca estourou");

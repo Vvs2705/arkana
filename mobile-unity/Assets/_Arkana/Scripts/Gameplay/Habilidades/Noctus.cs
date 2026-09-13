@@ -91,14 +91,11 @@ namespace Arkana.Gameplay
 
         // ------------------------------------------------------------------ tatica
 
-        /// <summary>Mordida do Vazio: a rota sai na mira e o corpo e' empurrado por ela (a mesma conta).</summary>
+        /// <summary>Mordida do Vazio: a rota sai na mira e o corpo DISPARA por ela (o dash do motor, a mesma conta), 6 m e para.</summary>
         public void Tatica(KitRunner k)
         {
-            float alcance = k.Dados.Tatica["alcance"];
-            Vector3 d = k.Mira();
-            _mordida = new ApoioGrupoD.Investida(k, "noctus_investida", k.Pos, d, alcance, 0.8f);
+            _mordida = new ApoioGrupoD.Investida(k, "noctus_investida", k.Pos, k.Mira(), k.Dados.Tatica["alcance"], 0.8f);
             _mordidaAcc = 0f;
-            ApoioGrupoD.Impulso(k.Dono, d, alcance);
         }
 
         private void Morder(KitRunner k, float dt)

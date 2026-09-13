@@ -284,6 +284,7 @@ namespace Arkana.Tests
             k.NotificarAtaque();
             k.Tick(0.05f);
             Assert.IsFalse(ilu.Invisivel, "atacou: aparece");
+            Assert.AreEqual(0f, p.Estados[Ilusionista.INVISIVEL], "e o CORPO volta para a visao dos bots (o estado apaga)");
             Assert.IsTrue(TemEstado(Ilusionista.INVISIVEL, false));
 
             // no fim quebram em sequencia e a ULTIMA nota revela onde ele esta'

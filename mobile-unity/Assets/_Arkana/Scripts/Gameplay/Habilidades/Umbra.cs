@@ -7,21 +7,24 @@ namespace Arkana.Gameplay
 {
     /// <summary>
     /// KIT DA UMBRA (12) — Ataque/Perseguicao. Ficha em design/personagens/12-umbra.md; tempos em DIRECAO.md §4 e §6.
-    ///   Passiva  Passo de Veludo   — abate devolve 30% da esquiva
-    ///   Tatica   Veu Umbrio        — 2,5 s de penumbra; o 1o golpe saindo do veu da' +50% (lamina violeta no alvo)
-    ///   Suprema  Danca das Sombras — 6 s: cada esquiva deixa uma sombra-isca que explode FRACO onde ela estava
+    ///   Passiva  Passo de Veludo   — corre SEM SOM de passos (o corpo: "sem_passos"); abate devolve 30% da esquiva
+    ///   Tatica   Veu Umbrio        — 2,5 s de penumbra (o corpo: "penumbra" — o bot nao a ve' PARADA; andando e' um vulto);
+    ///                                o 1o golpe saindo do veu da' +50% (lamina violeta no alvo)
+    ///   Suprema  Danca das Sombras — 6 s: cada esquiva TELEPORTA 8 m e deixa uma sombra-isca que explode FRACO onde ela estava
     /// OS LIMITADORES: conjurar QUEBRA o veu (ataque ou suprema); a isca so' doi colada (2,5 m, assedio) e cada salto
     /// SUSSURRA (um Disparo: os bots a 30 m ouvem); no fim as sombras restantes implodem e ela fica 1 s cega de LUZ
     /// (sem conjurar). O bonus e o abate leem Bus.DamageApplied com fonte = ela: o +50% e' dano NOVO pelo ponto unico
     /// (Combat), nunca multiplicador escondido no projetil.
-    /// ponytail: "sem som de passos" e "quase invisivel parada" sao do MOTOR (a percepcao do bot le' passos e visao sem
-    /// perguntar ao kit) — hoje o veu so' se VE (penumbra no corpo). E o "teleporte de 8 m" e' a propria esquiva (5 m,
-    /// Balance.Dodge): o IConjurador nao tem verbo de teleporte.
     /// </summary>
     public sealed class Umbra : IHabilidade
     {
         public const string VEU = "umbra_veu";
         public const string DANCA = "umbra_danca";
+        /// <summary>m do teleporte de cada esquiva na Danca (ficha 12: "teleporta curto (8m)").
+        /// ponytail: o numero mora aqui porque o Kits.GrupoC nao e' desta onda — mudar para umbra.Suprema["teleporte"].</summary>
+        public const float TELEPORTE_M = 8f;
+        /// <summary>s do "sem_passos" renovado a cada tique (morta, o corpo volta a fazer barulho sozinho).</summary>
+        const float PASSO_S = 0.5f;
 
         /// <summary>
         /// Casca: devolve `fracao` do cooldown CHEIO da esquiva ao corpo. ponytail: a esquiva mora na Locomocao do Pawn e o
@@ -32,7 +35,7 @@ namespace Arkana.Gameplay
         private readonly List<Sombra> _sombras = new List<Sombra>();
         private KitRunner _k;
         private bool _ouvindo, _armado, _avisando;
-        private float _veu, _veuT, _graca, _chegada;
+        private float _veu, _veuT, _graca;
         private EfeitoVisual _auraVeu;
 
         public bool NoVeu => _veu > 0f;
@@ -44,6 +47,7 @@ namespace Arkana.Gameplay
         public void Tick(KitRunner k, float dt)
         {
             Ouvir(k);
+            k.Dono.AplicarEstado(Pawn.SEM_PASSOS, PASSO_S);   // Passo de Veludo: os passos dela nao entregam
             if (_veu > 0f)
             {
                 _veu -= dt;
@@ -64,16 +68,11 @@ namespace Arkana.Gameplay
             }
             else _avisando = false;
             if (k.EstadoAtivo(DANCA) && k.DashIniciou) Saltou(k);
-            if (_chegada > 0f)
-            {
-                _chegada -= dt;
-                if (_chegada <= 0f) k.Visual("umbra_tinta", k.Pos, k.Pos, 0.5f, 0.5f);   // o corte de tinta tambem na CHEGADA
-            }
             for (int i = _sombras.Count - 1; i >= 0; i--)
                 if (!_sombras[i].Tick(k, dt)) _sombras.RemoveAt(i);
         }
 
-        /// <summary>Veu Umbrio: penumbra + bonus armado. A HUD so' ouve o estado (o chip nao existe em Textos: soa e some).</summary>
+        /// <summary>Veu Umbrio: penumbra NO CORPO (a visao do bot nao a pega parada) + bonus armado. A HUD so' ouve o estado.</summary>
         public void Tatica(KitRunner k)
         {
             Ouvir(k);
@@ -84,6 +83,7 @@ namespace Arkana.Gameplay
             _armado = true;
             if (_auraVeu != null) _auraVeu.Restante = 0f;
             _auraVeu = k.Visual(VEU, k.Pos, k.Pos, 1f, _veu, k.Dono);
+            k.Dono.AplicarEstado(Pawn.PENUMBRA, _veu);
             k.AvisarEstado(VEU, true);
         }
 
@@ -116,16 +116,20 @@ namespace Arkana.Gameplay
             _veu = 0f;
             if (_armado) _graca = k.Dados.Tatica["janela_bonus"];   // o tiro que saiu no fim do veu ainda voa
             if (_auraVeu != null) { _auraVeu.Restante = 0f; _auraVeu = null; }
+            k.Dono.AplicarEstado(Pawn.PENUMBRA, 0f);   // o corpo volta a ser visto
             k.AvisarEstado(VEU, false);
         }
 
-        /// <summary>Cada esquiva na danca: a isca fica ONDE ELA ESTAVA, a tinta risca a saida e a chegada, e o sussurro vaza.</summary>
+        /// <summary>Cada esquiva na danca TELEPORTA na direcao dela (o corpo corta o dash e pousa seguro): a isca fica ONDE ELA
+        /// ESTAVA, a tinta risca a saida e a chegada, e o sussurro vaza de onde ela sumiu.</summary>
         private void Saltou(KitRunner k)
         {
-            _sombras.Add(new Sombra(k, k.Pos));
-            k.Visual("umbra_tinta", k.Pos, k.Pos, 0.5f, 0.5f);
-            _chegada = Balance.Dodge.Duration;
-            Bus.EmitDisparo(k.Dono, k.Pos);   // o SUSSURRO do salto: counter sonoro para os bots
+            Vector3 de = k.Pos, dir = k.Dono.DirecaoDaEsquiva;
+            _sombras.Add(new Sombra(k, de));
+            k.Visual("umbra_tinta", de, de, 0.5f, 0.5f);
+            Bus.EmitDisparo(k.Dono, de);   // o SUSSURRO do salto: counter sonoro para os bots
+            if (dir.sqrMagnitude > 1e-6f && k.Dono.Teleportar(de + dir.normalized * TELEPORTE_M))
+                k.Visual("umbra_tinta", k.Pos, k.Pos, 0.5f, 0.5f);   // o corte de tinta tambem na CHEGADA
         }
 
         // ------------------------------------------------------------------ o bonus e o abate

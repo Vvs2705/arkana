@@ -19,6 +19,9 @@ namespace Arkana.Gameplay
         public const float GRAVIDADE = 9.81f;
         /// <summary>Vy no chao: o CharacterController precisa de um empurrao para baixo para manter isGrounded.</summary>
         public const float COLA_CHAO = -1f;
+        /// <summary>m/s MEDIOS do dash de kit (mordida, zigue-zague) — KNOB local: 6 m em 0,4 s, metade da esquiva (27,8 m/s),
+        /// que ainda se ve' VIAJAR (GDD §4.1). AUMENTAR = investida que nasce no alvo; DIMINUIR = volta a parecer corrida.</summary>
+        public const float VEL_IMPULSO = 15f;
 
         /// <summary>Velocidade horizontal INTENCIONAL (sem knockback).</summary>
         public Vector3 VelH;
@@ -27,6 +30,8 @@ namespace Arkana.Gameplay
         /// <summary>A velocidade REAL aplicada no ultimo Tick (o que a animacao e o banking leem).</summary>
         public Vector3 Vel;
         public float DodgeLeft, DodgeCd, IframesLeft;
+        /// <summary>s que faltam do dash de kit (Impulso). > 0 = o corpo segue a rota, o stick nao soma.</summary>
+        public float ImpulsoLeft;
         public float FlutuaS;
         public bool Flutuando;
         /// <summary>Histerese idle/run (RunAnimEnter/Exit).</summary>
@@ -36,12 +41,15 @@ namespace Arkana.Gameplay
         /// <summary>Ultima velocidade maxima recebida (frac de velocidade para giro e banking).</summary>
         public float VelMax = Balance.Player.Speed;
 
-        private Vector3 _dodgeDir;
+        private Vector3 _dodgeDir, _impDir;
+        private float _impM, _impDur;
         private float _prevYaw;
         private bool _yawInit;
 
         public float VelocidadeHorizontal => new Vector2(Vel.x, Vel.z).magnitude;
         public bool Esquivando => DodgeLeft > 0f;
+        /// <summary>Para onde a ultima esquiva saiu (XZ normalizada; zero antes da primeira).</summary>
+        public Vector3 DirEsquiva => _dodgeDir;
         public bool DodgePronto => DodgeCd <= 0f;
         /// <summary>1 = acabou de usar, 0 = pronta. A UI so' LE.</summary>
         public float DodgeCdFrac => DodgeCd / Balance.Dodge.Cooldown;
@@ -74,13 +82,27 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>Rampa linear de burst*media ate' (2-burst)*media: a MEDIA continua distance/duration, so' o arranque muda.</summary>
-        public static float DashSpeedAt(float p)
+        public static float DashSpeedAt(float p) => Rampa(Balance.Dodge.Distance, Balance.Dodge.Duration, p);
+
+        /// <summary>A rampa de TODO dash (esquiva e kit): velocidade no progresso `p` (0..1) de `metros` em `dur` s.</summary>
+        public static float Rampa(float metros, float dur, float p) =>
+            metros / dur * Mathf.Lerp(Balance.Dodge.Burst, 2f - Balance.Dodge.Burst, Mathf.Clamp01(p));
+
+        /// <summary>Metros andados `t` s depois do arranque de um dash de `metros` em `dur` s — a integral da Rampa. E' a conta
+        /// que a ROTA de um kit (ApoioGrupoD.Investida) usa: a logica e o corpo andam juntos.</summary>
+        public static float PercorridoNoDash(float metros, float dur, float t)
         {
-            float media = Balance.Dodge.Distance / Balance.Dodge.Duration;
-            return media * Mathf.Lerp(Balance.Dodge.Burst, 2f - Balance.Dodge.Burst, Mathf.Clamp01(p));
+            if (!(dur > 0f)) return metros;
+            t = Mathf.Clamp(t, 0f, dur);
+            float b = Balance.Dodge.Burst;
+            return metros / dur * (b * t + (1f - b) * t * t / dur);
         }
 
-        /// <summary>Dash em `dir` (XZ) com i-frames. Quem chama resolve o "parado = para onde olha".</summary>
+        /// <summary>Quanto dura um dash de kit de `metros` (a VEL_IMPULSO).</summary>
+        public static float DuracaoDoImpulso(float metros) => Mathf.Max(metros, 0f) / VEL_IMPULSO;
+
+        /// <summary>Dash em `dir` (XZ) com i-frames. Quem chama resolve o "parado = para onde olha". O ultimo verbo manda:
+        /// esquivar sai do dash de kit.</summary>
         public bool Dodge(Vector3 dir)
         {
             if (!DodgePronto) return false;
@@ -90,14 +112,42 @@ namespace Arkana.Gameplay
             DodgeLeft = Balance.Dodge.Duration;
             DodgeCd = Balance.Dodge.Cooldown;
             IframesLeft = Balance.Dodge.Iframes;
+            ImpulsoLeft = 0f;
             return true;
         }
 
-        /// <summary>SALTO ARCANO: so' do chao (sem pulo duplo) e nunca nadando.</summary>
-        public bool Pular(bool noChao, bool nadando)
+        /// <summary>
+        /// DASH DE KIT: `metros` em `dur` s na direcao (XZ), na MESMA rampa da esquiva, e para — sem a cauda do empurrao (o
+        /// Knockback decai a 9 m/s^2: 6 m levavam 1,15 s deslizando). Sem i-frames e sem cooldown (o kit paga o dele). O
+        /// stick nao soma por cima: o corpo anda a rota que o kit telegrafou. O ultimo verbo manda: corta a esquiva.
+        /// </summary>
+        public bool Impulso(Vector3 dir, float metros, float dur)
+        {
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 1e-6f || !(metros > 0f) || !(dur > 0f)) return false;
+            _impDir = dir.normalized;
+            _impM = metros;
+            _impDur = dur;
+            ImpulsoLeft = dur;
+            DodgeLeft = 0f;
+            return true;
+        }
+
+        /// <summary>O corpo mudou de lugar num quadro (teleporte): dash, empurrao e velocidade vertical nao atravessam com
+        /// ele. A corrida (VelH) e os i-frames ficam.</summary>
+        public void Parar()
+        {
+            DodgeLeft = 0f; ImpulsoLeft = 0f;
+            Knockback = Vector3.zero;
+            Vy = 0f;
+        }
+
+        /// <summary>SALTO ARCANO: so' do chao (sem pulo duplo) e nunca nadando. `fatorAltura` = quantas vezes mais ALTO
+        /// (h = v^2/2g, logo a velocidade sobe pela raiz): a mola do Fizz e' 1,5.</summary>
+        public bool Pular(bool noChao, bool nadando, float fatorAltura = 1f)
         {
             if (!noChao || nadando) return false;
-            Vy = Balance.Player.JumpV;
+            Vy = Balance.Player.JumpV * Mathf.Sqrt(Mathf.Max(fatorAltura, 0f));
             return true;
         }
 
@@ -127,6 +177,15 @@ namespace Arkana.Gameplay
                 h = _dodgeDir * DashSpeedAt(p);
                 // momentum: ao acabar o dash o corpo JA' esta' correndo pra la'
                 VelH = _dodgeDir * velMax * Balance.Dodge.ExitMomentum;
+            }
+            else if (ImpulsoLeft > 0f)
+            {
+                // o ultimo passo so' anda o que falta: a soma da' `metros` exato (a rota do kit mede a mesma integral)
+                float passo = Mathf.Min(dt, ImpulsoLeft);
+                float p = (_impDur - ImpulsoLeft + passo * 0.5f) / _impDur;
+                ImpulsoLeft -= passo;
+                h = _impDir * (Rampa(_impM, _impDur, p) * passo / dt);
+                VelH = _impDir * velMax * Balance.Dodge.ExitMomentum;
             }
             else
             {

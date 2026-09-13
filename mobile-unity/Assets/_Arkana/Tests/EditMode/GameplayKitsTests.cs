@@ -8,7 +8,8 @@ using Arkana.Gameplay;
 
 namespace Arkana.Tests
 {
-    /// <summary>Um conjurador sem cena: o minimo do IConjurador + o que a arena responde.</summary>
+    /// <summary>Um conjurador sem cena: o minimo do IConjurador + o que a arena responde. Os verbos de corpo so' ANOTAM (o
+    /// teleporte move o Pos: e' o unico que o kit precisa ver acontecer no mesmo tique).</summary>
     public sealed class FakeConjurador : IConjurador
     {
         public string Nome { get; set; }
@@ -18,10 +19,17 @@ namespace Arkana.Tests
         public float Mana { get; set; } = 50f;
         public Vector3 DirecaoDaMira { get; set; } = Vector3.forward;
         public bool NoChao { get; set; } = true;
+        public float FatorDePulo { get; set; } = 1f;
+        public int Pulos { get; set; }
+        public Vector3 DirecaoDaEsquiva { get; set; }
         /// <summary>Estados que o corpo recebeu (nome -> dur).</summary>
         public readonly Dictionary<string, float> Estados = new Dictionary<string, float>();
         /// <summary>A arena: quem AlvosNoRaio devolve.</summary>
         public List<IEntidade> Arena = new List<IEntidade>();
+        /// <summary>O ultimo dash pedido: direcao, metros, segundos (quantos, em Impulsos).</summary>
+        public Vector3 ImpulsoDir;
+        public float ImpulsoM, ImpulsoS;
+        public int Impulsos, Teleportes;
 
         public FakeConjurador(string nome, Vector3 pos, bool ehPlayer = true)
         {
@@ -31,6 +39,8 @@ namespace Arkana.Tests
 
         public void AplicarEstado(string nome, float dur) => Estados[nome] = dur;
         public Func<Vector3, float, IEntidade[]> AlvosNoRaio => (p, r) => Arena.ToArray();
+        public bool Teleportar(Vector3 destino) { Pos = destino; Teleportes++; return true; }
+        public bool Impulso(Vector3 dir, float metros, float dur) { ImpulsoDir = dir; ImpulsoM = metros; ImpulsoS = dur; Impulsos++; return true; }
     }
 
     /// <summary>

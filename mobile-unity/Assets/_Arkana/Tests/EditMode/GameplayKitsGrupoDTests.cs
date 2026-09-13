@@ -167,13 +167,22 @@ namespace Arkana.Tests
             Assert.IsTrue(_thits.Count(h => (Elemento)h[0] == Elemento.Raio) >= 2, "o raio publica Raio no trajeto (desliga construcoes)");
             Assert.IsTrue(k.EstadoAtivo(Fizz.MOLAS_TRAVADAS), "o preco: molas travadas");
             Assert.AreEqual(1f, fizz.FatorDoPulo(k), "sem pulo alto com as molas travadas");
+            Assert.AreEqual(1f, p.FatorDePulo, "e o CORPO pula normal");
+            int faiscas = k.Visuais.Count(v => v.Tipo == "fizz_mola");
+            p.Pulos++;
+            k.Tick(0.05f);
+            Assert.AreEqual(faiscas, k.Visuais.Count(v => v.Tipo == "fizz_mola"), "travadas: pulo sem faisca de mola");
             Andar(k, s["trava_dur"] + 0.1f);
             Assert.AreEqual(k.Dados.Passiva["pulo_mult"], fizz.FatorDoPulo(k), "as molas destravam sozinhas");
 
-            // a mola e' de ALTURA (h = v^2/2g): so' no quadro da decolagem
-            float vy = ApoioGrupoD.VyComMola(Balance.Player.JumpV, 1.5f);
-            Assert.AreEqual(1.5f, vy * vy / (Balance.Player.JumpV * Balance.Player.JumpV), 0.001f, "o pulo sobe 1,5x mais alto");
-            Assert.AreEqual(3f, ApoioGrupoD.VyComMola(3f, 1.5f), "no meio do ar a mola nao mexe");
+            // a mola e' do CORPO (IConjurador.FatorDePulo: a Locomocao sobe 1,5x a ALTURA); a faisca, na DECOLAGEM
+            Assert.AreEqual(k.Dados.Passiva["pulo_mult"], p.FatorDePulo, 0.001f, "o corpo pula 1,5x mais alto");
+            faiscas = k.Visuais.Count(v => v.Tipo == "fizz_mola");
+            k.Tick(0.05f);
+            Assert.AreEqual(faiscas, k.Visuais.Count(v => v.Tipo == "fizz_mola"), "sem pulo, sem faisca");
+            p.Pulos++;
+            k.Tick(0.05f);
+            Assert.AreEqual(faiscas + 1, k.Visuais.Count(v => v.Tipo == "fizz_mola"), "decolou: a faisca dos calcanhares");
 
             // QUEBRADA na carga: 60 de vida, sem raio e sem o preco
             _teles.Clear(); _thits.Clear();
@@ -391,6 +400,10 @@ namespace Arkana.Tests
             p.Mana = 30f;
             p.Arena.Add(p); p.Arena.Add(bot);
             Assert.IsTrue(k.UsarTatica());
+            Assert.AreEqual(1, p.Impulsos, "o corpo DISPARA pelo dash do motor (IConjurador.Impulso)");
+            Assert.AreEqual(t["alcance"], p.ImpulsoM, 0.001f, "6 m secos");
+            Assert.AreEqual(Locomocao.DuracaoDoImpulso(t["alcance"]), p.ImpulsoS, 0.001f, "no tempo da rota da mordida");
+            Assert.AreEqual(Vector3.forward, p.ImpulsoDir, "na mira");
             Andar(k, 0.1f);
             Assert.AreEqual(50f, bot.Mana, 0.001f, "a investida VIAJA: aos 0,1 s nao chegou a 4 m");
             Andar(k, 0.8f);
@@ -409,7 +422,7 @@ namespace Arkana.Tests
             bot.Pos = new Vector3(20f, 0f, 0f);
             Andar(k, 0.1f);
             Assert.IsTrue(k.UsarTatica());
-            Andar(k, ApoioGrupoD.DuracaoDoImpulso(t["alcance"]) + 0.1f);
+            Andar(k, Locomocao.DuracaoDoImpulso(t["alcance"]) + 0.1f);
             Assert.IsFalse(k.PodeConjurar, "errou a investida: vulneravel, sem conjurar");
             Andar(k, t["erro_dur"] + 0.1f);
             Assert.IsTrue(k.PodeConjurar, "o castigo tem prazo");
@@ -476,11 +489,15 @@ namespace Arkana.Tests
             Assert.AreEqual(t["dash_dist"], Vector3.Distance(pip.Rota(0), pip.Rota(1)), 0.001f);
             Assert.Greater(Vector3.Dot(pip.Rota(1) - pip.Rota(0), Vector3.right), 0f, "zig para um lado...");
             Assert.Less(Vector3.Dot(pip.Rota(2) - pip.Rota(1), Vector3.right), 0f, "...zag para o outro");
+            Assert.AreEqual(1, p.Impulsos, "o 1o dash leva o CORPO (IConjurador.Impulso)");
+            Assert.AreEqual(t["dash_dist"], p.ImpulsoM, 0.001f);
+            Assert.AreEqual(0f, Vector3.Angle(pip.Rota(1) - pip.Rota(0), p.ImpulsoDir), 0.01f, "pela rota telegrafada");
             Andar(k, 0.7f);
             Assert.Less(Ehp(vizinho), eV, "a faisca SALTA do atravessado para o inimigo mais perto dele");
             Assert.AreEqual(eC, Ehp(cruzado), 0.001f, "e nao volta no atravessado");
             Andar(k, t["intervalo"] * t["dashes"]);
             Assert.AreEqual(-1, pip.DashAtual, "tres dashes e acabou");
+            Assert.AreEqual((int)t["dashes"], p.Impulsos, "um dash de corpo por perna do zigue-zague");
 
             // NUNCA POUSAR: parada 2 s, definha 2 hp/s; andou, zera
             p.Vital.Hp = 60f;

@@ -44,16 +44,6 @@ namespace Arkana.Tests
 
         private static float Ehp(IEntidade e) => e.Vital.Hp + e.Vital.Escudo;
 
-        /// <summary>A Travessia move corpos pela casca; no teste o "corpo" e' o Pos dos fakes.</summary>
-        private static bool MoverFake(IEntidade e, Vector3 p)
-        {
-            var c = e as FakeConjurador;
-            if (c != null) { c.Pos = p; return true; }
-            var f = e as FakeEntidade;
-            if (f != null) { f.Pos = p; return true; }
-            return false;
-        }
-
         // ================================================================== 02 CEIFADORA
 
         [Test]
@@ -91,42 +81,38 @@ namespace Arkana.Tests
         [Test]
         public void Ceifadora_Travessia_AvisaAntes_Atravessa60m_SaiReveladaESemConjurar_ORasgoAbertoPuxaQuemToca()
         {
-            System.Func<IEntidade, Vector3, bool> velho = Ceifadora.Teleportar;
-            try
-            {
-                Ceifadora.Teleportar = MoverFake;
-                var c = new FakeConjurador("ceifa", Vector3.zero) { DirecaoDaMira = Vector3.forward };
-                var k = new KitRunner("02-ceifadora", c);
-                Dictionary<string, float> s = k.Dados.Suprema;
-                var inimigo = new FakeConjurador("bot", new Vector3(10f, 0f, 0f), false);
-                c.Arena.Add(c); c.Arena.Add(inimigo);
-                Carregar(k);
-                Assert.IsTrue(k.UsarSuprema());
-                Andar(k, k.Dados.Telegrafia - 0.2f);
-                Assert.AreEqual(Vector3.zero, c.Pos, "durante o aviso ela NAO sai do lugar");
-                Andar(k, 0.3f);
-                Assert.AreEqual(s["alcance"], c.Pos.z, 0.01f, "atravessou 60m em linha reta, na hora");
-                Assert.IsTrue(k.Visuais.Any(v => v.Tipo == "ceifadora_rasgo"), "o rasgo se ve'");
-                Assert.IsTrue(k.EstadoAtivo(Ceifadora.REVELADO) && TemEstado("revelado", true), "sai REVELADA (o chip da HUD)");
-                Assert.IsTrue(k.Visuais.Any(v => v.Tipo == "revelado" && v.Alvo == c), "o feixe sobre ela");
-                Assert.IsFalse(k.PodeConjurar, "1s SEM CONJURAR (vertigem do Vazio)");
-                // o rasgo fica ABERTO: quem tocar a entrada vem atras — inimigo inclusive
-                inimigo.Pos = new Vector3(0.5f, 0f, 0.3f);
-                k.Tick(0.1f);
-                Assert.Greater(inimigo.Pos.z, s["alcance"] - 3f, "o inimigo que tocou a entrada atravessou atras dela");
-                Assert.IsTrue(inimigo.Estados.ContainsKey("silencio"), "e sai sem conjurar tambem");
-                Andar(k, s["silencio"] + 0.1f);
-                Assert.IsTrue(k.PodeConjurar, "o silencio tem prazo");
-                Andar(k, s["aberto"]);
-                Assert.IsNull(((Ceifadora)k.Impl).RasgoAberto, "o rasgo cicatriza em 3s");
-                var tarde = new FakeEntidade("tarde", new Vector3(0.2f, 0f, 0f));
-                c.Arena.Add(tarde);
-                k.Tick(0.1f);
-                Assert.AreEqual(0f, tarde.Pos.z, 1e-4f, "rasgo fechado nao puxa ninguem");
-                Andar(k, s["revelado"]);
-                Assert.IsFalse(k.EstadoAtivo(Ceifadora.REVELADO), "o revelado expira sozinho");
-            }
-            finally { Ceifadora.Teleportar = velho; }
+            // o corpo atravessa pelo verbo do motor (IConjurador.Teleportar): no fake, o Pos
+            var c = new FakeConjurador("ceifa", Vector3.zero) { DirecaoDaMira = Vector3.forward };
+            var k = new KitRunner("02-ceifadora", c);
+            Dictionary<string, float> s = k.Dados.Suprema;
+            var inimigo = new FakeConjurador("bot", new Vector3(10f, 0f, 0f), false);
+            c.Arena.Add(c); c.Arena.Add(inimigo);
+            Carregar(k);
+            Assert.IsTrue(k.UsarSuprema());
+            Andar(k, k.Dados.Telegrafia - 0.2f);
+            Assert.AreEqual(Vector3.zero, c.Pos, "durante o aviso ela NAO sai do lugar");
+            Andar(k, 0.3f);
+            Assert.AreEqual(1, c.Teleportes, "a Travessia e' UM teleporte do corpo");
+            Assert.AreEqual(s["alcance"], c.Pos.z, 0.01f, "atravessou 60m em linha reta, na hora");
+            Assert.IsTrue(k.Visuais.Any(v => v.Tipo == "ceifadora_rasgo"), "o rasgo se ve'");
+            Assert.IsTrue(k.EstadoAtivo(Ceifadora.REVELADO) && TemEstado("revelado", true), "sai REVELADA (o chip da HUD)");
+            Assert.IsTrue(k.Visuais.Any(v => v.Tipo == "revelado" && v.Alvo == c), "o feixe sobre ela");
+            Assert.IsFalse(k.PodeConjurar, "1s SEM CONJURAR (vertigem do Vazio)");
+            // o rasgo fica ABERTO: quem tocar a entrada vem atras — inimigo inclusive
+            inimigo.Pos = new Vector3(0.5f, 0f, 0.3f);
+            k.Tick(0.1f);
+            Assert.Greater(inimigo.Pos.z, s["alcance"] - 3f, "o inimigo que tocou a entrada atravessou atras dela");
+            Assert.IsTrue(inimigo.Estados.ContainsKey("silencio"), "e sai sem conjurar tambem");
+            Andar(k, s["silencio"] + 0.1f);
+            Assert.IsTrue(k.PodeConjurar, "o silencio tem prazo");
+            Andar(k, s["aberto"]);
+            Assert.IsNull(((Ceifadora)k.Impl).RasgoAberto, "o rasgo cicatriza em 3s");
+            var tarde = new FakeConjurador("tarde", new Vector3(0.2f, 0f, 0f), false);
+            c.Arena.Add(tarde);
+            k.Tick(0.1f);
+            Assert.AreEqual(0f, tarde.Pos.z, 1e-4f, "rasgo fechado nao puxa ninguem");
+            Andar(k, s["revelado"]);
+            Assert.IsFalse(k.EstadoAtivo(Ceifadora.REVELADO), "o revelado expira sozinho");
         }
 
         [Test]

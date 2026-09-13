@@ -14,7 +14,8 @@ namespace Arkana.Gameplay
     /// `AnimDeLocomocao()` e' a UNICA fonte da animacao (estado sustentado se resolve aqui, nao driblando);
     /// gesto transitorio ("cast", "pegar") volta por relogio. Nasce INVISIVEL ate' `Saltar()` (decisao 14: o castelo
     /// viaja sem bonecos). Combat.TickDot, Efeitos.Tick e TerrenoReativo.Tick NAO sao daqui: rodam uma vez por frame
-    /// em Partida.Tick. E' o IConjurador dos kits: entrega mira, chao, mana (que o kit LE') e os alvos da arena.
+    /// em Partida.Tick. E' o IConjurador dos kits: entrega mira, chao, mana (que o kit LE') e os alvos da arena, e resolve os
+    /// verbos de corpo que eles pedem (Teleportar, Impulso, pulo com mola, invisivel/penumbra para a percepcao do bot).
     /// </summary>
     public class Pawn : MonoBehaviour, IConjurador
     {
@@ -22,6 +23,13 @@ namespace Arkana.Gameplay
         public const float SAIDA_TIRO = 0.9f;
         public const float GESTO_CAST_S = 0.3f;
         public static readonly Color TINT_MORTO = new Color(0.25f, 0.25f, 0.3f);
+        /// <summary>Os estados de corpo que a percepcao do bot le' (IConjurador.AplicarEstado).</summary>
+        public const string INVISIVEL = "invisivel", PENUMBRA = "penumbra", SEM_PASSOS = "sem_passos";
+        /// <summary>m do centro ate' onde o pouso do teleporte confere o chao (o corpo + folga): pilar, tronco e borda de
+        /// rocha a menos disso tiram o lugar.</summary>
+        public const float PEGADA = Partida.RAIO_CORPO + 0.15f;
+        /// <summary>m entre as tentativas do pouso seguro, recuando pela linha.</summary>
+        const float PASSO_POUSO = 1f;
 
         // ---------------------------------------------------------------- IEntidade
         public string Nome => name;
@@ -46,6 +54,9 @@ namespace Arkana.Gameplay
         public float CadenciaMult = 1f;
         public bool NoChao { get; private set; }
         public string Clipe { get; private set; } = "";
+        /// <summary>Quantas vezes mais ALTO o pulo sobe: a mola do Fizz escreve (IConjurador). 1 = normal.</summary>
+        public float FatorDePulo { get; set; } = 1f;
+        public int Pulos { get; private set; }
 
         // ---------------------------------------------------------------- intencao (a casca escreve)
         /// <summary>x direita, y frente; magnitude 0..1 ja' moldada pelo joystick.</summary>
@@ -62,11 +73,11 @@ namespace Arkana.Gameplay
         private Vector3 _dir;
         private float _fireCd, _gestoS;
         private string _gesto = "";
-        private bool _querFlutuar, _morto, _visivel;
+        private bool _querFlutuar, _morto, _visivel, _sumido;
         private Color _tint = Color.white;
         private GameObject _luva;
         // relogios dos estados que so' o corpo resolve (IConjurador.AplicarEstado)
-        private float _intangivelS, _silencioS;
+        private float _intangivelS, _silencioS, _invisivelS, _penumbraS, _semPassosS;
         private float _danoCausadoAntes;
         // a busca de alvos e' um servico da Partida em curso; sem partida, ninguem por perto (o kit trata null)
         private static readonly Func<Vector3, float, IEntidade[]> _buscador = BuscarAlvos;
@@ -80,6 +91,11 @@ namespace Arkana.Gameplay
         /// <summary>Silencio do proprio kit (Veu saindo do Atravessar) ou imposto de fora (aliado na Mare) barra ATE' o ataque.</summary>
         public bool PodeConjurar => _silencioS <= 0f && (Runner == null || Runner.PodeConjurar);
         public Vector3 Frente => transform.forward;
+        /// <summary>A VISAO do bot nao o pega: invisivel, ou em penumbra PARADO (andando e' um vulto — o limitador da Umbra).</summary>
+        public bool Oculto => Viva && (_invisivelS > 0f || (_penumbraS > 0f && VelocidadeHorizontal <= PercepcaoBot.PASSOS_V));
+        /// <summary>Os PASSOS nao entregam (Passo de Veludo). O oculto a percepcao ja' nao localiza por passo.</summary>
+        public bool SemPassos => _semPassosS > 0f;
+        public Vector3 DirecaoDaEsquiva => Loc != null ? Loc.DirEsquiva : Vector3.zero;
 
         // ---------------------------------------------------------------- IConjurador
         /// <summary>Mirando (player) e' o yaw da camera; senao o corpo (EncararDir do bot) ou a frente.</summary>
@@ -90,12 +106,21 @@ namespace Arkana.Gameplay
         public Func<Vector3, float, IEntidade[]> AlvosNoRaio => _buscador;
 
         /// <summary>"intangivel" = i-frames pelo relogio (a mascara de colisao fisica fica para depois: o Acerto da Partida
-        /// ja' respeita i-frames); "silencio" = sem conjurar. Renova para o maior prazo, nunca encurta.</summary>
+        /// ja' respeita i-frames); "silencio" = sem conjurar; "invisivel"/"penumbra"/"sem_passos" = o que a percepcao do bot
+        /// le' (Oculto, SemPassos). Renova para o maior prazo, nunca encurta; dur 0 apaga.</summary>
         public void AplicarEstado(string nome, float dur)
         {
-            if (nome == "intangivel") _intangivelS = Mathf.Max(_intangivelS, dur);
-            else if (nome == "silencio") _silencioS = Mathf.Max(_silencioS, dur);
+            switch (nome)
+            {
+                case "intangivel": _intangivelS = Renovar(_intangivelS, dur); break;
+                case "silencio": _silencioS = Renovar(_silencioS, dur); break;
+                case INVISIVEL: _invisivelS = Renovar(_invisivelS, dur); break;
+                case PENUMBRA: _penumbraS = Renovar(_penumbraS, dur); break;
+                case SEM_PASSOS: _semPassosS = Renovar(_semPassosS, dur); break;
+            }
         }
+
+        private static float Renovar(float agora, float dur) => dur > 0f ? Mathf.Max(agora, dur) : 0f;
 
         private static IEntidade[] BuscarAlvos(Vector3 pos, float raio) =>
             Partida.Atual != null ? Partida.Atual.AlvosNoRaio(pos, raio) : null;
@@ -116,6 +141,9 @@ namespace Arkana.Gameplay
 
         // ---------------------------------------------------------------- criacao
 
+        /// <summary>A vida com que o corpo de `slug` nasce: a da ficha (IdentidadeMago.VidaBase — a Pip tem 55), player ou bot.</summary>
+        public static Vitalidade VidaDe(string slug) => new Vitalidade(IdentidadeMago.De(slug).VidaBase);
+
         /// <summary>Um corpo novo, invisivel, no castelo (`Embarcar`) ou no chao (`Aterrar`).</summary>
         public static Pawn Criar(Transform pai, string slug, bool ehPlayer)
         {
@@ -135,7 +163,7 @@ namespace Arkana.Gameplay
             Slug = slug ?? "";
             EhPlayer = ehPlayer;
             _cc = GetComponent<CharacterController>();
-            Vital = new Vitalidade(Balance.Player.Hp);
+            Vital = VidaDe(Slug);
             Slot = new ArmaSlot(this) { AutoUpgrade = !ehPlayer };   // decisao 5: o player equipa apertando PEGAR
             Loc = new Locomocao();
             IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
@@ -211,6 +239,18 @@ namespace Arkana.Gameplay
             for (int i = 0; i < rs.Length; i++) rs[i].enabled = on;
         }
 
+        /// <summary>Quem NAO e' o dono nao ve' o oculto: a camera e' do player, entao o corpo de BOT some inteiro (luva junto;
+        /// morto volta a aparecer para o abate). O do player fica: a leitura e' do kit (vidro do Ilusionista, penumbra da
+        /// Umbra) — o dono sabe onde esta'. So' na BORDA (a busca de renderers aloca).
+        /// ponytail: bot nao usa kit, entao hoje nenhum corpo de bot fica oculto; o brilho de perto (ficha 08) pede VFX no dia.</summary>
+        private void Sumir()
+        {
+            bool some = !EhPlayer && Oculto;
+            if (some == _sumido) return;
+            _sumido = some;
+            Visivel(!some);
+        }
+
         // ---------------------------------------------------------------- o frame
 
         void Update()
@@ -223,6 +263,7 @@ namespace Arkana.Gameplay
             if (dt <= 0f) return;
             TickKit(dt);
             if (Queda.NoAr) { TickNoAr(dt); return; }
+            Sumir();
             if (!Viva) { if (!_morto) Morrer(); return; }
             if (_morto) Reviver();   // boneco de treino que a Partida resetou
 
@@ -260,6 +301,9 @@ namespace Arkana.Gameplay
         {
             _intangivelS = Mathf.Max(_intangivelS - dt, 0f);
             _silencioS = Mathf.Max(_silencioS - dt, 0f);
+            _invisivelS = Mathf.Max(_invisivelS - dt, 0f);
+            _penumbraS = Mathf.Max(_penumbraS - dt, 0f);
+            _semPassosS = Mathf.Max(_semPassosS - dt, 0f);
             if (Runner == null || Vital == null) return;
             float causado = Vital.DanoCausado;
             Runner.Tick(dt, causado - _danoCausadoAntes);   // o canal Apex da carga e' o DELTA do dano causado
@@ -368,7 +412,64 @@ namespace Arkana.Gameplay
         public bool UsarTatica() => PodeAgir && PodeConjurar && Runner != null && Runner.UsarTatica();
         public bool UsarSuprema() => PodeAgir && PodeConjurar && Runner != null && Runner.UsarSuprema();
 
-        public bool Pular() => PodeAgir && Loc.Pular(NoChao, Agua.Nadando);
+        /// <summary>Do chao, na altura do FatorDePulo (a mola do Fizz). Conta a decolagem: o kit ve' pela borda de Pulos.</summary>
+        public bool Pular()
+        {
+            if (!PodeAgir || !Loc.Pular(NoChao, Agua.Nadando, FatorDePulo)) return false;
+            Pulos++;
+            return true;
+        }
+
+        /// <summary>TELEPORTE (Travessia, Danca): surge no POUSO SEGURO ate' `destino` e avisa o CharacterController. No ar
+        /// (castelo, queda) ou morto, recusa. Dash e empurrao ficam para tras (Locomocao.Parar).</summary>
+        public bool Teleportar(Vector3 destino)
+        {
+            if (!Viva || Queda.NoAr) return false;
+            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+            transform.position = PousoSeguro(relevo, transform.position, destino, ChaoComObstaculos.Topo);
+            Physics.SyncTransforms();   // o CharacterController le' a pose nova no proximo Move
+            Loc.Parar();
+            NoChao = true;
+            return true;
+        }
+
+        /// <summary>DASH de kit pela Locomocao (a mesma rampa da esquiva, sem o deslize do empurrao).</summary>
+        public bool Impulso(Vector3 dir, float metros, float dur) => Viva && Loc.Impulso(dir, metros, dur);
+
+        /// <summary>
+        /// O POUSO SEGURO, puro: de `destino` recua pela linha ate' `de`, de metro em metro, ate' achar chao SECO (nunca o mar)
+        /// e LIVRE — nada solido acima do terreno no centro nem na PEGADA do corpo (`topo` = ChaoComObstaculos.Topo). Assim
+        /// ninguem surge em cima de copa (o colisor do tronco sobe 3 m DENTRO da copa), pilar ou muro, nem com meio corpo
+        /// dentro de rocha. Pousa na cota MAIS ALTA do chao sob a pegada: na encosta, nada do corpo fica dentro do morro.
+        /// Nada livre na linha inteira = fica onde esta'. Sem relevo, plano seco em y = 0; `topo` null = sem obstaculos.
+        /// </summary>
+        public static Vector3 PousoSeguro(IRelevo relevo, Vector3 de, Vector3 destino, Func<float, float, float, float> topo)
+        {
+            Vector3 p = new Vector3(destino.x, 0f, destino.z), alvo = new Vector3(de.x, 0f, de.z);
+            int n = Mathf.CeilToInt(Vector3.Distance(p, alvo) / PASSO_POUSO);
+            for (int i = 0; i <= n; i++, p = Vector3.MoveTowards(p, alvo, PASSO_POUSO))
+            {
+                if (relevo != null && !relevo.PodePousar(p.x, p.z)) continue;
+                float y;
+                if (Livre(relevo, topo, p.x, p.z, out y)) return new Vector3(p.x, y, p.z);
+            }
+            return de;
+        }
+
+        /// <summary>O centro e 8 pontos na borda da PEGADA sem nada solido acima do chao. `y` = a cota mais alta entre eles.</summary>
+        private static bool Livre(IRelevo relevo, Func<float, float, float, float> topo, float x, float z, out float y)
+        {
+            y = float.NegativeInfinity;
+            for (int k = 0; k <= 8; k++)
+            {
+                float a = k * Mathf.PI * 0.25f, r = k == 0 ? 0f : PEGADA;
+                float px = x + Mathf.Cos(a) * r, pz = z + Mathf.Sin(a) * r;
+                float h = relevo != null ? relevo.Altura(px, pz) : 0f;
+                if (topo != null && topo(px, pz, h) > h) return false;
+                y = Mathf.Max(y, h);
+            }
+            return true;
+        }
 
         /// <summary>Segurar o salto no ar. Quem cobra a mana e' a Locomocao no Tick.</summary>
         public void Flutuar(bool on) { _querFlutuar = on; }

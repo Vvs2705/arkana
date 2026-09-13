@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Arkana.Core;
-using Arkana.World;
 
 namespace Arkana.Gameplay
 {
@@ -22,10 +20,6 @@ namespace Arkana.Gameplay
         public const string REVELADO = "revelado";
         /// <summary>s entre duas conferidas da entrada do rasgo aberto.</summary>
         const float TOQUE_S = 0.1f;
-
-        /// <summary>Casca: move um corpo pelo Vazio. Padrao = Pawn; o teste troca por um fake (e devolve no fim).
-        /// ponytail: o motor devia ter IConjurador.Teleportar(pos) — o corpo resolveria CC, agua e queda num lugar so'.</summary>
-        public static Func<IEntidade, Vector3, bool> Teleportar = TeleportarPawn;
 
         /// <summary>A mao em curso: Atraso > 0 = a rachadura ainda corre; Preso != null = agarrando.</summary>
         public sealed class Mao
@@ -224,12 +218,13 @@ namespace Arkana.Gameplay
 
         // ------------------------------------------------------------------ suprema
 
-        /// <summary>Travessia: so' quando a telegrafia acaba. Ela sai do outro lado na hora; a entrada fica aberta.</summary>
+        /// <summary>Travessia: so' quando a telegrafia acaba. Ela sai do outro lado na hora (o pouso seguro do corpo: nunca no
+        /// mar, dentro do morro ou em cima de copa); a entrada fica aberta.</summary>
         public void Suprema(KitRunner k)
         {
             Dictionary<string, float> s = k.Dados.Suprema;
             Vector3 a = k.Pos;
-            if (!Teleportar(k.Dono, a + k.Mira() * s["alcance"])) return;   // sem corpo que ande: o Vazio nao abre
+            if (!k.Dono.Teleportar(a + k.Mira() * s["alcance"])) return;   // no ar: o Vazio nao abre
             _rasgo = new Rasgo { A = a, B = k.Pos, Aberto = s["aberto"] };
             _rasgo.Visual = k.Visual("ceifadora_rasgo", a, _rasgo.B, s["raio_toque"], s["aberto"]);
             _rasgo.Atravessaram.Add(k.Dono);
@@ -255,8 +250,9 @@ namespace Arkana.Gameplay
             foreach (IEntidade e in k.AlvosPerto(_rasgo.A, s["raio_toque"] + 3f, k.Dono))
             {
                 if (_rasgo.Atravessaram.Contains(e) || Plano(e.Pos, _rasgo.A) > r2) continue;
-                // cada um sai um passo ao lado do anterior: ninguem nasce dentro de ninguem
-                if (!Teleportar(e, _rasgo.B + lado * (1.2f * _rasgo.Atravessaram.Count))) continue;
+                // cada um sai um passo ao lado do anterior: ninguem nasce dentro de ninguem. So' CORPO atravessa.
+                IConjurador c = e as IConjurador;
+                if (c == null || !c.Teleportar(_rasgo.B + lado * (1.2f * _rasgo.Atravessaram.Count))) continue;
                 _rasgo.Atravessaram.Add(e);
                 Revelar(k, e, s);
             }
@@ -289,21 +285,6 @@ namespace Arkana.Gameplay
         {
             float dx = a.x - b.x, dz = a.z - b.z;
             return dx * dx + dz * dz;
-        }
-
-        /// <summary>O corpo de verdade: recua pela linha ate' o chao seco (o Vazio nao cospe ninguem no mar), pousa no topo
-        /// do que houver ali (rocha, ruina — a regra da Queda) e avisa o CharacterController. No ar (castelo/queda), recusa.</summary>
-        private static bool TeleportarPawn(IEntidade e, Vector3 destino)
-        {
-            Pawn p = e as Pawn;
-            if (p == null || p.Queda.NoAr) return false;
-            Relevo r = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
-            Vector3 de = p.Pos;
-            for (int i = 0; r != null && i < 40 && !r.PodePousar(destino.x, destino.z); i++) destino = Vector3.MoveTowards(destino, de, 2f);
-            destino.y = ChaoComObstaculos.Topo(destino.x, destino.z, Ilha.AlturaDoChao(destino.x, destino.z));
-            p.transform.position = destino;
-            Physics.SyncTransforms();   // o CharacterController le' a pose nova no proximo Move
-            return true;
         }
     }
 }
