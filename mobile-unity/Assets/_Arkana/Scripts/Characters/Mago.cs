@@ -6,27 +6,45 @@ using Arkana.Core;
 namespace Arkana.Characters
 {
     /// <summary>
-    /// Materiais do personagem por codigo (zero asset). Arkana/Mago (toon de personagem: faixas + rim +
-    /// emissao, em Resources/); sem ele, URP Lit; sem URP, Standard — calado, cadeia de reserva.
+    /// Materiais do personagem por codigo (zero asset). Arkana/Mago (toon de personagem: faixa macia + contorno de
+    /// luz + emissao, em Resources/); sem ele, URP Lit; sem URP, Standard — calado, cadeia de reserva.
     /// METAL DOMADO (Godot 26/08): sem reflection probe o metal vira silhueta preta no mobile —
     /// metallic &lt;= 0.2 e smoothness &lt;= 0.55 em TUDO que veste um mago, inclusive o .glb importado.
     /// </summary>
     public static class MaterialMago
     {
         public const float MetallicMax = 0.2f, SmoothnessMax = 0.55f;
-        static Shader _shader;
+        static Shader _shader, _toon;
+
+        /// <summary>Arkana/Mago, se o aparelho roda; senao null.</summary>
+        static Shader Toon()
+        {
+            if (_toon == null)
+            {
+                Shader t = Resources.Load<Shader>("ArkanaMago");
+                if (t == null) t = UnityEngine.Shader.Find("Arkana/Mago");
+                if (t != null && t.isSupported) _toon = t;
+            }
+            return _toon;
+        }
 
         static Shader Achar()
         {
-            if (_shader == null)
-            {
-                Shader toon = Resources.Load<Shader>("ArkanaMago");
-                if (toon == null) toon = UnityEngine.Shader.Find("Arkana/Mago");
-                if (toon != null && toon.isSupported) _shader = toon;
-            }
+            if (_shader == null) _shader = Toon();
             if (_shader == null) _shader = UnityEngine.Shader.Find("Universal Render Pipeline/Lit");
             if (_shader == null) _shader = UnityEngine.Shader.Find("Standard");
             return _shader;
+        }
+
+        /// <summary>
+        /// O material do FBX (URP Lit que o ImportacaoArkana faz, com a textura da Meshy) passa para o toon com CONTORNO
+        /// (onda 9A: de costas para o sol o mago era uma silhueta escura). O shader usa os nomes do Lit: textura, normal,
+        /// cor e preenchimento vem junto na troca. Sem toon suportado, fica o Lit — calado.
+        /// </summary>
+        public static void Vestir(Material m)
+        {
+            Shader t = Toon();
+            if (m != null && t != null) m.shader = t;
         }
 
         /// <summary>Null so' se nao ha' shader nenhum (build sem URP e sem Standard): o primitivo fica no rosa padrao, nunca lanca.</summary>
@@ -271,13 +289,13 @@ namespace Arkana.Characters
             // congelada do FBX (o elenco inteiro de braco erguido, foto de 12/09) ate' correr a primeira vez
             anim.Play(_clipesExternos[Clipe.Idle]);
 
-            // materiais proprios (o tint de um bot nao pode pintar o player) + metal domado
+            // materiais proprios (o tint de um bot nao pode pintar o player) + toon com contorno + metal domado
             Bounds b = new Bounds(inst.transform.position, Vector3.zero);
             bool temBounds = false;
             foreach (Renderer r in inst.GetComponentsInChildren<Renderer>())
             {
                 Material[] mats = r.materials;   // instancia
-                foreach (Material m in mats) { MaterialMago.Domar(m); _tint.Add(m); }
+                foreach (Material m in mats) { MaterialMago.Vestir(m); MaterialMago.Domar(m); _tint.Add(m); }
                 Bounds rb = LimitesDeRepouso(r);
                 if (!temBounds) { b = rb; temBounds = true; } else b.Encapsulate(rb);
             }

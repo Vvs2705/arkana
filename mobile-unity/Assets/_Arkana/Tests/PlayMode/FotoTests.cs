@@ -1408,5 +1408,99 @@ namespace Arkana.Tests
                 PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
             }
         }
+
+        // ---- onda 9A: colar dentro da classe FotoTests (antes do "}" final da classe). Rodar: .\foto.ps1 "Foto_Mago_Contorno"
+
+        /// <summary>
+        /// O CONTORNO DE LUZ (onda 9A) no TREINO, com a camera do jogador olhando PARA o sol: o lado do mago que ela ve' e' o
+        /// escuro — a silhueta das fotos 03 e 11. 36-mago-contorno: o jogador a 4 m (contorno discreto) e os dois bonecos a
+        /// ~12 e ~25 m (contorno cheio: tem de ler no celular). 36-mago-contorno-perto: o boneco 1 de frente, com o sol atras.
+        /// 36-elenco: cinco magos lado a lado — os mais escuros do elenco e a Vitalis (roupa branca: o contorno nao pode
+        /// estourar no bloom). Os "-antes" sao o MESMO quadro com o URP Lit que o import fazia (troca por nome de propriedade).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Mago_Contorno()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Assert.IsNotNull(sol, "sem sol");
+            Vector3 v = -sol.transform.forward; v.y = 0f; v.Normalize();   // para onde o SOL esta': a camera olha para la'
+            Vector3 lado = new Vector3(v.z, 0f, -v.x);
+
+            Gameplay.Pawn eu = main.Player.Pawn;
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(v.x, v.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            eu.EncararDir = v;   // de costas para a camera, de frente para o sol
+            var b1 = (Gameplay.Pawn)main.Partida.Bonecos[0];
+            var b2 = (Gameplay.Pawn)main.Partida.Bonecos[1];
+            b1.Aterrar(eu.Pos + v * 12f - lado * 3.5f);
+            b2.Aterrar(eu.Pos + v * 25f + lado * 5f);
+            b1.EncararDir = -v;  // de frente para a camera: o lado escuro e' o que se ve'
+            b2.EncararDir = -v;
+            yield return Esperar(1.5f);   // a camera assenta no yaw novo e os corpos giram
+            Foto(main.Player.Camera.Cam, "36-mago-contorno", true);
+            Diagnostico(main, "36-mago-contorno");
+
+            Vector3 p1 = b1.Pos;
+            Camera perto = CameraTemporaria("CamFotoContornoPerto", p1 - v * 3.2f + lado * 1.1f + Vector3.up * 1.5f, p1 + Vector3.up * 1.0f, Color.gray);
+            Foto(perto, "36-mago-contorno-perto", false);
+
+            // o ELENCO: cinco a ~6,5 m, de frente para a camera, com o sol atras deles
+            string[] cinco = { "04-corvus", "12-umbra", "07-vitalis", "19-noctus", "02-ceifadora" };
+            Vector3 c = eu.Pos + lado * 14f;
+            var magos = new System.Collections.Generic.List<GameObject>();
+            var sb = new System.Text.StringBuilder("36-mago-contorno: sol=" + v.ToString("F2") + " b1=" + b1.Pos.ToString("F1") + " (" + Vector3.Distance(b1.Pos, eu.Pos).ToString("F0")
+                + " m) b2=" + b2.Pos.ToString("F1") + " (" + Vector3.Distance(b2.Pos, eu.Pos).ToString("F0") + " m)\n");
+            for (int i = 0; i < cinco.Length; i++)
+            {
+                if (Resources.Load<GameObject>("magos/" + cinco[i]) == null) continue;
+                Vector3 p = c + lado * ((i - 2) * 1.5f);
+                p.y = Arkana.World.Ilha.AlturaDoChao(p.x, p.z);
+                var m = Arkana.Characters.Mago.Criar(null, cinco[i]);
+                m.transform.position = p;
+                m.transform.rotation = Quaternion.LookRotation(-v);
+                magos.Add(m.gameObject);
+            }
+            yield return Esperar(0.6f);
+            Camera elenco = CameraTemporaria("CamFotoContornoElenco", c - v * 6.5f + Vector3.up * 1.6f, c + Vector3.up * 0.9f, Color.gray);
+            Foto(elenco, "36-elenco", false);
+            foreach (var mg in Object.FindObjectsByType<Arkana.Characters.Mago>(FindObjectsSortMode.None))
+            {
+                Renderer r = mg.GetComponentInChildren<Renderer>();
+                sb.AppendLine("  " + mg.name + " fonte=" + mg.Fonte + " shader=" + (r != null && r.sharedMaterial != null ? r.sharedMaterial.shader.name : "-")
+                    + " dist-camera-jogador=" + Vector3.Distance(mg.transform.position, main.Player.Camera.Cam.transform.position).ToString("F1"));
+            }
+
+            // ANTES: os mesmos quadros com o URP Lit do import (o que o jogo tinha ate' a onda 9A)
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            int voltaram = 0;
+            foreach (var mg in Object.FindObjectsByType<Arkana.Characters.Mago>(FindObjectsSortMode.None))
+                foreach (Renderer r in mg.GetComponentsInChildren<Renderer>())
+                    foreach (Material mt in r.sharedMaterials)
+                        if (lit != null && mt != null && mt.shader.name == "Arkana/Mago" && mt.GetTexture("_BaseMap") != null)
+                        {
+                            mt.shader = lit;
+                            mt.EnableKeyword("_NORMALMAP");   // como o ImportacaoArkana grava
+                            mt.EnableKeyword("_EMISSION");
+                            voltaram++;
+                        }
+            sb.AppendLine("  antes: " + voltaram + " materiais de volta ao URP Lit");
+            yield return Esperar(1f);   // o editor compila a variante do Lit (sem isto o quadro pode sair no ciano de espera)
+            Foto(main.Player.Camera.Cam, "36-mago-contorno-antes", true);
+            Foto(perto, "36-mago-contorno-perto-antes", false);
+            Foto(elenco, "36-elenco-antes", false);
+            Object.Destroy(perto.gameObject);
+            Object.Destroy(elenco.gameObject);
+            foreach (GameObject g in magos) Object.Destroy(g);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Greater(voltaram, 0, "nenhum material do mago estava no Arkana/Mago");
+        }
     }
 }
