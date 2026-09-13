@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -115,15 +116,36 @@ namespace Arkana
     /// A casca fina da cena Main: garante EventSystem, cria Sfx, Menu, Ilha, Sol e a camera do menu (com a VitrineDoMenu) no
     /// boot, e a cada partida monta a arena (HUD, Castelo, Player, Bots/bonecos, Partida) e a desmonta no fim/abandono.
     /// Tudo por-partida vive sob "Arena" (restart = arena nova, limpa — estado que atravessa partida ja' vazou 3x no Godot).
+    /// A MONTAGEM e' em FATIAS (passo E da ORDEM: "sem quadro acima de 100 ms"): a TelaDeCarregamento cobre a tela no toque
+    /// do JOGAR, os modelos carregam fora do quadro e a arena sobe em passos por quadro com o relogio do jogo parado; no fim
+    /// a tela esvaece e a partida comeca como antes.
     /// Fiacao defensiva: peca ausente vira aviso, nunca excecao. Nao chama Bus.Reset(): HUD/Sfx/Fluxo ja' assinaram.
     /// </summary>
     public sealed class Main : MonoBehaviour
     {
         public const string NomeArena = "Arena";
         public const int Bonecos = 2;
+        /// <summary>
+        /// KNOB: ms de trabalho da montagem por quadro. Estourou, o proximo passo fica para o proximo quadro — o pior quadro e'
+        /// este orcamento + o passo mais caro. Menor = tela mais lisa e carregamento mais longo (cada quadro a mais custa o
+        /// desenho da tela e a espera do vsync).
+        /// </summary>
+        public const float OrcamentoMs = 12f;
 
         /// <summary>0 = sorteia a cada partida (o jogo). > 0 = partida repetivel (foto.ps1 e testes). Nunca ligado no APK.</summary>
         public static int SeedForcado = 0;
+
+        /// <summary>A partida esta' sendo montada: a tela de carregamento na frente, o relogio do jogo parado (timeScale 0: o
+        /// castelo nao parte, ninguem salta, a zona nao conta) e a Partida sem Tick (arena pela metade nao da' veredito).</summary>
+        public bool Carregando { get; private set; }
+        /// <summary>A tela de carregamento viva; esvaece e se destroi sozinha depois da montagem (== null de novo).</summary>
+        public TelaDeCarregamento Tela { get; private set; }
+        /// <summary>A MEDICAO da ultima montagem (sem log: o teste grava): ms de cada passo e da pre-carga (parede), quantos
+        /// quadros a montagem levou, o pior deles e a duracao inteira, do toque ao fim.</summary>
+        public readonly List<KeyValuePair<string, float>> TemposDaMontagem = new List<KeyValuePair<string, float>>();
+        public float PiorQuadroMs { get; private set; }
+        public int QuadrosDaMontagem { get; private set; }
+        public float DuracaoDaMontagemMs { get; private set; }
 
         public FluxoDeJogo Fluxo { get; private set; }
         public Partida Partida { get; private set; }
@@ -139,6 +161,11 @@ namespace Arkana
         Transform _arena;
         Camera _camMenu;
         ArkVitrine _vitrine;
+        Coroutine _montagem;
+        RenderTexture _arte;
+        ThreadPriority _prioridade;
+        readonly System.Diagnostics.Stopwatch _quadro = new System.Diagnostics.Stopwatch();
+        readonly System.Diagnostics.Stopwatch _parede = new System.Diagnostics.Stopwatch();
         readonly List<GameObject> _meus = new List<GameObject>();      // o que este boot criou fora da arena (some com ele)
         readonly List<GameObject> _tiros = new List<GameObject>();
         /// <summary>Qual projetil cada objeto do pool desenhou no quadro anterior: trocou de dono, o rastro recomeca (senao risca a tela).</summary>
@@ -194,6 +221,7 @@ namespace Arkana
             Desmontar();
             for (int i = 0; i < _meus.Count; i++) if (_meus[i] != null) Destroy(_meus[i]);
             _meus.Clear();
+            if (_arte != null) { _arte.Release(); Destroy(_arte); _arte = null; }
         }
 
         void Update()
@@ -218,7 +246,7 @@ namespace Arkana
                 _saltoAdb = false;
                 Player.Saltar();
             }
-            if (Partida == null) return;
+            if (Partida == null || Carregando) return;   // montando: a partida so' anda quando a arena estiver inteira
             Partida.Tick(dt);
             if (Hud != null && !Partida.Treino) Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
             DesenharTiros();
@@ -261,71 +289,239 @@ namespace Arkana
 
         // ---------------------------------------------------------------- arena
 
+        /// <summary>
+        /// O toque do JOGAR/TREINO (via FluxoDeJogo). Sincrono so' o que a tela precisa: fotografar a vitrine, apagar o menu,
+        /// cobrir com a tela e parar o relogio. O resto e' a corrotina Montando, em fatias. ANTES (ate' 12/09) tudo isto — 13
+        /// Resources.Load de mago de ~10 MB + 2 texturas de 2K cada, HUD, castelo, 12 bots, terreno e 5 visuais — cabia num
+        /// quadro so': a tela congelava no menu, sem retorno, ate' a partida aparecer.
+        /// </summary>
         void Montar()
         {
-            MostrarMenu(false);
-            Relevo relevo = GarantirIlha().Relevo;   // a do boot, quase sempre
-
-            _arena = new GameObject(NomeArena).transform;
-            // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede. SeedForcado > 0 so' para foto/teste:
-            // sem ele cada foto pousa num lugar diferente e duas rodadas nao se comparam.
-            int seed = SeedForcado > 0 ? SeedForcado : new System.Random().Next(1, int.MaxValue);
-            bool treino = ArkMenu.PedidoDeTreino;                    // lido ANTES: Partida.Iniciar consome e zera
-            Vector3[] nasc = Nascimentos(relevo, seed);
-
-            Hud = Hud.Criar();   // antes de Iniciar: a HUD assina MatchStarted no Criar
-            Hud.ReiniciarPedido += () => Fluxo.Reiniciar();
-            Hud.MenuPedido += VoltarAoMenu;
-            Hud.AbandonarPedido += VoltarAoMenu;
-
+            _quadro.Restart();   // o quadro do toque ja' conta: foto da vitrine + tela
+            _parede.Restart();
+            bool treino = ArkMenu.PedidoDeTreino;   // lido ANTES: Partida.Iniciar consome e zera
             string slug = ArkSelecao.MagoEscolhido;
-            Player = Player.Criar(_arena, slug);
-            Partida = new Partida(relevo);
-            Partida.Iniciar(seed, Balance.Match.Bots, treino, nasc[0]);
-            Partida.Registrar(Player.Pawn, Player.Pawn.Slot);
-            VisualDaPartida.Criar(_arena, Partida);   // loot, bau e tempestade na tela (a HUD so' anunciava)
+            // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede. SeedForcado > 0 so' para foto/teste:
+            // sem ele cada foto pousa num lugar diferente e duas rodadas nao se comparam. A primeira dica tambem sai dele.
+            int seed = SeedForcado > 0 ? SeedForcado : new System.Random().Next(1, int.MaxValue);
+            Texture arte = FotografarVitrine();   // ANTES de a vitrine desligar: o mago escolhido em guarda no pico
+            MostrarMenu(false);
+            Tela = TelaDeCarregamento.Criar(arte, slug, treino, seed);
+            Carregando = true;
+            Time.timeScale = 0f;
+            // KNOB: a integracao dos carregamentos assincronos pode usar ate' 50 ms por quadro (o padrao BelowNormal, 4 ms):
+            // atras da tela ninguem joga, carregar rapido vale mais que 60 FPS. Normal (10 ms) se a tela engasgar no aparelho.
+            _prioridade = Application.backgroundLoadingPriority;
+            Application.backgroundLoadingPriority = ThreadPriority.High;
+            _montagem = StartCoroutine(Montando(slug, treino, seed));
+        }
 
-            if (Partida.Treino)
+        /// <summary>A montagem em fatias: 1) a PRE-CARGA dos modelos fora do quadro (Resources.LoadAsync), com a barra no
+        /// progresso real; 2) os PASSOS do Montar de antes, na mesma ordem, quantos couberem no OrcamentoMs de cada quadro;
+        /// 3) o AQUECER atras da tela (HUD e camera acesos um quadro: shader e textura sobem ainda cobertos). No fim o relogio
+        /// volta e a tela esvaece.</summary>
+        IEnumerator Montando(string slug, bool treino, int seed)
+        {
+            TemposDaMontagem.Clear();
+            PiorQuadroMs = 0f;
+            QuadrosDaMontagem = 0;
+            yield return null;   // a tela desenha o primeiro quadro (0%) antes de qualquer peso
+            FecharQuadro();
+
+            Relevo relevo = GarantirIlha().Relevo;   // a do boot, quase sempre
+            _arena = new GameObject(NomeArena).transform;
+            Vector3[] nasc = Nascimentos(relevo, seed);
+            int corpos = treino ? Bonecos : Balance.Match.Bots;
+
+            // 1. O PESO: cada mago e' um .fbx de ~10 MB com duas texturas de 2K; o castelo, o bau e as luvas tambem vem de
+            //    Resources. A pre-carga os le' e descomprime no carregador do Unity, fora do quadro; o Resources.Load do
+            //    Mago/Castelo/loot depois so' acha na memoria. As requisicoes ficam vivas (a lista) ate' o fim da montagem.
+            var cargas = new List<ResourceRequest>();
+            foreach (string nome in Modelos(slug, corpos, treino)) cargas.Add(Resources.LoadAsync<GameObject>(nome));
+            List<Passo> passos = Passos(slug, treino, seed, relevo, nasc, corpos);
+            float total = cargas.Count + passos.Count;
+            var relogio = System.Diagnostics.Stopwatch.StartNew();
+            while (true)
             {
-                Player.Pawn.Aterrar(nasc[0]);
-                for (int i = 0; i < Bonecos; i++)
+                float soma = 0f;
+                bool todas = true;
+                for (int i = 0; i < cargas.Count; i++) { soma += cargas[i].isDone ? 1f : cargas[i].progress; todas &= cargas[i].isDone; }
+                Avancar(soma / total, Textos.CarregaMagos);
+                if (todas) break;
+                yield return null;
+                FecharQuadro();
+            }
+            TemposDaMontagem.Add(new KeyValuePair<string, float>("pre-carga", (float)relogio.Elapsed.TotalMilliseconds));
+
+            // 2 e 3. Os passos: quadro que estourou o orcamento fecha antes do proximo; passo "sozinho" fecha logo depois
+            for (int i = 0; i < passos.Count; i++)
+            {
+                if (_quadro.Elapsed.TotalMilliseconds >= OrcamentoMs) { yield return null; FecharQuadro(); }
+                Avancar((cargas.Count + i) / total, passos[i].Rotulo);
+                double antes = _quadro.Elapsed.TotalMilliseconds;
+                passos[i].Fazer();
+                Time.timeScale = 0f;   // o Hud.Vincular chama Retomar (timeScale 1): o relogio continua esperando a tela
+                TemposDaMontagem.Add(new KeyValuePair<string, float>(passos[i].Nome, (float)(_quadro.Elapsed.TotalMilliseconds - antes)));
+                if (passos[i].Sozinho) { yield return null; FecharQuadro(); }
+            }
+
+            cargas.Clear();
+            _montagem = null;
+            Carregando = false;
+            Time.timeScale = 1f;   // a partida comeca AQUI, com a tela esvaecendo por cima
+            Application.backgroundLoadingPriority = _prioridade;
+            DuracaoDaMontagemMs = (float)_parede.Elapsed.TotalMilliseconds;
+            if (Tela != null) Tela.Terminar();
+        }
+
+        void Avancar(float progresso, string passo) { if (Tela != null) Tela.Avancar(progresso, passo); }
+
+        /// <summary>Fecha a medicao de um quadro da montagem: de uma retomada da corrotina a outra = o quadro inteiro (o
+        /// desenho da tela e os Start que cairam nele inclusos).</summary>
+        void FecharQuadro()
+        {
+            float ms = (float)_quadro.Elapsed.TotalMilliseconds;
+            if (ms > PiorQuadroMs) PiorQuadroMs = ms;
+            QuadrosDaMontagem++;
+            _quadro.Restart();
+        }
+
+        /// <summary>Um passo da montagem: o que faz, o nome na medicao, o rotulo na tela e se o quadro fecha logo depois
+        /// (`sozinho`: quem trabalha no Start — castelo, terreno reativo, voo — pesa no comeco do quadro SEGUINTE, fora do
+        /// orcamento; nada mais entra nele).</summary>
+        struct Passo
+        {
+            public readonly string Nome, Rotulo;
+            public readonly Action Fazer;
+            public readonly bool Sozinho;
+            public Passo(string nome, string rotulo, Action fazer, bool sozinho = false) { Nome = nome; Rotulo = rotulo; Fazer = fazer; Sozinho = sozinho; }
+        }
+
+        /// <summary>
+        /// O Montar de antes, na MESMA ordem, picado. A ordem e' contrato: a HUD antes do Pawn e do Iniciar (assina MatchStarted e
+        /// KitBound no Criar); o Vincular antes do Start do castelo (o Mapa.Zerar apagaria a rota que o Start emite); os bots
+        /// antes do Embarcar do jogador; o Voo por ultimo, com todo corpo na arena. A HUD e a camera do jogador nascem
+        /// APAGADAS (nada de Update com arena pela metade, nada de desenhar o mundo atras da tela) e acendem no aquecer.
+        /// </summary>
+        List<Passo> Passos(string slug, bool treino, int seed, Relevo relevo, Vector3[] nasc, int corpos)
+        {
+            var p = new List<Passo>();
+            p.Add(new Passo("hud", Textos.CarregaArena, () =>
+            {
+                Hud = Hud.Criar();
+                Hud.gameObject.SetActive(false);
+                Hud.ReiniciarPedido += () => Fluxo.Reiniciar();
+                Hud.MenuPedido += VoltarAoMenu;
+                Hud.AbandonarPedido += VoltarAoMenu;
+            }));
+            p.Add(new Passo("jogador", Textos.CarregaMagos, () =>
+            {
+                Player = Player.Criar(_arena, slug);
+                Player.Camera.Cam.enabled = false;
+                Partida = new Partida(relevo);
+                Partida.Iniciar(seed, Balance.Match.Bots, treino, nasc[0]);
+                Partida.Registrar(Player.Pawn, Player.Pawn.Slot);
+                Hud.Vincular(Player.Pawn);
+            }));
+            p.Add(new Passo("loot", Textos.CarregaArena, () => VisualDaPartida.Criar(_arena, Partida)));   // loot, bau e tempestade na tela
+            if (treino)
+            {
+                p.Add(new Passo("pouso", Textos.CarregaArena, () => Player.Pawn.Aterrar(nasc[0])));
+                for (int i = 0; i < corpos; i++)
                 {
-                    // boneco = Pawn cru (nao age, nao persegue) que a Partida regenera: apanhar sem culpa e' o servico dele
-                    Pawn d = Pawn.Criar(_arena, OutroSlug(slug, i), false);
-                    d.name = "Boneco" + (i + 1);
-                    d.Aterrar(nasc[0] + new Vector3(8f + i * 3f, 0f, -2f));
-                    Partida.RegistrarBoneco(d);
+                    int k = i;
+                    p.Add(new Passo("boneco" + (k + 1), Textos.CarregaMagos, () =>
+                    {
+                        // boneco = Pawn cru (nao age, nao persegue) que a Partida regenera: apanhar sem culpa e' o servico dele
+                        Pawn d = Pawn.Criar(_arena, OutroSlug(slug, k), false);
+                        d.name = "Boneco" + (k + 1);
+                        d.Aterrar(nasc[0] + new Vector3(8f + k * 3f, 0f, -2f));
+                        Partida.RegistrarBoneco(d);
+                    }));
                 }
             }
             else
             {
-                Castelo = Castelo.Criar(_arena, relevo, seed);
-                for (int i = 0; i < Balance.Match.Bots; i++)
+                p.Add(new Passo("castelo", Textos.CarregaCastelo, () => Castelo = Castelo.Criar(_arena, relevo, seed), true));
+                for (int i = 0; i < corpos; i++)
                 {
-                    Bot b = Bot.Criar(_arena, OutroSlug(slug, i), seed + i + 1);
-                    b.Embarcar(Castelo);   // todos caem do mesmo castelo, cada bot no seu instante sorteado
-                    Partida.Registrar(b.Pawn, b.Pawn.Slot);
-                    Bots.Add(b);
+                    int k = i;
+                    p.Add(new Passo("bot" + (k + 1), Textos.CarregaMagos, () =>
+                    {
+                        Bot b = Bot.Criar(_arena, OutroSlug(slug, k), seed + k + 1);
+                        b.Embarcar(Castelo);   // todos caem do mesmo castelo, cada bot no seu instante sorteado
+                        Partida.Registrar(b.Pawn, b.Pawn.Slot);
+                        Bots.Add(b);
+                    }));
                 }
-                Player.Embarcar(Castelo);
             }
-
-            Hud.Vincular(Player.Pawn);
-            if (Partida.Treino) Hud.ModoTreino(); else Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
-            Player.Ligar(Hud);
-            Sfx.PosOuvinte = PosDoJogador;
+            p.Add(new Passo("ligar", Textos.CarregaArena, () =>
+            {
+                if (!treino) Player.Embarcar(Castelo);
+                if (Partida.Treino) Hud.ModoTreino(); else Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
+                Player.Ligar(Hud);
+                Sfx.PosOuvinte = PosDoJogador;
+            }));
             // O TERRENO REATIVO (GDD §14). Ate' 11/09 ele so' existia nos testes: nenhuma cena o criava, e fogo/gelo/muro
             // nunca aconteciam na partida. Nasce sob a arena (morre com ela); a Partida ticka pelo TerrenoReativoBehaviour.Atual.
-            _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
-            VisualDoTerreno.Criar(_arena);            // fogo, carvao, gelo, eletrico, lama, muro
-            VisualDosKits.Criar(_arena, Partida);     // muralha, fio, poca, eco, tear + o aviso da suprema no chao
-            VisualDoImpacto.Criar(_arena, Partida);   // o PESO do acerto: estouro onde o tiro para, piscada no corpo, bolha no escudo
-            VisualDoAbate.Criar(_arena, Partida);     // derrubado (anel no chao, losango do tempo) e eliminado (alma, corpo que afunda)
-            VisualDoVoo.Criar(_arena, Partida, Castelo);   // o voo: castelo vivo (runas, rochas, rastro), rastro e vento na queda, estalo no pouso
+            // Sozinho: o Start dele monta a grade da ilha e registra as 615 arvores.
+            p.Add(new Passo("terreno", Textos.CarregaTerreno, () =>
+            {
+                _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
+                VisualDoTerreno.Criar(_arena);        // fogo, carvao, gelo, eletrico, lama, muro
+            }, true));
+            p.Add(new Passo("kits", Textos.CarregaTerreno, () => VisualDosKits.Criar(_arena, Partida)));       // muralha, fio, poca, eco, tear + o aviso da suprema
+            p.Add(new Passo("impacto", Textos.CarregaTerreno, () => VisualDoImpacto.Criar(_arena, Partida)));  // estouro, piscada no corpo, bolha no escudo
+            p.Add(new Passo("abate", Textos.CarregaTerreno, () => VisualDoAbate.Criar(_arena, Partida)));      // derrubado e eliminado
+            p.Add(new Passo("voo", Textos.CarregaCastelo, () => VisualDoVoo.Criar(_arena, Partida, Castelo), true));   // castelo vivo, rastro, vento, estalo
+            // AQUECER atras da tela: a HUD e a camera do jogador acendem um quadro ANTES de a tela sair — o primeiro desenho do
+            // mundo visto do castelo (ou do chao do treino), com o que ele custa, cai ainda coberto.
+            p.Add(new Passo("aquecer", Textos.CarregaPronto, () =>
+            {
+                Hud.gameObject.SetActive(true);
+                Player.Camera.Cam.enabled = true;
+            }, true));
+            return p;
+        }
+
+        /// <summary>O que a partida vai instanciar de Resources — o mago do jogador, o de cada bot/boneco (o mesmo OutroSlug
+        /// dos passos), o castelo, o bau e as tres luvas — nos caminhos do Mago.TentarModeloExterno, Castelo.MontarVisual,
+        /// BauVisual e LootVisual. Caminho que nao existir so' termina com asset nulo (sem log).</summary>
+        static List<string> Modelos(string slug, int corpos, bool treino)
+        {
+            var m = new List<string> { "magos/" + slug };
+            for (int i = 0; i < corpos; i++) m.Add("magos/" + OutroSlug(slug, i));
+            if (!treino) m.Add("castelo");
+            m.Add(BauVisual.MODELO);
+            foreach (string id in Arma.TIERS) m.Add(LootVisual.ModeloDe(id));
+            return m;
+        }
+
+        /// <summary>
+        /// A ARTE da tela de carregamento: o quadro da vitrine (o mago escolhido em guarda no pico, o por do sol atras) num
+        /// RenderTexture, no toque do JOGAR — uma renderizacao a mais, uma vez. Sem a vitrine na tela (jogar de novo) reusa a
+        /// ultima; sem GPU (portao -nographics), null. KNOB: no tamanho da tela; tela pequena (a janela 640x480 do editor)
+        /// sai no 2400x1080 do Poco F4 — o da foto.
+        /// </summary>
+        Texture FotografarVitrine()
+        {
+            if (_camMenu == null || !_camMenu.enabled || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return _arte;
+            bool pequena = Screen.width < 1280;
+            int w = pequena ? 2400 : Screen.width, h = pequena ? 1080 : Screen.height;
+            if (_arte != null && (_arte.width != w || _arte.height != h)) { _arte.Release(); Destroy(_arte); _arte = null; }
+            if (_arte == null) _arte = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { name = "ArteDoCarregamento" };
+            RenderTexture antes = _camMenu.targetTexture;
+            _camMenu.targetTexture = _arte;
+            _camMenu.Render();
+            _camMenu.targetTexture = antes;
+            return _arte;
         }
 
         void Desmontar()
         {
+            if (_montagem != null) { StopCoroutine(_montagem); _montagem = null; }   // abandono/teste no meio da montagem
+            if (Carregando) { Carregando = false; Application.backgroundLoadingPriority = _prioridade; }
+            if (Tela != null) { Destroy(Tela.gameObject); Tela = null; }
             if (Partida != null) { Partida.Encerrar(); Partida = null; }
             if (Sfx != null) Sfx.PosOuvinte = null;
             if (Hud != null) { Destroy(Hud.gameObject); Hud = null; }

@@ -39,12 +39,19 @@ namespace Arkana.Tests
             while (t < segundos && frames < teto) { yield return null; t += Time.deltaTime; frames++; }
         }
 
+        /// <summary>A partida monta em FATIAS atras da tela de carregamento (onda 12B): espera a arena inteira (teto de quadros).</summary>
+        static IEnumerator AteMontar(Main main)
+        {
+            for (int n = 0; main.Carregando && n < 900; n++) yield return null;
+        }
+
         [UnityTest]
         public IEnumerator Voo_CasteloVivo_RastroEVentoNaQueda_EstaloNoPouso_SomeComOCastelo()
         {
             Main main = _go.AddComponent<Main>();
             yield return null;
             Bus.EmitGameStartRequested();
+            yield return AteMontar(main);
             yield return null;
             yield return null;   // o Start do castelo monta o modelo; no LateUpdate seguinte o voo pendura runas e rochas
             var v = Object.FindFirstObjectByType<VisualDoVoo>();

@@ -14,6 +14,41 @@ namespace Arkana.Core
         public const string TituloSub = "Magos Battle Royale";
         public const string TituloToque = "TOQUE PARA COMEÇAR";
 
+        // ---------------------------------------------------------------- tela de carregamento (GDD §11)
+        public const string CarregaPartida = "PREPARANDO A PARTIDA";
+        public const string CarregaTreino = "PREPARANDO O TREINO";
+        public const string CarregaDica = "DICA";
+        public const string CarregaPct = "{0}%";
+        /// <summary>O passo que a montagem esta' dando agora (a linha fina sobre a barra): a barra anda de verdade.</summary>
+        public const string CarregaMagos = "Convocando os magos";
+        public const string CarregaArena = "Erguendo a arena";
+        public const string CarregaCastelo = "O castelo se aproxima";
+        public const string CarregaTerreno = "Despertando o terreno";
+        public const string CarregaPronto = "Tudo pronto";
+        /// <summary>
+        /// DICAS da tela de carregamento: "as dicas ensinam a matriz de combos de graca" (GDD §11). Cada uma cabe em duas
+        /// linhas da placa. So' o que o jogo FAZ hoje (GDD §14 e o que o Kits/Balance cobram) — dica que mente ensina errado.
+        /// </summary>
+        public static readonly string[] Dicas =
+        {
+            "Água conduz Raio — cuidado onde pisa.",
+            "Fogo na grama e nas árvores se espalha, e a mata queimada vira carvão: a cobertura some.",
+            "Fogo na grama alta revela quem estava escondido nela.",
+            "Água congela o lago por 10 s e vira ponte — mas o Fogo derrete, e quem está em cima cai.",
+            "Raio na água eletrocuta todo mundo que está nela. Saia da água antes do raio.",
+            "Terra ergue um muro de pedra de 60 de vida: cobertura na hora, que qualquer dano derruba.",
+            "Água em chão de terra vira lamaçal e deixa todos lentos. O Fogo seca a lama.",
+            "Vento é faca de dois gumes: espalha o fogo, mas também dissipa névoa e gás.",
+            "Cada elemento tem a sua forma: círculo é Fogo, gota é Água, raio é Raio, quadrado é Terra, espiral é Vento.",
+            "Kits não gastam mana: a tática volta em segundos e a suprema carrega com o tempo e com o dano que você causa.",
+            "A suprema não carrega no ar: pouse cedo para chegar à luta com ela pronta.",
+            "Toda suprema é avisada: um anel acende no chão e enche até ela sair. Viu o anel, saia de perto.",
+            "O escudo evolui com o dano que você causa: branco, azul, roxo e dourado. Ele não se regenera sozinho.",
+            "A Manopla lendária só sai do Baú Celestial. Canalize perto dele: sair do raio cancela.",
+            "A tempestade arcana fecha a ilha em fases. Fora da zona, a vida escorre a cada segundo.",
+            "No ar, toque o salto de novo para abrir ou fechar o planeio.",
+        };
+
         // ---------------------------------------------------------------- menu principal
         public const string MenuJogar = "JOGAR";
         public const string MenuTreino = "TREINO";

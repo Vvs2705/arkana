@@ -98,16 +98,18 @@ namespace Arkana.Menu
         }
 
         /// <summary>Contorno escuro de 1,2 dp: o Shadow de 1 px do Formas.Texto some a 395 ppi; o Outline le' sobre a neve e
-        /// sobre a noite. Acompanha o alfa do texto (useGraphicAlpha): o "toque" pulsa com contorno e tudo.</summary>
-        static void Contorno(Text t)
+        /// sobre a noite. Acompanha o alfa do texto (useGraphicAlpha): o "toque" pulsa com contorno e tudo.
+        /// A tela de carregamento usa o mesmo (o nome do mago sobre o ceu do pico).</summary>
+        internal static void Contorno(Text t)
         {
             var o = t.gameObject.AddComponent<Outline>();
             o.effectColor = Formas.ComAlfa(Estilo.NoiteFunda, 0.9f);
             o.effectDistance = new Vector2(Dp.Px(1.2f), -Dp.Px(1.2f));
         }
 
-        /// <summary>Wordmark ARKANA: uma letra por Text (espacamento largo), o K na cor do raio (GDD §10).</summary>
-        HorizontalLayoutGroup Wordmark(Transform pai, float tamDp, float sepDp)
+        /// <summary>Wordmark ARKANA: uma letra por Text (espacamento largo), o K na cor do raio (GDD §10). Titulo, menu e a
+        /// tela de carregamento: a MESMA marca.</summary>
+        internal static HorizontalLayoutGroup Wordmark(Transform pai, float tamDp, float sepDp)
         {
             var go = new GameObject("Wordmark", typeof(RectTransform), typeof(HorizontalLayoutGroup));
             go.transform.SetParent(pai, false);

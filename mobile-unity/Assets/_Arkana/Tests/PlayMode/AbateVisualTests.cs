@@ -32,13 +32,19 @@ namespace Arkana.Tests
             yield return null;
         }
 
+        /// <summary>A partida monta em FATIAS atras da tela de carregamento (onda 12B): espera a arena inteira (teto de quadros).</summary>
+        static IEnumerator AteMontar(Main main)
+        {
+            for (int n = 0; main.Carregando && n < 900; n++) yield return null;
+        }
+
         [UnityTest]
         public IEnumerator Caido_AcendeAnel_MorteEstouraEAfunda_SoOVisualSome()
         {
             Main main = _go.AddComponent<Main>();
             yield return null;
             Bus.EmitGameStartRequested();
-            yield return null;
+            yield return AteMontar(main);
             var v = Object.FindFirstObjectByType<VisualDoAbate>();
             Assert.IsNotNull(v, "a partida tem quem desenhe o derrubado e o eliminado");
 

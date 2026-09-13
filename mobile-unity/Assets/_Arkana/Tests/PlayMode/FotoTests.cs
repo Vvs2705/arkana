@@ -2064,5 +2064,30 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
 
+        // ONDA 12B — colar em FotoTests.cs, dentro da classe (o onda12-carregar-compila.sh cola no fim). Rodar: .\foto.ps1 "Foto_Carregando"
+
+        /// <summary>
+        /// A TELA DE CARREGAMENTO (onda 12B) no MEIO da montagem da partida normal (12 bots: a mais longa). A arte e' o quadro da
+        /// vitrine (o mago escolhido em guarda no pico, o por do sol atras) que o Main fotografa no toque do JOGAR; a esquerda
+        /// PREPARANDO A PARTIDA, o nome, o titulo e a gema do elemento com o papel; embaixo a placa da DICA, o passo, o % e a
+        /// barra dourada com o brilho na ponta; no canto o selo girando. A foto sai pela camera do menu (desligada: so' renderiza
+        /// quando pedida) com a UI por cima — a tela cobre o mundo inteiro, entao a camera nao importa. Guarda junto o contrato:
+        /// a montagem ainda nao acabou quando a foto sai, o relogio do jogo esta' parado e a HUD ainda nao acendeu.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Carregando_TelaNoMeioDaMontagem()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return Esperar(1.2f);   // a vitrine poe o mago no pico e o corte por distancia acorda: a arte e' esse quadro
+            Bus.EmitGameStartRequested();
+            int n = 0;
+            while (main.Carregando && main.Tela.Logica.Barra < 0.4f && n < 900) { yield return null; n++; }
+            Assert.IsTrue(main.Carregando, "a montagem acabou antes da foto: nao sobrou meio para fotografar");
+            Assert.AreEqual(0f, Time.timeScale, "carregando, o relogio do jogo espera");
+            Assert.IsTrue(main.Hud == null || !main.Hud.gameObject.activeSelf, "a HUD monta apagada atras da tela");
+            Foto(main.CameraDoMenu, "42-carregando", true);
+        }
+
     }
 }
