@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using UnityEngine;
 using Arkana.Core;
 using Arkana.Characters;
+using Arkana.Terrain;
 
 namespace Arkana.Gameplay
 {
     /// <summary>
     /// O DESENHO DO GRUPO D (16 Fizz, 17 Sylva, 18 Basalto, 19 Noctus, 20 Pip) pelos ganchos parciais da casca: um Item por
-    /// EfeitoVisual, do mesmo pool (R/R2/Linha/Ps/Ps2 — o Mostrar liga e desliga SO' esses; o Extra ele nao conhece, entao este
-    /// grupo nao usa Extra). Tipos com o prefixo do mago. Pecas solidas (torreta, bobina, broto, moita, lascas, placas, nuvem)
-    /// sao primitivas COMBINADAS numa malha so' com cor de vertice, no Particles/Simple Lit (le' cor de vertice, recebe a luz
+    /// EfeitoVisual, do mesmo pool (R/R2/Linha/Ps/Ps2 e as pecas a mais em Extra — o Mostrar liga e desliga todas). Tipos com o
+    /// prefixo do mago. A torreta, a bobina (e a sucata delas) e as placas do Monolito sao as PECAS DA MESHY da onda 11
+    /// (PecaDaMeshy: textura no URP Lit); sem o .glb, e nas outras pecas solidas (broto, moita, lascas, nuvem), primitivas
+    /// COMBINADAS numa malha so' com cor de vertice, no Particles/Simple Lit (le' cor de vertice, recebe a luz
     /// do sol — em Build.ShadersDoCodigo); magia e' aditiva HDR (acende no bloom); fumaca, poeira e nevoa sao ALFA (aditivo
     /// cinza vira brilho). Sem luz dinamica, sem lixo por quadro: pontos de raio num buffer do Item, cor por MaterialPropertyBlock.
     /// Leitura por mago (EstadoGrupoD): o cabelo-estacao da Sylva (flor -> outono pela vida; cinza com a seiva gasta) e o fio
@@ -33,6 +35,15 @@ namespace Arkana.Gameplay
         static readonly Color GdMagma = new Color32(0xFF, 0x5A, 0x2A, 255);
         static readonly Color GdCarmesim = new Color32(0x8B, 0x1E, 0x2E, 255);
         static readonly Color GdVioleta = new Color32(0x8A, 0x5C, 0xF0, 255);
+        /// <summary>Sucata: o Lit da peca x este tom = cobre queimado. KNOB por foto.</summary>
+        static readonly Color GdCorSucata = new Color(0.3f, 0.25f, 0.22f, 1f);
+
+        /// <summary>As pecas da Meshy (onda 11) em Resources; sem o .glb, a primitiva combinada de antes.</summary>
+        const string GdGlbTorreta = "42-torreta-fizz", GdGlbBobina = "43-bobina-fizz", GdGlbMonolito = "41-monolito-basalto";
+        /// <summary>A LENTE acesa da torreta e o centro da ESFERA da bobina no .glb (medidos nos vertices laranja/azuis da
+        /// textura): o farol e a coroa acendem por cima delas. KNOB se a Meshy refizer a peca.</summary>
+        static readonly Vector3 GdLenteTorreta = new Vector3(0f, 0.55f, 0.5f);
+        const float GdEsferaBobina = 2.3f;
 
         /// <summary>Os dois efeitos por Sylva (chave estavel no pool, como o braco da Pyra). Restante 1 fixo: quem liga e' a leitura.</summary>
         sealed class GdSylva
@@ -73,15 +84,28 @@ namespace Arkana.Gameplay
             {
                 // ---------------------------------------------------------------- FIZZ
                 case "fizz_torreta":
-                    it.R = Peca(raiz, GdMalhaTorreta(), _gdProp);
+                {
+                    Mesh m = GdMalhaFizz(false, out Material mat, out float k);
+                    it.R = Peca(raiz, m, mat);
                     it.R2 = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Sphere), _gdBrilho);   // o FAROL que pisca
-                    it.R2.transform.localPosition = new Vector3(0f, 1.2f, -0.05f);
-                    it.R2.transform.localScale = Vector3.one * 0.17f;
+                    if (k > 0f)
+                    {
+                        // a cupula da Meshy: o farol acende NA LENTE (o olho que mira o cone)
+                        it.R.transform.localScale = Vector3.one * k;
+                        it.R2.transform.localPosition = GdLenteTorreta * k;
+                        it.R2.transform.localScale = Vector3.one * 0.26f;
+                    }
+                    else
+                    {
+                        it.R2.transform.localPosition = new Vector3(0f, 1.2f, -0.05f);
+                        it.R2.transform.localScale = Vector3.one * 0.17f;
+                    }
                     it.Linha = Linha(it.Go, 0.06f);   // o CONE no chao: o limitador (flanqueavel) se le'
                     it.Pontos = new Vector3[3];
                     it.Linha.positionCount = 3;
                     it.Linha.numCapVertices = 0;
                     break;
+                }
                 case "fizz_faisca":
                 case "pip_faisca":
                     it.Linha = Linha(it.Go, 0.12f);
@@ -94,15 +118,22 @@ namespace Arkana.Gameplay
                         new Vector2(0.15f, 0.4f), new Vector2(3f, 8f), new Vector2(0.05f, 0.14f), true, 1f, 90);
                     break;
                 case "fizz_bobina":
-                    it.R = Peca(raiz, GdMalhaBobina(), _gdProp);
-                    it.R2 = Peca(raiz, MalhaVfx.Primitiva(PrimitiveType.Sphere), _gdBrilho);   // a coroa que carrega
-                    it.R2.transform.localPosition = new Vector3(0f, 2.4f, 0f);
+                {
+                    // a COLUNA leva a peca, a coroa e os arcos juntos: "arma peca a peca" = a coluna sobe do chao em degraus
+                    Transform col = new GameObject("Coluna").transform;
+                    col.SetParent(raiz, false);
+                    Mesh m = GdMalhaFizz(true, out Material mat, out float k);
+                    it.R = Peca(col, m, mat);
+                    if (k > 0f) it.R.transform.localScale = Vector3.one * k;
+                    float topo = k > 0f ? GdEsferaBobina * k : 2.4f;   // a coroa acende em cima da esfera azul da Meshy
+                    it.R2 = Peca(col, MalhaVfx.Primitiva(PrimitiveType.Sphere), _gdBrilho);   // a coroa que carrega
+                    it.R2.transform.localPosition = new Vector3(0f, topo, 0f);
                     it.Linha = Linha(it.Go, 0.09f);   // o ARCO que salta da coroa ao chao, mais forte a cada passo
                     it.Pontos = new Vector3[8];
                     it.Linha.positionCount = 8;
-                    it.Ps = ParticulaVfx.Novo(raiz, "Arcos", Color.white, GdAzul, 30f,
+                    it.Ps = ParticulaVfx.Novo(col, "Arcos", Color.white, GdAzul, 30f,
                         new Vector2(0.1f, 0.3f), new Vector2(1.5f, 4f), new Vector2(0.05f, 0.12f), false, 1f, 160);
-                    it.Ps.transform.localPosition = new Vector3(0f, 2.4f, 0f);
+                    it.Ps.transform.localPosition = new Vector3(0f, topo, 0f);
                     ParticleSystem.ShapeModule shb = it.Ps.shape;
                     shb.scale = new Vector3(0.9f, 0.9f, 0.9f);
                     it.Ps2 = ParticulaVfx.Novo(it.Ps.transform, "Pingos", GdFaisca, GdCobre, 12f,
@@ -110,6 +141,7 @@ namespace Arkana.Gameplay
                     it.Ps2.transform.localRotation = Quaternion.identity;
                     GdGravidade(it.Ps2, 1f);
                     break;
+                }
                 case "fizz_mira":
                     it.Linha = Linha(it.Go, 0.05f);   // o LASER: quem vai levar ve' de onde vem (e foge do alcance)
                     it.Linha.positionCount = 2;
@@ -117,6 +149,9 @@ namespace Arkana.Gameplay
                     break;
                 case "fizz_sucata":
                     it.R = Peca(raiz, MalhaVfx.Disco(), _gdAlfa);   // a mancha de queimado
+                    // a PECA vira sucata: a torreta (R2) ou a bobina (Extra), cada uma num pivo na borda do pe' (tomba ali)
+                    it.R2 = GdSucata(raiz, false);
+                    it.Extra = new Component[] { GdSucata(raiz, true) };
                     it.Ps = GdFumaca(raiz, "Fumaca", new Color(0.35f, 0.33f, 0.3f, 0.55f), new Color(0.2f, 0.19f, 0.18f, 0.4f), 14f);
                     it.Ps.transform.localPosition = new Vector3(0f, 0.45f, 0f);
                     it.Ps2 = ParticulaVfx.Novo(it.Ps.transform, "Brasas", GdFaisca, GdMagma, 16f,
@@ -195,7 +230,31 @@ namespace Arkana.Gameplay
                     it.Ps2.transform.localRotation = Quaternion.identity;   // ja' herda a caixa da poeira
                     break;
                 case "basalto_monolito":
-                    it.R = Peca(raiz, GdMalhaPlacas(), _gdProp);
+                {
+                    // as PLACAS numa raiz propria: o desenho sobe a raiz e as seis vao juntas
+                    Transform placas = new GameObject("Placas").transform;
+                    placas.SetParent(raiz, false);
+                    Mesh m;
+                    Material mat;
+                    if (PecaDaMeshy.Carregar(GdGlbMonolito, out m, out mat))
+                    {
+                        // o MONOLITO da Meshy x 6 no anel de antes (0,8 m), achatado em placa (0,64 x 0,4): o Basalto aparece
+                        // nas frestas. R = a 1a, as outras 5 em Extra (o Mostrar liga e desliga).
+                        Bounds b = m.bounds;
+                        var outras = new Component[5];
+                        for (int i = 0; i < 6; i++)
+                        {
+                            Quaternion q = Quaternion.Euler(0f, i * 60f, 0f);
+                            Renderer r = Peca(placas, m, mat);
+                            r.transform.localPosition = q * new Vector3(0f, 0f, 0.8f);
+                            r.transform.localRotation = q * Quaternion.Euler(-6f, 0f, 0f);   // inclinadas para o corpo
+                            r.transform.localScale = new Vector3(0.64f / Mathf.Max(b.size.x, 0.01f),
+                                (2.5f - 0.2f * (i % 2)) / Mathf.Max(b.size.y, 0.01f), 0.4f / Mathf.Max(b.size.z, 0.01f));
+                            if (i == 0) it.R = r; else outras[i - 1] = r;
+                        }
+                        it.Extra = outras;
+                    }
+                    else it.R = Peca(placas, GdMalhaPlacas(), _gdProp);
                     it.R2 = Peca(raiz, MalhaVfx.Anel(), _gdBrilho);   // as runas acesas na base
                     it.R2.transform.localPosition = new Vector3(0f, 0.06f, 0f);
                     it.Ps = ParticulaVfx.Novo(raiz, "Brasas", GdSeiva, GdMagma, 40f,
@@ -204,6 +263,7 @@ namespace Arkana.Gameplay
                     ParticleSystem.ShapeModule shm = it.Ps.shape;
                     shm.scale = new Vector3(1.6f, 1.6f, 2.4f);
                     break;
+                }
                 case "basalto_estilhaco":
                     it.Ps = GdPedras(raiz, "Estilhacos", 0f, 0.8f);
                     ParticleSystem.MainModule me = it.Ps.main;
@@ -352,8 +412,10 @@ namespace Arkana.Gameplay
                 case "fizz_bobina":
                 {
                     t.SetPositionAndRotation(NoChao(v.Pos), Quaternion.Euler(0f, passo % 36 * 10f, 0f));
-                    // "arma a bobina peca a peca": a coluna sobe na 1a metade da carga, depois so' carrega
-                    it.R.transform.localScale = new Vector3(1f, Mathf.Clamp01(0.25f + prog * 1.6f), 1f);
+                    // "arma a bobina peca a peca": a coluna SOBE do chao em 4 trancos (catraca) no 1o terco da carga, depois so'
+                    // carrega. Sobe inteira, nao estica: a peca da Meshy achatada leria mola de borracha. KNOB: 4 degraus em 0,75 s.
+                    float degrau = Mathf.Min(1f, (Mathf.Floor(prog * 8f) + 1f) / 4f);
+                    it.R.transform.parent.localPosition = Vector3.down * ((1f - degrau) * (it.R2.transform.localPosition.y + 0.3f));
                     float f = Flicker[passo % Flicker.Length];
                     it.R2.transform.localScale = Vector3.one * ((0.45f + 0.35f * prog) * f);
                     Pintar(it.R2, Hdr(Color.Lerp(GdAzul, Color.white, prog), 1.2f + 2.2f * prog), 1f);
@@ -362,7 +424,7 @@ namespace Arkana.Gameplay
                     // o ARCO salta da coroa para um ponto do chao diferente a cada passo (arcos crescentes)
                     float ang = (passo * 137) % 360;
                     Vector3 chao = NoChao(v.Pos + ApoioGrupoD.Girar(Vector3.forward, ang) * (0.8f + 0.8f * prog)) + Vector3.up * 0.05f;
-                    GdRaio(it, v.Pos2 + (NoChao(v.Pos).y - v.Pos.y) * Vector3.up, chao, 8, 0.25f, (0.04f + 0.1f * prog), Color.white,
+                    GdRaio(it, it.R2.transform.position, chao, 8, 0.25f, (0.04f + 0.1f * prog), Color.white,   // sai da COROA, onde ela estiver
                         prog > 0.15f ? 0.4f + 0.6f * prog : 0f, passo);
                     break;
                 }
@@ -381,10 +443,25 @@ namespace Arkana.Gameplay
                 }
                 case "fizz_sucata":
                 {
-                    t.position = NoChao(v.Pos);
+                    // tomba para um lado sorteado PELO LUGAR (sem Random: a mesma sucata cai igual no replay)
+                    Vector3 p = NoChao(v.Pos);
+                    t.SetPositionAndRotation(p, Quaternion.Euler(0f, GdHash(Mathf.RoundToInt(p.x * 7f) * 131 + Mathf.RoundToInt(p.z * 7f)) * 180f, 0f));
                     it.R.transform.localPosition = Vector3.up * 0.04f;
                     it.R.transform.localScale = Vector3.one * (0.7f * v.Raio + 0.3f);
                     Pintar(it.R, new Color(0.12f, 0.09f, 0.07f, 1f), 0.7f * e);
+                    // a torreta quebrada (Raio 0,5) ou a bobina (Raio 1): uma acende, a outra apaga. Tomba sobre a borda do pe' em
+                    // 0,35 s, escurece (cobre queimado) e no fim afunda no chao junto com a fumaca.
+                    bool mega = v.Raio > 0.75f;
+                    var bobina = (Renderer)it.Extra[0];
+                    it.R2.enabled = !mega;
+                    bobina.enabled = mega;
+                    Renderer peca = mega ? bobina : it.R2;
+                    Transform pivo = peca.transform.parent;
+                    pivo.localRotation = Quaternion.Euler(0f, 0f, -(mega ? 80f : 72f) * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(idade / 0.35f)));
+                    Vector3 pp = pivo.localPosition;
+                    pp.y = -0.4f * (1f - Mathf.Clamp01((e - LeituraDosKits.Piso) / (1f - LeituraDosKits.Piso)));
+                    pivo.localPosition = pp;
+                    Pintar(peca, GdCorSucata, 1f);
                     GdTaxa(it.Ps, 16f * v.Raio * e);
                     GdTaxa(it.Ps2, 22f * v.Raio * e * Flicker[passo % Flicker.Length]);
                     break;
@@ -507,8 +584,8 @@ namespace Arkana.Gameplay
                 {
                     Vector3 p = NoChao(PosDoAlvo(v));
                     t.SetPositionAndRotation(p, Quaternion.identity);
-                    // as placas SOBEM da base ao olho (0,3 s) e as runas acendem em passos
-                    it.R.transform.localScale = new Vector3(1f, Mathf.Min(1f, idade / 0.3f), 1f);
+                    // as placas SOBEM da base ao olho (0,3 s: a raiz das seis) e as runas acendem em passos
+                    it.R.transform.parent.localScale = new Vector3(1f, Mathf.Min(1f, idade / 0.3f), 1f);
                     it.R2.transform.localScale = Vector3.one * (1.35f + 0.05f * Flicker[passo % Flicker.Length]);
                     Pintar(it.R2, Hdr(GdSeiva, 2f), e * Flicker[(passo + 1) % Flicker.Length]);
                     GdTaxa(it.Ps, 45f * e);
@@ -710,6 +787,40 @@ namespace Arkana.Gameplay
             return ps;
         }
 
+        // ------------------------------------------------------------------ pecas da Meshy (onda 11)
+
+        /// <summary>A torreta (ou a bobina) do Fizz: a peca da Meshy na ALTURA DO CORPO do kit (corpo_altura: o desenho e o alvo
+        /// medem o mesmo) com a escala em k; sem o .glb, a primitiva de antes no material de cor de vertice, com k = 0.</summary>
+        static Mesh GdMalhaFizz(bool bobina, out Material mat, out float k)
+        {
+            Kits.KitDef fizz = Kits.De("16-fizz");
+            float alto = (bobina ? fizz.Suprema : fizz.Tatica)["corpo_altura"];
+            Mesh m;
+            if (PecaDaMeshy.Carregar(bobina ? GdGlbBobina : GdGlbTorreta, out m, out mat))
+            {
+                k = alto / Mathf.Max(m.bounds.size.y, 0.01f);
+                return m;
+            }
+            GdMateriais();
+            mat = _gdProp;
+            k = 0f;
+            return bobina ? GdMalhaBobina() : GdMalhaTorreta();
+        }
+
+        /// <summary>A peca da SUCATA pendurada num PIVO na borda +x do pe': o pivo gira e ela tomba ali, sem enterrar nem flutuar.</summary>
+        static Renderer GdSucata(Transform raiz, bool bobina)
+        {
+            Mesh m = GdMalhaFizz(bobina, out Material mat, out float k);
+            float s = k > 0f ? k : 1f, borda = m.bounds.max.x * s;
+            Transform pivo = new GameObject("Pivo").transform;
+            pivo.SetParent(raiz, false);
+            pivo.localPosition = new Vector3(borda, 0f, 0f);
+            Renderer r = Peca(pivo, m, mat);
+            r.transform.localPosition = new Vector3(-borda, 0f, 0f);
+            r.transform.localScale = Vector3.one * s;
+            return r;
+        }
+
         // ------------------------------------------------------------------ malhas (1x, primitivas combinadas com cor de vertice)
 
         static Mesh GdMontar(string nome, Mesh[] malhas, Matrix4x4[] ms, Color[] cores)
@@ -738,7 +849,8 @@ namespace Arkana.Gameplay
         static Mesh GdCubo => MalhaVfx.Primitiva(PrimitiveType.Cube);
         static Mesh GdCaps => MalhaVfx.Primitiva(PrimitiveType.Capsule);
 
-        /// <summary>Torreta: base de cobre, haste, cabeca com o cano para +Z (o cone) e a lente azul dos oculos dele. ~1,2 m.</summary>
+        /// <summary>Torreta: base de cobre, haste, cabeca com o cano para +Z (o cone) e a lente azul dos oculos dele. ~1,2 m.
+        /// Reserva: so' sem o 42-torreta-fizz.glb (idem bobina e placas abaixo).</summary>
         static Mesh GdMalhaTorreta()
         {
             if (_gdTorreta != null) return _gdTorreta;

@@ -1,13 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Arkana.Core;
+using Arkana.Terrain;
 using Arkana.World;
 
 namespace Arkana.Gameplay
 {
     /// <summary>
     /// O DESENHO do Grupo C (12/09) pelos ganchos parciais — Umbra (penumbra roxa, lamina violeta, isca de sombra, tinta
-    /// preta), Brok (muralha de bronze que sobe FUNDIDA e esfria, runas azuis, bigorna que ressoa), Gromm (totem de chuva
+    /// preta), Brok (a Runa-Escudo da Meshy que sobe FUNDIDA e esfria, aro azul, bigorna que ressoa), Gromm (totem de chuva
     /// dourada, linha que treme, bisao de energia, rastro) e Maris (esfera d'agua, coluna, mare em bandas cel, choque).
     /// As regras da casca valem: pool por tipo, zero luz dinamica, passos de 12 fps, nada alocado por quadro. Peca a mais
     /// so' como FILHA do Ps (o Play(true)/Stop(true) do pool liga as filhas); renderer em Extra o Mostrar nao desligaria.
@@ -30,10 +31,17 @@ namespace Arkana.Gameplay
         /// <summary>A Umbra no veu: quase preta PARADA, um vulto roxo andando. KNOB por foto.</summary>
         static readonly Color TintPenumbraParadaC = new Color(0.14f, 0.11f, 0.24f), TintPenumbraAndandoC = new Color(0.42f, 0.35f, 0.62f);
         const int PontosChaoC = 16;
+        /// <summary>A Runa-Escudo da Meshy (onda 11): escudo oval de pranchas, runas de ferro, aro azul. Sem o .glb, as placas de bronze.</summary>
+        const string GlbEscudoBrokC = "44-escudo-brok";
+        /// <summary>KNOB por foto: a face das RUNAS virada para o Brok (a camera dele e' quem mais olha o escudo); false = para o
+        /// inimigo (o Brok ve' as pranchas e as alcas).</summary>
+        static readonly bool RunasParaDentroC = true;
 
         static Material _cFumaca, _cTinta;
         static Mesh _cArco, _cRunas, _cBigorna, _cTotem, _cBisao;
         static float _cArcoRaio, _cArcoMeia, _cArcoAltura, _cArcoEsp;
+        /// <summary>A muralha em cena e' o escudo da Meshy (true) ou as placas no arco (false, sem o .glb).</summary>
+        static bool _cEscudoMeshy;
         /// <summary>Qual tinta de penumbra cada Umbra esta' usando (0 = nenhuma): o SetTint so' na BORDA.</summary>
         readonly Dictionary<Pawn, int> _penumbraC = new Dictionary<Pawn, int>();
 
@@ -125,23 +133,52 @@ namespace Arkana.Gameplay
                     NovoEstouroC(it, raiz, new Color(1f, 0.9f, 0.5f), CorBrasaC, 1.2f, 5f);   // faisca de forja em todo cast
                     break;
                 case "brok_muralha":
-                    // MURALHA RUNICA: placas de bronze no arco (a malha sai dos numeros do kit: o desenho e a logica medem o
-                    // MESMO arco) + runas azuis nas duas faces + o clarao que corre as runas + faisca de forja e vapor.
-                    it.R = Peca(raiz, MalhaArcoBrok(), Ilha.MaterialPadrao());
-                    it.R2 = Peca(raiz, MalhaRunasBrok(), _mFeixe);
+                {
+                    // RUNA-ESCUDO: o escudo da Meshy (sem o .glb, placas de bronze no arco) + o brilho azul + o clarao que corre +
+                    // faisca de forja e vapor. Tudo sai dos numeros do kit: o desenho e a logica medem o MESMO arco. A peca e o
+                    // brilho num CORPO que sobe (escala y): fundido, do chao.
+                    MedirArcoC();
+                    Transform corpo = new GameObject("Corpo").transform;
+                    corpo.SetParent(raiz, false);
+                    Mesh m;
+                    Material mat;
+                    _cEscudoMeshy = PecaDaMeshy.Carregar(GlbEscudoBrokC, out m, out mat);
+                    if (_cEscudoMeshy)
+                    {
+                        // ponytail: escudo PLANO na corda media do arco (entre a corda e o apice): com os 4 m do comprimento ele
+                        // fica inteiro dentro da faixa e da abertura da logica. Arco de verdade pediria curvar a malha.
+                        Bounds b = m.bounds;
+                        float largura = 2f * _cArcoRaio * _cArcoMeia, z = ZEscudoC();
+                        float kx = largura / Mathf.Max(b.size.x, 0.01f);
+                        it.R = Peca(corpo, m, mat);
+                        it.R.transform.localPosition = new Vector3(0f, 0f, z);
+                        it.R.transform.localRotation = Quaternion.Euler(0f, RunasParaDentroC ? 180f : 0f, 0f);
+                        it.R.transform.localScale = new Vector3(kx, _cArcoAltura / Mathf.Max(b.size.y, 0.01f), kx);   // 4 x 2,2 m
+                        // o ARO AZUL: oval de pe' no plano do escudo, um tico maior que a borda — acende em volta, dos dois lados
+                        it.R2 = Peca(corpo, MalhaVfx.Anel(), _mFeixe);
+                        it.R2.transform.localPosition = new Vector3(0f, _cArcoAltura * 0.5f, z);
+                        it.R2.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                        it.R2.transform.localScale = new Vector3(largura * 0.52f, 1f, _cArcoAltura * 0.53f);
+                    }
+                    else
+                    {
+                        it.R = Peca(corpo, MalhaArcoBrok(), Ilha.MaterialPadrao());
+                        it.R2 = Peca(corpo, MalhaRunasBrok(), _mFeixe);
+                    }
                     it.Linha = Linha(it.Go, 0.45f);
                     it.Linha.positionCount = 2;
                     it.Ps = ParticulaVfx.Novo(raiz, "Faiscas", new Color(1f, 0.9f, 0.5f), CorBrasaC, 0f,
                         new Vector2(0.4f, 0.9f), new Vector2(2f, 5f), new Vector2(0.04f, 0.1f), true, 0.5f, 140);
                     GravidadeC(it.Ps, 1.1f);
                     float corda = 2f * _cArcoRaio * Mathf.Sin(_cArcoMeia);
-                    it.Ps.transform.localPosition = new Vector3(0f, 0.1f, _cArcoRaio * (1f + Mathf.Cos(_cArcoMeia)) * 0.5f);
+                    it.Ps.transform.localPosition = new Vector3(0f, 0.1f, ZEscudoC());
                     FormaC(it.Ps, corda, 0.8f, 0.1f);
                     it.Ps2 = FumacaC(it.Ps.transform, "Vapor", new Color(0.85f, 0.85f, 0.9f, 0.35f), new Color(0.6f, 0.6f, 0.65f, 0.25f),
                         new Vector2(0.9f, 1.6f), new Vector2(0.5f, 1.4f), new Vector2(0.6f, 1.3f), true, 0.2f, 40);
                     it.Ps2.transform.localRotation = Quaternion.identity;
                     FormaC(it.Ps2, corda, 0.8f, 0.1f);
                     break;
+                }
                 case "brok_estilhaco":
                     NovoEstouroC(it, raiz, CorBronzeC, new Color(1f, 0.85f, 0.45f), 1.5f, 6f);
                     break;
@@ -461,8 +498,9 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>
-        /// Sobe do chao como METAL FUNDIDO que esfria (brasa em HDR -> bronze) em 0,35 s e afunda nos ultimos 0,4 s; as
-        /// runas acendem com um CLARAO que corre de ponta a ponta (rapido na subida, depois no compasso da martelada).
+        /// Sobe do chao como METAL FUNDIDO que esfria (brasa em HDR -> a madeira e o ferro da peca) em 0,35 s e afunda nos
+        /// ultimos 0,4 s; o aro (ou as runas das placas) acende azul e um CLARAO corre a face de ponta a ponta (rapido na
+        /// subida, depois no compasso da martelada).
         /// </summary>
         void BrokMuralha(Item it, EfeitoVisual v)
         {
@@ -475,19 +513,27 @@ namespace Arkana.Gameplay
             float vivido = v.Duracao - v.Restante;
             float sobe = Mathf.Clamp01(vivido / 0.35f);
             float h = Mathf.Max(Mathf.Min(sobe * (2f - sobe), Mathf.Clamp01(v.Restante / 0.4f)), 0.01f);
-            Vector3 escala = new Vector3(1f, h, 1f);
-            it.R.transform.localScale = escala;
-            it.R2.transform.localScale = escala;
+            it.R.transform.parent.localScale = new Vector3(1f, h, 1f);   // o CORPO: a peca e o brilho sobem juntos
             float esfria = Mathf.Clamp01(vivido / 1.4f);
             Pintar(it.R, Color.Lerp(Hdr(CorBrasaC, 2.4f), Color.white, esfria * esfria), 1f);
             int passo = Passo();
             Pintar(it.R2, Hdr(CorRunaC, 2f), (vivido < 1.2f ? 1f : 0.7f) * Flicker[passo % Flicker.Length]);
             float ciclo = vivido < 1.2f ? vivido / 1.2f : ((vivido - 1.2f) % 1.5f) / 1.5f;
-            float ang = Mathf.Lerp(-_cArcoMeia, _cArcoMeia, ciclo);
-            float r = raio - _cArcoEsp * 0.5f - 0.08f;   // na face de DENTRO: e' a que o jogador ve' atras do Brok
-            float y = _cArcoAltura * 0.55f * h;
-            it.Linha.SetPosition(0, t.TransformPoint(new Vector3(Mathf.Sin(ang - 0.14f) * r, y, Mathf.Cos(ang - 0.14f) * r)));
-            it.Linha.SetPosition(1, t.TransformPoint(new Vector3(Mathf.Sin(ang + 0.14f) * r, y, Mathf.Cos(ang + 0.14f) * r)));
+            if (_cEscudoMeshy)
+            {
+                // na face do escudo virada para o Brok (a que o jogador ve'), de uma ponta a outra, na altura das runas
+                float x = Mathf.Lerp(-0.85f, 0.85f, ciclo) * _cArcoRaio * _cArcoMeia, ze = ZEscudoC() - 0.45f, ye = _cArcoAltura * 0.55f * h;
+                it.Linha.SetPosition(0, t.TransformPoint(new Vector3(x - 0.35f, ye, ze)));
+                it.Linha.SetPosition(1, t.TransformPoint(new Vector3(x + 0.35f, ye, ze)));
+            }
+            else
+            {
+                float ang = Mathf.Lerp(-_cArcoMeia, _cArcoMeia, ciclo);
+                float r = raio - _cArcoEsp * 0.5f - 0.08f;   // na face de DENTRO: e' a que o jogador ve' atras do Brok
+                float y = _cArcoAltura * 0.55f * h;
+                it.Linha.SetPosition(0, t.TransformPoint(new Vector3(Mathf.Sin(ang - 0.14f) * r, y, Mathf.Cos(ang - 0.14f) * r)));
+                it.Linha.SetPosition(1, t.TransformPoint(new Vector3(Mathf.Sin(ang + 0.14f) * r, y, Mathf.Cos(ang + 0.14f) * r)));
+            }
             it.Linha.startColor = CorLunarC;
             it.Linha.endColor = CorRunaC;
             Pintar(it.Linha, Hdr(Color.white, 2.6f), h);
@@ -815,10 +861,13 @@ namespace Arkana.Gameplay
             _cArcoEsp = t["espessura"];
         }
 
+        /// <summary>m do centro do arco ate' o escudo plano: a corda MEDIA (meio caminho entre a corda e o apice do arco).</summary>
+        static float ZEscudoC() => _cArcoRaio * (1f + Mathf.Cos(_cArcoMeia)) * 0.5f;
+
         const int PlacasBrokC = 7;
 
         /// <summary>Sete placas de bronze alternando altura (le' ESCUDO, nao parede de casa), inclinadas para o Brok (braco
-        /// escorado). Material do mundo (le' cor de vertice e recebe luz): o bronze tem face.</summary>
+        /// escorado). Material do mundo (le' cor de vertice e recebe luz): o bronze tem face. Reserva: so' sem o 44-escudo-brok.glb.</summary>
         static Mesh MalhaArcoBrok()
         {
             if (_cArco != null) return _cArco;

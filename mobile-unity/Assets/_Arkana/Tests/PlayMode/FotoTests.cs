@@ -1966,5 +1966,103 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+        /// <summary>
+        /// ONDA 11 — as PECAS DA MESHY no lugar das primitivas, pela camera do jogador no treino (roteiro do Foto_Kit_GrupoD):
+        /// 41-pecas-basalto (os muros de terra que o Punho ergue + o Monolito), 41-pecas-fizz-torreta, 41-pecas-fizz-bobina
+        /// (armada, laser no boneco), 41-pecas-fizz-sucata (a bobina tombada depois do raio) e 41-pecas-brok (a Runa-Escudo ja'
+        /// fria). O jogador fica DE LADO do boneco (muro nao nasce em celula ocupada) e recua depois de fincar a torreta e a bobina
+        /// (a peca a 1,2-1,5 m ficaria atras do corpo dele). O diag lista cada peca com o MATERIAL: "(meshy)" = veio do .glb;
+        /// ArkanaMundo / Vfx = caiu na primitiva. Esperas: KNOB por foto (o quadro cai com a peca inteira de pe').
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Pecas_Onda11([Values("18-basalto", "16-fizz", "13-brok")] string slug)
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                Assert.IsNotNull(main.Player.Pawn.Runner.Impl, slug + " sem kit");
+                GameObject boneco = GameObject.Find("Boneco1");
+                Assert.IsNotNull(boneco, "o treino tem boneco");
+                Vector3 b = boneco.transform.position, p0 = main.Player.Pawn.Pos;
+                Vector3 dir = new Vector3(b.x - p0.x, 0f, b.z - p0.z).normalized, lado = Vector3.Cross(Vector3.up, dir);
+                // o Fizz mira PERTO do boneco (o cone da torreta e o laser da bobina precisam de alguem); Basalto e Brok, ao lado
+                Vector3 pe = slug == "16-fizz" ? b - dir * 5f + lado * 1.5f : b - dir * 5f + lado * 6f;
+                LevarJogador(main, pe);
+                main.Player.Camera.Logica.Yaw = Mathf.Atan2(dir.x, dir.z);
+                main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+                yield return Esperar(0.3f);
+                Gameplay.KitRunner runner = main.Player.Pawn.Runner;
+                switch (slug)
+                {
+                    case "18-basalto":
+                        main.Player.Tatica();                           // o Punho: a onda chega aos 5 m e ergue 3 muros
+                        yield return Esperar(1f);
+                        main.Player.Suprema();
+                        yield return Esperar(runner.Dados.Telegrafia + 0.6f);   // o Monolito ja' de pe' (sobe em 0,3 s)
+                        Foto(main.Player.Camera.Cam, "41-pecas-basalto", true);
+                        DiagPecasOnda11(main, "41-pecas-basalto");
+                        break;
+                    case "16-fizz":
+                        main.Player.Tatica();
+                        yield return Esperar(0.4f);
+                        LevarJogador(main, pe - dir * 2.5f);              // recua: a torreta fica a ~4 m, inteira no quadro
+                        yield return Esperar(0.8f);
+                        Foto(main.Player.Camera.Cam, "41-pecas-fizz-torreta", true);
+                        DiagPecasOnda11(main, "41-pecas-fizz-torreta");
+                        yield return Esperar(1f);
+                        Vector3 aqui = main.Player.Pawn.Pos;
+                        main.Player.Suprema();
+                        yield return Esperar(0.3f);
+                        LevarJogador(main, aqui - dir * 2.5f);            // a bobina nasce a 1,2 m: recua de novo
+                        yield return Esperar(1f);                        // armada (sobe em 0,75 s), coroa carregando, laser
+                        Foto(main.Player.Camera.Cam, "41-pecas-fizz-bobina", true);
+                        DiagPecasOnda11(main, "41-pecas-fizz-bobina");
+                        yield return Esperar(runner.Dados.Telegrafia - 1.3f + 0.6f);   // disparou: a sucata tombada
+                        Foto(main.Player.Camera.Cam, "41-pecas-fizz-sucata", true);
+                        DiagPecasOnda11(main, "41-pecas-fizz-sucata");
+                        break;
+                    case "13-brok":
+                        main.Player.Tatica();
+                        yield return Esperar(1.6f);                      // ja' esfriou (1,4 s): a madeira e o ferro, o aro azul
+                        Foto(main.Player.Camera.Cam, "41-pecas-brok", true);
+                        DiagPecasOnda11(main, "41-pecas-brok");
+                        break;
+                }
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        /// <summary>As pecas LIGADAS dos kits e dos muros no quadro, com o material (o nome diz se veio do .glb).</summary>
+        static void DiagPecasOnda11(Main main, string nome)
+        {
+            var sb = new System.Text.StringBuilder(nome + ": pawn=" + main.Player.Pawn.Pos.ToString("F1")
+                + " cam=" + main.Player.Camera.Cam.transform.position.ToString("F1") + "\n");
+            foreach (Gameplay.EfeitoVisual v in main.Player.Pawn.Runner.Visuais)
+                sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " raio=" + v.Raio.ToString("F1")
+                    + " restante=" + v.Restante.ToString("F2"));
+            var raizes = new Component[] { Object.FindFirstObjectByType<Gameplay.VisualDosKits>(), Object.FindFirstObjectByType<Arkana.Terrain.VisualDoTerreno>() };
+            foreach (Component raiz in raizes)
+            {
+                if (raiz == null) { sb.AppendLine("  (sem uma das cascas)"); continue; }
+                foreach (Renderer r in raiz.GetComponentsInChildren<Renderer>(false))
+                    if (r.enabled && !(r is ParticleSystemRenderer) && !(r is LineRenderer))
+                        sb.AppendLine("  peca " + Caminho(r.transform) + " bounds=" + r.bounds.center.ToString("F1") + " tam=" + r.bounds.size.ToString("F1")
+                            + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.name + " [" + r.sharedMaterial.shader.name + "]" : "NULL"));
+            }
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
     }
 }
