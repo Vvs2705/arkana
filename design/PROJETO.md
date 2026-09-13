@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 12/09/2026, fim de tarde (ondas 3 a 8 em paralelo: combate, chão vivo em toda a ilha, pedras/árvores/moitas da Meshy, sombra macia + SSAO, água sem moiré, minimapa, voo, barra do alvo; falta medir FPS no aparelho)
+> **Atualizado em:** 13/09/2026, madrugada (ondas 10–12: ruínas e peças dos kits pela Meshy, verbos de motor dos kits, tela de carregamento; em curso: costa, céu, praia e logo; falta medir FPS no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,22 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — ondas em paralelo: o jogo ganhou peso, chão, pedra e sombra (12/09/2026, tarde)
+### >>> COMECE POR AQUI — madrugada de 13/09: peças da Meshy nos kits, motor dos kits e tela de carregamento
+
+**Entrou em `main` (portão 441 testes, 0 falhas):**
+
+| Onda | O que se vê | Arquivos | Foto |
+|---|---|---|---|
+| 10A | Colunas e blocos das Ruínas viram modelos da Meshy (coluna canelada, bloco rachado, coluna tombada): 59 peças em 2 malhas, 64,6 K tris | Ruinas, 38/39-*.glb | 40-ruinas-* |
+| 11 | Muro de terra (sobe do chão em 0,3 s, tomba ao quebrar), placas do Monólito do Basalto, torreta e Megabobina do Fizz (sucata tomba e afunda), Runa-Escudo do Brok — sai a caixa cinza. Carregador `PecaDaMeshy` no `VisualDoTerreno`; sem o GLB, volta a primitiva | VisualDoTerreno, VisualDosKits.GrupoC/D, 40–44-*.glb | 41-pecas-* |
+| 12A | Verbos de motor: `Teleportar` com pouso seguro (nunca no mar, em copa ou dentro do morro), `Impulso` na distância exata, invisível/penumbra/sem passos de verdade contra o bot (só vê a 2,5 m), fator de pulo, vida base na `IdentidadeMago` (Pip 55). Ceifadora, Umbra (8 m por esquiva), Noctus, Pip, Fizz e Ilusionista já usam | Pawn, Locomocao, Bot, IConjurador, IdentidadeMago, 7 kits | 39-kit-* |
+| 12B | Tela de carregamento: o JOGAR cobre tudo no mesmo quadro (vitrine do mago, nome, título, elemento, dica, barra real); a partida monta em fatias de 12 ms. Editor: 7 quadros, 254 ms, pior quadro 151 ms (medido em `Logs/carregamento-*.txt`) | Main, TelaDeCarregamento (novo), Textos, Menu | 42-carregando |
+
+**Em curso (agentes em cópias no rascunho):** 13A costa do mar (faixa rasa turquesa + espuma na linha d'água, textura assada do relevo), 13B céu com cúmulos de verdade (só `ArkanaCeu.shader`), 13C praia e cume com a Meshy (barco naufragado, troncos, rochas com estrela-do-mar, capim de duna; pedrinhas do cume no lugar das lascas), 14B logo ARKANA desenhado em código (letras próprias em ouro com bisel e brilho). Na fila: 14A mata (cristal arcano, tronco com musgo, cogumelos luminosos, samambaia — GLBs 50–53 prontos no rascunho `onda14-mata`), depois que a 13C largar o `Vegetacao.cs`.
+
+**Lições da madrugada:** a Meshy devolve líquen/musgo em verde-limão às vezes; o `scratchpad\desneon.py` (Blender) apaga a matiz 40–110° saturada da textura antes do jogo. O capim de duna de lâminas finas SOBREVIVEU ao remesh de 3 K (lâmina presa na base não estilhaça; o que estilhaça é folha solta).
+
+**Créditos Meshy:** ~340.
 
 **OS 20 MAGOS TÊM KIT (12/09, noite).** Os 17 que eram "declarados e inertes" ganharam passiva, tática e suprema com limitador e VFX, seguindo as fichas de `design/personagens/`. O trabalho foi feito por 4 agentes em paralelo (grupos A–D) e **só com arquivos novos**. Para isso, o coordenador tornou `Kits`, `KitRunner` e `VisualDosKits` classes `partial` com ganchos `GrupoA..D` (métodos parciais; grupo sem arquivo some na compilação). As leis dos kits (sem mana, telegrafia de 1 a 4 s, tática de 5 a 10 s, ficha = registro) valem para todos. São 50 testes novos, com ~140 mutantes mortos.
 
@@ -87,7 +102,7 @@ aparelho apareceu em `adb devices`.
    - VFX do voo.
 
    Se cair, os KNOBs pela ordem: `m_RenderScale` 0,85; SSAO `m_Active` 0; `_Pintado`/`_Fissura` 0; sombra 2048; `DistanciaLod1` 30.
-2. Aplicar as ondas 10A (ruínas) e 11 (peças dos kits), se ainda não entraram. Depois: HudEstados com os estados novos dos kits, os verbos de motor que os grupos pediram (Teleportar, Impulso, invisível para o bot) e bots usando kit (decisão do Diretor).
+2. ~~Ondas 10A e 11, HudEstados dos kits e verbos de motor~~ — feitos (ver o bloco de 13/09 acima). Falta: bots usando kit (decisão do Diretor); `Interromper()` do canal do baú e `RegredirNivel()` da Vitalidade (a 12A deixou anotado); fatiar o boot da ilha (`Ilha.MontarEmFatias`, os 6 s do aparelho) e aquecer shaders com `ShaderVariantCollection` na tela de carregamento.
 
 **Ondas 6 a 8 (12/09, fim de tarde), mesmo método:**
 
