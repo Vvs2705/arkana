@@ -1750,5 +1750,70 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
+
+        /// <summary>
+        /// O GRUPO C (Umbra, Brok, Gromm, Maris) em acao, pelo roteiro da Veu/Tessa: tatica e suprema no treino, pela camera do
+        /// jogador. A Danca da Umbra so' aparece na ESQUIVA (a isca fica onde ela estava): a foto esquiva depois do aviso.
+        /// O diag leva o que o kit escreveu (visuais) e o que a casca desenhou (renderers ligados e particulas vivas).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Kit_GrupoC([Values("12-umbra", "13-brok", "14-gromm", "15-maris")] string slug)
+        {
+            ExigirGpu();
+            string antes = PlayerPrefs.GetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, "");
+            try
+            {
+                Arkana.Menu.SelecaoPersonagem.MagoEscolhido = slug;
+                Main main = _go.AddComponent<Main>();
+                yield return null;
+                Arkana.Menu.Menu.PedidoDeTreino = true;
+                Bus.EmitGameStartRequested();
+                yield return Esperar(Gameplay.Partida.SUPREMA_TREINO_S + 1f);
+                Assert.IsNotNull(main.Player, "treino sem jogador");
+                Assert.IsNotNull(main.Player.Pawn.Runner.Impl, slug + " sem kit: o registro do Grupo C nao entrou");
+                OlharParaOCentro(main);
+                yield return Esperar(0.3f);
+                main.Player.Tatica();
+                yield return Esperar(0.9f);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-tatica", true);
+                DiagKitC(main, "39-kit-" + slug + "-tatica");
+                yield return Esperar(1.2f);
+                var runner = main.Player.Pawn.Runner;
+                string carga = "39-kit-" + slug + "-suprema: carga=" + runner.CargaSuprema.ToString("F2") + " pronto=" + runner.ProntoSuprema + "\n";
+                main.Player.Suprema();
+                yield return Esperar(runner.Dados.Telegrafia + 0.15f);   // a suprema e' TELEGRAFADA: o efeito sai quando o aviso enche
+                if (slug == "12-umbra") main.Player.Pawn.Dodge();
+                yield return Esperar(slug == "14-gromm" ? 0.7f : slug == "15-maris" ? 0.6f : 0.3f);
+                Foto(main.Player.Camera.Cam, "39-kit-" + slug + "-suprema", true);
+                File.AppendAllText(Path.Combine(Pasta, "diag.txt"), carga);
+                DiagKitC(main, "39-kit-" + slug + "-suprema");
+            }
+            finally
+            {
+                PlayerPrefs.SetString(Arkana.Menu.SelecaoPersonagem.PrefEscolhido, antes);
+            }
+        }
+
+        static void DiagKitC(Main main, string nome)
+        {
+            var runner = main.Player.Pawn.Runner;
+            var sb = new System.Text.StringBuilder(nome + ": pawn=" + main.Player.Pawn.Pos.ToString("F1")
+                + " cam=" + main.Player.Camera.Cam.transform.position.ToString("F1") + " tele=" + runner.Telegrafia.ToString("F2")
+                + " visuais=" + runner.Visuais.Count + "\n");
+            foreach (var v in runner.Visuais)
+                sb.AppendLine("  visual " + v.Tipo + " " + v.Pos.ToString("F1") + " -> " + v.Pos2.ToString("F1") + " raio=" + v.Raio.ToString("F1") + " restante=" + v.Restante.ToString("F2"));
+            var vk = Object.FindFirstObjectByType<Gameplay.VisualDosKits>();
+            if (vk == null) sb.AppendLine("  SEM VisualDosKits");
+            else
+            {
+                foreach (Renderer r in vk.GetComponentsInChildren<Renderer>(true))
+                    if (r.enabled && r.gameObject.activeInHierarchy && !(r is ParticleSystemRenderer))
+                        sb.AppendLine("  desenho " + Caminho(r.transform) + " bounds=" + r.bounds.center.ToString("F1") + " tam=" + r.bounds.size.ToString("F1")
+                            + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.shader.name : "NULL"));
+                foreach (ParticleSystem ps in vk.GetComponentsInChildren<ParticleSystem>(true))
+                    if (ps.particleCount > 0) sb.AppendLine("  particulas " + Caminho(ps.transform) + " vivas=" + ps.particleCount);
+            }
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
     }
 }
