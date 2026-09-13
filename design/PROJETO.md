@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 13/09/2026, madrugada (ondas 10–12: ruínas e peças dos kits pela Meshy, verbos de motor dos kits, tela de carregamento; em curso: costa, céu, praia e logo; falta medir FPS no aparelho)
+> **Atualizado em:** 13/09/2026, ~03h30 — PAUSA pedida pelo Diretor (ondas 10–13 em main: ruínas, peças dos kits, motor dos kits, tela de carregamento, costa, céu, praia; logo novo em código mas desligado; falta medir FPS no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,9 +51,32 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — madrugada de 13/09: peças da Meshy nos kits, motor dos kits e tela de carregamento
+### >>> COMECE POR AQUI — 13/09 (pausa às ~03h30): costa, céu, praia; o logo novo espera conserto
 
-**Entrou em `main` (portão 441 testes, 0 falhas):**
+**Próximo passo, na ordem (retomada):**
+1. **Consertar o logo** (`Scripts/Menu/Logo.cs`, onda 14B, commit `c0d6ea9`). A marca foi desenhada em código (glifos próprios estilo Cinzel/Trajan, ouro com bisel, contorno grosso, K em raio com halo azul, reflexo que corre). A prévia em Python ficou profissional, e a textura gerada pelo C# no mono bate com ela em 1/255. **No Unity, porém, a marca sai INVISÍVEL** no título, no menu e no carregamento: o espaço do layout existe, não há exceção no log e a foto passa. Já descartado: a textura destruída pelo `UnloadUnusedAssets` (o `hideFlags` já está no arquivo e continuou invisível). Por isso o `Menu.Wordmark` voltou para a fonte antiga. Para religar, use a versão do agente: `Menu.Wordmark(pai, larguraDp, brilho)` devolvendo um `Logo`, título 300 dp, menu 200 dp, carregamento 140 dp parada, e a foto `Foto_Logo_TituloEMenu` → `45-logo-*`. Próxima suspeita: um teste PlayMode que imprima `rect`, `canvasRenderer.GetMaterial()`, `mainTexture` e o número de vértices da malha gerada, e compare com uma `RawImage` usando a mesma textura.
+2. **Onda 14A — a mata** (cristal arcano, tronco com musgo, cogumelos luminosos, samambaia). Os GLBs já otimizados estão em `arte/cenario/ilha-fraturada/_originais-3d/50–53-*.glb`:
+   - cristal: 1,2 K tris, 1,5 m;
+   - tronco: 1,5 K;
+   - cogumelos: 1,2 K + LOD1 de 300;
+   - samambaia: 1,4 K. O LOD1 dela não desceu (1,2 K), porque as folhas são ilhas soltas.
+
+   O musgo do tronco é verde-limão: tinja no material ou passe no `arte/tools/blender/desneon.py`. Plante pelo `Vegetacao.cs`, como a `Praia.cs` faz: instanciado, com LOD e manchas. O cristal pede emissão no material (brilho arcano).
+3. **Medir FPS no Poco F4** com o APK mais novo (pasta de testes de sempre). Ainda não houve aparelho no `adb`. Custos novos que entraram nesta madrugada: o céu (~350–650 instruções na banda de nuvens), a costa (+20 slots no mar), a praia (~40–60 K tris na tela) e as 360 pedrinhas do cume. Os KNOBs de corte continuam os de baixo, mais `_Cobertura` do céu e `SeixosDoCumeRef`.
+4. Pendências anotadas:
+   - o `48-capim-duna-lod1.glb` tem 1,28 K tris (não desceu): reexportar mais leve;
+   - a rocha da costa tem o topo de areia laranja forte ao pôr do sol (tinta em `Praia.cs`);
+   - os botões do menu ainda são placas chapadas cor de oliva (próximo alvo visual, junto com o logo).
+
+**Entrou em `main` depois das 03h (portão 461 testes, 0 falhas):**
+
+| Onda | O que se vê | Arquivos | Foto |
+|---|---|---|---|
+| 13A | Costa do mar: faixa rasa turquesa, espuma que respira na linha d'água (~6,7 s por onda) e linha rala ao largo. Textura 192² assada do relevo, só no material do mar; lago e alagado iguais | ArkanaAgua.shader, Ilha | 42-costa-* |
+| 13B | Céu: banda de cúmulos no horizonte (topo em couve-flor, base reta, 3 tons toon, borda de luz dourada do lado do sol) e cirros no alto. **O castelo da Meshy passou pelo `KitCenario.Domado`**: tinha `metallicFactor` 1 e espelhava o zênite, então saiu azul inteiro com o céu limpo | ArkanaCeu.shader, Castelo, KitCenario | 43-ceu-*, 34-* |
+| 13C | Praia pela Meshy: 2 barcos naufragados, 20 troncos à deriva, 32 rochas com estrela-do-mar (9 com o pé no mar), 165 touceiras de capim de duna. No cume, as 1.000 lascas chapadas viram 360 pedrinhas da Meshy | Praia (novo), Vegetacao, Grama, 45–49-*.glb | 44-* |
+
+**Entrou em `main` na madrugada de 13/09 (portão 441 testes, 0 falhas):**
 
 | Onda | O que se vê | Arquivos | Foto |
 |---|---|---|---|
@@ -62,9 +85,11 @@ aparelho apareceu em `adb devices`.
 | 12A | Verbos de motor: `Teleportar` com pouso seguro (nunca no mar, em copa ou dentro do morro), `Impulso` na distância exata, invisível/penumbra/sem passos de verdade contra o bot (só vê a 2,5 m), fator de pulo, vida base na `IdentidadeMago` (Pip 55). Ceifadora, Umbra (8 m por esquiva), Noctus, Pip, Fizz e Ilusionista já usam | Pawn, Locomocao, Bot, IConjurador, IdentidadeMago, 7 kits | 39-kit-* |
 | 12B | Tela de carregamento: o JOGAR cobre tudo no mesmo quadro (vitrine do mago, nome, título, elemento, dica, barra real); a partida monta em fatias de 12 ms. Editor: 7 quadros, 254 ms, pior quadro 151 ms (medido em `Logs/carregamento-*.txt`) | Main, TelaDeCarregamento (novo), Textos, Menu | 42-carregando |
 
-**Em curso (agentes em cópias no rascunho):** 13A costa do mar (faixa rasa turquesa + espuma na linha d'água, textura assada do relevo), 13B céu com cúmulos de verdade (só `ArkanaCeu.shader`), 13C praia e cume com a Meshy (barco naufragado, troncos, rochas com estrela-do-mar, capim de duna; pedrinhas do cume no lugar das lascas), 14B logo ARKANA desenhado em código (letras próprias em ouro com bisel e brilho). Na fila: 14A mata (cristal arcano, tronco com musgo, cogumelos luminosos, samambaia — GLBs 50–53 prontos no rascunho `onda14-mata`), depois que a 13C largar o `Vegetacao.cs`.
-
-**Lições da madrugada:** a Meshy devolve líquen/musgo em verde-limão às vezes; o `scratchpad\desneon.py` (Blender) apaga a matiz 40–110° saturada da textura antes do jogo. O capim de duna de lâminas finas SOBREVIVEU ao remesh de 3 K (lâmina presa na base não estilhaça; o que estilhaça é folha solta).
+**Lições da madrugada:**
+- **Líquen/musgo verde-limão:** a Meshy às vezes devolve essa cor; o `arte/tools/blender/desneon.py` apaga a matiz 40–110° saturada da textura antes do jogo.
+- **Remesh de 3 K:** o capim de duna de lâminas finas sobreviveu (lâmina presa na base não estilhaça; o que estilhaça é folha solta).
+- **Metal da Meshy:** todo modelo novo precisa passar pelo `KitCenario.Domado`. O castelo era o único que não passava, e o céu novo o denunciou.
+- **Textura criada em código:** para sobreviver ao `UnloadUnusedAssets`, precisa de `HideFlags.DontUnloadUnusedAsset` (ou de um objeto da cena que a referencie, como o Sprite do Selo). Não resolveu o logo, mas vale sempre.
 
 **Créditos Meshy:** ~340.
 
