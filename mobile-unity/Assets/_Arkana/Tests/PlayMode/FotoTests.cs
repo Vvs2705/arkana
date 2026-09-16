@@ -2408,5 +2408,101 @@ namespace Arkana.Tests
             Assert.Greater(cume, 0, "o seixo do cume da Meshy nao carregou (falta o 49-seixos-cume.glb?)");
         }
 
+
+        /// <summary>
+        /// DIAGNOSTICO DO CORPO (queixa do Diretor, 16/09): a luva na mao "cobre a camera", o pulo e a corrida para tras.
+        /// 46-diag-luva*: a luva comum equipada (camera do jogador e de perto) + a escala do osso da mao no diag.
+        /// 46-diag-pulo-N: o pulo visto de lado, quadro a quadro. 46-diag-tras-N: stick para tras solto e mirando.
+        /// O Player e' desligado para o teste escrever a intencao direto no Pawn (a HUD reescreveria o stick).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Diag_LuvaPuloTras()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            var sb = new System.Text.StringBuilder("46-diag: fonte=" + eu.Visual.Fonte + "\n");
+
+            // 1) A LUVA
+            eu.Slot.Equipar(Gameplay.Arma.VARINHA);
+            yield return Esperar(0.4f);
+            Transform mao = eu.Visual.MaoDireita;
+            sb.AppendLine("  mao=" + Caminho(mao) + " lossy=" + mao.lossyScale.ToString("F3") + " rig=" + eu.Visual.transform.lossyScale.ToString("F3"));
+            foreach (Renderer r in mao.GetComponentsInChildren<Renderer>())
+                sb.AppendLine("    " + r.name + " bounds=" + r.bounds.size.ToString("F2") + " centro=" + r.bounds.center.ToString("F1"));
+            Foto(main.Player.Camera.Cam, "46-diag-luva", true);
+            Vector3 p = eu.Pos;
+            Camera cl = CameraTemporaria("CamDiagLuva", p + eu.transform.forward * 3f + eu.transform.right * 1.5f + Vector3.up * 1.6f, p + Vector3.up * 1.1f, Color.gray);
+            Foto(cl, "46-diag-luva-perto", false);
+            Object.Destroy(cl.gameObject);
+
+            // 2) O PULO, de lado
+            main.Player.enabled = false;
+            eu.Stick = Vector2.zero;
+            eu.YawAlvo = null;
+            yield return Esperar(0.5f);
+            p = eu.Pos;
+            Vector3 lado = eu.transform.right;
+            Assert.IsTrue(eu.Pular(), "nao pulou");
+            float t = 0f;
+            int n = 0;
+            float[] marcas = { 0.08f, 0.25f, 0.45f, 0.65f, 0.8f, 0.95f, 1.15f };
+            while (n < marcas.Length && t < 3f)
+            {
+                yield return null;
+                t += Time.deltaTime;
+                if (t < marcas[n]) continue;
+                Camera cp = CameraTemporaria("CamDiagPulo", p + lado * 5f + Vector3.up * 1.4f, p + Vector3.up * 1.4f, Color.gray);
+                Foto(cp, "46-diag-pulo-" + n, false);
+                Object.Destroy(cp.gameObject);
+                sb.AppendLine("  pulo t=" + t.ToString("F2") + " clipe=" + eu.Clipe + " visual=" + eu.Visual.ClipeAtual + " vy=" + eu.Loc.Vy.ToString("F2")
+                    + " noChao=" + eu.NoChao + " y=" + (eu.Pos.y - p.y).ToString("F2"));
+                n++;
+            }
+            yield return Esperar(1f);
+
+            // 3) PARA TRAS: solto (o corpo vira?) e mirando (o corpo encara a camera)
+            foreach (bool mirando in new[] { false, true })
+            {
+                float yaw = main.Player.Camera.Logica.Yaw;
+                eu.YawCam = yaw;
+                eu.YawAlvo = mirando ? yaw : (float?)null;
+                eu.transform.rotation = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f);
+                eu.Stick = new Vector2(0f, -1f);
+                t = 0f;
+                n = 0;
+                float[] tras = { 0.1f, 0.25f, 0.5f, 1.0f };
+                while (n < tras.Length && t < 3f)
+                {
+                    yield return null;
+                    t += Time.deltaTime;
+                    if (t < tras[n]) continue;
+                    string nome = "46-diag-tras-" + (mirando ? "mirando-" : "solto-") + n;
+                    Foto(main.Player.Camera.Cam, nome, true);
+                    Vector3 q = eu.Pos;
+                    Camera ct = CameraTemporaria("CamDiagTras", q + eu.transform.right * 4f + Vector3.up * 1.3f, q + Vector3.up * 1.0f, Color.gray);
+                    Foto(ct, nome + "-lado", false);
+                    Object.Destroy(ct.gameObject);
+                    float yawCorpo = eu.transform.eulerAngles.y;
+                    Vector3 v = eu.Loc.Vel;
+                    float yawVel = Mathf.Atan2(v.x, v.z) * Mathf.Rad2Deg;
+                    sb.AppendLine("  " + nome + " t=" + t.ToString("F2") + " clipe=" + eu.Clipe + " vel=" + eu.VelocidadeHorizontal.ToString("F2")
+                        + " yawCorpo=" + yawCorpo.ToString("F0") + " yawVel=" + yawVel.ToString("F0") + " yawCam=" + (yaw * Mathf.Rad2Deg).ToString("F0")
+                        + " dif=" + Mathf.DeltaAngle(yawCorpo, yawVel).ToString("F0"));
+                    n++;
+                }
+                eu.Stick = Vector2.zero;
+                yield return Esperar(0.8f);
+            }
+            main.Player.enabled = true;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+        }
+
     }
 }
