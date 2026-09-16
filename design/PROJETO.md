@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 16/09/2026, manhã (onda 15: luva na mão, pulo e andar para trás nos 20 magos, cast no tronco, logo ligado; em curso: botões do menu; falta medir FPS no aparelho)
+> **Atualizado em:** 16/09/2026, tarde (onda 15: luva, pulo, recuo, cast no tronco, logo; onda 16A: botões do menu; onda 14A: a mata; falta medir FPS no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -67,7 +67,19 @@ aparelho apareceu em `adb devices`.
 
 **Portão:** 493 testes, 0 falhas. **APK** `arkana-2026-09-16_1023.apk` (221 MB) na pasta de testes — o Diretor sobe ele mesmo no Drive ("JOGOS EM DESENVOLVIMENTO").
 
-**Em curso:** 16A botões do menu (placas escuras com filete dourado no lugar dos retângulos oliva). **Na fila:** 14A mata (GLBs 50–53 prontos), FPS no Poco F4, `Player.cs` — atirando por toque sem segurar a mira o tronco não torce para o tiro (a mira é limpa no quadro seguinte); o clone da Ilusionista não recebe `run` ao voltar de frente; `48-capim-duna-lod1.glb` ainda com 1,28 K tris.
+**16/09, tarde — entrou em `main` (portão 509 testes, 0 falhas):**
+
+| O quê | Causa / decisão | Foto |
+|---|---|---|
+| **Botões do menu** (onda 16A) | a "oliva" era a Borda: FILHO esticado do botão, e o uGUI pinta filho por cima do pai. Agora `PlacaBotao` (assada em código, 9-slice): placa escura chanfrada, moldura dourada em degradê, gemas de losango, rótulo `OuroClaro` com espaçamento (`Letreiro`); **JOGAR** em ouro cheio com aura que respira; afunda no toque (`BotaoMenu`). Vale para todo `Estilo.Botao` (Config, etc.) | 50-menu-*, 50-config |
+| **Configurações cortadas** | a `Lista` nascia com o `sizeDelta` padrão (100×100) e, esticada, ficava 100 px mais larga que a máscara | 50-config |
+| **Tiro por toque** | o `Player` largava a mira no quadro seguinte: agora segura `MIRA_APOS_TIRO_S` (0,55 s) e o corpo vira para o retículo | 52-tiro-toque |
+| **Reflexo da Ilusionista** | o clone não recebia o `run` ao sair do recuo e seguia andando para trás | 39-kit-08 |
+| **A mata** (onda 14A, `Mata.cs`) | 16 cristais arcanos, 32 troncos com musgo, 112 cachos de cogumelo luminoso, 248 samambaias, no molde da `Praia` (instanciado por bloco, LOD, corte). Foge das pegadas do kit (`PegadasDoKit` refaz o plantio puro do `KitCenario`). **Tronco:** o de 1,5 K lia como musgo em blocos de perto → o remesh inteiro de 3,1 K é o LOD0 e o de 1,5 K o LOD1 (25 m). **Brilho:** cristal e cogumelo usam o molde-asset `ArkanaMeshyBrilhoInstancing.mat` (Lit + instancing + `_EMISSION`) — keyword só em runtime some no APK com "Strip Unused" (teste `MoldeDoBrilho_AssetComEmissaoEInstancing`) | 51-mata-* |
+
+**Lições:** RectTransform novo nasce com `sizeDelta` 100×100 — todo nó esticado precisa zerar; `Graphic` próprio precisa de `[RequireComponent(typeof(CanvasRenderer))]`; keyword de shader ligada só em runtime precisa de um material-asset que a peça, senão o build a descarta; **nunca editar `.cs` com o Unity rodando** (aconteceu uma vez nesta tarde: o portão foi repetido).
+
+**Na fila:** FPS no Poco F4 (sem aparelho no `adb` em 16/09); `48-capim-duna-lod1.glb` ainda com 1,28 K tris (remesh de 400 no site); a mata tem 1 tronco encostando na rocha de basalto do kit (`KIT x MATA` no diag da foto 51); bots usando kit (decisão do Diretor).
 
 ### 13/09 (pausa às ~03h30): costa, céu, praia; o logo novo espera conserto
 
