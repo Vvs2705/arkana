@@ -16,8 +16,13 @@ namespace Arkana.Gameplay
         /// <summary>x direita, y frente (0..1) — a cena/HUD escreve por frame.</summary>
         public Vector2 Stick;
 
+        /// <summary>s que a mira fica ARMADA depois de um tiro por toque: o corpo vira para o reticulo e o tronco torce (onda 15B) em vez
+        /// de largar a mira no quadro seguinte e atirar de lado. KNOB: a duracao do gesto de conjurar (PoseMago: 0,55 s).</summary>
+        public const float MIRA_APOS_TIRO_S = 0.55f;
+
         private Hud _hud;
         private bool _mirando;
+        private float _miraAteS;
 
         public static Player Criar(Transform pai, string slug)
         {
@@ -62,7 +67,7 @@ namespace Arkana.Gameplay
             }
             Pawn.Stick = Stick;
             Pawn.YawCam = Camera.Logica.Yaw;
-            Pawn.YawAlvo = _mirando ? Camera.Logica.Yaw : (float?)null;
+            Pawn.YawAlvo = _mirando || Time.time < _miraAteS ? Camera.Logica.Yaw : (float?)null;
             if (Pawn.Queda.Fase != Queda.NO_CASTELO) Camera.Castelo = null;
         }
 
@@ -76,7 +81,7 @@ namespace Arkana.Gameplay
             _mirando = false;
             Vector3 origem = Pawn.Pos + Vector3.up * Pawn.ALTURA_MAO;
             Vector3 dir = gesto.sqrMagnitude < 0.0001f ? (PontoDeMira() - origem).normalized : Camera.Logica.MiraDoGesto(gesto);
-            if (Pawn.Atirar(dir)) Pawn.YawAlvo = Camera.Logica.Yaw;   // o corpo gira para a mira ao disparar
+            if (Pawn.Atirar(dir)) { Pawn.YawAlvo = Camera.Logica.Yaw; _miraAteS = Time.time + MIRA_APOS_TIRO_S; }   // o corpo gira para a mira ao disparar e segura o gesto inteiro
         }
 
         public void DisparoRapido() => DisparoMirado(Vector2.zero);

@@ -2839,5 +2839,54 @@ namespace Arkana.Tests
             Foto(main.CameraDoMenu, "45-logo-menu", true);
         }
 
+
+        /// <summary>
+        /// TIRO POR TOQUE com o Player LIGADO (a 48-atirando desliga o Player): a camera olha 120 graus para o lado do corpo e o
+        /// jogador atira sem segurar a mira. Antes da onda 15 o Player largava a mira no quadro seguinte e o corpo nunca virava
+        /// para o reticulo; agora ele segura MIRA_APOS_TIRO_S e o corpo vira. 52-tiro-toque-0/1 (de lado) + os yaws no diag.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Diag_TiroPorToque()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            eu.Slot.Equipar(Gameplay.Arma.VARINHA);
+            yield return Esperar(0.5f);
+            float yawCorpo0 = eu.transform.eulerAngles.y;
+            main.Player.Camera.Logica.Yaw = (yawCorpo0 + 120f) * Mathf.Deg2Rad;
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            yield return null;
+            Vector3 p = eu.Pos;
+            Vector3 lado = eu.transform.right;
+            var sb = new System.Text.StringBuilder("52-tiro-toque: yawCorpo0=" + yawCorpo0.ToString("F0") + " yawCam=" + (main.Player.Camera.Logica.Yaw * Mathf.Rad2Deg).ToString("F0") + "\n");
+            main.Player.DisparoRapido();
+            float t = 0f;
+            int n = 0;
+            float[] marcas = { 0.15f, 0.45f };
+            while (n < marcas.Length && t < 2f)
+            {
+                yield return null;
+                t += Time.deltaTime;
+                if (t < marcas[n]) continue;
+                Camera c = CameraTemporaria("CamDiagTiro", p + lado * 4f + Vector3.up * 1.4f, p + Vector3.up * 1.1f, Color.gray);
+                Foto(c, "52-tiro-toque-" + n, false);
+                Object.Destroy(c.gameObject);
+                float yawCorpo = eu.transform.eulerAngles.y, yawCam = main.Player.Camera.Logica.Yaw * Mathf.Rad2Deg;
+                sb.AppendLine("  52-tiro-toque-" + n + " t=" + t.ToString("F2") + " clipe=" + eu.Clipe + " yawCorpo=" + yawCorpo.ToString("F0")
+                    + " yawCam=" + yawCam.ToString("F0") + " dif=" + Mathf.DeltaAngle(yawCorpo, yawCam).ToString("F0") + " yawAlvo=" + (eu.YawAlvo.HasValue ? "sim" : "nao"));
+                n++;
+            }
+            float difFinal = Mathf.Abs(Mathf.DeltaAngle(eu.transform.eulerAngles.y, main.Player.Camera.Logica.Yaw * Mathf.Rad2Deg));
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Less(difFinal, 30f, "o corpo nao virou para o reticulo depois do tiro por toque (a mira foi largada cedo)");
+        }
+
     }
 }
