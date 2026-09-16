@@ -2939,5 +2939,143 @@ namespace Arkana.Tests
             Foto(main.CameraDoMenu, "50-config", true);
         }
 
+
+        /// <summary>
+        /// O CHAO DA MATA (onda 14A). 51-mata-chao: a camera a 1,6 m dentro da mata, a 5 m do tronco caido mais acompanhado
+        /// (cogumelos e samambaias a menos de 6 m dele), do lado em que o sol fica mais nas costas do fotografo. 51-mata-cristal: o
+        /// cristal mais perto do miolo da mata, a 4 m, visto do lado da sombra propria (a camera olha contra a luz: o brilho que se
+        /// ve' e' a emissao). 51-mata-alto: a mata a ~50 m de altura, do lado de dentro da ilha. O jogador vai para perto de cada
+        /// camera (a grama e o kit cortam pela camera DELE); o LOD e o corte da mata, pela camera da foto (Vegetacao.Olho).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Mata_ChaoCristalEAlto()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.World.Vegetacao veg = ilha.Vegetacao;
+            Assert.IsNotNull(veg, "sem vegetacao");
+            Arkana.World.Mata mata = veg.Mata;
+            Assert.IsNotNull(mata, "a vegetacao nao montou a mata");
+            Arkana.World.Relevo r = ilha.Relevo;
+            var sb = new System.Text.StringBuilder("51-mata: moldes=" + mata.Moldes + " cristais=" + mata.Contar(Arkana.World.Mata.Peca.Cristal)
+                + " troncos=" + mata.Contar(Arkana.World.Mata.Peca.Tronco) + " cogumelos=" + mata.Contar(Arkana.World.Mata.Peca.Cogumelo)
+                + " samambaias=" + mata.Contar(Arkana.World.Mata.Peca.Samambaia) + "\n");
+            // o KIT real (monta depois, a mata foge dele por PegadasDoKit, uma copia do sorteio): quem encosta em tronco ou cristal
+            if (ilha.Kit != null)
+                foreach (Transform k in ilha.Kit.GetComponentsInChildren<Transform>())
+                {
+                    if (k.parent != ilha.Kit.transform) continue;
+                    Arkana.World.PecaDoKit pk = System.Array.Find(Arkana.World.PlantioDoKit.Pecas, x => x.Id == k.name);
+                    if (pk == null) continue;
+                    for (int i = 0; i < mata.Total; i++)
+                    {
+                        Arkana.World.Mata.PecaPlantada q = mata.Plantada(i);
+                        Vector3 w = (Vector3)q.M.GetColumn(3) - k.position;
+                        w.y = 0f;
+                        if (q.Colide && w.magnitude < pk.RaioM * 0.8f)
+                            sb.AppendLine("  KIT x MATA: " + k.name + " em " + k.position.ToString("F0") + " encosta no " + q.Tipo + " a " + w.magnitude.ToString("F1") + " m");
+                    }
+                }
+            var sol = Object.FindFirstObjectByType<Arkana.World.Sol>();
+            Vector3 l = sol != null ? sol.transform.forward : new Vector3(0.6f, -0.5f, 0.6f);
+            l.y = 0f;
+            l.Normalize();
+
+            // 1) O CHAO: o tronco caido com mais cogumelos (valem 3) e samambaias a menos de 6 m; a camera a 5 m do lado dele
+            //    (o eixo do tronco e' o X do molde; o lado, o Z), no lado com o sol mais nas costas, a 1,6 m, olhando o meio dele
+            int it = -1, melhor = -1;
+            for (int i = 0; i < mata.Total; i++)
+            {
+                Arkana.World.Mata.PecaPlantada p = mata.Plantada(i);
+                if (p.Tipo != Arkana.World.Mata.Peca.Tronco) continue;
+                Vector3 c = p.M.GetColumn(3);
+                int n = 0;
+                for (int j = 0; j < mata.Total; j++)
+                {
+                    Arkana.World.Mata.PecaPlantada q = mata.Plantada(j);
+                    if (q.Tipo == Arkana.World.Mata.Peca.Tronco || q.Tipo == Arkana.World.Mata.Peca.Cristal) continue;
+                    Vector3 w = (Vector3)q.M.GetColumn(3) - c;
+                    w.y = 0f;
+                    if (w.magnitude < 6f) n += q.Tipo == Arkana.World.Mata.Peca.Cogumelo ? 3 : 1;
+                }
+                if (n > melhor) { melhor = n; it = i; }
+            }
+            Assert.GreaterOrEqual(it, 0, "nenhum tronco caido (falta o 51-tronco-musgo.glb em Resources?)");
+            Arkana.World.Mata.PecaPlantada tronco = mata.Plantada(it);
+            Vector3 t = tronco.M.GetColumn(3);
+            Vector3 lado = tronco.M.GetColumn(2);
+            lado.y = 0f;
+            lado.Normalize();
+            if (Vector3.Dot(lado, l) > 0f) lado = -lado;   // a camera fica de onde a luz vem: sol nas costas
+            Vector3 olho = t + lado * 5f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.6f;
+            LevarJogador(main, olho + lado * 4f);   // o corpo 4 m atras da camera
+            yield return Esperar(1.2f);
+            Camera cam = CameraTemporaria("CamFotoMataChao", olho, t + Vector3.up * 0.5f, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "51-mata-chao", false);
+            sb.AppendLine("  51-mata-chao: tronco em " + t.ToString("F1") + " vizinhos=" + melhor + " cam=" + olho.ToString("F1")
+                + " sol-nas-costas=" + Vector3.Dot(-lado, l).ToString("F2") + " lotes=" + mata.LotesEnviados + " tris-enviados=" + mata.TrisEnviados
+                + " (arvores: lotes=" + veg.LotesEnviados + " tris=" + veg.TrisEnviados + ")");
+            foreach (Collider k in Physics.OverlapSphere(t, 2f)) sb.AppendLine("    colisor no tronco: " + Caminho(k.transform) + " (" + k.GetType().Name + ")");
+            Object.Destroy(cam.gameObject);
+
+            // 2) O CRISTAL: o mais perto do miolo da mata (a sombra mais fechada), a 4 m, a 1,4 m do chao, visto do lado em que a
+            //    luz NAO bate (a camera olha contra a luz): o que brilha e' a emissao, nao o sol
+            int ic = -1;
+            float dc = float.MaxValue;
+            for (int i = 0; i < mata.Total; i++)
+            {
+                Arkana.World.Mata.PecaPlantada p = mata.Plantada(i);
+                if (p.Tipo != Arkana.World.Mata.Peca.Cristal) continue;
+                Vector3 c = p.M.GetColumn(3);
+                float d = Vector2.Distance(new Vector2(c.x, c.z), r.Floresta);
+                if (d < dc) { dc = d; ic = i; }
+            }
+            Assert.GreaterOrEqual(ic, 0, "nenhum cristal (falta o 50-cristal-arcano.glb em Resources?)");
+            Arkana.World.Mata.PecaPlantada cristal = mata.Plantada(ic);
+            Vector3 cr = cristal.M.GetColumn(3);
+            olho = cr + l * 4f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.4f;
+            LevarJogador(main, olho + l * 4f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoMataCristal", olho, cr + Vector3.up * (0.6f * cristal.Escala), Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "51-mata-cristal", false);
+            sb.AppendLine("  51-mata-cristal: cristal em " + cr.ToString("F1") + " escala=" + cristal.Escala.ToString("F2") + " a " + dc.ToString("F0")
+                + " m do miolo, cam=" + olho.ToString("F1") + " lotes=" + mata.LotesEnviados + " tris-enviados=" + mata.TrisEnviados);
+            foreach (Collider k in Physics.OverlapSphere(cr, 1f)) sb.AppendLine("    colisor no cristal: " + Caminho(k.transform) + " (" + k.GetType().Name + ")");
+            Object.Destroy(cam.gameObject);
+
+            // 3) DO ALTO: 50 m sobre a mata, 35 m para o lado de dentro da ilha, olhando o miolo (a mata atravessa o quadro)
+            var miolo = new Vector3(r.Floresta.x, Arkana.World.Ilha.AlturaDoChao(r.Floresta.x, r.Floresta.y), r.Floresta.y);
+            Vector3 dentro = -new Vector3(r.Floresta.x, 0f, r.Floresta.y).normalized;
+            olho = miolo + dentro * 35f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 50f;
+            LevarJogador(main, miolo + dentro * 12f);
+            yield return Esperar(1.2f);
+            cam = CameraTemporaria("CamFotoMataAlto", olho, miolo, Color.gray);
+            veg.Olho = cam;
+            yield return null;
+            Foto(cam, "51-mata-alto", false);
+            sb.AppendLine("  51-mata-alto: cam=" + olho.ToString("F1") + " lotes=" + mata.LotesEnviados + " tris-enviados=" + mata.TrisEnviados
+                + " (arvores: lotes=" + veg.LotesEnviados + " tris=" + veg.TrisEnviados + ")");
+            Object.Destroy(cam.gameObject);
+            veg.Olho = null;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Greater(mata.Contar(Arkana.World.Mata.Peca.Cogumelo), 0, "o cogumelo da Meshy nao nasceu (falta o 52-cogumelos.glb?)");
+            Assert.Greater(mata.Contar(Arkana.World.Mata.Peca.Samambaia), 0, "a samambaia da Meshy nao nasceu (falta o 53-samambaia.glb?)");
+        }
+
     }
 }

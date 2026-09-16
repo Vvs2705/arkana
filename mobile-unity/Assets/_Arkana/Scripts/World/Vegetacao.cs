@@ -336,6 +336,8 @@ namespace Arkana.World
         public int ContarMoitas() => moiM.Count;
         /// <summary>A praia (barco, troncos, rochas da costa, capim de duna), montada junto: onda 13C.</summary>
         public Praia Praia { get; private set; }
+        /// <summary>O chao da mata (troncos caidos, cogumelos, samambaias, cristais), montado junto: onda 14A.</summary>
+        public Mata Mata { get; private set; }
         /// <summary>De onde saiu a pedra: RochaDoPedregulho, Ruinas.RochaDoMar ou "blob" (diag da foto).</summary>
         public string MoldeDasRochas { get; private set; }
         /// <summary>De onde saiu a arvore: "35-arvore-copa + 36-pinheiro" ou "procedural" (diag da foto).</summary>
@@ -351,7 +353,7 @@ namespace Arkana.World
         public Camera Olho
         {
             get => cameraDoLod;
-            set { cameraDoLod = value; relogio = Periodo; if (Praia != null) Praia.Olho = value; }
+            set { cameraDoLod = value; relogio = Periodo; if (Praia != null) Praia.Olho = value; if (Mata != null) Mata.Olho = value; }
         }
 
         /// <summary>A arvore em `arvore` vista de `olho` vai no LOD1? Distancia 3D: do castelo (320 m) a mata inteira e' LOD1.</summary>
@@ -391,6 +393,7 @@ namespace Arkana.World
             MontarCelulas();
             MontarBlocos();
             MontarPraia();
+            MontarMata();
             relogio = Periodo;   // o primeiro Update ja' enche os lotes
         }
 
@@ -405,6 +408,23 @@ namespace Arkana.World
             Praia.transform.SetParent(transform, false);
             Praia.Olho = cameraDoLod;
             Praia.Montar(relevo, ocupados);
+        }
+
+        /// <summary>A MATA (onda 14A) pendurada aqui, como a praia: o chao da floresta foge das arvores (o tronco de 0,38 m + folga),
+        /// das pedras e das moitas que ja' nasceram perto da floresta (so' elas vao para os ocupados).</summary>
+        void MontarMata()
+        {
+            var ocupados = new List<Vector4>();
+            float perto = Mata.RaioDaMata(relevo) + 6f;
+            perto *= perto;
+            Vector2 c = relevo.Floresta;
+            foreach (Vector3 p in arvPos) if ((p.x - c.x) * (p.x - c.x) + (p.z - c.y) * (p.z - c.y) < perto) ocupados.Add(new Vector4(p.x, p.z, 0f, RaioTronco + 0.22f));
+            foreach (Matrix4x4 m in rocM) { Vector3 p = m.GetColumn(3); if ((p.x - c.x) * (p.x - c.x) + (p.z - c.y) * (p.z - c.y) < perto) ocupados.Add(new Vector4(p.x, p.z, 0f, m.GetColumn(0).magnitude)); }
+            foreach (Matrix4x4 m in moiM) { Vector3 p = m.GetColumn(3); if ((p.x - c.x) * (p.x - c.x) + (p.z - c.y) * (p.z - c.y) < perto) ocupados.Add(new Vector4(p.x, p.z, 0f, 0.7f * m.GetColumn(0).magnitude)); }
+            Mata = new GameObject("Mata").AddComponent<Mata>();
+            Mata.transform.SetParent(transform, false);
+            Mata.Olho = cameraDoLod;
+            Mata.Montar(relevo, ocupados);
         }
 
         // ---------------------------------------------------------------- scatter
@@ -939,10 +959,14 @@ namespace Arkana.World
         /// de instancing so' vai pro APK se algum material-ASSET a pede — o ArkanaArvoreInstancing (Lit + GPU Instancing, como
         /// o ArkanaGramaInstancing da grama); sem ele, o Lit dos Always Included Shaders. Copia: nunca altera o asset.
         /// </summary>
-        internal static Material MaterialDaMeshy(ref Material cache, string nome, Texture tex, Color tinta)
+        /// <summary>Molde com _EMISSION ligado (cristal e cogumelo da mata): keyword ligada so' em runtime e' descartada no build
+        /// ("Strip Unused" de instancing) e a peca sairia APAGADA no celular.</summary>
+        public const string MoldeBrilho = "ArkanaMeshyBrilhoInstancing";
+
+        internal static Material MaterialDaMeshy(ref Material cache, string nome, Texture tex, Color tinta, string moldeNome = "ArkanaArvoreInstancing")
         {
             if (cache != null) return cache;
-            Material molde = Resources.Load<Material>("ArkanaArvoreInstancing");
+            Material molde = Resources.Load<Material>(moldeNome);
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
             if (molde != null && molde.shader != lit) molde = null;   // referencia quebrada (meta regenerado): ignora
             if (lit == null) return null;
