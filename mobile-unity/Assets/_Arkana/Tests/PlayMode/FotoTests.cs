@@ -2504,5 +2504,107 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
         }
 
+
+        /// <summary>
+        /// A LUVA NA MAO (onda 15A): o soquete cancela a escala 100 do osso da Meshy e a luva da mao e' o .glb do chao.
+        /// 47-luva-jogador: camera do jogador com HUD — a tela NAO pode estar coberta (mede a fracao da tela que a luva pega).
+        /// 47-luva-perto: a 1,5 m da mao direita. 47-luva-disparo: perto, no meio do gesto de conjurar (braco a frente).
+        /// 47-luva-manopla: perto, a manopla com as duas gemas acesas. Escala e bounds medidos vao para o diag.txt.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Luva_NaMao()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            Transform mao = eu.Visual.MaoDireita;
+            var sb = new System.Text.StringBuilder("47-luva: fonte=" + eu.Visual.Fonte + " mao=" + Caminho(mao) + "\n");
+
+            // 1) A LUVA COMUM pela camera do jogador: tela livre
+            eu.Slot.Equipar(Gameplay.Arma.VARINHA);
+            yield return Esperar(0.4f);
+            float tela = DiagLuva(sb, "47-luva-jogador", mao, Gameplay.Arma.VARINHA, main.Player.Camera.Cam);
+            Foto(main.Player.Camera.Cam, "47-luva-jogador", true);
+            Diagnostico(main, "47-luva-jogador");
+
+            // 2) DE PERTO, parado
+            Camera cp = CameraDaMao(eu, mao, Gameplay.Arma.VARINHA);
+            DiagLuva(sb, "47-luva-perto", mao, Gameplay.Arma.VARINHA, cp);
+            Foto(cp, "47-luva-perto", false);
+            Object.Destroy(cp.gameObject);
+
+            // 3) NO MEIO DO GESTO: o braco chega a frente no CastFireT
+            main.Player.DisparoRapido();
+            float t = 0f;
+            while (t < Arkana.Characters.PoseMago.CastFireT) { yield return null; t += Time.deltaTime; }
+            cp = CameraDaMao(eu, mao, Gameplay.Arma.VARINHA);
+            DiagLuva(sb, "47-luva-disparo", mao, Gameplay.Arma.VARINHA, cp);
+            sb.AppendLine("    clipe=" + eu.Clipe + " visual=" + eu.Visual.ClipeAtual + " t=" + t.ToString("F2"));
+            Foto(cp, "47-luva-disparo", false);
+            Object.Destroy(cp.gameObject);
+            yield return Esperar(1f);
+
+            // 4) A MANOPLA, de perto: as duas gemas nas cores do par
+            eu.Slot.Equipar(Gameplay.Arma.MANOPLA, new[] { Elemento.Fogo, Elemento.Vento });
+            yield return Esperar(0.4f);
+            cp = CameraDaMao(eu, mao, Gameplay.Arma.MANOPLA);
+            DiagLuva(sb, "47-luva-manopla", mao, Gameplay.Arma.MANOPLA, cp);
+            Foto(cp, "47-luva-manopla", false);
+            Object.Destroy(cp.gameObject);
+
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.Less(tela, 0.15f, "a luva cobre a tela do jogador\n" + sb);
+        }
+
+        /// <summary>Camera a 1,5 m da luva, do lado de fora e um pouco a frente do corpo, olhando o centro dela.</summary>
+        static Camera CameraDaMao(Gameplay.Pawn eu, Transform mao, string arma)
+        {
+            Transform luva = mao.Find("Luva " + arma);
+            Assert.IsNotNull(luva, "a luva " + arma + " nao esta' na mao");
+            Vector3 alvo = LimitesDaLuva(luva).center;
+            Vector3 dir = (eu.transform.right * 0.8f + eu.transform.forward * 1f + Vector3.up * 0.35f).normalized;
+            return CameraTemporaria("CamLuva", alvo + dir * 1.5f, alvo, Color.gray);
+        }
+
+        static Bounds LimitesDaLuva(Transform luva)
+        {
+            Renderer[] rs = luva.GetComponentsInChildren<Renderer>();
+            Assert.Greater(rs.Length, 0, "luva sem renderer");
+            Bounds b = rs[0].bounds;
+            for (int i = 1; i < rs.Length; i++) b.Encapsulate(rs[i].bounds);
+            return b;
+        }
+
+        /// <summary>Escala, bounds e a fracao da tela que a caixa da luva pega nesta camera (0..1). Devolve a fracao.</summary>
+        static float DiagLuva(System.Text.StringBuilder sb, string nome, Transform mao, string arma, Camera cam)
+        {
+            Transform luva = mao.Find("Luva " + arma);
+            Assert.IsNotNull(luva, "a luva " + arma + " nao esta' na mao");
+            Bounds b = LimitesDaLuva(luva);
+            float x0 = 1f, y0 = 1f, x1 = 0f, y1 = 0f;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 c = new Vector3((i & 1) != 0 ? b.max.x : b.min.x, (i & 2) != 0 ? b.max.y : b.min.y, (i & 4) != 0 ? b.max.z : b.min.z);
+                Vector3 v = cam.WorldToViewportPoint(c);
+                if (v.z <= 0f) { x0 = y0 = 0f; x1 = y1 = 1f; break; }   // canto atras da camera: conta a tela toda
+                x0 = Mathf.Min(x0, v.x); y0 = Mathf.Min(y0, v.y); x1 = Mathf.Max(x1, v.x); y1 = Mathf.Max(y1, v.y);
+            }
+            float tela = Mathf.Max(0f, Mathf.Min(x1, 1f) - Mathf.Max(x0, 0f)) * Mathf.Max(0f, Mathf.Min(y1, 1f) - Mathf.Max(y0, 0f));
+            sb.AppendLine("  " + nome + ": maoLossy=" + mao.lossyScale.ToString("F3") + " soqueteLossy=" + luva.lossyScale.ToString("F4")
+                + " rig=" + mao.GetComponentInParent<Arkana.Characters.Mago>().transform.Find("Rig").lossyScale.ToString("F4")
+                + " luva tam=" + b.size.ToString("F3") + " centro=" + b.center.ToString("F2")
+                + " centro-osso=" + Vector3.Distance(b.center, mao.position).ToString("F3")
+                + " dist-camera=" + Vector3.Distance(b.center, cam.transform.position).ToString("F2")
+                + " tela=" + (tela * 100f).ToString("F1") + "%"
+                + " dedos(mundo)=" + luva.up.ToString("F2") + " dorso(mundo)=" + luva.forward.ToString("F2"));
+            return tela;
+        }
+
     }
 }

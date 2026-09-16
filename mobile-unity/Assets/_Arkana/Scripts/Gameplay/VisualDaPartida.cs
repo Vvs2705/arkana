@@ -463,12 +463,13 @@ namespace Arkana.Gameplay
                 GameObject modelo;
                 if (!_modelos.TryGetValue(chave, out modelo) || modelo == null)
                 {
-                    modelo = Modelo(LootVisual.ModeloDe(id), _pivo, LootVisual.TAMANHO_LUVA, false);
+                    // a MESMA luva que o Pawn veste (LuvaVisual.Modelo): de pe', no quadro da mao direita
+                    modelo = LuvaVisual.Modelo(id, _pivo, LootVisual.TAMANHO_LUVA);
                     if (modelo == null)
                     {
                         // sem o .glb: a luva procedural da mao, ampliada (o que se ve' e' o que se equipa)
                         modelo = LuvaVisual.Criar(_pivo, id, new[] { e0 });
-                        modelo.transform.localScale = Vector3.one * 2f;
+                        modelo.transform.localScale = Vector3.one * 1.5f;   // a da mao tem ~0,34 m; o .glb do chao, TAMANHO_LUVA
                     }
                     _modelos[chave] = modelo;
                 }
