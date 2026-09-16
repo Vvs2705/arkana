@@ -22,6 +22,12 @@ namespace Arkana.Gameplay
         /// <summary>m/s MEDIOS do dash de kit (mordida, zigue-zague) — KNOB local: 6 m em 0,4 s, metade da esquiva (27,8 m/s),
         /// que ainda se ve' VIAJAR (GDD §4.1). AUMENTAR = investida que nasce no alvo; DIMINUIR = volta a parecer corrida.</summary>
         public const float VEL_IMPULSO = 15f;
+        /// <summary>s descendo rapido (Vy &lt; -QUEDA_ANIM_V) sem chao para a pose virar QUEDA — degrau nao e' queda. Num PULO,
+        /// o ar alem do voo previsto (caiu do barranco). KNOB local.</summary>
+        public const float QUEDA_LONGA_S = 0.35f;
+        /// <summary>s da aterrissagem PARADA depois de um pulo ou queda longa (o Mago toca o pouso do take nesse tempo:
+        /// Balance.Anim.PousoVel). Correndo, a passada entra direto.</summary>
+        public const float POUSO_S = 0.5f;
 
         /// <summary>Velocidade horizontal INTENCIONAL (sem knockback).</summary>
         public Vector3 VelH;
@@ -40,6 +46,10 @@ namespace Arkana.Gameplay
         public float Bank;
         /// <summary>Ultima velocidade maxima recebida (frac de velocidade para giro e banking).</summary>
         public float VelMax = Balance.Player.Speed;
+        /// <summary>No ar por um PULO: a pose e' o salto, nao a queda (AtualizarAr zera no chao).</summary>
+        public bool Pulando;
+        /// <summary>s sem chao; s descendo rapido; s de voo previstos na decolagem (2*Vy/g); s que faltam da aterrissagem.</summary>
+        public float NoArS, DescendoS, VooS, PousoS;
 
         private Vector3 _dodgeDir, _impDir;
         private float _impM, _impDur;
@@ -134,12 +144,13 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>O corpo mudou de lugar num quadro (teleporte): dash, empurrao e velocidade vertical nao atravessam com
-        /// ele. A corrida (VelH) e os i-frames ficam.</summary>
+        /// ele — nem o pulo (sem aterrissagem no destino). A corrida (VelH) e os i-frames ficam.</summary>
         public void Parar()
         {
             DodgeLeft = 0f; ImpulsoLeft = 0f;
             Knockback = Vector3.zero;
             Vy = 0f;
+            Pulando = false; NoArS = 0f; DescendoS = 0f;
         }
 
         /// <summary>SALTO ARCANO: so' do chao (sem pulo duplo) e nunca nadando. `fatorAltura` = quantas vezes mais ALTO
@@ -148,7 +159,56 @@ namespace Arkana.Gameplay
         {
             if (!noChao || nadando) return false;
             Vy = Balance.Player.JumpV * Mathf.Sqrt(Mathf.Max(fatorAltura, 0f));
+            Pulando = true;
+            VooS = TempoDeVoo(Vy);
+            NoArS = 0f; DescendoS = 0f; PousoS = 0f;
             return true;
+        }
+
+        /// <summary>s de ar de um pulo que sai do chao com `vy` e volta a mesma altura.</summary>
+        public static float TempoDeVoo(float vy) => vy > 0f ? 2f * vy / GRAVIDADE : 0f;
+
+        /// <summary>
+        /// Os relogios do ar, DEPOIS do Move, com o chao deste quadro. Tocar o chao depois de um pulo (ou de uma queda longa)
+        /// arma a aterrissagem. O quadro da decolagem nao conta: o isGrounded ainda pode ser o de antes.
+        /// </summary>
+        public void AtualizarAr(float dt, bool noChao, bool nadando)
+        {
+            if (dt <= 0f) return;
+            PousoS = Mathf.Max(PousoS - dt, 0f);
+            if (!noChao && !nadando)
+            {
+                NoArS += dt;
+                DescendoS = Vy < -QUEDA_ANIM_V ? DescendoS + dt : 0f;
+                return;
+            }
+            if (Pulando && NoArS <= 0f && Vy > 0f && !nadando) return;
+            if (!nadando && (Pulando || QuedaLonga)) PousoS = POUSO_S;
+            Pulando = false; NoArS = 0f; DescendoS = 0f;
+        }
+
+        /// <summary>Queda de verdade: no pulo, o ar passou do voo previsto; sem pulo, descendo rapido ha' QUEDA_LONGA_S.</summary>
+        public bool QuedaLonga => Pulando ? NoArS > VooS + QUEDA_LONGA_S : DescendoS > QUEDA_LONGA_S;
+
+        /// <summary>A pose do corpo sem chao: planar, queda longa, o salto — ou null (degrau: segue a passada).</summary>
+        public string AnimNoAr()
+        {
+            if (Flutuando) return "planar";
+            if (QuedaLonga) return "cair";
+            return Pulando ? "pular" : null;
+        }
+
+        /// <summary>
+        /// RECUAR MIRANDO e' mais lento (Balance.Move.BackpedalMult): `graus` = da mira ate' a intencao de movimento. Rampa de
+        /// RecuoGraus-RecuoRampa (1) a RecuoGraus+RecuoRampa (BackpedalMult) — sem degrau quando o stick passa pela diagonal.
+        /// Entra no produto de velocidade como fator de postura.
+        /// </summary>
+        public static float FatorDeRecuo(float graus)
+        {
+            if (float.IsNaN(graus)) return 1f;
+            float a = Mathf.Abs(Mathf.DeltaAngle(0f, graus));
+            float u = Mathf.InverseLerp(Balance.Move.RecuoGraus - Balance.Move.RecuoRampa, Balance.Move.RecuoGraus + Balance.Move.RecuoRampa, a);
+            return Mathf.Lerp(1f, Balance.Move.BackpedalMult, u);
         }
 
         public void Empurrar(Vector3 v) { Knockback += v; }

@@ -79,6 +79,9 @@ namespace Arkana.Gameplay
         // relogios dos estados que so' o corpo resolve (IConjurador.AplicarEstado)
         private float _intangivelS, _silencioS, _invisivelS, _penumbraS, _semPassosS;
         private float _danoCausadoAntes;
+        // pernas x mira (onda 15B): o giro do visual sobre o corpo e se esta' recuando (histerese)
+        private float _pernasYaw;
+        private bool _recuando;
         // a busca de alvos e' um servico da Partida em curso; sem partida, ninguem por perto (o kit trata null)
         private static readonly Func<Vector3, float, IEntidade[]> _buscador = BuscarAlvos;
 
@@ -96,6 +99,12 @@ namespace Arkana.Gameplay
         /// <summary>Os PASSOS nao entregam (Passo de Veludo). O oculto a percepcao ja' nao localiza por passo.</summary>
         public bool SemPassos => _semPassosS > 0f;
         public Vector3 DirecaoDaEsquiva => Loc != null ? Loc.DirEsquiva : Vector3.zero;
+        /// <summary>O corpo encara uma mira (player mirando, bot encarando o alvo) em vez do proprio rumo.</summary>
+        public bool Mirando => YawAlvo.HasValue || EncararDir.sqrMagnitude > 0.0001f;
+        /// <summary>Graus que o VISUAL gira sobre o corpo para as pernas acharem o rumo (0 = de frente para a mira).</summary>
+        public float PernasYaw => _pernasYaw;
+        /// <summary>Anda para tras mirando (Walk_Backward; BackpedalMult na velocidade).</summary>
+        public bool Recuando => _recuando;
 
         // ---------------------------------------------------------------- IConjurador
         /// <summary>Mirando (player) e' o yaw da camera; senao o corpo (EncararDir do bot) ou a frente.</summary>
@@ -273,8 +282,11 @@ namespace Arkana.Gameplay
 
             Agua.Tick(dt, transform.position);
             Efeitos.EstadoAlvo est = Efeitos.De(this);
-            float velMax = VelocidadeMaxima(Agua.Fator, FatorDoTerrenoReativo(transform.position), est.StatusMult, Derrubado.FatorVelocidade(this));
             _dir = Locomocao.DirDoStick(Stick, YawCam);
+            // recuar mirando e' mais lento: entra no produto como postura (Balance.Move.BackpedalMult)
+            float recuo = Mirando && _dir.sqrMagnitude > 0.0001f
+                ? Locomocao.FatorDeRecuo(Mathf.DeltaAngle(YawDaMira(), Mathf.Atan2(_dir.x, _dir.z) * Mathf.Rad2Deg)) : 1f;
+            float velMax = VelocidadeMaxima(Agua.Fator, FatorDoTerrenoReativo(transform.position), est.StatusMult, Derrubado.FatorVelocidade(this) * recuo);
             bool podeFlutuar = _querFlutuar && Derrubado.PodeAgir(this);
             float mana = Mana;
             Vector3 desloc = Loc.Tick(dt, _dir, NoChao, Agua.Nadando, velMax, est.StunLeft > 0f, podeFlutuar, ref mana);
@@ -289,11 +301,40 @@ namespace Arkana.Gameplay
             Vector3 pos = transform.position;
             float chao = Ilha.AlturaDoChao(pos.x, pos.z);
             if (pos.y < chao) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
+            Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
 
             Virar(dt);
             Loc.AtualizarBank(transform.eulerAngles.y * Mathf.Deg2Rad, dt);
-            if (Visual != null) Visual.transform.localRotation = Quaternion.Euler(0f, 0f, -Loc.Bank * Mathf.Rad2Deg);
+            Pernas(dt);
             Tocar(_gestoS > 0f ? _gesto : AnimDeLocomocao());
+        }
+
+        /// <summary>Yaw (graus) que o corpo encara mirando: a camera (player) ou o alvo (bot).</summary>
+        private float YawDaMira() => YawAlvo.HasValue ? YawAlvo.Value * Mathf.Rad2Deg : Mathf.Atan2(EncararDir.x, EncararDir.z) * Mathf.Rad2Deg;
+
+        /// <summary>
+        /// PERNAS x MIRA (onda 15B). Mirando, o corpo (transform) fica na mira — e' a verdade do jogo — e so' o VISUAL gira as
+        /// pernas para o rumo real (ou contra ele, recuando); o Mago desfaz o giro no tronco. Solto, o corpo ja' vira para o
+        /// rumo e as pernas voltam a zero. O banking de sempre continua por fora, no referencial do corpo.
+        /// </summary>
+        private void Pernas(float dt)
+        {
+            if (Visual == null) return;
+            float alvo = 0f;
+            Vector3 v = Loc.Vel;
+            bool andando = Mirando && !Agua.Nadando && !Derrubado.Esta(this) && new Vector2(v.x, v.z).magnitude > Balance.Move.RunAnimExit;
+            if (andando)
+            {
+                PoseMago.Passada p = PoseMago.PassadaMirando(
+                    Mathf.DeltaAngle(transform.eulerAngles.y, Mathf.Atan2(v.x, v.z) * Mathf.Rad2Deg), _recuando);
+                _recuando = p.Tras;
+                alvo = p.Pernas;
+            }
+            else _recuando = false;
+            // Lerp comum (nao LerpAngle): o alvo mora em +-105, e trocar de lado passa por ZERO — o quadril gira pela frente
+            _pernasYaw = Mathf.Lerp(_pernasYaw, alvo, 1f - Mathf.Exp(-Balance.Anim.PernasRate * dt));
+            Visual.transform.localRotation = Quaternion.Euler(0f, 0f, -Loc.Bank * Mathf.Rad2Deg) * Quaternion.Euler(0f, _pernasYaw, 0f);
+            Visual.Torcao = PoseMago.TorcaoDoTronco(_pernasYaw);
         }
 
         /// <summary>Relogios do kit e dos estados do corpo. Roda ate' no ar (a carga da suprema ja' se barra por NoChao).</summary>
@@ -344,13 +385,20 @@ namespace Arkana.Gameplay
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
         }
 
-        /// <summary>A UNICA fonte da animacao: derrubado > nadando > ar > run/idle com histerese.</summary>
+        /// <summary>A UNICA fonte da animacao: derrubado > nadando > ar (planar, queda longa, pulo) > run/andar_tras com
+        /// histerese > aterrissagem parada > idle. Degrau sem pulo segue a passada.</summary>
         public string AnimDeLocomocao()
         {
             if (Derrubado.Esta(this)) return "derrubado";
             if (Agua.Nadando) return Agua.Locomocao(VelocidadeHorizontal);
-            if (!NoChao && (Loc.Flutuando || Loc.Vy < -Locomocao.QUEDA_ANIM_V)) return Loc.Flutuando ? "planar" : "cair";
-            return Loc.AnimNoChao();
+            if (!NoChao)
+            {
+                string ar = Loc.AnimNoAr();
+                if (ar != null) return ar;
+            }
+            string chao = Loc.AnimNoChao();
+            if (chao == "run") return _recuando ? "andar_tras" : chao;   // correndo, o pouso some na passada
+            return Loc.PousoS > 0f ? "pousar" : chao;
         }
 
         private void Tocar(string clipe)
@@ -417,6 +465,7 @@ namespace Arkana.Gameplay
         {
             if (!PodeAgir || !Loc.Pular(NoChao, Agua.Nadando, FatorDePulo)) return false;
             Pulos++;
+            if (Visual != null) Visual.VooS = Loc.VooS;   // o ar do take cabe no voo desta decolagem (a mola do Fizz voa mais)
             return true;
         }
 
@@ -500,7 +549,13 @@ namespace Arkana.Gameplay
             _morto = true;
             Stick = Vector2.zero; EncararDir = Vector3.zero; YawAlvo = null;
             Tocar("derrubado");   // deitado: o VisualDoAbate afunda o corpo, e em pe' ele descia como elevador
-            if (Visual != null) Visual.SetTint(TINT_MORTO);
+            _pernasYaw = 0f; _recuando = false;
+            if (Visual != null)
+            {
+                Visual.transform.localRotation = Quaternion.identity;   // caido de pernas tortas nao: o corpo deita inteiro
+                Visual.Torcao = 0f;
+                Visual.SetTint(TINT_MORTO);
+            }
             // o corpo afunda e some (VisualDoAbate): o colisor em pe' viraria parede invisivel para o passo, a camera e a mira
             if (_cc != null) _cc.enabled = false;
         }

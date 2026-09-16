@@ -443,11 +443,12 @@ namespace Arkana.Tests
             m.transform.position = p;
             Camera cam = CameraTemporaria("CamFotoClipes", p + new Vector3(0f, 1.1f, 4.2f), p + Vector3.up * 0.8f, Color.gray);
 
-            const int cw = 480, ch = 640, colunas = 5;
-            var folha = new Texture2D(cw * colunas, ch * 2, TextureFormat.RGB24, false);
+            const int cw = 480, ch = 640, colunas = 6;
+            Arkana.Characters.Clipe[] todos = Arkana.Characters.PoseMago.Todos;
+            int linhas = (todos.Length + colunas - 1) / colunas;   // a folha cresce com o contrato (onda 15: pular, pousar, andar para tras)
+            var folha = new Texture2D(cw * colunas, ch * linhas, TextureFormat.RGB24, false);
             var rt = new RenderTexture(cw, ch, 24, RenderTextureFormat.ARGB32);
             cam.targetTexture = rt;
-            Arkana.Characters.Clipe[] todos = Arkana.Characters.PoseMago.Todos;
             for (int i = 0; i < todos.Length; i++)
             {
                 m.Play(todos[i]);
@@ -455,7 +456,7 @@ namespace Arkana.Tests
                 yield return Esperar(unico ? 0.35f : 0.8f);   // disparo unico: foto no meio, antes de voltar ao idle
                 cam.Render();
                 RenderTexture.active = rt;
-                folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (1 - i / colunas) * ch);
+                folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (linhas - 1 - i / colunas) * ch);
                 RenderTexture.active = null;
             }
             folha.Apply();
@@ -2604,6 +2605,238 @@ namespace Arkana.Tests
                 + " tela=" + (tela * 100f).ToString("F1") + "%"
                 + " dedos(mundo)=" + luva.up.ToString("F2") + " dorso(mundo)=" + luva.forward.ToString("F2"));
             return tela;
+        }
+
+
+        /// <summary>
+        /// O CORPO DA ONDA 15B (queixa do Diretor, 16/09: pulo em Idle, moonwalk mirando para tras, pernas congeladas atirando).
+        /// 48-pulo-N: o pulo em fases visto de lado, quadro a quadro (decolagem, subida, topo, descida, pouso, aterrissagem, de pe').
+        /// 48-tras-mirando-N (+ -lado): stick para tras mirando a frente — Walk_Backward, pernas contra o rumo, sem moonwalk.
+        /// 48-lado-mirando-N (+ -lado): stick para a direita mirando a frente — pernas no rumo, tronco torcido para a mira.
+        /// 48-atirando-correndo-N: de lado, correndo solto e disparando — o cast so' no tronco, as pernas correm.
+        /// O Player e' desligado e a intencao vai direto no Pawn. A luva so' entra no tiro (a de antes tapava a camera de lado).
+        /// O diag (Logs/fotos/diag.txt) diz o take, o tempo, a velocidade do estado, a torcao, as pernas e os angulos.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Corpo_PuloRecuoTiro()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Gameplay.Pawn eu = main.Player.Pawn;
+            var sb = new System.Text.StringBuilder("48-corpo: fonte=" + eu.Visual.Fonte + " fases(decolagem,pouso)=" + eu.Visual.FasesDoPulo.ToString("F3")
+                + " takePulo=" + eu.Visual.TemClipe("Regular_Jump") + " takeTras=" + eu.Visual.TemClipe("Walk_Backward") + "\n");
+            main.Player.enabled = false;
+            eu.Stick = Vector2.zero;
+            eu.YawAlvo = null;
+            eu.EncararDir = Vector3.zero;
+            yield return Esperar(0.6f);
+
+            // 1) O PULO, de lado
+            Vector3 p = eu.Pos;
+            Vector3 lado = eu.transform.right;
+            Assert.IsTrue(eu.Pular(), "nao pulou");
+            float t = 0f;
+            int n = 0;
+            bool idleNoAr = false, viuPulo = false, viuPouso = false;
+            float[] marcas = { 0.05f, 0.25f, 0.5f, 0.8f, 1.02f, 1.2f, 1.6f };
+            while (n < marcas.Length && t < 3f)
+            {
+                yield return null;
+                t += Time.deltaTime;
+                if (!eu.NoChao && eu.Clipe == "idle") idleNoAr = true;
+                viuPulo |= eu.Clipe == "pular";
+                viuPouso |= eu.Clipe == "pousar";
+                if (t < marcas[n]) continue;
+                Camera cp = CameraTemporaria("CamPulo15", p + lado * 5f + Vector3.up * 1.4f, p + Vector3.up * 1.2f, Color.gray);
+                Foto(cp, "48-pulo-" + n, false);
+                Object.Destroy(cp.gameObject);
+                sb.AppendLine("  48-pulo-" + n + " t=" + t.ToString("F2") + " clipe=" + eu.Clipe + " " + eu.Visual.Estado()
+                    + " vy=" + eu.Loc.Vy.ToString("F2") + " noChao=" + eu.NoChao + " y=" + (eu.Pos.y - p.y).ToString("F2")
+                    + " noArS=" + eu.Loc.NoArS.ToString("F2") + " pousoS=" + eu.Loc.PousoS.ToString("F2"));
+                n++;
+            }
+            yield return Esperar(0.6f);
+
+            // 2) RECUANDO MIRANDO: stick para tras, mira a frente (camera do jogador + de lado, pela direita)
+            var viu = new System.Collections.Generic.List<string>();
+            yield return AndarCorpo15(main, eu, sb, viu, "48-tras-mirando", new Vector2(0f, -1f), true, false,
+                new[] { 0.3f, 0.55f, 0.8f, 1.05f }, new Vector3(4f, 1.3f, 0f), true);
+            bool recuou = viu.Contains("andar_tras");
+            // 3) DE LADO MIRANDO: stick para a direita, mira a frente (camera do jogador + da frente-esquerda: pernas de perfil)
+            viu.Clear();
+            yield return AndarCorpo15(main, eu, sb, viu, "48-lado-mirando", new Vector2(1f, 0f), true, false,
+                new[] { 0.3f, 0.6f, 0.9f }, new Vector3(-3f, 1.3f, 3f), true);
+            bool strafeCorre = viu.Contains("run") && !viu.Contains("andar_tras");
+            // 4) ATIRANDO CORRENDO (solto), de lado
+            eu.Slot.Equipar(Gameplay.Arma.VARINHA);
+            yield return Esperar(0.4f);
+            viu.Clear();
+            yield return AndarCorpo15(main, eu, sb, viu, "48-atirando-correndo", new Vector2(0f, 1f), false, true,
+                new[] { 0.4f, 0.65f, 0.9f }, new Vector3(4f, 1.3f, 0f), false);
+            bool castNoTronco = viu.Contains("castTronco");
+
+            main.Player.enabled = true;
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.IsFalse(idleNoAr, "o pulo voltou a ficar em Idle no ar");
+            Assert.IsTrue(viuPulo, "o pulo nao tocou 'pular'");
+            Assert.IsTrue(viuPouso, "parado, o pulo nao aterrissou ('pousar')");
+            Assert.IsTrue(recuou, "stick para tras mirando nao recuou (andar_tras)");
+            Assert.IsTrue(strafeCorre, "stick de lado mirando tinha de ser corrida de lado, nao recuo");
+            Assert.IsTrue(castNoTronco, "correndo, o cast nao foi para o tronco");
+        }
+
+        /// <summary>Anda `stick` (mirando a frente ou solto; atirando para a frente do corpo a cada 0,28 s) e fotografa nas
+        /// `marcas`: a camera do jogador (se `comJogador`, como `nome-N`, e a de fora como `nome-N-lado`) ou so' a de fora
+        /// (`nome-N`), posta em `olhoLocal` no referencial do corpo. `viu` junta os clipes (e "castTronco") das marcas.</summary>
+        static IEnumerator AndarCorpo15(Main main, Gameplay.Pawn eu, System.Text.StringBuilder sb, System.Collections.Generic.List<string> viu,
+            string nome, Vector2 stick, bool mirando, bool atirando, float[] marcas, Vector3 olhoLocal, bool comJogador)
+        {
+            float yaw = main.Player.Camera.Logica.Yaw;
+            eu.YawCam = yaw;
+            eu.YawAlvo = mirando ? yaw : (float?)null;
+            eu.transform.rotation = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f);
+            eu.Stick = stick;
+            float t = 0f, proximoTiro = 0f;
+            int n = 0;
+            while (n < marcas.Length && t < 3f)
+            {
+                yield return null;
+                t += Time.deltaTime;
+                if (atirando && t >= proximoTiro && eu.Atirar(eu.transform.forward)) proximoTiro = t + 0.28f;
+                if (t < marcas[n]) continue;
+                string foto = nome + "-" + n;
+                if (comJogador) Foto(main.Player.Camera.Cam, foto, true);
+                Vector3 q = eu.Pos;
+                Camera cl = CameraTemporaria("CamCorpo15", q + eu.transform.TransformDirection(olhoLocal), q + Vector3.up * 1.0f, Color.gray);
+                Foto(cl, comJogador ? foto + "-lado" : foto, false);
+                Object.Destroy(cl.gameObject);
+                float yawCorpo = eu.transform.eulerAngles.y;
+                Vector3 v = eu.Loc.Vel;
+                float yawVel = Mathf.Atan2(v.x, v.z) * Mathf.Rad2Deg;
+                viu.Add(eu.Clipe);
+                if (eu.Visual.CastNoTronco) viu.Add("castTronco");
+                sb.AppendLine("  " + foto + " t=" + t.ToString("F2") + " clipe=" + eu.Clipe + " " + eu.Visual.Estado()
+                    + " castNoTronco=" + eu.Visual.CastNoTronco + " vel=" + eu.VelocidadeHorizontal.ToString("F2")
+                    + " yawCorpo=" + yawCorpo.ToString("F0") + " yawVel=" + yawVel.ToString("F0") + " dif=" + Mathf.DeltaAngle(yawCorpo, yawVel).ToString("F0")
+                    + " pernas=" + eu.PernasYaw.ToString("F0") + " recuando=" + eu.Recuando);
+                n++;
+            }
+            eu.Stick = Vector2.zero;
+            eu.YawAlvo = null;
+            yield return Esperar(0.8f);
+        }
+
+
+        /// <summary>
+        /// DIAGNOSTICO DO LOGO (onda 14B saiu invisivel no titulo, no menu e no carregamento): um Canvas proprio com o Logo, uma
+        /// RawImage com a MESMA textura do Logo e um Image de controle, lado a lado. 49-diag-logo.png + o estado do Graphic no diag.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Diag_Logo()
+        {
+            ExigirGpu();
+            var cam = CameraTemporaria("CamDiagLogo", new Vector3(0f, 0f, -10f), Vector3.zero, Color.gray);
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.25f, 0.3f, 0.4f);
+            var cgo = new GameObject("CanvasDiagLogo", typeof(Canvas), typeof(UnityEngine.UI.CanvasScaler));
+            var canvas = cgo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var sb = new System.Text.StringBuilder("49-diag-logo:\n");
+
+            var lgo = new GameObject("LogoDiag", typeof(RectTransform), typeof(Arkana.Menu.Logo));
+            lgo.transform.SetParent(cgo.transform, false);
+            var logo = lgo.GetComponent<Arkana.Menu.Logo>();
+            var lrt = (RectTransform)lgo.transform;
+            lrt.anchoredPosition = new Vector2(-300f, 150f);
+            lrt.sizeDelta = new Vector2(500f, 500f / Arkana.Menu.Logo.Aspecto);
+
+            var rgo = new GameObject("RawDiag", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
+            rgo.transform.SetParent(cgo.transform, false);
+            var raw = rgo.GetComponent<UnityEngine.UI.RawImage>();
+            raw.texture = logo.mainTexture;
+            var rrt = (RectTransform)rgo.transform;
+            rrt.anchoredPosition = new Vector2(300f, 150f);
+            rrt.sizeDelta = new Vector2(500f, 300f);
+
+            var igo = new GameObject("ImagemControle", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            igo.transform.SetParent(cgo.transform, false);
+            igo.GetComponent<UnityEngine.UI.Image>().color = Color.magenta;
+            var irt = (RectTransform)igo.transform;
+            irt.anchoredPosition = new Vector2(0f, -250f);
+            irt.sizeDelta = new Vector2(200f, 60f);
+
+            yield return null;
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+
+            Texture t = logo.mainTexture;
+            var cr = logo.canvasRenderer;
+            Material crm = cr.materialCount > 0 ? cr.GetMaterial() : null;
+            sb.AppendLine("  logo ativo=" + logo.IsActive() + " enabled=" + logo.enabled + " rect=" + lrt.rect + " cor=" + logo.color
+                + " tex=" + (t != null ? t.name + " " + t.width + "x" + t.height : "null")
+                + " material=" + (logo.materialForRendering != null ? logo.materialForRendering.name + " / " + logo.materialForRendering.shader.name : "null")
+                + " cr.material=" + (crm != null ? crm.name : "nenhum") + " cr.materiais=" + cr.materialCount
+                + " cr.textura=" + (crm != null && crm.mainTexture != null ? crm.mainTexture.name : "?")
+                + " cr.alpha=" + cr.GetAlpha() + " cr.cull=" + cr.cull + " cr.hasMoved=" + cr.hasMoved + " depth=" + logo.depth
+                + " absoluteDepth=" + cr.absoluteDepth);
+            var v = new System.Collections.Generic.List<UIVertex>();
+            var ti = new System.Collections.Generic.List<int>();
+            Arkana.Menu.Logo.Preencher(v, ti, logo.GetPixelAdjustedRect(), logo.color, -1f);
+            sb.Append("  malha: vertices=" + v.Count + " indices=" + ti.Count);
+            foreach (UIVertex u in v) sb.Append(" [" + u.position.ToString("F0") + " uv" + u.uv0.ToString("F2") + " a" + u.color.a + "]");
+            sb.AppendLine();
+            var tex2 = t as Texture2D;
+            if (tex2 != null) sb.AppendLine("  textura legivel=" + tex2.isReadable + " formato=" + tex2.format + " mips=" + tex2.mipmapCount + " hide=" + tex2.hideFlags);
+            sb.AppendLine("  raw ativo=" + raw.IsActive() + " rect=" + rrt.rect + " tex=" + (raw.texture != null ? raw.texture.name : "null"));
+
+            Foto(cam, "49-diag-logo", true);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Object.Destroy(cgo);
+            Object.Destroy(cam.gameObject);
+        }
+
+        // ONDA 14B — colar em FotoTests.cs, dentro da classe (o onda14-logo-compila.sh cola no fim). Rodar: .\foto.ps1 "Foto_Logo"
+
+        /// <summary>
+        /// A MARCA NOVA (onda 14B): ARKANA com letras proprias desenhadas em codigo (Logo) — ouro em degrade com bisel,
+        /// contorno escuro grosso, espessura em bronze, sombra macia, o A em ponta de lanca com a barra em losango e a perna do
+        /// K em raio amarelo com halo azul-eletrico. 45-logo-titulo: a tela de titulo (o selo, a marca de 300 dp, o subtitulo)
+        /// com o reflexo congelado sobre o A do meio e a cintilancia na ponta dele; 45-logo-menu: o menu com a marca de 200 dp
+        /// sobre os botoes, parada. Guarda o contrato: a marca velha (uma letra por Text) saiu, as duas marcas sao Logo na
+        /// proporcao do desenho, e a do menu fica acima do JOGAR.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Logo_TituloEMenu()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return Esperar(1.2f);   // a vitrine poe o mago no pico (o mesmo fundo do 01-menu)
+            var marcas = Object.FindObjectsByType<Arkana.Menu.Logo>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Assert.AreEqual(2, marcas.Length, "titulo e menu tem a marca desenhada (o menu nasce apagado)");
+            Assert.IsNull(GameObject.Find("LK"), "a marca velha (uma letra por Text) saiu");
+            foreach (Arkana.Menu.Logo m in marcas)
+            {
+                Rect r = m.rectTransform.rect;
+                Assert.AreEqual(Arkana.Menu.Logo.Aspecto, r.width / r.height, 0.02f, "a caixa da marca na proporcao do desenho");
+                m.Fase = m.transform.parent.parent.name == "Titulo" ? 0.56f : 1f;   // titulo: o reflexo sobre o A do meio; menu: parado
+            }
+            yield return null;
+            Foto(main.CameraDoMenu, "45-logo-titulo", true);
+
+            Tocar("TapTitulo");
+            yield return null;
+            GameObject marcaMenu = GameObject.Find("MenuPrincipal/Centro/Wordmark");
+            Assert.IsNotNull(marcaMenu, "o menu mostra a marca");
+            Assert.Greater(marcaMenu.transform.position.y, GameObject.Find("BtnJogar").transform.position.y, "a marca acima do JOGAR");
+            Foto(main.CameraDoMenu, "45-logo-menu", true);
         }
 
     }

@@ -214,6 +214,12 @@ namespace Arkana.Core
             public const float TurnPivotBonus = 0.7f;
             /// <summary>Banking: inclina pra dentro da curva. Max ~7.5 graus; acima parece moto.</summary>
             public const float BankGain = 0.035f, BankMax = 0.13f, BankRate = 9f;
+            /// <summary>KNOB (onda 15B, padrao do genero; o Diretor pode vetar com 1): RECUAR MIRANDO anda a esta fracao.
+            /// DIMINUIR = recuar vira castigo e o pe' do Walk_Backward escorrega menos; 1 = recua na velocidade cheia.</summary>
+            public const float BackpedalMult = 0.7f;
+            /// <summary>Graus entre a MIRA e o MOVIMENTO a partir dos quais o corpo RECUA (pernas para tras). O BackpedalMult
+            /// entra em rampa de RecuoGraus-RecuoRampa (1) a RecuoGraus+RecuoRampa (cheio): sem degrau no strafe diagonal.</summary>
+            public const float RecuoGraus = 105f, RecuoRampa = 15f;
         }
 
         /// <summary>ANIMACAO x VELOCIDADE (R20): speed_scale sai da velocidade real — fim da patinacao.</summary>
@@ -222,6 +228,24 @@ namespace Arkana.Core
             /// <summary>MEDIDO no pyra.glb (21/08): root motion de 7.91 m por ciclo. Pe' escorrega pra tras = DIMINUA.</summary>
             public const float RunStrideM = 7.91f;
             public const float ScaleMin = 0.55f, ScaleMax = 1.9f;
+            /// <summary>MEDIDO no 01-pyra.fbx (16/09): o Walk_Backward anda 0,90 m em 0,875 s de clipe (o importador tira esse
+            /// deslocamento; a lei da patinacao do recuo sai daqui). Pe' escorrega para a frente = DIMINUA.</summary>
+            public const float BackStrideM = 0.90f;
+            /// <summary>KNOB: teto da cadencia do andar para tras. O clipe e' um ANDAR (1 m/s): recuando a 5,25 m/s ele satura
+            /// aqui e o pe' escorrega. AUMENTAR = passo de formiga; DIMINUIR = mais patinacao.</summary>
+            public const float BackScaleMax = 2.6f;
+            /// <summary>Graus que o tronco desfaz do giro das pernas (Spine02/Spine01/Spine, um terco cada). Acima disso o peito
+            /// sai da mira. AUMENTAR = coruja; DIMINUIR = o tiro sai de lado.</summary>
+            public const float TorcaoMax = 75f;
+            /// <summary>Histerese do recuo: entra em Move.RecuoGraus, so' volta a correr de frente abaixo de RecuoGraus - isto.</summary>
+            public const float RecuoBanda = 15f;
+            /// <summary>1/s — com que pressa as pernas acham o rumo novo (exponencial). MAIOR = pivo seco; MENOR = deslize.</summary>
+            public const float PernasRate = 12f;
+            /// <summary>KNOB: a aterrissagem do Regular_Jump toca nesta velocidade (0,78 s de clipe -> ~0,5 s). Parado so'.</summary>
+            public const float PousoVel = 1.5f;
+            /// <summary>MEDIDO no Running do 01-pyra.fbx (quadro 12 de 16): os dois pes fora do chao, joelho da frente erguido,
+            /// pe' de tras alto. E' o quadro que o mago SEM o Regular_Jump segura no ar (o pulo de reserva).</summary>
+            public const float PuloReservaT = 0.46f;
         }
 
         public static class Touch
