@@ -230,6 +230,9 @@ namespace Arkana.Menu
             scroll.horizontal = false;
             _lista = Formas.No(srt, "Lista");
             _lista.anchorMin = new Vector2(0, 1); _lista.anchorMax = new Vector2(1, 1); _lista.pivot = new Vector2(0.5f, 1);
+            // RectTransform novo nasce com sizeDelta 100x100: esticado, a lista ficava 100 px MAIS LARGA que a mascara e cortava
+            // o rotulo a esquerda e o botao a direita (foto 50-config). A altura vem do ContentSizeFitter.
+            _lista.sizeDelta = Vector2.zero;
             var v = _lista.gameObject.AddComponent<VerticalLayoutGroup>();
             v.spacing = Dp.Px(6f); v.padding = new RectOffset(8, 8, 8, 8);
             v.childControlWidth = true; v.childControlHeight = false; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
