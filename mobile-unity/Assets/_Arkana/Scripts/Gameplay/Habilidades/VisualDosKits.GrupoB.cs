@@ -588,7 +588,10 @@ namespace Arkana.Gameplay
                 else if (dono != null)
                 {
                     Clipe? c = PoseMago.Alias(dono.Clipe);
-                    if (c.HasValue && c.Value != Clipe.Idle && c.Value != Clipe.Run && c.Value != m.ClipeAtual) m.Play(c.Value);
+                    // idle/run saem da velocidade (abaixo); a excecao e' a VOLTA do recuo (onda 15B): o dono sai do "andar_tras"
+                    // pelo nome "run" e, sem repassar, o reflexo seguia andando para tras
+                    bool volta = c == Clipe.Run && m.ClipePedido == Clipe.AndarTras;
+                    if (c.HasValue && (volta || (c.Value != Clipe.Idle && c.Value != Clipe.Run)) && c.Value != m.ClipePedido) m.Play(c.Value);
                     m.SetVelocidade(dono.VelocidadeHorizontal);   // corre quando ele corre: o mesmo passo, trocado
                 }
             }
