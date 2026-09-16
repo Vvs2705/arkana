@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 13/09/2026, ~03h30 — PAUSA pedida pelo Diretor (ondas 10–13 em main: ruínas, peças dos kits, motor dos kits, tela de carregamento, costa, céu, praia; logo novo em código mas desligado; falta medir FPS no aparelho)
+> **Atualizado em:** 16/09/2026, manhã (onda 15: luva na mão, pulo e andar para trás nos 20 magos, cast no tronco, logo ligado; em curso: botões do menu; falta medir FPS no aparelho)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,25 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 13/09 (pausa às ~03h30): costa, céu, praia; o logo novo espera conserto
+### >>> COMECE POR AQUI — 16/09: o corpo do mago (a queixa do Diretor) e o logo ligado
+
+**O Diretor jogou o APK de 13/09 e reclamou (16/09):** "salto do personagem, a corrida para trás, ao pegar a luva parece que ela é imensa, chega a cobrir a câmera toda"; perguntou se valia passar os personagens pelo Blender. **Diagnóstico com foto e número antes de mexer** (`Foto_Diag_LuvaPuloTras`, foto 46): os três eram de CÓDIGO, não de modelo — o Blender para personagem foi descartado (já tinha falhado em 27/08).
+
+| Onda | Causa raiz medida | O que entrou | Foto |
+|---|---|---|---|
+| 15A luva | `Mago.MaoDireita` no externo é o osso `RightHand` com **lossyScale 100** (a Armature do FBX da Meshy); as primitivas de 0,1 m viravam cubos de 10–17 m | `LuvaVisual`: soquete filho do osso que cancela a escala, orientado pelo bind (dedos +Y, polegar = frente); a luva é o MESMO `.glb` da Meshy que aparece no chão (varinha e cajado são luvas esquerdas: espelhados), 1,3× o antebraço, teto 0,35 m; gema acesa na cor do elemento; sem `.glb`, primitivas no soquete | 47-luva-* |
+| 15B pulo | não existia clipe de pulo: subia em Idle e piscava `Fall1` 0,2 s | **Salto Regular** da biblioteca do site (take `Regular_Jump`) aplicado nos 20 magos (grátis) e baixado de novo (`importar_mago.ps1`); `Clipe.Pular` começa na decolagem (0,50 s do take), o ar estica ao voo previsto (2·Vy/g), `Pousar` ao tocar o chão (0,5 s; correndo mistura direto); fases medidas em runtime por `SampleAnimation` (cache por clipe); o deslocamento do quadril sai na importação (`OnPostprocessAnimation`); sem o take, segura o quadro 12 do Running | 48-pulo-* |
+| 15B recuo | mirando, o corpo olha a mira e toca a corrida de frente (moonwalk, dif=180°) | **Andar para trás** (`Walk_Backward`) nos 20; acima de 105° entre mira e movimento vira `AndarTras` com **recuo a 0,7×** (`Balance.Move.BackpedalMult` — o Diretor pode vetar); até 105° as pernas giram para o rumo e o tronco torce até 75° para a mira (`LateUpdate`, Spine02/01/Spine); sem o take, a corrida ao contrário | 48-tras-*, 48-lado-* |
+| 15B tiro | o `cast` congelava as pernas correndo | cast correndo = camada só do tronco (`AddMixingTransform` em Spine02); parado, corpo inteiro; `CastFired`/`CastFireT` iguais | 48-atirando-* |
+| logo | o `Logo : MaskableGraphic` nascia **sem `CanvasRenderer`** (o Graphic do UGUI 2 não exige; `Image` sim) — malha montada, nada desenhado | `[RequireComponent(typeof(CanvasRenderer))]`; religado no título (300 dp), menu (200 dp) e carregamento (140 dp) | 45-logo-*, 42-carregando |
+
+**Receita para clipe novo em todos os magos (site da Meshy, grátis):** Animar → filtro "animados" (ícone de boneco) → abrir o rig de 12/09 pelo nome inglês da Meshy (Emberarm Vanguard = Pyra, Voidreaper = Ceifadora, Azure Wraith = Véu, Ravenborn = Corvus, Occultist = Corvomante, Amethyst Butterfly = Olho-de-Éter, Starlight Alchemist = Vitalis, Violet Aristocrat = Ilusionista, Toxic Alchemist = Vex, Sparkthread = Tessa, Starborn Elven = Aelion, Violet Shadowblade = Umbra, Ironforge = Brok, Stormhide = Gromm, Azure Tide = Maris, Gizmo = Fizz, Verdant Blossom = Sylva, Emberstone Colossus = Basalto, Crimson Nocturne = Noctus, Azure Sparkwing = Pip) → Biblioteca → buscar → Adicionar (≈10 s) → Baixar: fbx, **MeshyRig** (não Mixamo!), Todos Adicionados, Arquivo único, 30 fps → `importar_mago.ps1 <zip> NN-slug`. Conferir o slug pela md5 da `texture_0.png` contra `NN-slug-cor.png` (`scratchpad\elenco-zips\conferir.ps1`). Há uma "Pyra (modelo de jogo)" de 26/08 no filtro que NÃO é a do jogo.
+
+**Portão:** 493 testes, 0 falhas. **APK** `arkana-2026-09-16_1023.apk` (221 MB) na pasta de testes — o Diretor sobe ele mesmo no Drive ("JOGOS EM DESENVOLVIMENTO").
+
+**Em curso:** 16A botões do menu (placas escuras com filete dourado no lugar dos retângulos oliva). **Na fila:** 14A mata (GLBs 50–53 prontos), FPS no Poco F4, `Player.cs` — atirando por toque sem segurar a mira o tronco não torce para o tiro (a mira é limpa no quadro seguinte); o clone da Ilusionista não recebe `run` ao voltar de frente; `48-capim-duna-lod1.glb` ainda com 1,28 K tris.
+
+### 13/09 (pausa às ~03h30): costa, céu, praia; o logo novo espera conserto
 
 **Próximo passo, na ordem (retomada):**
 1. **Consertar o logo** (`Scripts/Menu/Logo.cs`, onda 14B, commit `c0d6ea9`). A marca foi desenhada em código (glifos próprios estilo Cinzel/Trajan, ouro com bisel, contorno grosso, K em raio com halo azul, reflexo que corre). A prévia em Python ficou profissional, e a textura gerada pelo C# no mono bate com ela em 1/255. **No Unity, porém, a marca sai INVISÍVEL** no título, no menu e no carregamento: o espaço do layout existe, não há exceção no log e a foto passa. Já descartado: a textura destruída pelo `UnloadUnusedAssets` (o `hideFlags` já está no arquivo e continuou invisível). Por isso o `Menu.Wordmark` voltou para a fonte antiga. Para religar, use a versão do agente: `Menu.Wordmark(pai, larguraDp, brilho)` devolvendo um `Logo`, título 300 dp, menu 200 dp, carregamento 140 dp parada, e a foto `Foto_Logo_TituloEMenu` → `45-logo-*`. Próxima suspeita: um teste PlayMode que imprima `rect`, `canvasRenderer.GetMaterial()`, `mainTexture` e o número de vértices da malha gerada, e compare com uma `RawImage` usando a mesma textura.
