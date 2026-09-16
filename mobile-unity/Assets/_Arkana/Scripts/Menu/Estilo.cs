@@ -16,6 +16,7 @@ namespace Arkana.Menu
         public static readonly Color Painel = Formas.Hex("#0E1430");
         public static readonly Color PainelAlto = Formas.Hex("#101838");
         public static readonly Color Ouro = Formas.Hex("#F0C75E");
+        public static readonly Color OuroClaro = Formas.Hex("#FFE9A6");   // o rotulo dos botoes (o Ouro chapado sumia na areia)
         public static readonly Color OuroFosco = Formas.Hex("#8A7336");
         public static readonly Color Raio = Formas.Hex("#F5D90A");   // o "K" da wordmark
         public static readonly Color Texto = Formas.Hex("#E8E6F0");
@@ -58,29 +59,58 @@ namespace Arkana.Menu
             return t;
         }
 
-        /// <summary>Botao de menu: painel escuro, borda dourada, alvo >= 48dp. Devolve o Button (Text filho "Rotulo").</summary>
-        public static Button Botao(Transform pai, string nome, string texto, float larguraDp = 300f, float alturaDp = BotaoDp, float fonteDp = 18f)
+        /// <summary>
+        /// Botao de menu: a PLACA do PlacaBotao (cantos chanfrados, contorno escuro, moldura dourada em degrade, fio
+        /// interno e miolo escuro com volume) + gema de losango nas duas laterais e o rotulo em ouro claro com
+        /// espacamento e contorno. Alvo >= 48dp. `principal` = o JOGAR: ouro cheio, letra escura e a aura respirando.
+        /// Devolve o Button (Text filho "Rotulo": o Config le o rotulo por GetComponentInChildren).
+        /// A borda NAO e' mais um filho esticado: filho desenha por cima do pai e cobria a placa (a oliva da foto 45).
+        /// </summary>
+        public static Button Botao(Transform pai, string nome, string texto, float larguraDp = 300f, float alturaDp = BotaoDp, float fonteDp = 18f, bool principal = false)
         {
             var go = new GameObject(nome, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(pai, false);
             var rt = (RectTransform)go.transform;
             rt.sizeDelta = new Vector2(Dp.Px(larguraDp), AlturaAlvo(alturaDp));
-            var img = go.GetComponent<Image>();
-            img.color = PainelAlto;
-            var borda = Formas.Imagem(go.transform, "Borda", null, Formas.ComAlfa(OuroFosco, 0.8f));
-            AreaSegura.Esticar(borda.rectTransform);
-            borda.transform.SetAsFirstSibling();
-            borda.rectTransform.offsetMin = new Vector2(-2, -2);
-            borda.rectTransform.offsetMax = new Vector2(2, 2);
+            var placa = go.GetComponent<Image>();
+            PlacaBotao.Vestir(placa, principal ? PlacaBotao.Tipo.Cheia : PlacaBotao.Tipo.Escura);
             var b = go.GetComponent<Button>();
+            b.targetGraphic = placa;
             var cores = b.colors;
-            cores.normalColor = Color.white;
-            cores.highlightedColor = new Color(1.1f, 1.1f, 1.1f);
-            cores.pressedColor = Ouro;
+            cores.normalColor = cores.highlightedColor = cores.selectedColor = Color.white;   // toque nao tem hover; solto nao fica aceso
+            cores.pressedColor = new Color(0.66f, 0.64f, 0.68f);   // pressionado ESCURECE a placa (e o BotaoMenu afunda)
+            cores.fadeDuration = 0f;
             b.colors = cores;
-            var t = Formas.Texto(go.transform, "Rotulo", texto, fonteDp, Ouro);
+            var dedo = go.AddComponent<BotaoMenu>();
+            if (principal) dedo.Aura = PlacaBotao.Aura(go.transform);
+            Gema(go.transform, "GemaEsq", 0f);
+            Gema(go.transform, "GemaDir", 1f);
+            var t = Formas.Texto(go.transform, "Rotulo", texto, fonteDp, principal ? NoiteFunda : OuroClaro);
+            t.fontStyle = FontStyle.Bold;
+            t.GetComponent<Shadow>().enabled = false;   // o Letreiro tem de vir PRIMEIRO: sombra e contorno copiam a malha depois
+            var letreiro = t.gameObject.AddComponent<Letreiro>();
+            if (principal) letreiro.Baixo = new Color(1f, 1f, 1f, 0f);   // letra escura no ouro nao leva degrade
+            else Arkana.Menu.Menu.Contorno(t);                           // o mesmo contorno do titulo: le' sobre a areia
             AreaSegura.Esticar(t.rectTransform);
             return b;
+        }
+
+        /// <summary>A gema de losango na lateral da placa: a escura por baixo (contorno) e o ouro por cima — o mesmo
+        /// detalhe do losango da tela de carregamento.</summary>
+        static void Gema(Transform pai, string nome, float ancoraX)
+        {
+            var escura = Formas.Imagem(pai, nome, Formas.Losango(), PlacaBotao.CorGema);
+            FixarGema(escura.rectTransform, ancoraX, Dp.Px(PlacaBotao.GemaDp));
+            var ouro = Formas.Imagem(escura.transform, "Ouro", Formas.Losango(), Ouro);
+            FixarGema(ouro.rectTransform, 0.5f, Dp.Px(PlacaBotao.GemaOuroDp));
+        }
+
+        static void FixarGema(RectTransform rt, float ancoraX, float lado)
+        {
+            rt.anchorMin = rt.anchorMax = new Vector2(ancoraX, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(lado, lado);
         }
 
         /// <summary>Botao invisivel que cobre outro no' (card, tela de titulo): o alvo e' a area inteira.</summary>

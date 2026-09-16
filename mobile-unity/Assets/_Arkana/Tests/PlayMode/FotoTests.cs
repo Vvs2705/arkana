@@ -2888,5 +2888,56 @@ namespace Arkana.Tests
             Assert.Less(difFinal, 30f, "o corpo nao virou para o reticulo depois do tiro por toque (a mira foi largada cedo)");
         }
 
+        // ONDA 16A — colar em FotoTests.cs, no FIM da classe (depois do Foto_Logo_TituloEMenu). Rodar: .\foto.ps1 "Foto_Botoes"
+
+        /// <summary>
+        /// OS BOTOES DO MENU (onda 16A): a foto 45 lia "placeholder" — retangulo chapado cor de oliva (a borda dourada
+        /// era FILHA e o uGUI desenha filho por cima do pai, cobrindo a placa). Agora cada botao e' a PLACA assada em
+        /// codigo: cantos chanfrados, contorno escuro, moldura dourada em degrade, fio interno, miolo escuro
+        /// translucido com luz em cima, gema de losango nas duas laterais e o rotulo em ouro claro espacado com
+        /// contorno. 50-menu-botoes: o menu inteiro (o JOGAR maior, em ouro cheio com letra escura e a aura respirando;
+        /// os quatro secundarios escuros). 50-menu-pressionado: o JOGAR com o dedo em cima (escurece e afunda).
+        /// 50-config: a tela secundaria que usa o MESMO botao (VOLTAR, as opcoes e o RESTAURAR PADRAO).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Botoes_MenuEConfig()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return Esperar(1.2f);   // a vitrine poe o mago no pico (o mesmo fundo do 45-logo-menu)
+            Tocar("TapTitulo");
+            yield return null;
+            GameObject jogar = GameObject.Find("BtnJogar"), sair = GameObject.Find("BtnSair");
+            Assert.IsNotNull(jogar, "o menu abriu sem o JOGAR");
+            Assert.IsNotNull(sair, "o menu abriu sem o SAIR");
+            var placa = jogar.GetComponent<UnityEngine.UI.Image>();
+            Assert.IsNotNull(placa.sprite, "a placa e' um sprite assado, nao um retangulo chapado");
+            Assert.AreEqual(UnityEngine.UI.Image.Type.Sliced, placa.type, "a placa e' 9-slice");
+            Assert.IsNull(jogar.transform.Find("Borda"), "a borda-filha que cobria a placa (a oliva da foto 45) saiu");
+            Assert.IsNotNull(jogar.transform.Find("GemaEsq"), "a gema de losango na lateral");
+            Assert.Greater(((RectTransform)jogar.transform).rect.width, ((RectTransform)sair.transform).rect.width, "o JOGAR e' o principal: maior");
+            Assert.IsNotNull(jogar.transform.Find("Aura"), "o principal respira");
+            Assert.IsNull(sair.transform.Find("Aura"), "os secundarios nao");
+            yield return null;
+            Foto(main.CameraDoMenu, "50-menu-botoes", true);
+
+            // PRESSIONADO pelo caminho do dedo: o Button escurece a placa (fadeDuration 0) e o BotaoMenu afunda
+            var toque = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(jogar, toque, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
+            yield return null;
+            Assert.Less(jogar.transform.localScale.x, 1f, "o JOGAR afunda no toque");
+            Assert.Less(placa.canvasRenderer.GetColor().r, 0.9f, "e escurece");
+            Foto(main.CameraDoMenu, "50-menu-pressionado", true);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(jogar, toque, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
+            yield return null;
+            Assert.AreEqual(1f, jogar.transform.localScale.x, 1e-3f, "e volta ao soltar");
+
+            // a tela secundaria: o MESMO Estilo.Botao no VOLTAR, nas opcoes e no RESTAURAR PADRAO
+            Tocar("BtnConfig");
+            yield return null;
+            Assert.IsNotNull(GameObject.Find("BtnVoltarConfig"), "as Configuracoes abriram");
+            Foto(main.CameraDoMenu, "50-config", true);
+        }
+
     }
 }

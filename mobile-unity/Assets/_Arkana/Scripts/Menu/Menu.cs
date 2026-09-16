@@ -125,7 +125,7 @@ namespace Arkana.Menu
             var t = Tela("MenuPrincipal");
             var col = Estilo.Coluna(t, "Centro", 12f);
             Wordmark(col.transform, 200f, true);
-            Botao(col.transform, "BtnJogar", T_JOGAR, OnJogar);
+            Botao(col.transform, "BtnJogar", T_JOGAR, OnJogar, true);
             Botao(col.transform, "BtnTreino", T_TREINO, () => { PedidoDeTreino = true; OnJogar(); });
             Botao(col.transform, "BtnElenco", T_ELENCO, () => { if (_elenco == null) _elenco = MontarElenco(); Ir(_elenco); });
             Botao(col.transform, "BtnConfig", T_CONFIG, () => { if (_config == null) _config = MontarConfig(); Ir(_config); });
@@ -133,10 +133,15 @@ namespace Arkana.Menu
             return t;
         }
 
-        Button Botao(Transform pai, string nome, string texto, Action acao)
+        /// <summary>KNOB por foto: o JOGAR e' o PRINCIPAL (maior, ouro cheio, aura respirando); os outros, secundarios.</summary>
+        const float JogarLarguraDp = 300f, JogarAlturaDp = 66f, JogarFonteDp = 24f;
+        const float ItemLarguraDp = 264f, ItemAlturaDp = 52f, ItemFonteDp = 18f;
+
+        Button Botao(Transform pai, string nome, string texto, Action acao, bool principal = false)
         {
-            var b = Estilo.Botao(pai, nome, texto, 260f, Estilo.BotaoDp, 18f);
-            Estilo.Tamanho(b, Dp.Px(260f), Estilo.AlturaAlvo(Estilo.BotaoDp));
+            float larg = principal ? JogarLarguraDp : ItemLarguraDp, alt = principal ? JogarAlturaDp : ItemAlturaDp;
+            var b = Estilo.Botao(pai, nome, texto, larg, alt, principal ? JogarFonteDp : ItemFonteDp, principal);
+            Estilo.Tamanho(b, Dp.Px(larg), Estilo.AlturaAlvo(alt));
             b.onClick.AddListener(() => acao());
             return b;
         }
