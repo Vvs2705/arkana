@@ -82,8 +82,7 @@ namespace Arkana.Menu
             ((RectTransform)col.transform).anchoredPosition = new Vector2(0, Dp.Px(20f));
             var selo = Formas.Imagem(col.transform, "Selo", Selo.SpriteDe(256), Color.white);
             Estilo.Tamanho(selo, Dp.Px(150f), Dp.Px(150f));
-            var marca = Wordmark(col.transform, 44f, 8f);
-            Estilo.Tamanho(marca, Dp.Px(300f), Dp.Px(52f));
+            Wordmark(col.transform, 300f, true);
             var sub = Formas.Texto(col.transform, "Sub", T_SUB, 16f, Estilo.Texto);   // Texto, nao TextoFosco: o fosco sumia na neve
             Contorno(sub);
             Estilo.Tamanho(sub, Dp.Px(300f), Dp.Px(22f));
@@ -107,30 +106,25 @@ namespace Arkana.Menu
             o.effectDistance = new Vector2(Dp.Px(1.2f), -Dp.Px(1.2f));
         }
 
-        /// <summary>Wordmark ARKANA: uma letra por Text (espacamento largo), o K na cor do raio (GDD §10). Titulo, menu e a
-        /// tela de carregamento: a MESMA marca.</summary>
-        internal static HorizontalLayoutGroup Wordmark(Transform pai, float tamDp, float sepDp)
+        /// <summary>A marca ARKANA: o Logo (letras proprias desenhadas em codigo; o K em raio, GDD §10). `larguraDp` = a largura
+        /// da tinta, a altura sai da proporcao; `brilho` = o reflexo correndo. Titulo, menu e a tela de carregamento: a MESMA
+        /// marca.</summary>
+        internal static Logo Wordmark(Transform pai, float larguraDp, bool brilho)
         {
-            var go = new GameObject("Wordmark", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            var go = new GameObject("Wordmark", typeof(RectTransform), typeof(Logo));
             go.transform.SetParent(pai, false);
-            var h = go.GetComponent<HorizontalLayoutGroup>();
-            h.spacing = Dp.Px(sepDp); h.childAlignment = TextAnchor.MiddleCenter;
-            h.childControlWidth = false; h.childControlHeight = false; h.childForceExpandWidth = false; h.childForceExpandHeight = false;
-            foreach (char ch in T_MARCA)
-            {
-                var l = Formas.Texto(go.transform, "L" + ch, ch.ToString(), tamDp, ch == 'K' ? Estilo.Raio : Estilo.Ouro);
-                Contorno(l);   // o ouro sobre a neve do pico (titulo e menu principal)
-                Estilo.Tamanho(l, Dp.Px(tamDp * 0.8f), Dp.Px(tamDp * 1.2f));
-            }
-            return h;
+            var logo = go.GetComponent<Logo>();
+            logo.raycastTarget = false;   // o toque do titulo passa (o TapTitulo cobre a tela por baixo)
+            logo.Brilho = brilho;
+            Estilo.Tamanho(logo, Dp.Px(larguraDp), Dp.Px(larguraDp / Logo.Aspecto));
+            return logo;
         }
 
         RectTransform MontarMenu()
         {
             var t = Tela("MenuPrincipal");
             var col = Estilo.Coluna(t, "Centro", 12f);
-            var marca = Wordmark(col.transform, 26f, 4f);
-            Estilo.Tamanho(marca, Dp.Px(200f), Dp.Px(34f));
+            Wordmark(col.transform, 200f, true);
             Botao(col.transform, "BtnJogar", T_JOGAR, OnJogar);
             Botao(col.transform, "BtnTreino", T_TREINO, () => { PedidoDeTreino = true; OnJogar(); });
             Botao(col.transform, "BtnElenco", T_ELENCO, () => { if (_elenco == null) _elenco = MontarElenco(); Ir(_elenco); });

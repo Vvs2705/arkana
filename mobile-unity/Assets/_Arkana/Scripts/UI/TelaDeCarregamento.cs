@@ -178,9 +178,8 @@ namespace Arkana.UI
         {
             _selo = Formas.Imagem(c, "Selo", SpriteDoSelo(), Color.white).rectTransform;
             Fixar(_selo, SupEsq, Meio, new Vector2(Dp.Px(20f), -Dp.Px(20f)), Vector2.one * Dp.Px(40f));
-            var marca = ArkMenu.Wordmark(c, 20f, 5f);
-            marca.childAlignment = TextAnchor.MiddleLeft;
-            Fixar((RectTransform)marca.transform, SupEsq, SupEsq, new Vector2(Dp.Px(48f), 0f), new Vector2(Dp.Px(220f), Dp.Px(40f)));
+            var marca = ArkMenu.Wordmark(c, 140f, false).rectTransform;   // parada: quem corre aqui e' o reflexo da barra
+            Fixar(marca, SupEsq, new Vector2(0f, 0.5f), new Vector2(Dp.Px(50f), -Dp.Px(20f)), marca.sizeDelta);   // na linha do centro do selo
         }
 
         /// <summary>O ESCOLHIDO, a esquerda (o mago da foto fica no terco direito): o que se prepara, NOME, titulo, o fio das

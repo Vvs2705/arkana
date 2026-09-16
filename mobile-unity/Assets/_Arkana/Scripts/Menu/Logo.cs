@@ -16,6 +16,9 @@ namespace Arkana.Menu
     /// o REFLEXO que corre (faixas com alfa por vertice que amostram a mascara da face) e a cintilancia nas pontas dos As.
     /// Titulo, menu e tela de carregamento: a MESMA marca (Menu.Wordmark).
     /// </summary>
+    // o Graphic do UGUI 2 nao pede CanvasRenderer (so' Image/Text pedem): sem ele a marca montava a malha e nao desenhava
+    // nada — o titulo saiu sem logo (foto 45, diag 49)
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class Logo : MaskableGraphic
     {
         // ---------- KNOBs (unidade = 1/100 da altura de caixa das letras) ----------
