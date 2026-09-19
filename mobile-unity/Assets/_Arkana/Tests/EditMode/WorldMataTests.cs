@@ -196,6 +196,25 @@ namespace Arkana.Tests
         }
 
         [Test]
+        public void Mata_RefazOKitComAsPegadasDasRuinas()
+        {
+            // defeito: PegadasDoKit ignorando os reservados (as Pegadas das ruinas que o kit real recebe): o sorteio daqui diverge
+            // do real e um tronco nasce dentro da rocha de basalto (foto 51, 16/09). Uma pegada reservada em cima de uma peca do
+            // kit tem de EMPURRAR a peca para outro lugar, como no KitCenario.Montar.
+            List<Vector4> livre = Mata.PegadasDoKit(Relevo2);
+            Vector4 peca = livre.Find(k => k.w > 0.5f && Vector2.Distance(new Vector2(k.x, k.y), Relevo2.Floresta) < Mata.RaioDaMata(Relevo2)
+                && Vector2.Distance(new Vector2(k.x, k.y), Relevo2.Ruinas) > Relevo2.RuinasR);
+            Assert.Greater(peca.w, 0f, "nenhuma peca do kit dentro da mata para reservar");
+            var ruina = new Vector4(peca.x + 0.1f, peca.y, 0f, peca.w + 0.1f);
+            List<Vector4> kit = Mata.PegadasDoKit(Relevo2, null, new List<Vector4> { ruina });
+            Assert.Contains(ruina, kit, "a pegada reservada entra nas pegadas (a mata foge dela tambem)");
+            foreach (Vector4 k in kit)
+                if (k != ruina)
+                    Assert.GreaterOrEqual(Vector2.Distance(new Vector2(k.x, k.y), new Vector2(ruina.x, ruina.y)), k.w + ruina.w - 1e-3f,
+                        "peca do kit dentro da pegada reservada em " + k);
+        }
+
+        [Test]
         public void Mata_CogumeloAoPeDeArvoreOuDeTronco()
         {
             // defeito: sortear o cacho solto na mata (cogumelo no meio do nada nao le' como mata viva)

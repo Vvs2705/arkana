@@ -122,12 +122,13 @@ namespace Arkana.World
             Pos = MontarPos(gen.transform);
             if (comVegetacao)
             {
-                Vegetacao = Filho<Vegetacao>(gen.transform, "Vegetacao");
-                Vegetacao.Montar(Relevo, MaterialToon());
-                Grama = Filho<Grama>(gen.transform, "Grama");
-                Grama.Montar(Relevo);
+                // as ruinas antes da vegetacao: a mata refaz o sorteio do kit e precisa das mesmas Pegadas que o kit recebe
                 Ruinas = Filho<Ruinas>(gen.transform, "Ruinas");
                 Ruinas.Montar(Relevo, MaterialPedra());
+                Vegetacao = Filho<Vegetacao>(gen.transform, "Vegetacao");
+                Vegetacao.Montar(Relevo, MaterialToon(), Ruinas.Pegadas);
+                Grama = Filho<Grama>(gen.transform, "Grama");
+                Grama.Montar(Relevo);
                 // o kit vem por ultimo: planta pelos POIs e foge do que as ruinas ja' ocupam
                 Kit = Filho<KitCenario>(gen.transform, "KitCenario");
                 Kit.Montar(Relevo, Ruinas.Pegadas);

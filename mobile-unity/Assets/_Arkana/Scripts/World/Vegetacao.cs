@@ -291,6 +291,7 @@ namespace Arkana.World
 
         Relevo relevo;
         Material mat;
+        IList<Vector4> reservadosDoKit;
         int celulas;
         float passo;
         Celula[] cels;
@@ -369,10 +370,12 @@ namespace Arkana.World
             relogio = Periodo;   // a arvore da Meshy sai (ou volta) dos lotes no proximo quadro, junto com o toco
         }
 
-        public void Montar(Relevo relevo, Material mat)
+        /// <param name="reservadosDoKit">as Pegadas das ruinas: o kit real foge delas, e a mata refaz o sorteio do kit (Mata.PegadasDoKit).</param>
+        public void Montar(Relevo relevo, Material mat, IList<Vector4> reservadosDoKit = null)
         {
             this.relevo = relevo;
             this.mat = mat;
+            this.reservadosDoKit = reservadosDoKit;
             for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
             protoArvore = ProtoArvore();
             protoToco = ProtoToco();
@@ -424,7 +427,7 @@ namespace Arkana.World
             Mata = new GameObject("Mata").AddComponent<Mata>();
             Mata.transform.SetParent(transform, false);
             Mata.Olho = cameraDoLod;
-            Mata.Montar(relevo, ocupados);
+            Mata.Montar(relevo, ocupados, reservadosDoKit);
         }
 
         // ---------------------------------------------------------------- scatter

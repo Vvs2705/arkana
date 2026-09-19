@@ -84,12 +84,13 @@ namespace Arkana.World
         /// daqui) e as manchas de samambaia. `ocupados` (x, z, raio em w) e' respeitado e recebe o que for plantado; as pegadas do
         /// KIT (PegadasDoKit, `temGlb` como la') entram junto.
         /// </summary>
-        public static List<PecaPlantada> Plantio(Relevo r, List<Vector4> ocupados = null, System.Func<string, bool> temGlb = null)
+        public static List<PecaPlantada> Plantio(Relevo r, List<Vector4> ocupados = null, System.Func<string, bool> temGlb = null,
+            IList<Vector4> reservadosDoKit = null)
         {
             var lista = new List<PecaPlantada>();
             if (r == null) return lista;
             if (ocupados == null) ocupados = new List<Vector4>();
-            ocupados.AddRange(PegadasDoKit(r, temGlb));
+            ocupados.AddRange(PegadasDoKit(r, temGlb, reservadosDoKit));
             float area = r.Escala * r.Escala;
             float raioMata = RaioDaMata(r);
             var ancoras = new List<Vector4>();
@@ -233,13 +234,14 @@ namespace Arkana.World
         /// sem isto, 29 troncos e cristais nasciam dentro da rocha de basalto, da ponte de raiz e da torre (sonda de 16/09). PURO:
         /// o mesmo PlantioDoKit, na ordem do KitCenario.Montar (miolo das ruinas, altar, pecas). `temGlb` null = todas (a sonda);
         /// a casca passa o Resources.Load (peca sem .glb nao reserva chao, como no kit).
-        /// ponytail: sem as Pegadas das ruinas (montam depois da Vegetacao), o sorteio do kit pode divergir perto delas e, em
-        /// cascata, no fim da sequencia; a foto 51 loga o kit REAL que toca tronco ou cristal. Se aparecer, a Ilha passa as pegadas
-        /// da mata ao kit (ou monta as ruinas antes).
+        /// `reservados` = as Pegadas das ruinas, que o kit real tambem recebe (Ilha.cs monta as Ruinas ANTES da Vegetacao): sem
+        /// elas o sorteio daqui divergia do real perto das ruinas e, em cascata, no fim da sequencia (foto 51: um tronco na rocha
+        /// de basalto, 16/09).
         /// </summary>
-        public static List<Vector4> PegadasDoKit(Relevo r, System.Func<string, bool> temGlb = null)
+        public static List<Vector4> PegadasDoKit(Relevo r, System.Func<string, bool> temGlb = null, IList<Vector4> reservados = null)
         {
             var kit = new List<Vector4> { new Vector4(r.Ruinas.x, r.Ruinas.y, 0f, r.RuinasR * 0.7f) };
+            if (reservados != null) kit.AddRange(reservados);
             PlantioDoKit.Altar(r, kit);
             foreach (PecaDoKit peca in PlantioDoKit.Pecas)
                 if (temGlb == null || temGlb(peca.Id)) PlantioDoKit.Posicoes(r, PlantioDoKit.SeedKit, peca, kit);
@@ -352,7 +354,7 @@ namespace Arkana.World
             set { olho = value; relogio = Periodo; }
         }
 
-        public void Montar(Relevo relevo, List<Vector4> ocupados)
+        public void Montar(Relevo relevo, List<Vector4> ocupados, IList<Vector4> reservadosDoKit = null)
         {
             pecas.Clear(); vis.Clear(); blocos.Clear();
             for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject);
@@ -391,7 +393,7 @@ namespace Arkana.World
             }
             for (int k = 0; k < 8; k++) tris[k] = malha[k] != null ? (int)(malha[k].GetIndexCount(0) / 3) : 0;
 
-            foreach (PecaPlantada p in Plantio(relevo, ocupados, id => Resources.Load<GameObject>(id) != null))
+            foreach (PecaPlantada p in Plantio(relevo, ocupados, id => Resources.Load<GameObject>(id) != null, reservadosDoKit))
             {
                 int t = (int)p.Tipo;
                 if (!tem[t]) continue;   // sem o .glb a peca nao nasce (nem colisor invisivel)
