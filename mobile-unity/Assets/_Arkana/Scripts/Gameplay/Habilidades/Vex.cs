@@ -36,9 +36,6 @@ namespace Arkana.Gameplay
         public Nuvem Obra => _obra;
         public Selo SeloDaObra => _selo;
 
-        /// <summary>O time, pelo criterio do resto do jogo (Combat.Creditar, Derrubado): hoje o unico esquadrao e' o dos EhPlayer.</summary>
-        public static bool MesmoTime(IEntidade a, IEntidade b) => a == b || (a != null && b != null && a.EhPlayer && b.EhPlayer);
-
         static float Plano(Vector3 v) => new Vector2(v.x, v.z).magnitude;
 
         public void Tick(KitRunner k, float dt)
@@ -169,7 +166,7 @@ namespace Arkana.Gameplay
                 if (_acc < TICK) return true;
                 _acc = 0f;
                 foreach (IEntidade e in k.AlvosPerto(Para, k.Dados.Tatica["gatilho"], k.Dono))
-                    if (!MesmoTime(k.Dono, e)) { Detonar(k, vex); return false; }
+                    if (!Combat.MesmoTime(k.Dono, e)) { Detonar(k, vex); return false; }
                 return true;
             }
 
@@ -218,7 +215,7 @@ namespace Arkana.Gameplay
                 foreach (IEntidade e in k.AlvosPerto(Centro, Raio))
                 {
                     if (EhObra) vex._selo.Selar(e);   // o selo vale para TODO MUNDO dentro — o time dele e ele mesmo
-                    if (MesmoTime(k.Dono, e)) continue;
+                    if (Combat.MesmoTime(k.Dono, e)) continue;
                     // `dono` como FONTE: o dano da nevoa credita a evolucao do escudo dele (GDD §5)
                     Combat.AplicarDot(e, _dps, TICK, "veneno", k.Dono);
                     Efeitos.Lentificar(e, _lentidao, TICK * 2f);

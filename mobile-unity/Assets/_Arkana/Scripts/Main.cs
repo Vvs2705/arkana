@@ -113,6 +113,58 @@ namespace Arkana
     }
 
     /// <summary>
+    /// QUEM NASCE NA PARTIDA, puro (o teste conta sem cena). SOLO = o de hoje: Balance.Match.Bots bots, cada um sozinho
+    /// (ninguem registrado: o Combat da' a cada um o seu time) e cada um no seu salto. DUPLA (contrato 17G): as
+    /// Balance.Match.DuplasInimigas duplas (times 1..n; as duas pontas no MESMO nascimento — o mesmo salto do castelo — e o
+    /// 2o pousa AO LADO, afastado) e, por ULTIMO, o PARCEIRO do jogador (time 0, o nascimento do jogador): 14 corpos em 7
+    /// times. O parceiro vai no fim da lista: Main.Bots[0] continua sendo um inimigo (os testes de cena usam o 1o bot como alvo).
+    /// </summary>
+    public static class Montagem
+    {
+        public struct Vaga
+        {
+            /// <summary>Time registrado no Combat; SEM_TIME = nao registra (o solo de hoje).</summary>
+            public int Time;
+            /// <summary>Quem tem o mesmo nascimento salta junto; 0 = o do jogador.</summary>
+            public int Nascimento;
+            /// <summary>Indice da vaga que esta' SEGUE (a outra ponta da dupla inimiga); -1 = ninguem.</summary>
+            public int Segue;
+            /// <summary>O parceiro do jogador: segue o jogador.</summary>
+            public bool Parceiro;
+            /// <summary>Lado do afastamento de quem segue (+1/-1).</summary>
+            public float Lado;
+        }
+
+        public const int SEM_TIME = -1;
+
+        /// <summary>Os bots da partida, na ordem de criacao.</summary>
+        public static Vaga[] Bots(bool dupla) => dupla ? Duplas(Balance.Match.DuplasInimigas) : Solo(Balance.Match.Bots);
+
+        /// <summary>Corpos na arena, o jogador incluso.</summary>
+        public static int Corpos(bool dupla) => 1 + Bots(dupla).Length;
+
+        public static Vaga[] Solo(int bots)
+        {
+            var v = new Vaga[Mathf.Max(bots, 0)];
+            for (int i = 0; i < v.Length; i++) v[i] = new Vaga { Time = SEM_TIME, Nascimento = i + 1, Segue = -1 };
+            return v;
+        }
+
+        public static Vaga[] Duplas(int duplas)
+        {
+            int n = Mathf.Max(duplas, 0);
+            var v = new Vaga[n * 2 + 1];
+            for (int t = 0; t < n; t++)
+            {
+                v[t * 2] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = -1 };
+                v[t * 2 + 1] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = t * 2, Lado = (t % 2 == 0) ? 1f : -1f };
+            }
+            v[n * 2] = new Vaga { Time = Combat.TIME_DO_PLAYER, Nascimento = 0, Segue = -1, Parceiro = true, Lado = 1f };
+            return v;
+        }
+    }
+
+    /// <summary>
     /// A casca fina da cena Main: garante EventSystem, cria Sfx, Menu, Ilha, Sol e a camera do menu (com a VitrineDoMenu) no
     /// boot, e a cada partida monta a arena (HUD, Castelo, Player, Bots/bonecos, Partida) e a desmonta no fim/abandono.
     /// Tudo por-partida vive sob "Arena" (restart = arena nova, limpa — estado que atravessa partida ja' vazou 3x no Godot).
@@ -151,6 +203,10 @@ namespace Arkana
         public Partida Partida { get; private set; }
         public Player Player { get; private set; }
         public readonly List<Bot> Bots = new List<Bot>();
+        /// <summary>O parceiro bot do jogador (modo DUPLA; null no solo e no treino). Tambem esta' em Bots (o ultimo).</summary>
+        public Bot Parceiro { get; private set; }
+        /// <summary>Esta partida e' em DUPLA (Menu.ModoDupla fora do treino), lido no toque do JOGAR.</summary>
+        public bool Dupla { get; private set; }
         public Hud Hud { get; private set; }
         public ArkMenu Menu { get; private set; }
         public Sfx Sfx { get; private set; }
@@ -248,7 +304,9 @@ namespace Arkana
             }
             if (Partida == null || Carregando) return;   // montando: a partida so' anda quando a arena estiver inteira
             Partida.Tick(dt);
-            if (Hud != null && !Partida.Treino) Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
+            if (Hud != null && !Partida.Treino) AtualizarHud();
+            // o parceiro mira o que o jogador tem SOB A MIRA enquanto nao tem alvo (o 1o acerto do jogador ja' o foca pelo Bus)
+            if (Parceiro != null && Hud != null) Parceiro.Percepcao.MiraDoParceiro(Hud.Marcas.Logica.SobAMira);
             DesenharTiros();
         }
 
@@ -300,6 +358,7 @@ namespace Arkana
             _quadro.Restart();   // o quadro do toque ja' conta: foto da vitrine + tela
             _parede.Restart();
             bool treino = ArkMenu.PedidoDeTreino;   // lido ANTES: Partida.Iniciar consome e zera
+            Dupla = !treino && ArkMenu.ModoDupla;   // o treino e' sozinho com os bonecos (o combo se aprende la' com o parceiro na partida)
             string slug = ArkSelecao.MagoEscolhido;
             // sorteado POR PARTIDA; Partida/Castelo/Zona/Loot guardam para a rede. SeedForcado > 0 so' para foto/teste:
             // sem ele cada foto pousa num lugar diferente e duas rodadas nao se comparam. A primeira dica tambem sai dele.
@@ -330,15 +389,16 @@ namespace Arkana
 
             Relevo relevo = GarantirIlha().Relevo;   // a do boot, quase sempre
             _arena = new GameObject(NomeArena).transform;
-            Vector3[] nasc = Nascimentos(relevo, seed);
-            int corpos = treino ? Bonecos : Balance.Match.Bots;
+            Montagem.Vaga[] vagas = Montagem.Bots(Dupla);
+            Vector3[] nasc = Nascimentos(relevo, seed, 1 + vagas.Length);
+            int corpos = treino ? Bonecos : vagas.Length;
 
             // 1. O PESO: cada mago e' um .fbx de ~10 MB com duas texturas de 2K; o castelo, o bau e as luvas tambem vem de
             //    Resources. A pre-carga os le' e descomprime no carregador do Unity, fora do quadro; o Resources.Load do
             //    Mago/Castelo/loot depois so' acha na memoria. As requisicoes ficam vivas (a lista) ate' o fim da montagem.
             var cargas = new List<ResourceRequest>();
             foreach (string nome in Modelos(slug, corpos, treino)) cargas.Add(Resources.LoadAsync<GameObject>(nome));
-            List<Passo> passos = Passos(slug, treino, seed, relevo, nasc, corpos);
+            List<Passo> passos = Passos(slug, treino, seed, relevo, nasc, corpos, vagas);
             float total = cargas.Count + passos.Count;
             var relogio = System.Diagnostics.Stopwatch.StartNew();
             while (true)
@@ -403,7 +463,7 @@ namespace Arkana
         /// antes do Embarcar do jogador; o Voo por ultimo, com todo corpo na arena. A HUD e a camera do jogador nascem
         /// APAGADAS (nada de Update com arena pela metade, nada de desenhar o mundo atras da tela) e acendem no aquecer.
         /// </summary>
-        List<Passo> Passos(string slug, bool treino, int seed, Relevo relevo, Vector3[] nasc, int corpos)
+        List<Passo> Passos(string slug, bool treino, int seed, Relevo relevo, Vector3[] nasc, int corpos, Montagem.Vaga[] vagas)
         {
             var p = new List<Passo>();
             p.Add(new Passo("hud", Textos.CarregaArena, () =>
@@ -419,8 +479,9 @@ namespace Arkana
                 Player = Player.Criar(_arena, slug);
                 Player.Camera.Cam.enabled = false;
                 Partida = new Partida(relevo);
-                Partida.Iniciar(seed, Balance.Match.Bots, treino, nasc[0]);
+                Partida.Iniciar(seed, treino ? 0 : vagas.Length, treino, nasc[0]);
                 Partida.Registrar(Player.Pawn, Player.Pawn.Slot);
+                if (Dupla) Combat.DefinirTime(Player.Pawn, Combat.TIME_DO_PLAYER);   // DEPOIS do Iniciar (o Combat.Reset limpa os times)
                 Hud.Vincular(Player.Pawn);
             }));
             p.Add(new Passo("loot", Textos.CarregaArena, () => VisualDaPartida.Criar(_arena, Partida)));   // loot, bau e tempestade na tela
@@ -449,8 +510,9 @@ namespace Arkana
                     p.Add(new Passo("bot" + (k + 1), Textos.CarregaMagos, () =>
                     {
                         Bot b = Bot.Criar(_arena, OutroSlug(slug, k), seed + k + 1);
-                        b.Embarcar(Castelo);   // todos caem do mesmo castelo, cada bot no seu instante sorteado
+                        b.Embarcar(Castelo);   // todos caem do mesmo castelo, cada bot no seu instante sorteado (a dupla, junto)
                         Partida.Registrar(b.Pawn, b.Pawn.Slot);
+                        Parear(b, vagas[k]);
                         Bots.Add(b);
                     }));
                 }
@@ -458,7 +520,7 @@ namespace Arkana
             p.Add(new Passo("ligar", Textos.CarregaArena, () =>
             {
                 if (!treino) Player.Embarcar(Castelo);
-                if (Partida.Treino) Hud.ModoTreino(); else Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos);
+                if (Partida.Treino) Hud.ModoTreino(); else AtualizarHud();
                 Player.Ligar(Hud);
                 Sfx.PosOuvinte = PosDoJogador;
             }));
@@ -471,7 +533,11 @@ namespace Arkana
                 VisualDoTerreno.Criar(_arena);        // fogo, carvao, gelo, eletrico, lama, muro
             }, true));
             p.Add(new Passo("kits", Textos.CarregaTerreno, () => VisualDosKits.Criar(_arena, Partida)));       // muralha, fio, poca, eco, tear + o aviso da suprema
-            p.Add(new Passo("impacto", Textos.CarregaTerreno, () => VisualDoImpacto.Criar(_arena, Partida)));  // estouro, piscada no corpo, bolha no escudo
+            p.Add(new Passo("impacto", Textos.CarregaTerreno, () =>
+            {
+                VisualDoImpacto.Criar(_arena, Partida);    // estouro, piscada no corpo, bolha no escudo
+                VisualDaSintonia.Criar(_arena, Partida);   // a canalizacao da dupla, os 10 combos e o "falhou" (17C; os dois modos)
+            }));
             p.Add(new Passo("abate", Textos.CarregaTerreno, () => VisualDoAbate.Criar(_arena, Partida)));      // derrubado e eliminado
             p.Add(new Passo("voo", Textos.CarregaCastelo, () => VisualDoVoo.Criar(_arena, Partida, Castelo), true));   // castelo vivo, rastro, vento, estalo
             // AQUECER atras da tela: a HUD e a camera do jogador acendem um quadro ANTES de a tela sair — o primeiro desenho do
@@ -530,8 +596,28 @@ namespace Arkana
             for (int i = 0; i < _tiros.Count; i++) if (_tiros[i] != null) Destroy(_tiros[i]);
             _tiros.Clear();
             _donoDoTiro.Clear();
-            Player = null; Castelo = null; Bots.Clear();
+            Player = null; Castelo = null; Bots.Clear(); Parceiro = null;
             Time.timeScale = 1f;   // a pausa da HUD nao pode atravessar partida
+        }
+
+        /// <summary>O topo da HUD: BOTS n no solo, DUPLAS n (times vivos) na dupla.</summary>
+        void AtualizarHud() => Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos, Dupla ? Partida.TimesVivos : -1);
+
+        /// <summary>Registra o time e forma a dupla da vaga (solo: nada — o de hoje). A outra ponta ja' existe: nasceu antes.</summary>
+        void Parear(Bot b, Montagem.Vaga v)
+        {
+            if (v.Time != Montagem.SEM_TIME) Combat.DefinirTime(b.Pawn, v.Time);
+            if (v.Parceiro)
+            {
+                b.Parear(Player.Pawn, true, v.Lado);   // salta quando o jogador salta, pousa ao lado dele, foca o alvo dele
+                Parceiro = b;
+            }
+            else if (v.Segue >= 0 && v.Segue < Bots.Count)
+            {
+                Bot lider = Bots[v.Segue];
+                b.Parear(lider.Pawn, true, v.Lado);
+                lider.Parear(b.Pawn, false);   // o lider nao segue, mas foca o alvo do outro e o socorre
+            }
         }
 
         void VoltarAoMenu()
@@ -541,18 +627,20 @@ namespace Arkana
 
         Vector3 PosDoJogador()
         {
+            IEntidade visto = Partida != null && Partida.PlayerFora ? Partida.ParceiroVivo() : null;   // espectador: ouve onde a camera esta'
+            if (visto != null) return visto.Pos;
             if (Player != null && Player.Pawn != null) return Player.Pawn.Pos;
             Camera c = Camera.main;
             return c != null ? c.transform.position : Vector3.zero;
         }
 
-        /// <summary>[0] = jogador (sorteado pelo seed), o resto para os bots. Sem ilha: centro + anel de 30 m (Main.gd).</summary>
-        static Vector3[] Nascimentos(Relevo relevo, int seed)
+        /// <summary>[0] = jogador (sorteado pelo seed), o resto para os bots. Sem ilha: centro + anel de 30 m (Main.gd) com
+        /// `total` pontos (os corpos da partida).</summary>
+        static Vector3[] Nascimentos(Relevo relevo, int seed, int total)
         {
             Vector3[] n = relevo != null ? relevo.Nascimentos : null;
             if (n == null || n.Length < 2)
             {
-                int total = 1 + Balance.Match.Bots;
                 var pts = new Vector3[total];
                 pts[0] = new Vector3(0f, 1f, 0f);
                 for (int i = 1; i < total; i++)

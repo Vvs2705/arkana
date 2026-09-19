@@ -14,7 +14,7 @@ namespace Arkana.Gameplay
     /// bots a 30 m vem); ao acabar, as runas do martelo apagam 3 s (sem tatica). Escudo so' pela porta
     /// KitRunner.RegenerarEscudo; a runa DEVOLVE no mesmo tique o que o Combat cobrou (como a Pyra devolve o fogo).
     /// ponytail: solo — a tempera e a runa valem para o proprio Brok (sem esquadrao nao ha' aliado a 8 m); a regeneracao
-    /// da bigorna ja' pega todo EhPlayer no raio.
+    /// da bigorna ja' pega todo aliado do dono (Combat.MesmoTime) no raio.
     /// </summary>
     public sealed class Brok : IHabilidade
     {
@@ -140,9 +140,6 @@ namespace Arkana.Gameplay
         public void EstadoAcabou(KitRunner k, string nome) { }
         public void TerrenoAtingido(KitRunner k, Elemento el, Vector3 pos, bool forte) { }
 
-        /// <summary>Tiro do proprio time passa (a muralha e a bigorna sao DELE): o dono e todo EhPlayer (o unico esquadrao hoje).</summary>
-        private static bool DoTime(IEntidade atirador, IEntidade dono) => atirador == dono || (atirador != null && atirador.EhPlayer);
-
         /// <summary>Tiro some NA peca: gasta a vida dela na regua do muro de terra (§14) e o impacto acontece ali.</summary>
         private static float Bater(Projetil p)
         {
@@ -188,7 +185,7 @@ namespace Arkana.Gameplay
                 for (int i = 0; i < vivos.Count; i++)
                 {
                     Projetil p = vivos[i];
-                    if (p == null || !p.Vivo || DoTime(p.Atirador, _dono)) continue;
+                    if (p == null || !p.Vivo || Combat.MesmoTime(p.Atirador, _dono)) continue;
                     if (!Cruza(p.Pos - p.Dir * (p.Velocidade * dt), p.Pos)) continue;
                     Vida -= Bater(p);
                     Bloqueados++;
@@ -276,7 +273,7 @@ namespace Arkana.Gameplay
                 float r = _s["raio"];
                 if ((_dono.Pos - Pos).sqrMagnitude <= r * r) KitRunner.RegenerarEscudo(_dono, q);
                 foreach (IEntidade a in k.AlvosPerto(Pos, r, _dono))
-                    if (a.EhPlayer) KitRunner.RegenerarEscudo(a, q);   // ESCUDO, nunca vida
+                    if (Combat.MesmoTime(_dono, a)) KitRunner.RegenerarEscudo(a, q);   // ESCUDO, nunca vida
                 return true;
             }
 
@@ -287,7 +284,7 @@ namespace Arkana.Gameplay
                 for (int i = 0; i < vivos.Count && Vida > 0f; i++)
                 {
                     Projetil p = vivos[i];
-                    if (p == null || !p.Vivo || DoTime(p.Atirador, _dono)) continue;
+                    if (p == null || !p.Vivo || Combat.MesmoTime(p.Atirador, _dono)) continue;
                     if (KitRunner.DistSegmento(alvo, p.Pos - p.Dir * (p.Velocidade * dt), p.Pos) > _s["raio_corpo"]) continue;
                     Vida -= Bater(p);
                 }

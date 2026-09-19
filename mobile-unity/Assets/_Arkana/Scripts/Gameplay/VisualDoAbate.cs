@@ -12,7 +12,8 @@ namespace Arkana.Gameplay
     /// (1) DERRUBADO por ESTADO (Derrubado.De a cada quadro: nao ha' evento para perder, e o reerguer/morrer apaga sozinho):
     /// ANEL vermelho pulsando no chao (brilho macio + aro grosso + onda que abre) e, sobre a cabeca de quem nao e' o jogador,
     /// um LOSANGO que se le' de longe (cresce com a distancia: o tamanho de tela segura) com o ANEL DO TEMPO em volta — o
-    /// esvaecimento drenando, ou o reerguer enchendo em verde. (2) ELIMINADO pelo Bus.EntityDied (uma vez): estouro de ALMA
+    /// esvaecimento drenando, ou o reerguer enchendo em verde. O ALIADO caido (o parceiro, na dupla) acende no AZUL-ALIADO
+    /// (Dupla.CorAliado), nunca no vermelho do inimigo: de longe se sabe quem ir buscar. (2) ELIMINADO pelo Bus.EntityDied (uma vez): estouro de ALMA
     /// na cor do elemento do mago (IdentidadeMago) — coluna de luz curta, faiscas subindo, clarao e onda no chao.
     /// (3) O CORPO de bot fica um instante cinza, AFUNDA soltando cinza e some. Quem depende do corpo (loot nao cai do
     /// morto; kill feed leva o NOME; BotsVivos e' contador da Partida; a camera segue o jogador) nao depende do VISUAL: so'
@@ -162,7 +163,7 @@ namespace Arkana.Gameplay
                     Caido c;
                     if (!_caidos.TryGetValue(pw, out c)) { c = PegarCaido(); _caidos[pw] = c; }
                     c.Quadro = _quadro;
-                    PintarCaido(c, pw, d, cam);
+                    PintarCaido(c, pw, d, cam, Dupla.CorDoCaido(p.Player, pw, CorCaido));
                 }
             Recolher();
             Colunas(dt);
@@ -171,17 +172,17 @@ namespace Arkana.Gameplay
 
         // ------------------------------------------------------------------ derrubado
 
-        void PintarCaido(Caido c, Pawn p, Derrubado d, Camera cam)
+        void PintarCaido(Caido c, Pawn p, Derrubado d, Camera cam, Color cor)
         {
             Vector3 pe = p.Pos;
             c.Chao.SetPositionAndRotation(pe + Vector3.up * 0.05f, Deitar(pe));
             float ciclo = (Time.time - c.Desde) * PulsoHz;
             ciclo -= Mathf.Floor(ciclo);                                  // 0 -> 1 a cada batida
             float bate = 0.5f + 0.5f * Mathf.Cos(ciclo * 2f * Mathf.PI);   // 1 no comeco da batida
-            Pintar(c.Aro, CorCaido, BrilhoAnel * (0.6f + 0.4f * bate), 1f);
+            Pintar(c.Aro, cor, BrilhoAnel * (0.6f + 0.4f * bate), 1f);
             c.Onda.transform.localScale = Vector3.one * (AnelM * (1f + 0.85f * ciclo));   // a onda ABRE e apaga
-            Pintar(c.Onda, CorCaido, BrilhoAnel, (1f - ciclo) * (1f - ciclo));
-            Pintar(c.Brilho, CorCaido, 0.9f, 0.35f + 0.25f * bate);
+            Pintar(c.Onda, cor, BrilhoAnel, (1f - ciclo) * (1f - ciclo));
+            Pintar(c.Brilho, cor, 0.9f, 0.35f + 0.25f * bate);
             // o losango e' para os OUTROS: o jogador caido ja' tem o painel da HUD (e ele tamparia a mira)
             bool marca = !p.EhPlayer && cam != null;
             if (c.Marca.gameObject.activeSelf != marca) c.Marca.gameObject.SetActive(marca);
@@ -191,7 +192,7 @@ namespace Arkana.Gameplay
             float s = Mathf.Max(MarcaM, Vector3.Distance(cam.transform.position, pos) * MarcaPorMetro) * (1f + 0.08f * bate);
             c.Marca.SetPositionAndRotation(pos, cam.transform.rotation);   // de frente para a camera: o arco e o quad no plano da tela
             c.Marca.localScale = new Vector3(s, s, s);
-            Pintar(c.Losango, CorCaido, BrilhoMarca, 1f);
+            Pintar(c.Losango, cor, BrilhoMarca, 1f);
             // o ANEL DO TEMPO: reerguendo enche em verde; senao drena com o esvaecimento
             bool verde = d.Progresso > 0f;
             float frac = verde ? d.Progresso : d.Esvaecimento;

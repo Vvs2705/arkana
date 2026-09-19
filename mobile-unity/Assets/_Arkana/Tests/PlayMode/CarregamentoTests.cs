@@ -63,7 +63,7 @@ namespace Arkana.Tests
             Assert.IsNotNull(main.Partida);
             Assert.AreEqual(treino, main.Partida.Treino);
             Assert.IsTrue(main.Partida.Rodando);
-            Assert.AreEqual(treino ? 0 : Balance.Match.Bots, main.Bots.Count, "todos os corpos criados");
+            Assert.AreEqual(treino ? 0 : Montagem.Bots(main.Dupla).Length, main.Bots.Count, "todos os corpos criados");
             Assert.IsTrue(main.Hud.gameObject.activeSelf, "a HUD acende no fim");
             Assert.AreSame(main.Player.Camera.Cam, Camera.main, "e quem filma e' a camera do jogador");
             Assert.AreEqual(1f, main.Tela.Logica.Progresso, "100% na tela");

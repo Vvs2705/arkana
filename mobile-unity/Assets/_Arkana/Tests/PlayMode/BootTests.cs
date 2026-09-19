@@ -61,8 +61,9 @@ namespace Arkana.Tests
             Assert.IsTrue(main.Partida.Rodando);
             Assert.IsNotNull(main.Player, "jogador criado");
             Assert.IsTrue(main.Player.Pawn.Viva, "jogador vivo");
-            Assert.AreEqual(Balance.Match.Bots, main.Bots.Count, "todos os bots criados");
-            Assert.AreEqual(Balance.Match.Bots, main.Partida.BotsVivos);
+            // o modo padrao e' DUPLA (parceiro + 6 duplas = 13 bots); o solo segue com Balance.Match.Bots
+            Assert.AreEqual(Montagem.Bots(main.Dupla).Length, main.Bots.Count, "todos os bots criados");
+            Assert.AreEqual(Montagem.Bots(main.Dupla).Length, main.Partida.BotsVivos);
             Assert.IsNotNull(main.Hud);
             Assert.IsNotNull(Camera.main, "a camera do jogador e' a MainCamera");
             // o volume sozinho nao muda nada na tela: a camera tem de pedir o pos

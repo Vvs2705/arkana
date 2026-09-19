@@ -761,8 +761,11 @@ namespace Arkana.Tests
                 + " particulas=" + part + " t=" + t.ToString("F2"));
             Assert.AreEqual(alvo.Nome, main.Hud.Logica.Eliminado, "a faixa diz QUEM caiu");
 
-            // DERRUBADO: o treino ja' levantou o boneco; ele cai pela porta do estado e um golpe drena o anel do tempo
+            // DERRUBADO: o treino ja' levantou o boneco; ele cai pela porta do estado e um golpe drena o anel do tempo. Caido SEM
+            // ninguem de pe' no time sai no proximo tique (onda 17): o boneco e o jogador ganham um aliado de pe' (outro boneco)
             yield return Esperar(0.5f);
+            Combat.DefinirTime(alvo, 7);
+            Combat.DefinirTime(main.Partida.Bonecos[1], 7);
             new Gameplay.Derrubado(alvo).Cair(eu);
             Combat.AplicarDano(alvo, 35f, Elemento.Terra, eu);
             yield return Esperar(1.2f);
@@ -771,7 +774,10 @@ namespace Arkana.Tests
             sb.AppendLine("29-derrubado: caido=" + (dd != null) + " esvaecimento=" + (dd != null ? dd.Esvaecimento.ToString("F2") : "-")
                 + " aneis=" + vis.CaidosNaTela + " clipe=" + alvo.Clipe);
 
-            // O JOGADOR DERRUBADO: a vinheta, o painel da HUD e o anel sob ele; o golpe tira luz e engrossa a vinheta
+            // O JOGADOR DERRUBADO: a vinheta, o painel da HUD e o anel sob ele; o golpe tira luz e engrossa a vinheta. O treino so'
+            // tem 2 bonecos: o de pe' passa para o time do jogador (e o caido levanta, senao sairia sem aliado de pe')
+            Gameplay.Derrubado.Reerguer(alvo);
+            Combat.DefinirTime(main.Partida.Bonecos[1], Combat.TIME_DO_PLAYER);
             new Gameplay.Derrubado(eu).Cair(null);
             Combat.AplicarDano(eu, 45f, Elemento.Terra, null);   // terra: sem queimadura, a vinheta da foto e' so' a do caido
             yield return Esperar(1f);
@@ -3075,6 +3081,207 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             Assert.Greater(mata.Contar(Arkana.World.Mata.Peca.Cogumelo), 0, "o cogumelo da Meshy nao nasceu (falta o 52-cogumelos.glb?)");
             Assert.Greater(mata.Contar(Arkana.World.Mata.Peca.Samambaia), 0, "a samambaia da Meshy nao nasceu (falta o 53-samambaia.glb?)");
+        }
+
+
+
+        /// <summary>
+        /// SINTONIA NO MUNDO (onda 17C): os 10 combos disparados no treino, numa FOLHA 5x2 (53-sintonia-combos: um quadro por
+        /// combo, na ordem do enum, a mesma camera de lado e do alto) + a CANALIZACAO pela camera do jogador (fio nas duas cores
+        /// do player ao parceiro passando pelo ponto, anel enchendo) + o FALHOU (anel rachando). A dupla e' o player e o Boneco1
+        /// (mesmo time); o alvo e' o Boneco2. Chama SintoniaEfeitos.Disparar e os eventos do Bus DIRETO: QUANDO fundir e' da
+        /// Core.Sintonia (teste proprio); aqui se julga a FORMA de cada combo no quadro — tem de se reconhecer de longe.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Sintonia_OsDezCombos()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            Assert.GreaterOrEqual(main.Partida.Bonecos.Count, 2, "o treino tem os dois bonecos");
+
+            void Levar(Gameplay.Pawn corpo, Vector3 p)
+            {
+                var cc = corpo.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                corpo.transform.position = new Vector3(p.x, Arkana.World.Ilha.AlturaDoChao(p.x, p.z) + 0.05f, p.z);
+                if (cc != null) cc.enabled = true;
+            }
+
+            Gameplay.Pawn eu = main.Player.Pawn;
+            var parceiro = (Gameplay.Pawn)main.Partida.Bonecos[0];
+            var alvo = (Gameplay.Pawn)main.Partida.Bonecos[1];
+            Combat.DefinirTime(eu, Combat.TIME_DO_PLAYER);
+            Combat.DefinirTime(parceiro, Combat.TIME_DO_PLAYER);
+            Combat.DefinirTime(alvo, 1);
+            var vis = Object.FindFirstObjectByType<Gameplay.VisualDaSintonia>();
+            bool criado = vis == null;   // a Main da 17D cria; sem ela, a foto cria o seu
+            if (criado) vis = Gameplay.VisualDaSintonia.Criar(null, main.Partida);
+
+            // o ponto do combo a 14 m a frente do jogador; o parceiro a direita, os dois de frente para o alvo
+            Vector3 frente = alvo.Pos - eu.Pos; frente.y = 0f; frente.Normalize();
+            Vector3 lado = new Vector3(frente.z, 0f, -frente.x);
+            Vector3 ponto = eu.Pos + frente * 14f;
+            ponto.y = Arkana.World.Ilha.AlturaDoChao(ponto.x, ponto.z);
+            Levar(parceiro, eu.Pos + frente * 3f + lado * 6f);
+            Levar(alvo, ponto);
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(frente.x, frente.z);
+            Arkana.Terrain.TerrenoReativo terreno = Arkana.Terrain.TerrenoReativoBehaviour.Atual != null ? Arkana.Terrain.TerrenoReativoBehaviour.Atual.Terreno : null;
+            yield return Esperar(0.4f);
+
+            // 53-sintonia-canalizacao: a camera DO JOGADOR (com a HUD) no meio da canalizacao
+            Bus.EmitSintoniaCanalizando(ComboSintonia.ExplosaoDePlasma, eu, parceiro, ponto, Balance.Sintonia.CanalizacaoS);
+            yield return Esperar(Balance.Sintonia.CanalizacaoS * 0.6f);
+            Foto(main.Player.Camera.Cam, "53-sintonia-canalizacao", true);
+            Bus.EmitSintoniaFalhou(ComboSintonia.ExplosaoDePlasma, eu, parceiro, ponto);
+            yield return Esperar(0.2f);
+            Foto(main.Player.Camera.Cam, "53-sintonia-falhou", true);
+            yield return Esperar(0.6f);
+
+            // a FOLHA: a mesma camera de lado e do alto (a area inteira do maior combo, 12 m, cabe no quadro)
+            Camera cam = CameraTemporaria("CamFotoSintonia", ponto - frente * 16f - lado * 9f + Vector3.up * 11f, ponto + Vector3.up * 1.5f, Color.gray);
+            const int cw = 640, ch = 400, colunas = 5;
+            var combos = (ComboSintonia[])System.Enum.GetValues(typeof(ComboSintonia));
+            int linhas = (combos.Length + colunas - 1) / colunas;
+            var folha = new Texture2D(cw * colunas, ch * linhas, TextureFormat.RGB24, false);
+            var rt = new RenderTexture(cw, ch, 24, RenderTextureFormat.ARGB32);
+            cam.targetTexture = rt;
+            var sb = new System.Text.StringBuilder("53-sintonia-combos:");
+            for (int i = 0; i < combos.Length; i++)
+            {
+                ComboSintonia c = combos[i];
+                Gameplay.SintoniaEfeitos.Reset();
+                if (terreno != null) terreno.Reset();   // o fogo/lama do quadro anterior nao suja o proximo
+                Levar(alvo, ponto);
+                yield return Esperar(1.2f);             // o estouro anterior termina de cair
+                Elemento x, y;
+                Gameplay.SintoniaEfeitos.Par(c, out x, out y);
+                var d = new DisparoSintonia { Combo = c, A = eu, B = parceiro, ElA = x, ElB = y, Ponto = ponto, Alvo = alvo, Dano = 20f };
+                Gameplay.SintoniaEfeitos.Disparar(d);
+                Bus.EmitSintoniaDisparou(d);
+                // cada forma no seu auge: o plasma estufando, o raio da nuvem aceso, o funil e a parede de areia ja' cheios
+                float auge;
+                switch (c)
+                {
+                    case ComboSintonia.ExplosaoDePlasma: auge = 0.18f; break;
+                    case ComboSintonia.NuvemTempestuosa: auge = 0.12f; break;
+                    case ComboSintonia.Eletrocussao: auge = 0.3f; break;
+                    case ComboSintonia.ChuvaDeMagma: auge = 0.35f; break;
+                    case ComboSintonia.TempestadeTorrencial: auge = 0.5f; break;
+                    case ComboSintonia.CristaisCarregados: auge = 0.5f; break;
+                    case ComboSintonia.TempestadeDeAreia: auge = 1.6f; break;
+                    default: auge = 1.1f; break;
+                }
+                yield return Esperar(auge);
+                cam.Render();
+                RenderTexture.active = rt;
+                folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (linhas - 1 - i / colunas) * ch);
+                RenderTexture.active = null;
+                int particulas = 0;
+                foreach (var ps in vis.GetComponentsInChildren<ParticleSystem>()) particulas += ps.particleCount;
+                sb.Append(" " + c + "(ativos=" + Gameplay.SintoniaEfeitos.Ativos.Count + ",particulas=" + particulas + ")");
+                Assert.Greater(particulas + Gameplay.SintoniaEfeitos.Ativos.Count, 0, c + ": o combo aparece");
+            }
+            folha.Apply();
+            Directory.CreateDirectory(Pasta);
+            File.WriteAllBytes(Path.Combine(Pasta, "53-sintonia-combos.png"), folha.EncodeToPNG());
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString() + "\n");
+            Gameplay.SintoniaEfeitos.Reset();
+            cam.targetTexture = null;
+            Object.Destroy(folha);
+            rt.Release();
+            Object.Destroy(rt);
+            Object.Destroy(cam.gameObject);
+            if (criado) Object.Destroy(vis.gameObject);
+        }
+
+        // ---- COLAR em FotoTests.cs dentro da classe (antes do ultimo `}` dela). Onda 17D (Dupla em jogo).
+
+        /// <summary>
+        /// A DUPLA EM JOGO (onda 17D). 54-dupla-menu: o seletor MODO: DUPLA | SOLO colado a' esquerda do JOGAR (DUPLA aceso).
+        /// 54-dupla-parceiro: a partida NORMAL em dupla, os dois no chao — o parceiro a' frente com a marca AZUL (nome + vida),
+        /// DUPLAS 7 no topo, o ponto azul no minimapa, o anel da Sintonia em volta do ataque e o SINTONIA PRONTA (a borda
+        /// forcada pela logica). 54-dupla-sintonia: a faixa da canalizacao (SINTONIA + TORNADO FLAMEJANTE nas duas cores, o
+        /// trilho na metade), disparada DIRETO pelo Bus (a regra da 17B nao e' o assunto da foto). 54-dupla-quebrada: o falhou.
+        /// 54-dupla-espectador: o jogador eliminado (derrubado e finalizado) com o time vivo — a camera no parceiro e a placa
+        /// ESPECTANDO · nome, sem os controles do corpo. O parceiro fica PARADO (bot desligado): a foto e' da leitura, nao da IA.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Dupla_ParceiroESintonia()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return Esperar(1.2f);   // a vitrine poe o mago no pico
+            Arkana.Menu.Menu.ModoDupla = true;   // o padrao, sem depender do PlayerPrefs do editor (a foto nao grava)
+            Tocar("TapTitulo");
+            yield return null;
+            Assert.IsNotNull(GameObject.Find("BtnModoDupla"), "o menu tem o seletor MODO (DUPLA)");
+            Assert.IsNotNull(GameObject.Find("BtnModoSolo"), "e o SOLO");
+            Foto(main.CameraDoMenu, "54-dupla-menu", true);
+
+            Bus.EmitGameStartRequested();
+            for (int n = 0; main.Carregando && n < 2000; n++) yield return null;
+            yield return Esperar(1f);   // a tela de carregamento esvaece
+            Assert.IsTrue(main.Dupla, "JOGAR com o modo DUPLA monta a partida em dupla");
+            Assert.IsNotNull(main.Parceiro, "o parceiro bot nasceu");
+            Assert.AreEqual(14, main.Partida.Arena.Count, "jogador + parceiro + 6 duplas");
+            Assert.AreEqual(7, main.Partida.TimesVivos, "7 times");
+            Assert.IsTrue(Combat.MesmoTime(main.Player.Pawn, main.Parceiro.Pawn), "o parceiro e' do time do jogador");
+
+            // os dois no chao, lado a lado: saem do castelo pela porta (a Queda so' aceita posicao la') e pousam no ato
+            Gameplay.Pawn eu = main.Player.Pawn, par = main.Parceiro.Pawn;
+            main.Parceiro.enabled = false;
+            Vector3 n0 = Arkana.World.Ilha.Atual.Relevo.Nascimentos[0];
+            main.Castelo.Saltar(eu.gameObject);
+            eu.Aterrar(new Vector3(n0.x, -999f, n0.z));
+            yield return null;
+            OlharParaOCentro(main);
+            float yaw = main.Player.Camera.Logica.Yaw;
+            Vector3 frente = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)), lado = new Vector3(frente.z, 0f, -frente.x);
+            main.Castelo.Saltar(par.gameObject);
+            Vector3 pp = eu.Pos + frente * 6f + lado * 2.5f;
+            par.Aterrar(new Vector3(pp.x, -999f, pp.z));
+            main.Hud.Dupla.Logica.Recarregar(12f, Balance.Sintonia.CooldownS);   // a BORDA: no proximo quadro a recarga real (0) acende o PRONTA
+            yield return Esperar(1.2f);
+            Foto(main.Player.Camera.Cam, "54-dupla-parceiro", true);
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("54-dupla-parceiro: duplas=" + main.Hud.Duplas + " parceiro=" + par.Nome + " dist=" + Vector3.Distance(eu.Pos, par.Pos).ToString("F1")
+                + " marca=" + (main.Hud.Marcas.Logica.Parceiro == (IEntidade)par) + " pronta=" + main.Hud.Dupla.Logica.ProntaAlfa.ToString("F2")
+                + " recarga=" + main.Hud.Dupla.Logica.Recarga.ToString("F2"));
+            Assert.AreEqual(7, main.Hud.Duplas, "o topo conta DUPLAS");
+            Assert.AreSame(par, main.Hud.Marcas.Logica.Parceiro, "o parceiro tem a marca azul");
+
+            // a FAIXA DA SINTONIA: canalizando (o trilho enche em CanalizacaoS), depois o falhou
+            Vector3 ponto = eu.Pos + frente * 10f;
+            Bus.EmitSintoniaCanalizando(ComboSintonia.TornadoFlamejante, eu, par, ponto, Balance.Sintonia.CanalizacaoS);
+            yield return Esperar(Balance.Sintonia.CanalizacaoS * 0.5f);
+            Foto(main.Player.Camera.Cam, "54-dupla-sintonia", true);
+            sb.AppendLine("54-dupla-sintonia: estado=" + main.Hud.Dupla.Logica.Estado + " progresso=" + main.Hud.Dupla.Logica.Progresso.ToString("F2")
+                + " alfa=" + main.Hud.Dupla.Logica.Alfa.ToString("F2"));
+            Assert.AreEqual(Arkana.UI.DuplaHudLogica.Faixa.Canalizando, main.Hud.Dupla.Logica.Estado, "a faixa acende na canalizacao da dupla");
+            Bus.EmitSintoniaFalhou(ComboSintonia.TornadoFlamejante, eu, par, ponto);
+            yield return Esperar(0.3f);
+            Foto(main.Player.Camera.Cam, "54-dupla-quebrada", true);
+            Assert.AreEqual(Arkana.UI.DuplaHudLogica.Faixa.Quebrada, main.Hud.Dupla.Logica.Estado, "o falhou vira SINTONIA QUEBRADA");
+            yield return Esperar(Arkana.UI.DuplaHudLogica.QuebradaS);
+
+            // o ESPECTADOR: com o parceiro de pe' o jogador CAI; o segundo golpe o finaliza — o time segue vivo
+            Combat.AplicarDano(eu, 9999f, Elemento.Terra, null);
+            Combat.AplicarDano(eu, 9999f, Elemento.Terra, null);
+            yield return Esperar(1.5f);   // a camera assenta nas costas do parceiro
+            Foto(main.Player.Camera.Cam, "54-dupla-espectador", true);
+            sb.AppendLine("54-dupla-espectador: vivo=" + eu.Viva + " fora=" + main.Partida.PlayerFora + " seguindo=" + (main.Player.Camera.Seguindo != null ? main.Player.Camera.Seguindo.Nome : "-")
+                + " fluxo=" + main.Fluxo.Atual);
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
+            Assert.IsFalse(eu.Viva, "o jogador foi eliminado");
+            Assert.IsTrue(main.Partida.PlayerFora, "com o parceiro vivo, o jogador fica de FORA (nao e' derrota)");
+            Assert.AreEqual(FluxoDeJogo.Estado.Partida, main.Fluxo.Atual, "a partida segue");
+            Assert.AreSame(par, main.Player.Camera.Seguindo, "a camera segue o parceiro");
         }
 
     }

@@ -195,7 +195,7 @@ namespace Arkana.Gameplay
                 for (int i = vivos.Count - 1; i >= 0; i--)
                 {
                     Projetil p = vivos[i];
-                    if (p == null || !p.Vivo || p.Atirador == _dona) continue;
+                    if (p == null || !p.Vivo || Combat.MesmoTime(_dona, p.Atirador)) continue;   // so' tiro INIMIGO
                     float d = Vector3.Distance(p.Pos, centro);
                     if (d > _s["raio"] || d < _s["zona_morta"]) continue;   // ZONA MORTA: nada de corpo a corpo
                     vivos.RemoveAt(i);   // absorvido: sai da arena sem impacto (nem terreno, nem dano)
@@ -210,7 +210,7 @@ namespace Arkana.Gameplay
             {
                 KitRunner.RegenerarEscudo(_dona, quanto);
                 foreach (IEntidade a in k.AlvosPerto(centro, _s["raio_aliado"], _dona))
-                    if (a.EhPlayer) KitRunner.RegenerarEscudo(a, quanto);
+                    if (Combat.MesmoTime(_dona, a)) KitRunner.RegenerarEscudo(a, quanto);
             }
         }
     }

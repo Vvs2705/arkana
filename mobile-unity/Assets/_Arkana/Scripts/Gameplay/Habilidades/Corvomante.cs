@@ -182,7 +182,8 @@ namespace Arkana.Gameplay
             return dano;
         }
 
-        private static bool Inimigo(IEntidade eu, IEntidade e) => e != null && e != eu && !(eu.EhPlayer && e.EhPlayer);
+        /// <summary>Tiro sem dono (null) nao e' inimigo; o resto e' a pergunta unica do Combat.</summary>
+        private static bool Inimigo(IEntidade eu, IEntidade e) => e != null && !Combat.MesmoTime(eu, e);
 
         private static float Plano(Vector3 a, Vector3 b)
         {

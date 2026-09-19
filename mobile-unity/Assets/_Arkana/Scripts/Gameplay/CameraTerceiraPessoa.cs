@@ -1,4 +1,5 @@
 using UnityEngine;
+using Arkana.Core;
 using Arkana.Menu;
 using Arkana.World;
 
@@ -68,6 +69,18 @@ namespace Arkana.Gameplay
         public Vector3 Direita => new Vector3(Mathf.Cos(Yaw), 0f, -Mathf.Sin(Yaw));
         public Vector3 Direcao3D => Rotacao * Vector3.forward;
 
+        /// <summary>ESPECTADOR (contrato 17G): o jogador foi eliminado e o time dele segue vivo -> a camera segue o parceiro.
+        /// Fora disso (ou sem parceiro), o dono de sempre.</summary>
+        public static IEntidade QuemSeguir(IEntidade dono, bool playerFora, IEntidade parceiro) => playerFora && parceiro != null ? parceiro : dono;
+
+        /// <summary>Espectando ninguem gira a camera (o dedo do morto nao orbita): o yaw vai para as COSTAS de quem e' seguido,
+        /// na taxa `k` (0..1 por quadro) — se ve' o que ele ve'.</summary>
+        public void Acompanhar(float yawRad, float k)
+        {
+            Yaw = Mathf.LerpAngle(Yaw * Mathf.Rad2Deg, yawRad * Mathf.Rad2Deg, k) * Mathf.Deg2Rad;
+            Pitch = Mathf.Lerp(Pitch, PITCH_PADRAO, k);
+        }
+
         /// <summary>Do pivo (pe' do mago) ao olho (ombro) e a posicao DESEJADA (antes da colisao).</summary>
         public void Posicionar(Vector3 pivoPe, out Vector3 olho, out Vector3 desejada)
         {
@@ -94,6 +107,10 @@ namespace Arkana.Gameplay
         public Pawn Alvo;
         /// <summary>Quando o mago viaja no castelo, o pivo e' o castelo.</summary>
         public Transform Castelo;
+        /// <summary>Quem a camera segue AGORA: o Alvo, ou o parceiro com o jogador fora (espectador). A HUD le'.</summary>
+        public Pawn Seguindo { get; private set; }
+        /// <summary>1/s: quao rapido o espectador assenta nas costas do parceiro. KNOB (game feel).</summary>
+        const float EspectadorResposta = 2.5f;
 
         public static CameraTerceiraPessoa Criar(Pawn alvo)
         {
@@ -122,16 +139,21 @@ namespace Arkana.Gameplay
         void LateUpdate()
         {
             if (Alvo == null) return;
-            Queda q = Alvo.Queda;
+            Partida partida = Partida.Atual;
+            bool fora = partida != null && partida.PlayerFora;
+            Pawn alvo = CameraLogica.QuemSeguir(Alvo, fora, fora ? partida.ParceiroVivo() : null) as Pawn ?? Alvo;
+            Seguindo = alvo;
+            if (alvo != Alvo) Logica.Acompanhar(alvo.transform.eulerAngles.y * Mathf.Deg2Rad, Mathf.Min(EspectadorResposta * Time.deltaTime, 1f));
+            Queda q = alvo.Queda;
             bool noCastelo = q != null && q.Fase == Queda.NO_CASTELO && Castelo != null;
             Logica.ModoAtual = noCastelo ? CameraLogica.Modo.Castelo : (q != null && q.NoAr ? CameraLogica.Modo.Queda : CameraLogica.Modo.Normal);
             Logica.Tick(Time.deltaTime);
-            Vector3 pivo = noCastelo ? Castelo.position : Alvo.Pos;
+            Vector3 pivo = noCastelo ? Castelo.position : alvo.Pos;
             Vector3 olho, desejada;
             Logica.Posicionar(pivo, out olho, out desejada);
             Vector3 centro = noCastelo ? pivo : pivo + Vector3.up * CameraLogica.ALTURA_PIVO;
             bool deCima;
-            transform.position = Colidir(centro, olho, desejada, Alvo.transform, out deCima);
+            transform.position = Colidir(centro, olho, desejada, alvo.transform, out deCima);
             // de cima, a camera olha para a cabeca do mago (a rotacao da Logica apontaria para o horizonte, de dentro do canto)
             transform.rotation = deCima ? Quaternion.LookRotation(centro - transform.position, Vector3.up) : Logica.Rotacao;
         }

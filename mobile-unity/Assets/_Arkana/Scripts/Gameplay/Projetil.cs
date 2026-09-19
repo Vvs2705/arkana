@@ -93,7 +93,8 @@ namespace Arkana.Gameplay
             if (acerto != null)
             {
                 IEntidade alvo = acerto(Pos);
-                if (alvo != null && alvo != Atirador) { Impacto(alvo, vizinhos); return false; }
+                // PONTE A4: o tiro direto ATRAVESSA o aliado (fogo amigo desligado); o terreno segue pegando todo mundo
+                if (alvo != null && !Combat.MesmoTime(alvo, Atirador)) { Impacto(alvo, vizinhos); return false; }
             }
             if (AlcanceRestante <= 0f) Vivo = false;
             return Vivo;
@@ -102,12 +103,13 @@ namespace Arkana.Gameplay
         /// <summary>
         /// O ELEMENTO DEIXA DE SER COSMETICO: a reacao no alvo se resolve ANTES do dano (conducao multiplica este
         /// tiro). Dano SO' pelo Combat. TerrainHit SEMPRE: o terreno decide se reage; este codigo nunca muda o mundo.
+        /// E' o impacto UNICO (corpo; chao, muro e peca de kit chegam com alvo null): a Sintonia ouve daqui, por ultimo.
         /// </summary>
         public void Impacto(IEntidade alvo, IList<IEntidade> vizinhos = null)
         {
             if (!Vivo) return;
             Vivo = false;
-            if (alvo != null && alvo != Atirador)
+            if (alvo != null && !Combat.MesmoTime(alvo, Atirador))
             {
                 float mult = Efeitos.Aplicar(alvo, ElementoDoTiro, Dano, Atirador, vizinhos);
                 float efetivo = Combat.AplicarDano(alvo, Dano * mult, ElementoDoTiro, Atirador);
@@ -116,6 +118,7 @@ namespace Arkana.Gameplay
                     Bus.EmitPlayerKilledBot(alvo.Nome);
             }
             Bus.EmitTerrainHit(ElementoDoTiro, Pos, false);
+            Sintonia.RegistrarImpacto(Atirador, ElementoDoTiro, Pos, alvo, Dano);
         }
 
         /// <summary>EMPURRAO = base x fator do elemento. Dobrado so' no chao (nada de juggle no ar).</summary>

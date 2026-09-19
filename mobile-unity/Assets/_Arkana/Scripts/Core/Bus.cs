@@ -51,6 +51,9 @@ namespace Arkana.Core
         public static event Action<int, Vector3, float, float> ZonaFechando;       // fase, centro, raio, duracao
         public static event Action<float, float> ZonaDano;                         // dano efetivo, dps da fase (1x por segundo)
         public static event Action<bool> ZonaEstado;                               // dentro (na BORDA)
+        public static event Action<ComboSintonia, IEntidade, IEntidade, Vector3, float> SintoniaCanalizando; // combo, a, b, ponto, duracao (todos veem)
+        public static event Action<DisparoSintonia> SintoniaDisparou;              // DEPOIS de Sintonia.Efeito
+        public static event Action<ComboSintonia, IEntidade, IEntidade, Vector3> SintoniaFalhou; // combo, a, b, ponto
 
         public static void EmitDamageApplied(IEntidade target, float amount, Elemento element, IEntidade source, bool onShield) => DamageApplied?.Invoke(target, amount, element, source, onShield);
         public static void EmitShieldChanged(IEntidade e, float shield, float shieldMax, int level) => ShieldChanged?.Invoke(e, shield, shieldMax, level);
@@ -91,6 +94,9 @@ namespace Arkana.Core
         public static void EmitZonaFechando(int fase, Vector3 centro, float raio, float duracao) => ZonaFechando?.Invoke(fase, centro, raio, duracao);
         public static void EmitZonaDano(float dano, float dps) => ZonaDano?.Invoke(dano, dps);
         public static void EmitZonaEstado(bool dentro) => ZonaEstado?.Invoke(dentro);
+        public static void EmitSintoniaCanalizando(ComboSintonia c, IEntidade a, IEntidade b, Vector3 ponto, float duracao) => SintoniaCanalizando?.Invoke(c, a, b, ponto, duracao);
+        public static void EmitSintoniaDisparou(DisparoSintonia d) => SintoniaDisparou?.Invoke(d);
+        public static void EmitSintoniaFalhou(ComboSintonia c, IEntidade a, IEntidade b, Vector3 ponto) => SintoniaFalhou?.Invoke(c, a, b, ponto);
 
         /// <summary>Zera TODOS os ouvintes. Chamar no SetUp de cada teste e ao trocar de cena.</summary>
         public static void Reset()
@@ -105,6 +111,7 @@ namespace Arkana.Core
             BauCanalizando = null; BauAberto = null; StatusAplicado = null; QuedaFase = null;
             QuedaAltura = null; CasteloRota = null; ZonaAbertura = null; ZonaFormando = null;
             ZonaAvisou = null; ZonaFechando = null; ZonaDano = null; ZonaEstado = null;
+            SintoniaCanalizando = null; SintoniaDisparou = null; SintoniaFalhou = null;
         }
     }
 }

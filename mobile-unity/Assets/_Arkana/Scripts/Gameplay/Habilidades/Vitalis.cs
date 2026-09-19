@@ -14,7 +14,7 @@ namespace Arkana.Gameplay
     /// a Lumen (a cura para); com a Lumen fora — curando, ou apagada 3s depois do Jardim — a passiva DESLIGA; o Jardim e' um
     /// FAROL (coluna de luz de `farol_altura` m que a casca desenha, por cima de qualquer parede).
     /// SOLO (hoje): ninguem cai (Derrubado.SOLO_DERRUBA) e nao ha' aliado — a passiva espera o esquadrao e a Lumen cura a
-    /// propria Vitalis. ponytail: com duplas/trios, Vai Lumen segue o aliado EhPlayer mais ferido a `alcance` m e o dano
+    /// propria Vitalis. ponytail: com duplas/trios, Vai Lumen segue o aliado (Combat.MesmoTime) mais ferido a `alcance` m e o dano
     /// que a dissipa passa a ser o DELE.
     /// </summary>
     public sealed class Vitalis : IHabilidade
@@ -118,7 +118,7 @@ namespace Arkana.Gameplay
                 if (_busca < TICK) return;
                 _busca = 0f;
                 foreach (IEntidade a in k.AlvosPerto(k.Pos, p["alcance"], k.Dono))
-                    if (Vex.MesmoTime(k.Dono, a) && Derrubado.Esta(a)) { _reerguendo = a; break; }
+                    if (Combat.MesmoTime(k.Dono, a) && Derrubado.Esta(a)) { _reerguendo = a; break; }
                 if (_reerguendo == null) return;
                 d = Derrubado.De(_reerguendo);
             }
@@ -168,7 +168,7 @@ namespace Arkana.Gameplay
                     Selo.Abrir();
                     foreach (IEntidade e in k.AlvosPerto(Centro, Raio, k.Dono))
                     {
-                        if (!Vex.MesmoTime(k.Dono, e)) { if (_s["selo_inimigo"] > 0f) Selo.Selar(e); continue; }
+                        if (!Combat.MesmoTime(k.Dono, e)) { if (_s["selo_inimigo"] > 0f) Selo.Selar(e); continue; }
                         // aliado dentro (so' existe com esquadrao): reergue mais rapido ou regenera
                         if (Derrubado.Esta(e)) Derrubado.Acelerar(e, _s["reerguer_mult"], TICK * 2f);
                         else e.Vital.Curar(_s["cura"] * TICK);

@@ -270,7 +270,7 @@ namespace Arkana.Gameplay
                 _acc = 0f;
                 Ondas++;
                 foreach (IEntidade e in k.AlvosPerto((A + B) * 0.5f, Vector3.Distance(A, B) * 0.5f + MeiaLargura + 1f, k.Dono))
-                    if (!Vex.MesmoTime(k.Dono, e) && Dentro(e.Pos)) Combat.AplicarDano(e, _s["dano"], EL, k.Dono);
+                    if (!Combat.MesmoTime(k.Dono, e) && Dentro(e.Pos)) Combat.AplicarDano(e, _s["dano"], EL, k.Dono);
                 return Ondas < (int)_s["ondas"];
             }
         }

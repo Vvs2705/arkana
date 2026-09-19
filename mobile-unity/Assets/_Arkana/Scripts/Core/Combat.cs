@@ -17,6 +17,35 @@ namespace Arkana.Core
         /// </summary>
         public static Func<IEntidade, IEntidade, bool> InterceptarMorte;
 
+        // ------------------------------------------------------------------ TIMES
+        /// <summary>O time do humano (e do parceiro bot dele no modo DUPLA).</summary>
+        public const int TIME_DO_PLAYER = 0;
+        // A cena registra (0..n). Quem nunca foi registrado ganha, na 1a pergunta, um time NEGATIVO so' dele — o FFA de hoje
+        // e os fakes de teste, que nao registram nada; negativo nunca colide com time da cena.
+        private static readonly Dictionary<IEntidade, int> _times = new Dictionary<IEntidade, int>();
+        private static int _avulso;
+
+        /// <summary>A cena (Main) chama no nascimento — DEPOIS do Partida.Iniciar, que chama Reset(). Reset() limpa o registro.</summary>
+        public static void DefinirTime(IEntidade e, int time) { if (e != null) _times[e] = time; }
+
+        /// <summary>
+        /// Registrado → o registrado. Sem registro → EhPlayer ? TIME_DO_PLAYER : um time UNICO daquela entidade (cada um
+        /// sozinho: compativel com os testes e fakes que ja' existem). EhPlayer so' decide isto; "e' aliado?" e' MesmoTime.
+        /// </summary>
+        public static int TimeDe(IEntidade e)
+        {
+            if (e == null) return int.MinValue;   // ninguem
+            int t;
+            if (_times.TryGetValue(e, out t)) return t;
+            if (e.EhPlayer) return TIME_DO_PLAYER;
+            t = --_avulso;
+            _times[e] = t;
+            return t;
+        }
+
+        /// <summary>A UNICA pergunta "e' aliado?" do jogo (kits, Derrubado, Partida, anti-farm, bots). null → false.</summary>
+        public static bool MesmoTime(IEntidade a, IEntidade b) => a != null && b != null && (a == b || TimeDe(a) == TimeDe(b));
+
         /// <summary>Janela de DoT por alvo: quanto ja' foi aplicado neste tique (o teto somado mora aqui).</summary>
         private sealed class JanelaDot { public float Tempo; public float Aplicado; }
         // Alvo morto sai do dicionario — sem isso vaza uma entrada por bot por partida (cicatriz do Godot).
@@ -119,11 +148,13 @@ namespace Arkana.Core
         /// <summary>m/s do empurrao deste elemento (Combate.Knockback x Perfil.Empurrao).</summary>
         public static float Empurrao(Elemento el) => Balance.Combate.Knockback * Balance.Perfil(el).Empurrao;
 
-        /// <summary>Zera janelas de DoT e o interceptador. Chamar no SetUp de teste e ao trocar de cena.</summary>
+        /// <summary>Zera janelas de DoT, o interceptador e o registro de times. Chamar no SetUp de teste e ao trocar de cena.</summary>
         public static void Reset()
         {
             _dot.Clear();
             InterceptarMorte = null;
+            _times.Clear();
+            _avulso = 0;
         }
 
         private static Elemento ElementoDoDot(string tipo)
@@ -140,9 +171,7 @@ namespace Arkana.Core
         /// </summary>
         private static void Creditar(IEntidade fonte, IEntidade alvo, float dano)
         {
-            if (fonte == null || fonte == alvo || fonte.Vital == null) return;
-            // Time: hoje o unico esquadrao e' o do player. Duplas/trios entram AQUI, num lugar so'.
-            if (fonte.EhPlayer && alvo.EhPlayer) return;
+            if (fonte == null || fonte.Vital == null || MesmoTime(fonte, alvo)) return;   // o proprio e o aliado nao contam
             Vitalidade fv = fonte.Vital;
             fv.DanoCausado += dano;
             if (fv.Evoluir()) Bus.EmitShieldChanged(fonte, fv.Escudo, fv.EscudoMax, fv.Nivel);

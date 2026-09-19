@@ -157,7 +157,7 @@ namespace Arkana.Gameplay
                 if ((_dono.Pos - Pos).sqrMagnitude <= r * r) Curar(_dono, q);
                 foreach (IEntidade a in k.AlvosPerto(Pos, r, _dono))
                 {
-                    if (!a.EhPlayer) continue;
+                    if (!Combat.MesmoTime(_dono, a)) continue;
                     float curou = Curar(a, q);
                     if (curou > 0f) Curar(_dono, curou * k.Dados.Passiva["cura_propria"]);   // Sangue da Estepe
                 }
@@ -171,7 +171,7 @@ namespace Arkana.Gameplay
                 for (int i = 0; i < vivos.Count && Vida > 0f; i++)
                 {
                     Projetil p = vivos[i];
-                    if (p == null || !p.Vivo || p.Atirador == _dono || (p.Atirador != null && p.Atirador.EhPlayer)) continue;
+                    if (p == null || !p.Vivo || Combat.MesmoTime(p.Atirador, _dono)) continue;
                     if (KitRunner.DistSegmento(meio, p.Pos - p.Dir * (p.Velocidade * dt), p.Pos) > _t["raio_corpo"]) continue;
                     Vida -= p.Dano * Balance.Perfil(p.ElementoDoTiro).Estrutura;   // a regua do muro de terra (§14)
                     p.Impacto(null);   // o tiro morre no totem: o impacto acontece ali
@@ -246,7 +246,7 @@ namespace Arkana.Gameplay
                 float largura = _s["largura"];
                 foreach (IEntidade alvo in k.AlvosPerto(b, largura + Vector3.Distance(a, b), _dono))
                 {
-                    if (alvo.EhPlayer || Atingidos.Contains(alvo)) continue;   // empurra INIMIGO
+                    if (Combat.MesmoTime(_dono, alvo) || Atingidos.Contains(alvo)) continue;   // empurra INIMIGO
                     if (KitRunner.DistSegmento(alvo.Pos, a, b) > largura) continue;
                     if (Efeitos.De(alvo).IframesLeft > 0f) continue;   // a esquiva fura o bisao (imunidade total)
                     Atingidos.Add(alvo);
@@ -266,7 +266,7 @@ namespace Arkana.Gameplay
                 for (int g = 0; g < golpes && t.BloqueiaTiro(p); g++) Bus.EmitTerrainHit(Elemento.Terra, p, true);
             }
 
-            /// <summary>O rastro acelera o time (EhPlayer); o Gromm cansado nao pega carona no proprio rastro.</summary>
+            /// <summary>O rastro acelera o time do dono; o Gromm cansado nao pega carona no proprio rastro.</summary>
             private void Acelerar(KitRunner k)
             {
                 Vector3 fim = VisualRastro.Pos2;
@@ -274,7 +274,7 @@ namespace Arkana.Gameplay
                 if (!k.EstadoAtivo(CANSADO) && KitRunner.DistSegmento(_dono.Pos, Origem, fim) <= largura) k.BuffVelocidade(vel, TICK * 3f);
                 Vector3 meio = (Origem + fim) * 0.5f;
                 foreach (IEntidade a in k.AlvosPerto(meio, Vector3.Distance(Origem, fim) * 0.5f + largura, _dono))
-                    if (a.EhPlayer && KitRunner.DistSegmento(a.Pos, Origem, fim) <= largura) Efeitos.Lentificar(a, vel, TICK * 3f);
+                    if (Combat.MesmoTime(_dono, a) && KitRunner.DistSegmento(a.Pos, Origem, fim) <= largura) Efeitos.Lentificar(a, vel, TICK * 3f);
             }
         }
     }

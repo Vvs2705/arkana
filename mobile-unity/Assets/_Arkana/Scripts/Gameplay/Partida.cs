@@ -8,8 +8,9 @@ namespace Arkana.Gameplay
 {
     /// <summary>
     /// A PARTIDA, pura (porte de Main.gd sem a cena): dona do relogio, da arena (quem esta' vivo), da zona, do loot,
-    /// do bau, dos projeteis em voo e do veredito. O fim de verdade e' ULTIMO EM PE'; Match.DurationS e' rede de
-    /// seguranca (derrota). A cena cria os corpos e os REGISTRA aqui; por frame chama `Tick(dt)`.
+    /// do bau, dos projeteis em voo e do veredito. O fim de verdade e' ULTIMO TIME EM PE' (PONTE A6: com dupla, a dupla vence
+    /// junta — mesmo com o player fora); SOLO e' o ultimo em pe' de sempre. Match.DurationS e' rede de seguranca (derrota).
+    /// A cena cria os corpos e os REGISTRA aqui (o time e' o do Combat.DefinirTime); por frame chama `Tick(dt)`.
     /// `Combat.TickDot` e os relogios de Zona/Loot/Bau/Efeitos/Derrubado rodam AQUI, uma vez, e nao no Pawn.
     /// TREINO (DIRECAO.md §8): sem zona, sem relogio, sem queda; 3 luvas no spawn; bonecos que regeneram; suprema em 5 s.
     /// Consome `Arkana.Menu.Menu.PedidoDeTreino` e ZERA: partida normal nenhuma herda o treino por engano.
@@ -41,6 +42,24 @@ namespace Arkana.Gameplay
         public bool Acabou { get; private set; }
         public int BotsVivos { get; private set; }
         public float Restante { get; private set; }
+
+        /// <summary>Times com alguem vivo (de pe' OU derrubado), contando o do player. A HUD do modo DUPLA le' ("DUPLAS n").</summary>
+        public int TimesVivos
+        {
+            get
+            {
+                _contados.Clear();   // reusado: a HUD pergunta por frame, sem lixo
+                for (int i = 0; i < Arena.Count; i++) if (Vivo(Arena[i])) _contados.Add(Combat.TimeDe(Arena[i]));
+                return _contados.Count;
+            }
+        }
+
+        /// <summary>O player foi ELIMINADO mas o time dele segue vivo: espectador (a camera segue o ParceiroVivo).</summary>
+        public bool PlayerFora => Player != null && !Vivo(Player) && ParceiroVivo() != null;
+
+        /// <summary>O 1o vivo (de pe' ou derrubado) do time do player que nao e' o player; null se nenhum.</summary>
+        public IEntidade ParceiroVivo() => AliadoVivo(Player);
+
         /// <summary>Segundos para a suprema encher (o KitRunner pergunta aqui em vez de a Kits no treino).</summary>
         public float SupremaCargaS(float padrao) => Treino ? SUPREMA_TREINO_S : padrao;
 
@@ -48,6 +67,7 @@ namespace Arkana.Gameplay
         private readonly Dictionary<IEntidade, ArmaSlot> _slots = new Dictionary<IEntidade, ArmaSlot>();
         private readonly Dictionary<IEntidade, IEntidade> _ultimoAtacante = new Dictionary<IEntidade, IEntidade>();
         private readonly HashSet<IEntidade> _ultimoDanoAmbiente = new HashSet<IEntidade>();
+        private readonly HashSet<int> _contados = new HashSet<int>();
 
         public Partida(IRelevo relevo) { _relevo = relevo; }
 
@@ -66,6 +86,7 @@ namespace Arkana.Gameplay
             Combat.Reset(); Efeitos.Reset(); Derrubado.Reset();
             Derrubado.Instalar();
             Derrubado.Arena = Arena;
+            Sintonia.Reset(); SintoniaEfeitos.Reset(); SintoniaEfeitos.Instalar();   // no TREINO tambem: e' onde se aprende o combo
             Loot = new Loot(_relevo);
             if (Treino)
             {
@@ -149,6 +170,7 @@ namespace Arkana.Gameplay
         {
             if (!Rodando || Acabou || dt <= 0f) return;
             Combat.TickDot(dt);
+            Sintonia.Tick(dt); SintoniaEfeitos.Tick(dt);
             TerrenoReativo terreno = TerrenoAtivo;
             if (terreno != null) terreno.Tick(dt, Arena);   // o DoT do chao (fogo, agua eletrificada) sai daqui, UMA vez
             if (Zona != null) Zona.Tick(dt, Arena);
@@ -231,15 +253,46 @@ namespace Arkana.Gameplay
         {
             if (!Rodando || Acabou || e == null) return;
             if (Bonecos.Contains(e)) return;
-            if (e.EhPlayer) { Fim(false); return; }
-            if (!Arena.Contains(e)) return;
+            if (!e.EhPlayer && !Arena.Contains(e)) return;
+            // O TIME DO PLAYER: o player fora com o parceiro vivo vira espectador; DERROTA so' quando o time inteiro saiu
+            // (AliadoVivo do player e' o parceiro; o do parceiro e' o player). Solo: ninguem no time — a morte dele e' o fim.
+            if (e.EhPlayer || Combat.MesmoTime(e, Player))
+            {
+                if (!e.EhPlayer) BotsVivos--;   // o parceiro e' bot
+                if (AliadoVivo(e) == null) Fim(false);
+                return;
+            }
             // Kill feed: o tiro direto ja' emite em Projetil.Impacto. Aqui so' a morte por DoT/zona (fonte null)
             // cujo ULTIMO atacante foi o player — senao o abate some do feed (ou duplica).
             IEntidade ultimo;
             if (_ultimoDanoAmbiente.Contains(e) && _ultimoAtacante.TryGetValue(e, out ultimo) && ultimo != null && ultimo.EhPlayer)
                 Bus.EmitPlayerKilledBot(e.Nome);
             BotsVivos--;
-            if (BotsVivos <= 0 && !Treino) Fim(true);
+            // VITORIA: DUPLA (alguem registrado no time do player) = resta so' o time do player, mesmo com ele fora;
+            // SOLO = a contagem de sempre (ultimo em pe').
+            if (!Treino && (TemParceiro() ? TimesVivos <= 1 : BotsVivos <= 0)) Fim(true);
+        }
+
+        /// <summary>Em jogo: com vida (o derrubado conta — a reserva de esvaecer e' Hp) e nao e' boneco. So' o Combat mata, e
+        /// zera o Hp ANTES do EntityDied: quem esta' saindo ja' nao conta aqui.</summary>
+        private bool Vivo(IEntidade e) => e != null && e.Vital != null && e.Vital.Viva && !Bonecos.Contains(e);
+
+        /// <summary>O 1o vivo do time de `de` que nao e' ele (null se nenhum, ou `de` null).</summary>
+        private IEntidade AliadoVivo(IEntidade de)
+        {
+            for (int i = 0; i < Arena.Count; i++)
+            {
+                IEntidade e = Arena[i];
+                if (e != de && Vivo(e) && Combat.MesmoTime(e, de)) return e;
+            }
+            return null;
+        }
+
+        /// <summary>Modo DUPLA: alguem alem do player registrado no time dele (vivo ou nao).</summary>
+        private bool TemParceiro()
+        {
+            for (int i = 0; i < Arena.Count; i++) if (Arena[i] != Player && Combat.MesmoTime(Arena[i], Player)) return true;
+            return false;
         }
 
         /// <summary>O veredito, UMA vez. MatchOver e' na borda; o resto observa.</summary>
@@ -257,6 +310,7 @@ namespace Arkana.Gameplay
             Bus.EntityDied -= AoMorrer;
             Bus.DamageApplied -= AoDanar;
             Bus.QuedaFase -= AoMudarQueda;
+            Sintonia.Reset(); SintoniaEfeitos.Reset();
             Rodando = false;
             if (Atual == this) Atual = null;
         }

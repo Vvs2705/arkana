@@ -74,7 +74,7 @@ namespace Arkana.Gameplay
             if (_k == null) return;
             if (ApoioGrupoD.MortoNaCena(_k.Dono)) { Bus.DamageApplied -= _aoDanar; _k = null; return; }
             if (fonte != _k.Dono || alvo == null || alvo.Vital == null || alvo.Vital.Viva) return;
-            if (ApoioGrupoD.MesmoLado(fonte, alvo) || !_k.Dono.Vital.Viva) return;
+            if (Combat.MesmoTime(fonte, alvo) || !_k.Dono.Vital.Viva) return;
             _k.DevolverDano(_k.Dados.Passiva["abate_vida"]);
             _k.Visual("noctus_dreno", alvo.Pos, alvo.Pos, 0.25f, 0.9f, alvo);   // o banquete: o fio de eter corre do caido para ele
         }

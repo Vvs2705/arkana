@@ -263,6 +263,70 @@ namespace Arkana.Core
             public const float DurationS = 480f;
             /// <summary>12 e' o teto estrutural (14 nascimentos) e o passo que se paga sem medir FPS no celular.</summary>
             public const int Bots = 12;
+            /// <summary>Modo DUPLA: player + parceiro bot + 6 duplas de bots = 14 corpos (o mesmo teto dos 14 nascimentos).</summary>
+            public const int DuplasInimigas = 6;
+        }
+
+        /// <summary>
+        /// SINTONIA (GDD §9; regra em Core.Sintonia). Numeros = VARIANTE A do Roblox (Balance.luau, sintoniaVariant) e
+        /// NAO VALIDADOS (PONTE A19 e §4 item 1): o proprio Roblox abriu um A/B (a B e' 0,75 s / 18 s / x2,0) porque
+        /// ninguem sabe qual funciona. Entram como KNOB; quem julga e' o Diretor, no aparelho.
+        /// DISTANCIA: studs -> metros a ~0,5 m/stud. Medido nos pares que existem nos dois jogos: velocidade 0,34
+        /// (22 studs/s -> 7,5 m/s), alcance ~0,38 (90 studs -> 28-38 m), celula de terreno 0,75 (4 -> 3 m); 0,5 e' o meio.
+        /// </summary>
+        public static class Sintonia
+        {
+            /// <summary>s para o 2o aliado impactar. AUMENTAR = combo por acaso; DIMINUIR = so' dupla treinada combina.</summary>
+            public const float JanelaS = 1.5f;
+            /// <summary>s de canalizacao visivel ANTES da fusao (a janela de interromper). DIMINUIR = combo sem resposta.</summary>
+            public const float CanalizacaoS = 1.0f;
+            /// <summary>s de recarga dos DOIS, cobrada no INICIO. DIMINUIR = spam de combo; AUMENTAR = pilar que ninguem ve.</summary>
+            public const float CooldownS = 24f;
+            /// <summary>Dano do combo = (danoA + danoB) x Mult. Tem de ficar > 1 ("mais forte que a soma", GDD §9).</summary>
+            public const float Mult = 2.35f;
+            /// <summary>m entre os dois impactos (14 studs). AUMENTAR = dois alvos diferentes fundem; DIMINUIR = so' tiro colado.</summary>
+            public const float RaioAlvoM = 7f;
+
+            /// <summary>
+            /// m de area de cada combo (PONTE A15; Elements.luau em studs x 0,5). E' o par (raio, duracao) que separa burst
+            /// pontual de negacao de area — rebalanceia-se o combo por aqui, sem mexer no dano.
+            /// </summary>
+            public static float Raio(ComboSintonia c)
+            {
+                switch (c)
+                {
+                    case ComboSintonia.TornadoFlamejante: return 8f;      // 16 studs
+                    case ComboSintonia.ChuvaDeMagma: return 9f;           // 18
+                    case ComboSintonia.ExplosaoDePlasma: return 6f;       // 12 (a PONTE A15 diz 10; vale o codigo, Elements.luau)
+                    case ComboSintonia.CortinaDeVapor: return 10f;        // 20
+                    case ComboSintonia.Eletrocussao: return 11f;          // 22
+                    case ComboSintonia.Lamacal: return 10f;               // 20
+                    case ComboSintonia.TempestadeTorrencial: return 12f;  // 24
+                    case ComboSintonia.TempestadeDeAreia: return 11f;     // 22
+                    case ComboSintonia.CristaisCarregados: return 8f;     // 16 (o terreno usa metade: minas, nao redoma)
+                    case ComboSintonia.NuvemTempestuosa: return 5f;       // 10
+                }
+                throw new ArgumentOutOfRangeException(nameof(c));
+            }
+
+            /// <summary>s do que PERSISTE (tornado, poca, lama, cristais, nuvem). Plasma 0,6 = o clarao do burst.</summary>
+            public static float Duracao(ComboSintonia c)
+            {
+                switch (c)
+                {
+                    case ComboSintonia.TornadoFlamejante: return 6f;
+                    case ComboSintonia.ChuvaDeMagma: return 8f;
+                    case ComboSintonia.ExplosaoDePlasma: return 0.6f;
+                    case ComboSintonia.CortinaDeVapor: return 9f;
+                    case ComboSintonia.Eletrocussao: return 2f;
+                    case ComboSintonia.Lamacal: return 12f;
+                    case ComboSintonia.TempestadeTorrencial: return 6f;
+                    case ComboSintonia.TempestadeDeAreia: return 8f;
+                    case ComboSintonia.CristaisCarregados: return 15f;
+                    case ComboSintonia.NuvemTempestuosa: return 6f;       // "persegue o alvo marcado por 6 s" (GDD §9)
+                }
+                throw new ArgumentOutOfRangeException(nameof(c));
+            }
         }
     }
 }

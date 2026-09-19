@@ -245,6 +245,7 @@ namespace Arkana.UI
     /// NORTE FIXO e a seta gira: o pequeno e o grande leem igual (a zona "a nordeste" e' nordeste nos dois), o giro de
     /// cabeca fica com a bussola, e foto de mapa girado le' torto. No castelo e na queda o minimapa mostra a ilha INTEIRA
     /// (escolher onde pousar); no chao, VistaLocalM em volta do jogador. No treino: so' a ilha e o jogador (nao ha' zona).
+    /// O PARCEIRO (dupla) e' um ponto AZUL-ALIADO com contorno escuro, preso na borda da janela como o jogador.
     /// </summary>
     public sealed class Minimapa
     {
@@ -334,6 +335,9 @@ namespace Arkana.UI
             BauCelestial bau = p != null ? p.Bau : null;
             q.TemBau = bau != null && (bau.FaseAtual == BauCelestial.Fase.Caindo || bau.FaseAtual == BauCelestial.Fase.Pousado);
             if (q.TemBau) q.Bau = bau.Pos;
+            IEntidade parceiro = p != null ? p.ParceiroVivo() : null;
+            q.TemParceiro = parceiro != null && parceiro != jogador;   // espectando, o "jogador" da HUD ja' e' ele
+            if (q.TemParceiro) q.Parceiro = parceiro.Pos;
             q.TemRota = _temRota && fase == Queda.NO_CASTELO;
             q.RotaA = _rotaA; q.RotaB = _rotaB;
             // zoom: castelo e queda = a ilha inteira (escolher o pouso); no chao, a janela local. Anda em ~1 s
@@ -396,8 +400,8 @@ namespace Arkana.UI
     {
         public Texture2D Textura;
         public float Extensao, Yaw;
-        public bool TemJogador, ZonaAtiva, TemProximo, TemBau, TemRota;
-        public Vector3 Jogador, ZonaCentro, ProximoCentro, Bau, RotaA, RotaB;
+        public bool TemJogador, ZonaAtiva, TemProximo, TemBau, TemRota, TemParceiro;
+        public Vector3 Jogador, ZonaCentro, ProximoCentro, Bau, RotaA, RotaB, Parceiro;
         public float ZonaRaio, ProximoRaio;
     }
 
@@ -413,7 +417,7 @@ namespace Arkana.UI
         readonly RectTransform _janela;
         readonly RawImage _ilha;
         readonly AnelUi _tinta, _atual, _proximo;
-        readonly Image _rota, _bau, _bauFundo, _cone, _seta, _setaFundo;
+        readonly Image _rota, _bau, _bauFundo, _cone, _seta, _setaFundo, _parceiro, _parceiroFundo;
         readonly RectTransform[] _pois;
         readonly Vector3[] _poisM;
         readonly float _icone;
@@ -465,6 +469,8 @@ namespace Arkana.UI
             }
             _bauFundo = Marca("BauFundo", Formas.Losango(), Formas.ComAlfa(Estilo.NoiteFunda, 0.9f), 15f);
             _bau = Marca("Bau", Formas.Losango(), Estilo.Ouro, 10.5f);
+            _parceiroFundo = Marca("ParceiroFundo", Formas.Disco(), Formas.ComAlfa(Estilo.NoiteFunda, 0.9f), 12f);   // por baixo da seta:
+            _parceiro = Marca("Parceiro", Formas.Disco(), Dupla.CorAliado, 8f);                                       // colados, o jogador le' por cima
             _cone = Marca("Cone", Formas.Sombra(), new Color(1f, 1f, 1f, 0.32f), 58f);
             _cone.type = Image.Type.Filled; _cone.fillMethod = Image.FillMethod.Radial360;
             _cone.fillOrigin = (int)Image.Origin360.Top; _cone.fillClockwise = true; _cone.fillAmount = ConeGraus / 360f;
@@ -551,10 +557,18 @@ namespace Arkana.UI
                 float s = 1f + 0.12f * Mathf.Sin(Time.unscaledTime * 5f);
                 _bau.rectTransform.localScale = new Vector3(s, s, 1f);
             }
+            float m = lado * 0.5f - Dp.Px(6f * _icone);
+            // parceiro: o ponto azul, preso na borda como o jogador (longe nao some: e' para onde voltar)
+            _parceiro.enabled = _parceiroFundo.enabled = q.TemParceiro;
+            if (q.TemParceiro)
+            {
+                Vector2 pp = MapaLogica.NaJanela(q.Parceiro, centro, escala);
+                pp = new Vector2(Mathf.Clamp(pp.x, -m, m), Mathf.Clamp(pp.y, -m, m));
+                _parceiro.rectTransform.anchoredPosition = pp; _parceiroFundo.rectTransform.anchoredPosition = pp;
+            }
             // jogador: cone da camera + seta; fora da janela (castelo no mar) ele encosta na borda, nunca some
             _seta.enabled = _setaFundo.enabled = _cone.enabled = q.TemJogador;
             if (!q.TemJogador) return;
-            float m = lado * 0.5f - Dp.Px(6f * _icone);
             Vector2 pj = MapaLogica.NaJanela(q.Jogador, centro, escala);
             pj = new Vector2(Mathf.Clamp(pj.x, -m, m), Mathf.Clamp(pj.y, -m, m));
             float giro = MapaLogica.GiroDaSeta(q.Yaw);

@@ -153,7 +153,7 @@ namespace Arkana.Gameplay
             float melhor = float.MaxValue;
             foreach (IEntidade e in k.AlvosPerto(k.Pos, t["alcance"], k.Dono))
             {
-                if (!Inimigo(k.Dono, e)) continue;
+                if (Combat.MesmoTime(k.Dono, e)) continue;
                 Vector3 d = e.Pos - k.Pos;
                 d.y = 0f;
                 float frente = Vector3.Dot(d, dir);
@@ -193,7 +193,7 @@ namespace Arkana.Gameplay
             foreach (IEntidade e in k.AlvosPerto(_mao.Ponto, t["raio"] + 3f, k.Dono))
             {
                 // em esquiva e' imune a TUDO (Efeitos: i-frames = nem estado)
-                if (!Inimigo(k.Dono, e) || Efeitos.De(e).IframesLeft > 0f) continue;
+                if (Combat.MesmoTime(k.Dono, e) || Efeitos.De(e).IframesLeft > 0f) continue;
                 float d = Plano(e.Pos, _mao.Ponto);
                 if (d <= r2 && d < melhor) { melhor = d; preso = e; }
             }
@@ -277,9 +277,6 @@ namespace Arkana.Gameplay
         public void TerrenoAtingido(KitRunner k, Elemento el, Vector3 pos, bool forte) { }
 
         // ------------------------------------------------------------------ apoio
-
-        /// <summary>Time: hoje o unico esquadrao e' o do player (Combat.Creditar). Bot contra bot sao inimigos.</summary>
-        private static bool Inimigo(IEntidade eu, IEntidade e) => e != null && e != eu && !(eu.EhPlayer && e.EhPlayer);
 
         private static float Plano(Vector3 a, Vector3 b)
         {

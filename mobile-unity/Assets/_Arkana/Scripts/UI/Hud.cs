@@ -191,6 +191,10 @@ namespace Arkana.UI
     public struct HudLayout
     {
         public Rect Barras, Topo, Pausa, Minimapa, Bussola, MapaGrande, Joystick, Disparo, Esquiva, Tatica, Suprema, Salto, Carrossel, ArmaRotulo, Pegar, Altimetro, KillFeed;
+        /// <summary>A DUPLA (HudDupla): a faixa da Sintonia (topo central, entre a faixa de aviso e a do abate), o anel de
+        /// recarga em volta do ataque (fora do anel verde da mira, 1,16x; sem tocar o SALTO), o "SINTONIA PRONTA" acima da fileira da esquiva e a
+        /// placa do espectador (rodape central, acima do PEGAR).</summary>
+        public Rect Sintonia, AnelSintonia, SintoniaPronta, Espectando;
 
         /// <summary>Lado do minimapa em dp: o teto e o piso (tela baixa encolhe o mapa ate' o piso, nunca o empilha). KNOB por foto.</summary>
         public const float MinimapaDp = 124f, MinimapaMinDp = 72f;
@@ -234,6 +238,14 @@ namespace Arkana.UI
             // mapa grande: o maior quadrado que cabe na area segura, com respiro de leitura
             float mg = Mathf.Min(tela.y - m.Topo - m.Baixo, tela.x - m.Esq - m.Dir) - 2f * mm;
             l.MapaGrande = new Rect((m.Esq + tela.x - m.Dir - mg) * 0.5f, (m.Baixo + tela.y - m.Topo - mg) * 0.5f, mg, mg);
+            // a DUPLA. A faixa de aviso mora em topo-70..topo-44 dp; a do abate, de meio+68 a meio+104 dp: a da Sintonia cabe
+            // entre as duas no Poco F4 deitado (437 dp)
+            float sw = Mathf.Min(420f * px, tela.x - m.Esq - m.Dir - 2f * mm);
+            l.Sintonia = new Rect(tela.x * 0.5f - sw * 0.5f, tela.y - m.Topo - 72f * px - 42f * px, sw, 42f * px);
+            float anel = l.Disparo.width * 1.22f;
+            l.AnelSintonia = new Rect(l.Disparo.center.x - anel * 0.5f, l.Disparo.center.y - anel * 0.5f, anel, anel);
+            l.SintoniaPronta = new Rect(l.Disparo.xMin - 10f * px - 132f * px, l.Esquiva.yMax + 4f * px, 132f * px, 20f * px);
+            l.Espectando = new Rect(tela.x * 0.5f - 140f * px, l.Pegar.yMax + 16f * px, 280f * px, 34f * px);
             return l;
         }
     }
@@ -303,6 +315,10 @@ namespace Arkana.UI
         public Minimapa Mapa { get; private set; }
         /// <summary>Barra de escudo/vida + nome sobre quem o jogador acertou e sobre o alvo da mira (MarcasDeAlvo.cs).</summary>
         public MarcasDeAlvo Marcas { get; private set; }
+        /// <summary>A HUD da DUPLA: faixa da Sintonia, anel de recarga, SINTONIA PRONTA e ESPECTANDO (HudDupla.cs).</summary>
+        public HudDupla Dupla { get; private set; }
+        /// <summary>DUPLAS vivas no topo (&lt; 0 = partida solo: o topo diz BOTS).</summary>
+        public int Duplas => _duplas;
         public IEntidade Jogador { get; private set; }
         public bool Pausado { get; private set; }
         public bool SegurandoSalto => Salto != null && Salto.Segurando;
@@ -346,6 +362,8 @@ namespace Arkana.UI
         bool _treino;
         float _restante;
         int _botsVivos;
+        int _duplas = -1;
+        IEntidade _espectado;
         float _escudoQuebrou;
         float _escudoVal, _escudoMax;
         int _escudoNivel;
@@ -473,6 +491,7 @@ namespace Arkana.UI
             Carrossel.Escolheu += e => ElementoEscolhido?.Invoke(e);
             Carrossel.Visivel(false);
             _armaRotulo = Formas.Texto(_raiz, "ArmaRotulo", "", 11f, Color.white, TextAnchor.MiddleRight);
+            Dupla = new HudDupla(_raiz);   // por cima dos controles (o anel abraca o ataque), por baixo do mapa grande e do fim
             Mapa = new Minimapa(_raiz);   // depois dos controles (o mapa grande cobre o meio), antes do FIM (o veredito cobre tudo)
 
             MontarFim();
@@ -664,11 +683,11 @@ namespace Arkana.UI
         void PintarTopo()
         {
             int seg = _treino ? -1 : Mathf.Max(Mathf.CeilToInt(_restante), 0);
-            int bots = _treino ? -1 : _botsVivos;
+            int bots = _treino ? -1 : (_duplas >= 0 ? 100000 + _duplas : _botsVivos);   // DUPLAS n e BOTS n nunca se confundem
             if (seg == _topoSeg && bots == _topoBots) return;
             _topoSeg = seg; _topoBots = bots;
             _relogio.text = HudLogica.TextoRelogio(_restante, _treino, T_TREINO);
-            _bots.text = _treino ? "" : string.Format(T_BOTS, _botsVivos);
+            _bots.text = _treino ? "" : DuplaHudLogica.TextoTopo(_duplas, _botsVivos);
             _iconeRelogio.SetActive(!_treino);
             _linhaBots.SetActive(!_treino);
             float x0 = Dp.Px(_treino ? 10f : 28f);   // sem icone, o texto centraliza na placa
@@ -935,6 +954,7 @@ namespace Arkana.UI
             AreaSegura.NoRect((RectTransform)Pegar.transform, l.Pegar);
             AreaSegura.NoRect(_altimetroBox, l.Altimetro);
             AreaSegura.NoRect(_killFeed, l.KillFeed);
+            Dupla.Layout(l);
             Mapa.Layout(l.Minimapa, l.Bussola, l.MapaGrande);
             // olhar livre: da fronteira do joystick (35%) ate' a borda direita
             _olhar.anchorMin = new Vector2(0.35f, 0); _olhar.anchorMax = Vector2.one; _olhar.offsetMin = Vector2.zero; _olhar.offsetMax = Vector2.zero;
@@ -990,6 +1010,7 @@ namespace Arkana.UI
             Bus.EntityDerrubada -= OnDerrubada; Bus.EntityReerguida -= OnReerguida; Bus.DerrubadoProgresso -= OnDerrubadoProgresso;
             Bus.QuedaFase -= OnQuedaFase; Bus.QuedaAltura -= OnQuedaAltura; Bus.CasteloRota -= OnCasteloRota; Bus.MatchStarted -= OnMatchStarted; Bus.MatchOver -= OnMatchOver;
             ConfigLogica.Mudou -= AplicarConfig;
+            if (Dupla != null) Dupla.Desligar();
             if (Pausado) Time.timeScale = 1f;
         }
 
@@ -1022,15 +1043,20 @@ namespace Arkana.UI
             _restante = (float)Balance.Match.DurationS;
             _botsVivos = (int)Balance.Match.Bots;
             _treino = false;
+            _duplas = -1;
+            Dupla.Vincular(jogador);
+            _espectado = null;
+            Controles(true);
             foreach (var kv in _labels) if (kv.Value != null) Destroy(kv.Value.gameObject);
             _labels.Clear();
             Retomar();
         }
 
-        /// <summary>A cena chama por frame (ou quando muda): relogio e bots vivos nao passam pelo Bus.</summary>
-        public void AtualizarPartida(float restanteS, int botsVivos) { _restante = restanteS; _botsVivos = botsVivos; _treino = false; }
+        /// <summary>A cena chama por frame (ou quando muda): relogio e bots vivos nao passam pelo Bus. `duplasVivas` &gt;= 0 =
+        /// partida em DUPLA (o topo diz DUPLAS n e o anel da Sintonia aparece); &lt; 0 = solo (BOTS n, o de sempre).</summary>
+        public void AtualizarPartida(float restanteS, int botsVivos, int duplasVivas = -1) { _restante = restanteS; _botsVivos = botsVivos; _duplas = duplasVivas; _treino = false; }
         /// <summary>No TREINO nao existe relogio nem contagem que importe: o canto diz o que a cena e'.</summary>
-        public void ModoTreino() { _treino = true; }
+        public void ModoTreino() { _treino = true; _duplas = -1; }
 
         /// <summary>O veredito: cor (fio, titulo, brilho, losango), colocacao (so' fora do treino, que nao tem ranking) e abates.</summary>
         public void MostrarFim(bool vitoria)
@@ -1047,7 +1073,7 @@ namespace Arkana.UI
             _fimBrilho.canvasRenderer.SetAlpha(1f);
             bool rank = !_treino;
             _fimChipColocacao.gameObject.SetActive(rank);
-            _fimColocacao.text = string.Format(T_COLOCACAO_NUM, HudLogica.Colocacao(vitoria, _botsVivos));
+            _fimColocacao.text = string.Format(T_COLOCACAO_NUM, HudLogica.Colocacao(vitoria, RestantesNoFim()));
             _fimColocacao.color = vitoria ? Estilo.Ouro : Color.white;
             _fimAbates.text = Logica.Abates.ToString();
             _fimChipColocacao.anchoredPosition = new Vector2(-Dp.Px(FimChipX), -Dp.Px(FimChipsY));
@@ -1055,6 +1081,27 @@ namespace Arkana.UI
             _fimT = 0f;
             PintarFim(0f);   // ja' nasce transparente e grande: o primeiro quadro nao pisca a placa pousada
             _fim.gameObject.SetActive(true);
+        }
+
+        /// <summary>Quem ficou na frente: bots de pe' no solo; TIMES vivos na dupla, lidos NA HORA do veredito (o numero do
+        /// quadro anterior ainda contava o time do jogador que acabou de cair).</summary>
+        int RestantesNoFim()
+        {
+            if (_duplas < 0) return _botsVivos;
+            var p = Arkana.Gameplay.Partida.Atual;
+            return p != null ? p.TimesVivos : _duplas;
+        }
+
+        /// <summary>Espectando, os controles do corpo somem (o dedo do eliminado nao tem o que mover); de volta, voltam. Pegar e
+        /// carrossel tem a vida deles (OnLoot, Carrossel.Visivel) e ficam de fora.</summary>
+        void Controles(bool on)
+        {
+            Joystick.gameObject.SetActive(on);
+            Disparo.gameObject.SetActive(on);
+            Esquiva.gameObject.SetActive(on);
+            Tatica.gameObject.SetActive(on);
+            Suprema.gameObject.SetActive(on);
+            Salto.gameObject.SetActive(on);
         }
 
         /// <summary>Por frame so' com a tela de fim no ar: a entrada (ate' pousar) e, na vitoria, o brilho respirando (alfa
@@ -1363,8 +1410,13 @@ namespace Arkana.UI
             if (Screen.width != (int)_telaAtual.x || Screen.height != (int)_telaAtual.y) Layout();
             // relogio / bots / fps
             PintarTopo();
+            // ESPECTADOR: o jogador fora e o time vivo -> a camera segue o parceiro; a HUD mostra de quem e o mapa centra nele
+            var partida = Arkana.Gameplay.Partida.Atual;
+            IEntidade espectado = partida != null && partida.PlayerFora ? partida.ParceiroVivo() : null;
+            if (espectado != _espectado) { _espectado = espectado; Controles(espectado == null); }
+            Dupla.Pintar(dt, _duplas >= 0 && !_treino, espectado);
             // minimapa, mapa grande e bussola: leem a partida, o jogador e o yaw da camera (Minimapa.cs)
-            Mapa.Pintar(dt, Jogador, _pawn != null ? _pawn.Queda.Fase : null);
+            Mapa.Pintar(dt, espectado ?? Jogador, espectado != null ? Arkana.Gameplay.Queda.POUSOU : (_pawn != null ? _pawn.Queda.Fase : null));
             if (_fim.gameObject.activeSelf) PintarFim(dt);
             if (_mostraFps) _fps.text = string.Format(T_FPS, Mathf.RoundToInt(1f / Mathf.Max(dt, 0.0001f)));
             // rotulo da arma: pulso -> espera -> apaga

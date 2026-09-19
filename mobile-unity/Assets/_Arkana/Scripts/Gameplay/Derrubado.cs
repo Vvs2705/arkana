@@ -36,7 +36,7 @@ namespace Arkana.Gameplay
         /// <summary>SOLO: sem esquadrao derrubado e' morte com passos a mais — entao bot e player solo morrem.</summary>
         public const bool SOLO_DERRUBA = false;
 
-        /// <summary>Os pawns da arena (a casca escreve; o teste tambem). Esquadrao = todos os EhPlayer.</summary>
+        /// <summary>Os pawns da arena (a casca escreve; o teste tambem). Esquadrao = Combat.MesmoTime.</summary>
         public static IList<IEntidade> Arena;
         /// <summary>Proxies sem corpo que reerguem (a Lumen da Vitalis): contam como "de pe'" no esquadrao.</summary>
         public static readonly HashSet<IEntidade> Reanimadores = new HashSet<IEntidade>();
@@ -106,8 +106,8 @@ namespace Arkana.Gameplay
             return false;
         }
 
-        /// <summary>Hoje esquadrao = os EhPlayer (mesmo criterio do Combat). Duplas/trios mudam SO' aqui.</summary>
-        private static bool MesmoEsquadrao(IEntidade a, IEntidade b) => a.EhPlayer && b.EhPlayer;
+        /// <summary>Esquadrao = o time do Combat (a pergunta unica). Bot com parceiro de pe' CAI; sozinho, morre.</summary>
+        private static bool MesmoEsquadrao(IEntidade a, IEntidade b) => a != b && Combat.MesmoTime(a, b);
 
         private static bool DePe(IEntidade n) =>
             Reanimadores.Contains(n) || (n.Vital != null && n.Vital.Viva && !Esta(n));
@@ -198,6 +198,14 @@ namespace Arkana.Gameplay
             }
             // O ESVAECIMENTO PASSA PELO PONTO UNICO (DoT direto na vida). No ultimo tique fecha a conta EXATA em
             // zero, e a morte sai do mesmo EntityDied de sempre — UMA vez.
+            // TIME INTEIRO NO CHAO = ELIMINADO (regra dos BRs de esquadrao): sem ninguem de pe' para vir buscar, sai NESTE tique
+            // (antes a dupla toda caida esperava ate' 30 s por um resgate que nao existe). Golpe direto pelo ponto unico: o DoT
+            // do esvaecimento tem teto de 12/s e nao fecharia a conta. O elemento e' o mesmo que o DoT "esvaecer" usa.
+            if (!TemEsquadrao(Pawn))
+            {
+                Combat.AplicarDano(Pawn, Pawn.Vital.Hp, Elemento.Fogo, Causador, false, true);
+                return;
+            }
             float hp = Pawn.Vital.Hp;
             float quanto = DanoTique;
             if (hp - quanto < 0.001f) quanto = hp;

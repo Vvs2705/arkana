@@ -82,7 +82,7 @@ namespace Arkana.Gameplay
             int cap = Mathf.CeilToInt(p["trilha_janela"] / p["trilha_amostra"]) + 1;
             foreach (IEntidade e in k.AlvosPerto(k.Pos, raio, k.Dono))
             {
-                if (!Inimigo(k.Dono, e)) continue;
+                if (Combat.MesmoTime(k.Dono, e)) continue;
                 Trilha t;
                 if (!_trilhas.TryGetValue(e, out t)) { t = new Trilha(cap); _trilhas[e] = t; }
                 t.Por(e.Pos, _agora);
@@ -119,7 +119,7 @@ namespace Arkana.Gameplay
             _ouvintes.Clear();
             _ouvintesPos.Clear();
             foreach (IEntidade e in k.AlvosPerto(k.Pos, t["raio"], k.Dono))
-                if (Inimigo(k.Dono, e)) { _ouvintes.Add(e); _ouvintesPos.Add(e.Pos); }
+                if (!Combat.MesmoTime(k.Dono, e)) { _ouvintes.Add(e); _ouvintesPos.Add(e.Pos); }
             _janela = t["janela"];
             Uivar(k, t["raio"], 1.2f, t["denuncia"] > 0f);
         }
@@ -186,7 +186,7 @@ namespace Arkana.Gameplay
             float melhor = float.MaxValue;
             foreach (IEntidade e in k.AlvosPerto(k.Pos, s["garra_alcance"], k.Dono))
             {
-                if (!Inimigo(k.Dono, e) || Efeitos.De(e).IframesLeft > 0f) continue;   // esquiva e' imunidade total
+                if (Combat.MesmoTime(k.Dono, e) || Efeitos.De(e).IframesLeft > 0f) continue;   // esquiva e' imunidade total
                 float d = (e.Pos - k.Pos).sqrMagnitude;
                 if (d < melhor) { melhor = d; alvo = e; }
             }
@@ -209,8 +209,6 @@ namespace Arkana.Gameplay
 
         public void DanoRecebido(KitRunner k, float quanto) { }
         public void TerrenoAtingido(KitRunner k, Elemento el, Vector3 pos, bool forte) { }
-
-        private static bool Inimigo(IEntidade eu, IEntidade e) => e != null && e != eu && !(eu.EhPlayer && e.EhPlayer);
 
         private static float Plano(Vector3 a, Vector3 b)
         {

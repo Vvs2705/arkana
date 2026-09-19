@@ -151,7 +151,7 @@ namespace Arkana.Gameplay
                 for (int i = vivos.Count - 1; i >= 0; i--)
                 {
                     Projetil p = vivos[i];
-                    if (p == null || !p.Vivo || Vex.MesmoTime(_dono, p.Atirador)) continue;   // o proprio e o do time passam
+                    if (p == null || !p.Vivo || Combat.MesmoTime(_dono, p.Atirador)) continue;   // o proprio e o do time passam
                     if (Vector3.Dot(p.Dir, Normal) >= 0f) continue;   // pelas costas ou de raspao: passa
                     float dy = p.Pos.y - Centro.y;
                     if (dy < -Projetil.RAIO_HITBOX || dy > ALTURA + Projetil.RAIO_HITBOX) continue;
@@ -313,7 +313,7 @@ namespace Arkana.Gameplay
                 for (int j = vivos.Count - 1; j >= 0; j--)
                 {
                     Projetil p = vivos[j];
-                    if (p == null || !p.Vivo || Vex.MesmoTime(_dono, p.Atirador)) continue;
+                    if (p == null || !p.Vivo || Combat.MesmoTime(_dono, p.Atirador)) continue;
                     for (int i = 0; i < Pos.Length; i++)
                     {
                         if (!Inteiro[i]) continue;

@@ -193,7 +193,7 @@ namespace Arkana.Core
         public static readonly string[] CfgDaltonismos = { "Nenhum", "Protanopia", "Deuteranopia", "Tritanopia" };
         public const string CfgNumerosDano = "Números de dano";
         public const string CfgIdiomaNota = "Idioma: só PT-BR por enquanto.";
-        public const string CfgComboNota = "Dicas de combo entram com a Conjuração Combinada (Sintonia).";
+        public const string CfgComboNota = "Sintonia: acerte o mesmo alvo que o parceiro, com outro elemento, quase juntos — as duas magias se fundem.";
 
         // ---------------------------------------------------------------- bau celestial (GDD §16.2)
         public const string BauTitulo = "BAÚ CELESTIAL";
@@ -304,6 +304,37 @@ namespace Arkana.Core
             { "faminto", "FAMINTO" },
             { "supercelula", "SUPERCÉLULA" },
         };
+
+        // ---------------------------------------------------------------- sintonia e dupla (GDD §9, onda 17)
+        public const string Sintonia = "SINTONIA";
+        public const string SintoniaQuebrada = "SINTONIA QUEBRADA";
+        public const string SintoniaPronta = "SINTONIA PRONTA";
+        public const string HudDuplas = "DUPLAS {0}";
+        public const string Espectando = "ESPECTANDO · {0}";
+        public const string Parceiro = "PARCEIRO";
+        public const string ModoRotulo = "MODO";
+        public const string ModoDupla = "DUPLA";
+        public const string ModoSolo = "SOLO";
+        public const string DuplaEliminada = "DUPLA ELIMINADA";
+
+        /// <summary>O nome do combo na tela (faixa da canalizacao e disparo), ja' com acento.</summary>
+        public static string ComboNome(ComboSintonia c)
+        {
+            switch (c)
+            {
+                case ComboSintonia.TornadoFlamejante: return "TORNADO FLAMEJANTE";
+                case ComboSintonia.ChuvaDeMagma: return "CHUVA DE MAGMA";
+                case ComboSintonia.ExplosaoDePlasma: return "EXPLOSÃO DE PLASMA";
+                case ComboSintonia.CortinaDeVapor: return "CORTINA DE VAPOR";
+                case ComboSintonia.Eletrocussao: return "ELETROCUSSÃO";
+                case ComboSintonia.Lamacal: return "LAMAÇAL";
+                case ComboSintonia.TempestadeTorrencial: return "TEMPESTADE TORRENCIAL";
+                case ComboSintonia.TempestadeDeAreia: return "TEMPESTADE DE AREIA";
+                case ComboSintonia.CristaisCarregados: return "CRISTAIS CARREGADOS";
+                case ComboSintonia.NuvemTempestuosa: return "NUVEM TEMPESTUOSA";
+            }
+            return "?";
+        }
 
         /// <summary>
         /// O ROTULO DE UMA ARMA NA TELA: nome + o elemento que ela impoe ao disparo (ordem do Diretor, 26/08).

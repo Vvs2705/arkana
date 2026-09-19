@@ -9,7 +9,8 @@ namespace Arkana.Menu
     /// <summary>
     /// Porta de entrada: Titulo (Selo + wordmark + "toque para comecar") -> Menu (JOGAR / TREINO / ELENCO / CONFIGURACOES)
     /// -> Elenco e Configuracoes. Tudo por codigo. JOGAR emite Bus.GameStartRequested; TREINO liga PedidoDeTreino (estatico:
-    /// sobrevive a troca de cena, e quem consome zera) e pede a partida do mesmo jeito.
+    /// sobrevive a troca de cena, e quem consome zera) e pede a partida do mesmo jeito. Colado no JOGAR, o seletor MODO:
+    /// DUPLA | SOLO (ModoDupla, lembrado no PlayerPrefs).
     /// </summary>
     public sealed class Menu : MonoBehaviour
     {
@@ -20,6 +21,17 @@ namespace Arkana.Menu
         /// <summary>O treino e' a MESMA cena da partida com um pedido diferente. A cena le e ZERA ao consumir.</summary>
         public static bool PedidoDeTreino;
 
+        /// <summary>
+        /// O MODO da partida (contrato 17G): DUPLA = o jogador + um PARCEIRO bot contra 6 duplas (a Sintonia, GDD §9, so' existe
+        /// com aliado); SOLO = o FFA de sempre. O Main le' no toque do JOGAR (o treino e' sempre sozinho). Lido do PlayerPrefs
+        /// no boot do menu; o seletor escreve e GRAVA; teste escreve direto (nao grava).
+        /// </summary>
+        public static bool ModoDupla = ModoPadrao;
+        /// <summary>PADRAO DUPLA: decisao do coordenador (onda 17), VETAVEL pelo Diretor — trocar aqui volta o jogo ao solo.</summary>
+        public const bool ModoPadrao = true;
+        public const string PrefModo = "partida.modo_dupla";
+        public const string T_MODO = Textos.ModoRotulo, T_DUPLA = Textos.ModoDupla, T_SOLO = Textos.ModoSolo;
+
         public event Action JogarPedido;   // alem do Bus, para a cena que quiser fiacao direta
 
         Canvas _canvas;
@@ -27,6 +39,7 @@ namespace Arkana.Menu
         RectTransform _titulo, _menu, _elenco, _config;
         RectTransform _atual;
         Text _tap;
+        CanvasGroup _modoDupla, _modoSolo;
         float _fase;
         bool _iniciando;
 
@@ -43,6 +56,7 @@ namespace Arkana.Menu
         {
             _raiz = (RectTransform)_canvas.transform;
             ConfigLogica.Aplicar(ConfigLogica.Atual);   // settings lidos e aplicados UMA vez, no boot
+            ModoDupla = PlayerPrefs.GetInt(PrefModo, ModoPadrao ? 1 : 0) != 0;
             // FUNDO TRANSLUCIDO: atras do Titulo, do menu principal e do Elenco passa o 3D (VitrineDoMenu, o mago no pico).
             // Continua bloqueando o toque. O Elenco nao pinta fundo (painel a esquerda, o mago escolhido a direita); so' as
             // Configuracoes pintam o PROPRIO Estilo.Fundo opaco por cima (muito texto) — nao ha' o que trocar no Ir. O degrade
@@ -125,7 +139,12 @@ namespace Arkana.Menu
             var t = Tela("MenuPrincipal");
             var col = Estilo.Coluna(t, "Centro", 12f);
             Wordmark(col.transform, 200f, true);
-            Botao(col.transform, "BtnJogar", T_JOGAR, OnJogar, true);
+            // o JOGAR numa LINHA do tamanho dele: o seletor de MODO pendura a' esquerda, FORA da coluna (mais uma fileira
+            // passava da altura do Poco F4 deitado, 437 dp)
+            var linha = Formas.No(col.transform, "LinhaJogar");
+            Estilo.Tamanho(linha, Dp.Px(JogarLarguraDp), Estilo.AlturaAlvo(JogarAlturaDp));
+            Botao(linha, "BtnJogar", T_JOGAR, OnJogar, true);
+            MontarModo(linha);
             Botao(col.transform, "BtnTreino", T_TREINO, () => { PedidoDeTreino = true; OnJogar(); });
             Botao(col.transform, "BtnElenco", T_ELENCO, () => { if (_elenco == null) _elenco = MontarElenco(); Ir(_elenco); });
             Botao(col.transform, "BtnConfig", T_CONFIG, () => { if (_config == null) _config = MontarConfig(); Ir(_config); });
@@ -144,6 +163,58 @@ namespace Arkana.Menu
             Estilo.Tamanho(b, Dp.Px(larg), Estilo.AlturaAlvo(alt));
             b.onClick.AddListener(() => acao());
             return b;
+        }
+
+        /// <summary>KNOB por foto: as duas placas do seletor, o vao entre elas, a distancia ate' o JOGAR e o alfa do apagado.</summary>
+        const float ModoLarguraDp = 112f, ModoAlturaDp = 48f, ModoFonteDp = 16f, ModoVaoDp = 8f, ModoAoLadoDp = 16f, ModoApagado = 0.4f;
+
+        /// <summary>
+        /// O seletor MODO: rotulo "MODO" em ouro e as duas placas do menu (Estilo.Botao) lado a lado, colado a' esquerda do
+        /// JOGAR e na altura dele. O escolhido fica ACESO e o outro APAGADO (alfa): escolha le' de relance, sem cor nova.
+        /// </summary>
+        void MontarModo(RectTransform linha)
+        {
+            float w = 2f * Dp.Px(ModoLarguraDp) + Dp.Px(ModoVaoDp), h = Estilo.AlturaAlvo(ModoAlturaDp);
+            var grupo = Formas.No(linha, "Modo");
+            grupo.anchorMin = grupo.anchorMax = new Vector2(0f, 0.5f);
+            grupo.pivot = new Vector2(1f, 0.5f);
+            grupo.anchoredPosition = new Vector2(-Dp.Px(ModoAoLadoDp), 0f);
+            grupo.sizeDelta = new Vector2(w, Estilo.AlturaAlvo(JogarAlturaDp));
+            var rotulo = Formas.Texto(grupo, "RotuloModo", T_MODO, 11f, Estilo.Ouro);
+            rotulo.fontStyle = FontStyle.Bold;
+            Contorno(rotulo);
+            rotulo.rectTransform.anchorMin = new Vector2(0f, 1f); rotulo.rectTransform.anchorMax = Vector2.one;
+            rotulo.rectTransform.pivot = new Vector2(0.5f, 1f);
+            rotulo.rectTransform.anchoredPosition = Vector2.zero;
+            rotulo.rectTransform.sizeDelta = new Vector2(0f, Dp.Px(14f));
+            _modoDupla = BotaoModo(grupo, "BtnModoDupla", T_DUPLA, 0f, true);
+            _modoSolo = BotaoModo(grupo, "BtnModoSolo", T_SOLO, 1f, false);
+            PintarModo();
+        }
+
+        CanvasGroup BotaoModo(RectTransform grupo, string nome, string texto, float ancoraX, bool dupla)
+        {
+            var b = Estilo.Botao(grupo, nome, texto, ModoLarguraDp, ModoAlturaDp, ModoFonteDp);
+            var rt = (RectTransform)b.transform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(ancoraX, 0f);
+            rt.anchoredPosition = Vector2.zero;
+            b.onClick.AddListener(() => EscolherModo(dupla));
+            return b.gameObject.AddComponent<CanvasGroup>();
+        }
+
+        void EscolherModo(bool dupla)
+        {
+            ModoDupla = dupla;
+            PlayerPrefs.SetInt(PrefModo, dupla ? 1 : 0);
+            PlayerPrefs.Save();
+            PintarModo();
+        }
+
+        void PintarModo()
+        {
+            if (_modoDupla == null) return;
+            _modoDupla.alpha = ModoDupla ? 1f : ModoApagado;
+            _modoSolo.alpha = ModoDupla ? ModoApagado : 1f;
         }
 
         RectTransform MontarElenco()
@@ -173,7 +244,7 @@ namespace Arkana.Menu
         }
 
         /// <summary>Permite pedir de novo (a cena voltou ao menu sem destruir este objeto).</summary>
-        public void Rearmar() { _iniciando = false; }
+        public void Rearmar() { _iniciando = false; PintarModo(); }   // o teste pode ter trocado o ModoDupla por fora
 
         void Ir(RectTransform alvo)
         {

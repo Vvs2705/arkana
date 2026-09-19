@@ -20,8 +20,8 @@ namespace Arkana.Gameplay
 
     /// <summary>
     /// O APOIO DO GRUPO D — o que os 5 kits dividem, FORA do motor (ninguem edita o KitRunner para por um kit):
-    ///  - LADO: quem e' inimigo/aliado. Hoje o unico esquadrao e' o do player (a mesma regra do Combat.Creditar); SOLO, aliado
-    ///    nao existe e os efeitos "em aliado" caem no proprio mago.
+    ///  - LADO: quem e' inimigo/aliado — a pergunta unica Combat.MesmoTime; SOLO, aliado nao existe e os efeitos "em aliado"
+    ///    caem no proprio mago.
     ///  - CORPO: o dash de kit e' o verbo IConjurador.Impulso; a logica mede na ROTA (Investida), que anda a MESMA integral
     ///    do dash do corpo (Locomocao.PercorridoNoDash), entao os dois andam juntos. O fake do teste nao anda. O empurrao de
     ///    INIMIGO (onda do Basalto) segue no canal do knockback: tranco que desliza e' o certo para quem foi empurrado.
@@ -32,14 +32,11 @@ namespace Arkana.Gameplay
     {
         // ------------------------------------------------------------------ lado
 
-        /// <summary>Mesmo esquadrao (ou o proprio). Nao pergunta se esta' vivo: serve para tiro de quem ja' caiu.</summary>
-        public static bool MesmoLado(IEntidade a, IEntidade b) => a == b || (a != null && b != null && a.EhPlayer && b.EhPlayer);
-
         public static bool Inimigo(IEntidade dono, IEntidade e) =>
-            e != null && e.Vital != null && e.Vital.Viva && !MesmoLado(dono, e);
+            e != null && e.Vital != null && e.Vital.Viva && !Combat.MesmoTime(dono, e);
 
         public static bool Aliado(IEntidade dono, IEntidade e) =>
-            e != null && e != dono && e.Vital != null && e.Vital.Viva && MesmoLado(dono, e);
+            e != null && e != dono && e.Vital != null && e.Vital.Viva && Combat.MesmoTime(dono, e);
 
         /// <summary>O inimigo mais perto de `p` a ate' `raio` m (sem `exceto`). Aloca (AlvosPerto): so' em tique de 0,1 s.</summary>
         public static IEntidade MaisProximo(KitRunner k, Vector3 p, float raio, IEntidade exceto = null)
@@ -148,7 +145,7 @@ namespace Arkana.Gameplay
             for (int i = vivos.Count - 1; i >= 0; i--)
             {
                 Projetil p = vivos[i];
-                if (p == null || !p.Vivo || MesmoLado(k.Dono, p.Atirador)) continue;
+                if (p == null || !p.Vivo || Combat.MesmoTime(k.Dono, p.Atirador)) continue;
                 Vector3 d = p.Pos - base_;
                 if (d.y < -0.6f || d.y > altura + 0.3f || d.x * d.x + d.z * d.z > r2) continue;
                 vivos.RemoveAt(i);
@@ -169,7 +166,7 @@ namespace Arkana.Gameplay
             for (int i = 0; i < vivos.Count; i++)
             {
                 Projetil p = vivos[i];
-                if (p == null || !p.Vivo || MesmoLado(k.Dono, p.Atirador)) continue;
+                if (p == null || !p.Vivo || Combat.MesmoTime(k.Dono, p.Atirador)) continue;
                 Vector3 d = peito - p.Pos;
                 float dd = d.sqrMagnitude;
                 if (dd > d2 || Vector3.Dot(d, p.Dir) <= 0f) continue;

@@ -36,7 +36,7 @@ namespace Arkana.Gameplay
         /// <summary>Atravessar: a tatica tambem AVISA (0,8s de ativacao) antes de valer.</summary>
         public void Tatica(KitRunner k) => k.LigarEstado(ATIVACAO, k.Dados.Tatica["ativacao"]);
 
-        /// <summary>Mare: ela e os ALIADOS (EhPlayer, hoje o unico esquadrao) a `raio` m entram JUNTOS.</summary>
+        /// <summary>Mare: ela e os ALIADOS (Combat.MesmoTime) a `raio` m entram JUNTOS.</summary>
         public void Suprema(KitRunner k)
         {
             Dictionary<string, float> s = k.Dados.Suprema;
@@ -47,7 +47,7 @@ namespace Arkana.Gameplay
             Espectral(k.Dono, dur);
             foreach (IEntidade a in k.AlvosPerto(k.Pos, s["raio"], k.Dono))
             {
-                if (!a.EhPlayer) continue;
+                if (!Combat.MesmoTime(k.Dono, a)) continue;
                 Efeitos.Lentificar(a, s["buff_vel"], dur);
                 Espectral(a, dur);
                 IConjurador c = a as IConjurador;

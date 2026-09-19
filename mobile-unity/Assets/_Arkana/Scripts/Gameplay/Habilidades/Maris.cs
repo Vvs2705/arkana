@@ -180,7 +180,7 @@ namespace Arkana.Gameplay
                 float melhorD = r;
                 foreach (IEntidade e in k.AlvosPerto(b, r + Vector3.Distance(a, b) + alt, _dona))
                 {
-                    if (e.EhPlayer || Efeitos.De(e).IframesLeft > 0f) continue;   // aliado nao; a ESQUIVA fura (o limitador)
+                    if (Combat.MesmoTime(_dona, e) || Efeitos.De(e).IframesLeft > 0f) continue;   // aliado nao; a ESQUIVA fura (o limitador)
                     float d = KitRunner.DistSegmento(e.Pos + Vector3.up * alt, a, b);
                     if (d <= melhorD) { melhorD = d; melhor = e; }
                 }
@@ -254,7 +254,7 @@ namespace Arkana.Gameplay
                 _acc = 0f;
                 foreach (IEntidade a in k.AlvosPerto(Centro, Raio))   // SEM excluir ninguem: ela tambem esta' na agua
                 {
-                    bool time = a == _dona || a.EhPlayer;
+                    bool time = Combat.MesmoTime(_dona, a);
                     Banhar(a, time ? _s["buff_vel"] : _s["lentidao"], TICK * 2f);
                     if (Choque > 0f) Combat.AplicarDot(a, Balance.Terrain.ElectrifyDps, janela, "electric", null);
                 }
