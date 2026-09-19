@@ -7,7 +7,7 @@ namespace Arkana.Core
     /// Nenhum texto solto no codigo: quem desenha tela LE daqui. Quando o EN entrar, este arquivo vira
     /// a origem do CSV sem que nenhuma tela mude. Formatos usam {0}/{1} (string.Format), nao %d/%s.
     /// </summary>
-    public static class Textos
+    public static partial class Textos
     {
         // ---------------------------------------------------------------- titulo
         public const string Marca = "ARKANA";
