@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 16/09/2026, tarde (onda 15: luva, pulo, recuo, cast no tronco, logo; onda 16A: botões do menu; onda 14A: a mata; falta medir FPS no aparelho)
+> **Atualizado em:** 19/09/2026 (fase G4: onda 17 — a DUPLA e a SINTONIA no celular; onda 18 em andamento)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,27 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 16/09: o corpo do mago (a queixa do Diretor) e o logo ligado
+### >>> COMECE POR AQUI — 19/09: fase G4 — a dupla e a Sintonia (o pilar do jogo) entraram no celular
+
+**Avaliação das fases (19/09, pedida pelo Diretor):** G0–G2 fechadas; G3 praticamente fechada (20 magos reais, kits, praia, mata, céu, menu). **G4 é a fase aberta**: tinha zona, 12 bots e derrubado, mas **faltava a dupla e a Sintonia** — a "invenção que vão copiar de nós" (GDD §9) não existia no celular. G5 (multijogador) exige servidor e contas: decisão do Diretor, e só depois da G4 divertida contra bots. G6 (loja) é ato do Diretor. O Diretor mandou **ignorar a medição de FPS** ("o Poco F4 vai aguentar").
+
+**Onda 17 (4 raias paralelas contra um contrato escrito antes — `scratchpad/onda17-contrato.md`; portão 562 testes, 0 falhas; 105 mutantes mortos):**
+
+| Raia | O que entrou | Por quê |
+|---|---|---|
+| 17A Times | `Combat.MesmoTime` é a ÚNICA pergunta "é aliado?" (anti-farm, derrubado, 12 kits, Grupo D); `EhPlayer` = só "é o humano". Vitória por dupla (PONTE A6), `Partida.PlayerFora`/`ParceiroVivo`/`TimesVivos` | havia ~15 cópias de `a.EhPlayer && b.EhPlayer`; dupla com bot exigia um lugar só |
+| 17B Sintonia | `Core/Sintonia.cs`: aliados, elementos diferentes, mesmo ponto (7 m) em 1,5 s → 1 s de canalização → combo ×2,35; recarga 24 s cobrada no INÍCIO, devolvida a quem fica de pé se o outro cai (PONTE A5); gancho único no `Projetil.Impacto` | GDD §9; números = variante A do Roblox, **NÃO validados** (A19) — o Diretor julga no aparelho |
+| 17C Efeitos | `SintoniaEfeitos.cs` (os 10 combos no mundo com receita de terreno do Roblox e counters: Água desfaz tornado/magma/areia, Vento desfaz vapor...) + `VisualDaSintonia.cs` | dano só em inimigo (fonte = A); o que vira chão pega todo mundo (A4) |
+| 17D Dupla | Menu MODO **DUPLA** (padrão, VETÁVEL) \| SOLO; parceiro bot que acompanha a 4–8 m, foca o seu alvo, prefere outro elemento e te levanta; 6 duplas inimigas saltam juntas; câmera de espectador; HUD: DUPLAS n, faixa SINTONIA, anel de recarga, marca azul do parceiro, minimapa | GDD §9: o solo é pareado com um parceiro bot que entra na canalização real |
+| coordenador | tiro direto ATRAVESSA o aliado (A4); **time inteiro no chão sai no próximo tique** (antes esperava 30 s); pontes apagadas; dica da Config vira "como fazer o combo"; testes de contagem de bots seguem o modo; foto 29 com aliado de pé; **tronco dentro da rocha**: a Ilha monta as ruínas ANTES da vegetação e a mata refaz o sorteio do kit com as mesmas Pegadas (o diag ainda acusa 1 tronco a 9,0 m do centro de uma rocha de 11,5 m × escala — o limiar do diag usa o raio sem escala; conferir visualmente) | |
+
+**Fotos:** 53-sintonia-* (canalização e os 10 combos), 54-dupla-* (menu, parceiro, faixa, quebrada, espectador). **Veredito do coordenador sobre a 53-combos:** a canalização e a faixa estão boas; os combos de ZONA estão amadores (discos chapados e opacos que cortam a ladeira, plasma = esfera branca, nuvem/tornado fracos, arcos brancos sobrando) → **onda 18A refaz o visual**.
+
+**Onda 18 (em andamento, contrato `scratchpad/onda18-contrato.md`; `Textos` virou `partial` para cada raia ter o seu `Textos.<Raia>.cs`):** 18A acabamento visual dos 10 combos (zona que segue o relevo, sem opaco); 18B **Selo do Campeão** (cartão de fim de partida, §18.6); 18C **Grimório de Descobertas** (12 páginas sem vantagem, §18.3 + PONTE A18); 18D **Ping de Sintonia** (tocar no anel = "COMBO?", parceiro aceita e vai com o elemento complementar, §18.7).
+
+**Fila depois da 18:** Presságios (§18.4) — o GDD só tem 3 exemplos e mexem em números de combate: **escrever a spec no GDD antes** (regra do `design/00-LEIA.md`); Espírito Errante + altares de retorno (§18.6, PONTE A8/A9); números locais dos combos (`SintoniaEfeitos`) para a `Balance.Sintonia`; cegueira do vapor/areia para os bots (hoje só visual); bots usando kit (decisão do Diretor); capim da duna mais leve (descartado enquanto FPS não importa).
+
+### 16/09: o corpo do mago (a queixa do Diretor) e o logo ligado
 
 **O Diretor jogou o APK de 13/09 e reclamou (16/09):** "salto do personagem, a corrida para trás, ao pegar a luva parece que ela é imensa, chega a cobrir a câmera toda"; perguntou se valia passar os personagens pelo Blender. **Diagnóstico com foto e número antes de mexer** (`Foto_Diag_LuvaPuloTras`, foto 46): os três eram de CÓDIGO, não de modelo — o Blender para personagem foi descartado (já tinha falhado em 27/08).
 
