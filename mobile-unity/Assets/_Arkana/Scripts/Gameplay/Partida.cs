@@ -200,6 +200,8 @@ namespace Arkana.Gameplay
                 Projetil p = Projeteis[i];
                 bool voa = p.Tick(dt, acerto, Arena);
                 if (voa && terreno != null && NoMuro(terreno, p.Pos)) { p.Impacto(null); voa = false; }
+                // O GELO PARA O TIRO como o chao (onda 18E): quem mira no gelo acerta o gelo — o fogo derrete ONDE bateu, nao no fundo adiante
+                if (voa && terreno != null && LeituraDoTerreno.TiroNoGelo(terreno, p.Pos, Arkana.World.Ilha.SuperficieDaAgua(p.Pos.x, p.Pos.z))) { p.Impacto(null); voa = false; }
                 // O CHAO PARA O TIRO (GDD §14): sem isto ele varava morro e o terreno reativo so' via o tiro que acertava
                 // corpo. Agora o erro acende a mata, faz lama, congela/eletrifica o lago (a celula e' x,z; o fundo conta).
                 // ponytail: o fundo e nao a lamina — quem nada atira com a mao abaixo da agua e nao pode matar o proprio tiro.

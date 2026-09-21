@@ -12,7 +12,8 @@ namespace Arkana.Terrain
 
     /// <summary>
     /// A LEITURA do terreno reativo (GDD §14: o jogador tem de LER o mapa mudando), PURA: cor e forma por estado,
-    /// o teto de emissores de fogo (mobile), a escolha de quem ganha emissor e o estagio do muro por hp.
+    /// o teto de emissores de fogo (mobile), a escolha de quem ganha emissor, o estagio do muro por hp e o gelo que sustenta
+    /// (a caixa do colisor, a regra do nadador, o tiro que pousa no gelo).
     /// </summary>
     public static class LeituraDoTerreno
     {
@@ -78,6 +79,43 @@ namespace Arkana.Terrain
             return Mathf.Min(s, 1f - q * q);
         }
 
+        // ------------------------------------------------------------------ gelo: a ROTA (GDD §14, "lago congela e vira caminho")
+
+        /// <summary>m de gelo abaixo da lamina no COLISOR = o fundo do nado (Agua.PEITO): o nadador encosta na borda, nunca passa por baixo.</summary>
+        public const float GrossuraDoGelo = Agua.PEITO;
+
+        /// <summary>
+        /// Base da laje DESENHADA em relacao a' lamina. Fresca (0,45 m), o topo fica 5 cm acima do colisor: o pe' pisa NO gelo
+        /// (a -0,1 de antes o mago afundava 35 cm na placa). Derretendo, ela afina e o topo AFUNDA sob a lamina: a rota avisa
+        /// que vai sumir. KNOB por foto (59-gelo-em-cima), vetavel.
+        /// </summary>
+        public static readonly float BaseDoGelo = -0.4f;   // readonly, nao const: o teste le' o valor do Arkana.dll
+
+        /// <summary>O gelo AFINA no fim (derretendo) mas nunca encolhe a pegada: a rota que a logica da' e' a que se ve'.</summary>
+        public static float EspessuraDoGelo(float restante) =>
+            0.45f * Mathf.Lerp(0.35f, 1f, LeituraDosKits.EscalaPorRestante(restante, Balance.Terrain.FreezeDuration));
+
+        /// <summary>
+        /// O COLISOR da celula congelada: TOPO na lamina (onde a Agua mede o peito — em cima dele ninguem nada), a pegada da
+        /// celula INTEIRA (vizinhas emendam sem fresta: piso continuo) e GrossuraDoGelo para baixo. Fundo raso so' enterra a caixa.
+        /// </summary>
+        public static Bounds CaixaDoGelo(Vector3 centro, float lamina, float lado) =>
+            new Bounds(new Vector3(centro.x, lamina - GrossuraDoGelo * 0.5f, centro.z), new Vector3(lado, GrossuraDoGelo, lado));
+
+        /// <summary>
+        /// A REGRA DO NADADOR: quem tem o pe' abaixo do topo quando a celula SOLIDIFICA sobe para o topo, no mesmo x,z — ninguem
+        /// fica preso dentro nem embaixo do gelo (sai do nado para o gelo, encharcado). Quem ja' esta' em cima, ou no ar, fica.
+        /// </summary>
+        public static Vector3 PorEmCima(Vector3 pe, Bounds caixa) =>
+            pe.y < caixa.max.y ? new Vector3(pe.x, caixa.max.y, pe.z) : pe;
+
+        /// <summary>
+        /// O TIRO pousa no gelo como pousa no chao: celula congelada e o tiro na lamina ou abaixo. Por cima segue voando; agua
+        /// LIQUIDA nao o para (quem para e' o fundo). O projetil nao tem fisica: quem pergunta e' o laco da Partida, como no muro.
+        /// </summary>
+        public static bool TiroNoGelo(TerrenoReativo t, Vector3 pos, float lamina) =>
+            t != null && pos.y <= lamina && t.EstadoEm(pos) == EstadoCelula.Congelado;
+
         /// <summary>
         /// As celulas do `estado` que ganham emissor: as `teto` mais PERTO de `perto` (a camera), em ordem de distancia
         /// no chao. Sem alocar (insercao ordenada, O(n x teto)). Devolve quantas — nunca mais que `teto`.
@@ -104,6 +142,48 @@ namespace Arkana.Terrain
         {
             float dx = a.x - b.x, dz = a.z - b.z;
             return dx * dx + dz * dz;
+        }
+    }
+
+    /// <summary>
+    /// UM objeto por celula viva, com pool — o padrao do muro, PURO para o teste. `Pegar` a celula que esta' no estado NESTE
+    /// quadro (`novo` = acabou de sair do pool ou de nascer: posicione); `Soltar` no fim do quadro devolve ao pool quem nao foi
+    /// pego — a celula saiu de Visiveis (o gelo derreteu). O pool nunca passa do maior numero de celulas vivas juntas.
+    /// </summary>
+    public sealed class PoolDeCelulas<T>
+    {
+        readonly System.Func<T> _novo;
+        readonly Dictionary<int, T> _vivos = new Dictionary<int, T>();
+        readonly Dictionary<int, int> _visto = new Dictionary<int, int>();
+        readonly Stack<T> _livres = new Stack<T>();
+        readonly List<int> _soltar = new List<int>();
+
+        public PoolDeCelulas(System.Func<T> novo) { _novo = novo; }
+
+        public int Vivos => _vivos.Count;
+        public int Livres => _livres.Count;
+
+        public T Pegar(int idx, int quadro, out bool novo)
+        {
+            T t;
+            novo = !_vivos.TryGetValue(idx, out t);
+            if (novo) _vivos[idx] = t = _livres.Count > 0 ? _livres.Pop() : _novo();
+            _visto[idx] = quadro;
+            return t;
+        }
+
+        public void Soltar(int quadro, System.Action<T> aoSoltar)
+        {
+            _soltar.Clear();
+            foreach (KeyValuePair<int, int> kv in _visto) if (kv.Value != quadro) _soltar.Add(kv.Key);
+            for (int i = 0; i < _soltar.Count; i++)
+            {
+                T t = _vivos[_soltar[i]];
+                _vivos.Remove(_soltar[i]);
+                _visto.Remove(_soltar[i]);
+                aoSoltar(t);
+                _livres.Push(t);
+            }
         }
     }
 
@@ -149,6 +229,8 @@ namespace Arkana.Terrain
     /// (LeituraDoTerreno.TetoDeFogo/TetoDeFaiscas), nos mais perto da camera. O muro e' objeto de verdade (pool): o muro
     /// de TERRA da Meshy (pedras empilhadas, frestas ambar; sem o .glb, a pedra facetada no material do mundo) + BoxCollider
     /// (nao se atravessa, como no Godot); SOBE do chao, racha pelo hp e AFUNDA ao cair. O TIRO quem barra e' a Partida.
+    /// O GELO e' chao de verdade pelo mesmo padrao: um BoxCollider por celula congelada (pool), topo na lamina — o corpo anda
+    /// por cima em vez de nadar por baixo; derreteu, o colisor sai e quem estava em cima cai na agua.
     /// Arvore queimada e' da Vegetacao (nao duplica). O TerrenoReativoBehaviour nasce um frame depois e muda no restart:
     /// le' Atual a cada frame.
     /// </summary>
@@ -199,6 +281,9 @@ namespace Arkana.Terrain
         readonly List<MuroVivo> _caindo = new List<MuroVivo>();
         readonly List<int> _soltar = new List<int>();
         readonly List<CelulaVisivel> _escolhidas = new List<CelulaVisivel>();
+        /// <summary>O CHAO do gelo: um BoxCollider por celula congelada; derreteu, volta ao pool no mesmo quadro.</summary>
+        PoolDeCelulas<BoxCollider> _gelos;
+        static readonly Collider[] _dentro = new Collider[32];
         Lote _brasa, _carvao, _gelo, _raio, _lama;
         Emissores _fogo, _faiscas;
         TerrenoReativo _ultimo;
@@ -232,6 +317,7 @@ namespace Arkana.Terrain
             _lama = new Lote(MalhaVfx.Disco(), _mLama);
             _fogo = new Emissores(NovoFogo);
             _faiscas = new Emissores(NovaFaisca);
+            _gelos = new PoolDeCelulas<BoxCollider>(NovoGelo);
         }
 
         void LateUpdate()
@@ -245,6 +331,7 @@ namespace Arkana.Terrain
             if (vis != null)
                 for (int i = 0; i < vis.Count; i++) Classificar(vis[i]);
             SoltarMuros();
+            _gelos.Soltar(_quadro, SoltarGelo);
 
             Camera cam = Camera.main;
             Vector3 olho = cam != null ? cam.transform.position : transform.position;
@@ -272,14 +359,13 @@ namespace Arkana.Terrain
                 case EstadoCelula.Lama: _lama.Add(Raso(c, 0.11f, 0f, _cs * 0.56f)); break;
                 // losango = quadrado a 45 graus com a DIAGONAL da celula: as pontas se tocam e a agua vira trelica
                 case EstadoCelula.Eletrificado: _raio.Add(NaAgua(c, 0.06f, 45f, new Vector3(_cs * 0.7071f, 1f, _cs * 0.7071f))); break;
-                case EstadoCelula.Congelado: _gelo.Add(NaAgua(c, -0.1f, 0f, new Vector3(_cs * CelulaVisual, EspessuraDoGelo(c), _cs * CelulaVisual))); break;
+                case EstadoCelula.Congelado:
+                    _gelo.Add(NaAgua(c, LeituraDoTerreno.BaseDoGelo, 0f, new Vector3(_cs * CelulaVisual, LeituraDoTerreno.EspessuraDoGelo(c.Restante), _cs * CelulaVisual)));
+                    Solidificar(c);
+                    break;
                 case EstadoCelula.Muro: DesenharMuro(c); break;
             }
         }
-
-        /// <summary>O gelo AFINA no fim (derretendo) mas nunca encolhe a pegada: a rota que a logica da' e' a que se ve'.</summary>
-        static float EspessuraDoGelo(CelulaVisivel c) =>
-            0.45f * Mathf.Lerp(0.35f, 1f, LeituraDosKits.EscalaPorRestante(c.Restante, Balance.Terrain.FreezeDuration));
 
         /// <summary>Plano rente ao chao, inclinado pela normal do relevo (encosta nao enterra meia brasa).</summary>
         Matrix4x4 Raso(CelulaVisivel c, float acima, float giro, float lado)
@@ -317,6 +403,58 @@ namespace Arkana.Terrain
             Color c = LeituraDoTerreno.CorDoEstado(s);
             c.a *= f;
             m.SetColor(_idCor, c);
+        }
+
+        // ------------------------------------------------------------------ gelo (a rota)
+
+        /// <summary>
+        /// A celula congelada vira CHAO, no padrao do muro: BoxCollider na raiz de um objeto do pool, camada padrao (o
+        /// CharacterController pisa; a Queda e o pouso o acham pelo ChaoComObstaculos). Posicionado INATIVO, entra na fisica ja'
+        /// no lugar; quem estava dentro sobe (TirarDeDentro).
+        /// </summary>
+        void Solidificar(CelulaVisivel c)
+        {
+            bool novo;
+            BoxCollider bc = _gelos.Pegar(c.Idx, _quadro, out novo);
+            if (!novo) return;
+            Apoio a = ApoioDe(c);
+            Bounds caixa = LeituraDoTerreno.CaixaDoGelo(a.Chao, a.Agua, _cs);
+            bc.transform.position = caixa.center;
+            bc.size = caixa.size;
+            bc.gameObject.SetActive(true);
+            TirarDeDentro(caixa);
+        }
+
+        BoxCollider NovoGelo()
+        {
+            var go = new GameObject("Gelo");
+            go.SetActive(false);
+            go.transform.SetParent(transform, false);
+            return go.AddComponent<BoxCollider>();
+        }
+
+        /// <summary>Derreteu: o chao sai JA' e quem estava em cima cai na agua (e nada, como sempre: a Agua mede pela lamina).</summary>
+        static void SoltarGelo(BoxCollider bc) { bc.gameObject.SetActive(false); }
+
+        /// <summary>
+        /// Os corpos (CharacterController) dentro da caixa que acabou de solidificar sobem para o topo (LeituraDoTerreno.PorEmCima).
+        /// ponytail: so' na BORDA do congelamento. Nadar CONTRA a borda do gelo nao sobe (degrau de 1,2 m > stepOffset 0,4): da
+        /// agua para o gelo, so' pela margem. Subir pela borda pediria esta regra por contato, no Pawn.
+        /// </summary>
+        static void TirarDeDentro(Bounds caixa)
+        {
+            int n = Physics.OverlapBoxNonAlloc(caixa.center, caixa.extents, _dentro, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+            bool mexeu = false;
+            for (int i = 0; i < n; i++)
+            {
+                if (!(_dentro[i] is CharacterController)) continue;
+                Transform t = _dentro[i].transform;
+                Vector3 p = LeituraDoTerreno.PorEmCima(t.position, caixa);
+                if (p == t.position) continue;
+                t.position = p;
+                mexeu = true;
+            }
+            if (mexeu) Physics.SyncTransforms();   // o CharacterController le' a pose nova no proximo Move (como no Teleportar)
         }
 
         // ------------------------------------------------------------------ muro
