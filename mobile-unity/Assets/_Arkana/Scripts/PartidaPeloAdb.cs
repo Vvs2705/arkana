@@ -24,6 +24,9 @@ namespace Arkana
         /// <summary>0 = sem pedido; -1 = sem teto; N = teto de N quadros.</summary>
         public static int FpsPedido() => Extra(i => i.Call<int>("getIntExtra", EXTRA_FPS, 0));
 
+        /// <summary>`--ei arkana_bancada 1`: mede o custo de cada corte de GPU depois do pouso (BancadaDeCortes).</summary>
+        public static int BancadaPedida() => Extra(i => i.Call<int>("getIntExtra", "arkana_bancada", 0));
+
         static T Extra<T>(System.Func<AndroidJavaObject, T> ler)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
