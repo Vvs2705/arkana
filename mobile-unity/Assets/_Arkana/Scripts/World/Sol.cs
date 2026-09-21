@@ -52,9 +52,10 @@ namespace Arkana.World
             luz.color = new Color(1f, 0.86f, 0.63f);
             luz.intensity = 1.55f;
             luz.shadowStrength = 0.92f;
-            // Macia ALTA por luz. Sem o UniversalAdditionalLightData (a cena e o Main criam a luz sem ele) o URP
-            // amostra a macia BAIXA (4 taps) e escala o bias para o kernel 5x5; com Alta os dois batem no 7x7.
-            luz.GetUniversalAdditionalLightData().softShadowQuality = SoftShadowQuality.High;
+            // Macia BAIXA (4 taps), igual ao asset (o bias escala pelo kernel do asset: luz e asset tem de bater). A ALTA (7x7)
+            // custava ~10 ms por quadro no Poco F4 (bancada de 21/09: 15,7 -> 29,5 FPS com ela e o SSAO fora); a dura
+            // (1 tap) mede igual a baixa e volta os degraus na sombra do mago (foto 24, 12/09).
+            luz.GetUniversalAdditionalLightData().softShadowQuality = SoftShadowQuality.Low;
             if (transform.rotation == Quaternion.identity)
                 transform.rotation = Quaternion.Euler(30f, -28f, 0f);   // 30 graus como no Godot: sombra longa, relevo legivel
         }
@@ -111,8 +112,11 @@ namespace Arkana.World
                 if (d != null)
                     foreach (ScriptableRendererFeature f in d.rendererFeatures)
                         ssao |= f is ScreenSpaceAmbientOcclusion && f.isActive;
+            // ponytail: a qualidade da macia e' internal no URP 17; reflexao so' para o diagnostico/teste
+            object q = typeof(UniversalRenderPipelineAsset).GetProperty("softShadowQuality",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)?.GetValue(urp);
             return urp.mainLightShadowmapResolution + "px x" + urp.shadowCascadeCount
-                + (urp.supportsSoftShadows ? " macia" : " dura") + (ssao ? " ssao" : " sem-ssao");
+                + (urp.supportsSoftShadows ? " macia" + (q != null ? "-" + q.ToString().ToLowerInvariant() : "") : " dura") + (ssao ? " ssao" : " sem-ssao");
         }
     }
 }

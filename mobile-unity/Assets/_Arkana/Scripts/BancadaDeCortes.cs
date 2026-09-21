@@ -21,7 +21,8 @@ namespace Arkana
     {
         const float ASSENTAR = 2f, MEDIR = 8f, DEPOIS_DO_POUSO = 6f;
 
-        static readonly string[] Cortes =
+        /// <summary>Padrao; `--es arkana_cortes "base,ssao+sombra_dura,..."` troca a lista sem APK novo.</summary>
+        static readonly string[] CortesPadrao =
         {
             "base", "sem_ssao", "sombra_2cascatas_2048", "sem_sombra", "escala_085", "escala_070", "sem_hdr", "sem_pos",
             "sem_grama", "sem_vegetacao", "chao_simples", "sem_agua", "sem_nuvens",
@@ -41,6 +42,9 @@ namespace Arkana
         float _escala, _distSombra;
         int _cascatas, _resSombra;
         bool _hdr, _pousou;
+        Light _sol;
+        LightShadows _sombraSol;
+        SoftShadowQuality _suave;
         readonly List<ScriptableRendererFeature> _ssao = new List<ScriptableRendererFeature>();
 
         void OnEnable() { Bus.QuedaFase += AoFase; }
@@ -54,10 +58,15 @@ namespace Arkana
             _escala = _urp.renderScale; _cascatas = _urp.shadowCascadeCount; _resSombra = _urp.mainLightShadowmapResolution;
             _distSombra = _urp.shadowDistance; _hdr = _urp.supportsHDR;
             AcharSsao();
+            foreach (Light l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (l.type == LightType.Directional && (_sol == null || l.intensity > _sol.intensity)) _sol = l;
+            if (_sol != null) { _sombraSol = _sol.shadows; _suave = _sol.GetUniversalAdditionalLightData().softShadowQuality; }
             Debug.Log("ARKANA BANCADA inicio escala=" + _escala + " cascatas=" + _cascatas + " sombra=" + _resSombra + " dist=" + _distSombra
                 + " hdr=" + _hdr + " ssao=" + _ssao.Count + " tela=" + Screen.width + "x" + Screen.height);
             yield return new WaitForSecondsRealtime(DEPOIS_DO_POUSO);
-            foreach (string corte in Cortes)
+            string pedidos = PartidaPeloAdb.CortesPedidos();
+            string[] cortes = string.IsNullOrEmpty(pedidos) ? CortesPadrao : pedidos.Split(',');
+            foreach (string corte in cortes)
             {
                 Restaurar();
                 Aplicar(corte);
@@ -78,10 +87,18 @@ namespace Arkana
             Debug.Log("ARKANA BANCADA FIM");
         }
 
+        /// <summary>O time do jogador nao cai nem morre durante a bancada (em 21/09 a dupla perdeu no meio e a bancada mediu o
+        /// cartao de fim): levanta quem caiu e enche a vida a cada quadro.</summary>
         static void SegurarJogador()
         {
-            IEntidade p = Gameplay.Partida.Atual != null ? Gameplay.Partida.Atual.Player : null;
-            if (p != null && p.Vital != null && p.Vital.Viva) p.Vital.Hp = p.Vital.HpMax;
+            Gameplay.Partida partida = Gameplay.Partida.Atual;
+            if (partida == null || partida.Player == null) return;
+            foreach (IEntidade e in partida.Arena)
+            {
+                if (e == null || e.Vital == null || !e.Vital.Viva || !Combat.MesmoTime(e, partida.Player)) continue;
+                if (Gameplay.Derrubado.Esta(e)) Gameplay.Derrubado.Reerguer(e);
+                e.Vital.Hp = e.Vital.HpMax;
+            }
         }
 
         void AcharSsao()
@@ -104,6 +121,7 @@ namespace Arkana
             if (cam != null) cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
             Ligados(true, true, true);
             Floats(1f);
+            if (_sol != null) { _sol.shadows = _sombraSol; _sol.GetUniversalAdditionalLightData().softShadowQuality = _suave; }
         }
 
         void Aplicar(string corte)
@@ -117,6 +135,11 @@ namespace Arkana
                     case "sem_sombra": _urp.shadowDistance = 0f; break;
                     case "escala_085": case "escala085": _urp.renderScale = 0.85f; break;
                     case "escala_070": _urp.renderScale = 0.7f; break;
+                    case "escala_080": case "escala080": _urp.renderScale = 0.8f; break;
+                    case "escala_075": case "escala075": _urp.renderScale = 0.75f; break;
+                    case "sombra_dura": if (_sol != null) _sol.shadows = LightShadows.Hard; break;
+                    case "sombra_suave_baixa": if (_sol != null) _sol.GetUniversalAdditionalLightData().softShadowQuality = SoftShadowQuality.Low; break;
+                    case "sombra_suave_media": if (_sol != null) _sol.GetUniversalAdditionalLightData().softShadowQuality = SoftShadowQuality.Medium; break;
                     case "sem_hdr": _urp.supportsHDR = false; break;
                     case "sem_pos": Camera cam = Camera.main; if (cam != null) cam.GetUniversalAdditionalCameraData().renderPostProcessing = false; break;
                     case "sem_grama": Ligados(false, true, true); break;

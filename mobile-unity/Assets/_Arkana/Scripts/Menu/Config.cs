@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Rendering.Universal;
 using Arkana.Core;
 using Arkana.UI;
 
@@ -70,6 +71,17 @@ namespace Arkana.Menu
         public static readonly int[] FpsOpcoes = { 30, 60, 120, -1 };
         public static readonly string[] FpsRotulos = { "30", "60", "120", "Ilimitado" };
         public static readonly string[] Qualidades = { "Baixa", "Média", "Alta" };
+
+        /// <summary>O que a QUALIDADE muda de verdade. Ate' 21/09 os 3 niveis do QualitySettings usavam o MESMO asset URP e a
+        /// opcao nao mudava nada. Medido no Poco F4 (BancadaDeCortes, 21/09, ja' sem SSAO e com macia baixa): Alta = o asset
+        /// como esta' (~25 FPS no chao, aparelho quente); Media = 85% + 2 cascatas de 2048 (~32); Baixa = 70% e as mesmas
+        /// cascatas (a escala e' o corte mais barato em imagem a 395 ppi). KNOBs — o Diretor julga no aparelho.</summary>
+        public struct PerfilDeVideo { public float Escala; public int Cascatas, Sombra; }
+
+        public static PerfilDeVideo Perfil(int qualidade) =>
+            qualidade <= 0 ? new PerfilDeVideo { Escala = 0.7f, Cascatas = 2, Sombra = 2048 }
+            : qualidade == 1 ? new PerfilDeVideo { Escala = 0.85f, Cascatas = 2, Sombra = 2048 }
+            : new PerfilDeVideo { Escala = 1f, Cascatas = 4, Sombra = 4096 };
         public static readonly string[] Layouts = { "Padrão", "Espelhado" };
 
         /// <summary>Padrao de fabrica — o TIPO de cada valor e' o contrato da chave.</summary>
@@ -170,6 +182,14 @@ namespace Arkana.Menu
             if (Application.isMobilePlatform || Application.isEditor == false) Screen.fullScreen = c.Bool(K_TELA_CHEIA);
             int q = Mathf.Clamp(c.Int(K_QUALIDADE), 0, 2);
             if (QualitySettings.names.Length > 0) QualitySettings.SetQualityLevel(Mathf.Clamp(q * (QualitySettings.names.Length - 1) / 2, 0, QualitySettings.names.Length - 1), false);
+            // ponytail: no editor o asset URP e' o ARQUIVO do projeto (mudar em runtime grava no disco e suja o git): o perfil so'
+            // vale fora do editor; as fotos do PC saem na Alta, que e' o asset como esta'
+            UniversalRenderPipelineAsset urp = UniversalRenderPipeline.asset;
+            if (!Application.isEditor && urp != null)
+            {
+                PerfilDeVideo pv = Perfil(q);
+                urp.renderScale = pv.Escala; urp.shadowCascadeCount = pv.Cascatas; urp.mainLightShadowmapResolution = pv.Sombra;
+            }
             AudioListener.volume = Mathf.Clamp01(c.Float(K_VOL_GERAL) / 100f);
             FiltroDaltonismo.Modo = Mathf.Clamp(c.Int(K_DALTONISMO), 0, 3);
             Mudou?.Invoke(c);

@@ -9,6 +9,19 @@ namespace Arkana.Tests
     public class MenuConfigTests
     {
         [Test]
+        public void Qualidade_MudaOQueSeDesenha_AltaEOAssetComoEsta()
+        {
+            // DEFEITO: os 3 niveis usavam o mesmo asset URP e a opcao "Qualidade" nao mudava nada (21/09). Alta = o asset
+            // (4 cascatas de 4096, escala 1); Media e Baixa cortam o que a bancada do Poco F4 mediu que mais custa
+            ConfigLogica.PerfilDeVideo alta = ConfigLogica.Perfil(2), media = ConfigLogica.Perfil(1), baixa = ConfigLogica.Perfil(0);
+            Assert.AreEqual(1f, alta.Escala); Assert.AreEqual(4, alta.Cascatas); Assert.AreEqual(4096, alta.Sombra);
+            Assert.AreEqual(0.85f, media.Escala, 1e-4f); Assert.AreEqual(2, media.Cascatas); Assert.AreEqual(2048, media.Sombra);
+            Assert.Less(baixa.Escala, media.Escala, "Baixa mais leve que a Media");
+            Assert.LessOrEqual(baixa.Cascatas, media.Cascatas);
+            Assert.AreEqual(1, ConfigLogica.Padrao[ConfigLogica.K_QUALIDADE], "o padrao continua a Media");
+        }
+
+        [Test]
         public void DefaultsDoGdd12()
         {
             var c = new ConfigLogica();

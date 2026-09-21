@@ -27,6 +27,9 @@ namespace Arkana
         /// <summary>`--ei arkana_bancada 1`: mede o custo de cada corte de GPU depois do pouso (BancadaDeCortes).</summary>
         public static int BancadaPedida() => Extra(i => i.Call<int>("getIntExtra", "arkana_bancada", 0));
 
+        /// <summary>`--es arkana_cortes "base,sem_ssao+escala_085"`: a lista da bancada sem APK novo (null = a padrao).</summary>
+        public static string CortesPedidos() => Extra(i => i.Call<string>("getStringExtra", "arkana_cortes"));
+
         static T Extra<T>(System.Func<AndroidJavaObject, T> ler)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR

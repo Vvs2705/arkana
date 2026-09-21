@@ -3764,5 +3764,81 @@ namespace Arkana.Tests
             Assert.AreSame(inimigo, main.Parceiro.Percepcao.Alvo);
         }
 
+
+        // ---- COLAR em FotoTests.cs dentro da classe (antes do ultimo `}` dela). Onda 18E — o gelo que sustenta.
+
+        /// <summary>
+        /// O GELO QUE SUSTENTA (onda 18E, GDD §14: agua sobre agua congela o lago e vira ROTA; o fogo derrete e quem esta' em cima
+        /// cai). Ate' aqui a logica dizia Caminhavel e a tela desenhava a laje, mas o corpo nadava POR BAIXO dela. No treino: o
+        /// jogador NADANDO na celula mais funda do lago; um TerrainHit de AGUA ali (o caminho do impacto, sem projetil: nenhuma
+        /// pagina do Grimorio acende) congela o 3x3 — o nadador SOBE para o topo (a regra do nadador) e fica de pe' na lamina.
+        /// 59-gelo-em-cima: a camera do jogador, ele de pe' na laje. Depois um TerrainHit de FOGO derrete a celula dele: o
+        /// colisor sai, ele cai e volta a NADAR. 59-gelo-derreteu: ele nadando no buraco da laje.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Gelo_OMagoAndaPorCima()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            for (int n = 0; main.Carregando && n < 2000; n++) yield return null;
+            yield return Esperar(1f);   // a tela de carregamento esvaece
+            Assert.IsNotNull(Arkana.World.Ilha.Atual, "sem ilha");
+            Arkana.Terrain.TerrenoReativo terreno = Arkana.Terrain.TerrenoReativoBehaviour.Atual != null ? Arkana.Terrain.TerrenoReativoBehaviour.Atual.Terreno : null;
+            Assert.IsNotNull(terreno, "o treino tem terreno reativo");
+
+            // a celula de AGUA mais funda do LAGO (a lamina do lago, nao o mar nem o brejo): ali se nada de verdade
+            float lamina = Arkana.World.Relevo.LagoY;
+            int melhor = -1;
+            float fundo = float.MaxValue;
+            for (int idx = 0; idx < terreno.N * terreno.N; idx++)
+            {
+                if (terreno.Tipo(idx) != Arkana.Terrain.TipoCelula.Agua) continue;
+                Vector3 c = terreno.Centro(idx);
+                if (Arkana.World.Ilha.SuperficieDaAgua(c.x, c.z) != lamina) continue;
+                if (c.y < fundo) { fundo = c.y; melhor = idx; }
+            }
+            Assert.GreaterOrEqual(melhor, 0, "sem lago na ilha");
+            Vector3 centro = terreno.Centro(melhor);
+            Assert.Greater(lamina - centro.y, Gameplay.Agua.PEITO + 0.3f, "preparo: a celula e' funda (nado de verdade)");
+
+            // 1) NADANDO: o corpo no fundo da celula; a Agua o faz boiar com o peito na lamina
+            Gameplay.Pawn eu = main.Player.Pawn;
+            LevarJogador(main, centro);
+            yield return Esperar(1.5f);
+            Assert.IsTrue(eu.Agua.Nadando, "preparo: o jogador nada no lago");
+            Assert.AreEqual(Arkana.Terrain.EstadoCelula.Normal, terreno.Estado(melhor));
+
+            // 2) CONGELA com ele dentro: sobe para o topo e fica DE PE' na lamina
+            Bus.EmitTerrainHit(Elemento.Agua, centro, false);
+            Assert.AreEqual(Arkana.Terrain.EstadoCelula.Congelado, terreno.Estado(melhor), "agua sobre agua congelou");
+            yield return Esperar(1f);
+            Vector3 p = eu.Pos;
+            Assert.AreEqual(melhor, terreno.CelulaEm(p), "na mesma celula: subiu, nao foi jogado para o lado");
+            Assert.IsFalse(eu.Agua.Nadando, "em cima do gelo ninguem nada");
+            Assert.AreEqual(lamina, p.y, 0.15f, "de pe' NA lamina (o topo do colisor), nao por baixo");
+            Assert.IsTrue(eu.NoChao, "o gelo SUSTENTA: o CharacterController esta' apoiado");
+            float topo = Gameplay.ChaoComObstaculos.Topo(p.x, p.z, Arkana.World.Ilha.AlturaDoChao(p.x, p.z));
+            Assert.AreEqual(lamina, topo, 0.05f, "a Queda e o pouso veem o gelo como chao (ChaoComObstaculos)");
+            OlharParaOCentro(main);
+            yield return Esperar(0.3f);   // a camera assenta no rumo novo
+            Foto(main.Player.Camera.Cam, "59-gelo-em-cima", true);
+            string diag = "59-gelo-em-cima: celula=" + melhor + " fundo=" + centro.y.ToString("F2") + " lamina=" + lamina.ToString("F2")
+                + " pawn=" + p.ToString("F2") + " nadando=" + eu.Agua.Nadando + " noChao=" + eu.NoChao + " topo=" + topo.ToString("F2") + "\n";
+
+            // 3) O FOGO derrete a celula dele: o colisor sai, ele cai e volta a NADAR
+            Bus.EmitTerrainHit(Elemento.Fogo, centro, false);
+            Assert.AreEqual(Arkana.Terrain.EstadoCelula.Normal, terreno.Estado(melhor), "o fogo derreteu");
+            yield return Esperar(1.5f);
+            Assert.IsTrue(eu.Agua.Nadando, "quem estava em cima caiu na agua e nada, como sempre");
+            Assert.Less(eu.Pos.y, lamina - 0.5f, "afundou ate' o peito");
+            Foto(main.Player.Camera.Cam, "59-gelo-derreteu", true);
+            diag += "59-gelo-derreteu: pawn=" + eu.Pos.ToString("F2") + " nadando=" + eu.Agua.Nadando + "\n";
+            Directory.CreateDirectory(Pasta);
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), diag);
+        }
+
     }
 }
