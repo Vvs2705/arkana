@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 19/09/2026 (fase G4: onda 17 — a DUPLA e a SINTONIA no celular; onda 18 em andamento)
+> **Atualizado em:** 21/09/2026 (Poco F4 mediu 17–20 FPS no chão — GPU; bancada de cortes pronta; onda 18 fechada: combos no relevo, Selo do Campeão, Grimório, Ping de Sintonia)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,28 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 19/09: fase G4 — a dupla e a Sintonia (o pilar do jogo) entraram no celular
+### >>> COMECE POR AQUI — 21/09: o Poco F4 mediu 17–20 FPS no chão; onda 18 fechada
+
+**O aparelho voltou ao `adb` (21/09) e MEDIU** (APK `arkana-2026-09-19_1725`, partida automática em dupla, `arkana_fps 300`):
+castelo/queda **36–40 FPS**; **no chão, 17–20 FPS a partida inteira** (pior quadro 66–165 ms); bateria a 44 °C. Em 12/09 eram 60 cravados — as ondas 5–17 (sombra 4096×4 cascatas + SSAO, `_Chao` em toda a ilha, 615 árvores, grama, mata, praia, céu) nunca tinham sido medidas. **O gargalo é a GPU:** com o jogo a 17 FPS, `UnityMain` usa 17% de um núcleo e o render 10% (`top -H`). O Diretor tinha mandado ignorar FPS ("o Poco aguenta"); **a medição diz que não aguenta** — é a regra dele de 25/08: FPS se mede, e jogo travando é jogo não funcionando. **Próximo passo, com o celular no USB:** `BancadaDeCortes` (commit `2d8510f`, já no APK `arkana-2026-09-21_1418`): `adb shell am start -n br.com.vstack.arkana/com.unity3d.player.UnityPlayerGameActivity --es arkana_auto partida --ei arkana_fps 300 --ei arkana_bancada 1` e `adb logcat -s Unity | grep "ARKANA BANCADA"` — 15 cortes de 10 s depois do pouso (sem SSAO, sombra 2 cascatas/2048, sem sombra, escala 0,85/0,70, sem HDR, sem pós, sem grama, sem vegetação, chão simples, sem água, sem nuvens, combinado, base de novo). Com a tabela, corta-se o que custa mais e rende menos. MIUI: com "Depuração USB (configurações de segurança)" ligada, `adb shell input tap/swipe` FUNCIONA (21/09) — dá para jogar pelo computador.
+
+**Achado do aparelho (corrigido na 18D):** a marca azul do parceiro atrás da câmera grudava em cima do botão SUPREMA.
+
+**Onda 18 (portão 613 testes, 0 falhas; fotos 55–58):**
+
+| Raia | O que entrou |
+|---|---|
+| 18A | os 10 combos redesenhados: zona em grade que segue o chão desenhado, shader `ArkanaSintoniaZona` (material em `Resources/`, teste que o carrega), funil, lava, plasma violeta, nuvens de partícula, cristais da Meshy, nuvem com raio. Os "arcos brancos" eram a onda de choque plana |
+| 18B | **Selo do Campeão** (§18.6): cartão de fim com carimbo, retrato, colocação por dupla, abates, dano, Sintonias, tempo vivo, elementos; canvas próprio (ordem 60), HUD de combate some. Compartilhar de verdade pede FileProvider no manifesto (não feito) |
+| 18C | **Grimório de Descobertas** (§18.3, A18): 12 páginas sem vantagem (6 de terreno, 6 de dupla/desfecho), bit por página em `grimorio.v1`, aviso em partida, livro no menu (ELENCO \| GRIMÓRIO). "Ponte de Gelo" virou "Lago Congelado" e "Fumaçar o Esconderijo" virou "Vento no Fogo" (vetável) |
+| 18D | **Ping de Sintonia** (§18.7): tocar no anel pronto = COMBO? no inimigo da mira; o parceiro aceita em 0,5 s, prende o foco 12 s e escolhe o elemento que funde, ou recusa "SEM COMBO" |
+| coordenador | dica falsa "fogo na grama alta revela escondidos" (não existe) trocada pela da Sintonia; dica do anel tocável |
+
+**Em andamento:** 18E — **o gelo não sustentava ninguém** (o `TerrenoReativo` diz "congelada vira ROTA", mas o corpo nadava por baixo): colisor por célula congelada no `VisualDoTerreno`, como o muro.
+
+**Fila:** a tabela da bancada e os cortes de GPU (prioridade 1 quando o celular voltar); Presságios (escrever a spec no GDD antes); Espírito Errante + altares; números locais dos combos para a `Balance`; cegueira do vapor/areia para bots; autor no `Bus.TerrainChanged` (kit e combo não acendem página de terreno); botão compartilhar do cartão; bots usando kit (Diretor).
+
+### 19/09: fase G4 — a dupla e a Sintonia (o pilar do jogo) entraram no celular
 
 **Avaliação das fases (19/09, pedida pelo Diretor):** G0–G2 fechadas; G3 praticamente fechada (20 magos reais, kits, praia, mata, céu, menu). **G4 é a fase aberta**: tinha zona, 12 bots e derrubado, mas **faltava a dupla e a Sintonia** — a "invenção que vão copiar de nós" (GDD §9) não existia no celular. G5 (multijogador) exige servidor e contas: decisão do Diretor, e só depois da G4 divertida contra bots. G6 (loja) é ato do Diretor. O Diretor mandou **ignorar a medição de FPS** ("o Poco F4 vai aguentar").
 
