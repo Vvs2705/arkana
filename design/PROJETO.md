@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 21/09/2026 (Poco F4 mediu 17–20 FPS no chão — GPU; bancada de cortes pronta; onda 18 fechada: combos no relevo, Selo do Campeão, Grimório, Ping de Sintonia)
+> **Atualizado em:** 21/09/2026, tarde (chão do Poco F4 de 16 para 34 FPS medido; Qualidade real; gelo vira chão; onda 18: combos no relevo, Selo do Campeão, Grimório, Ping de Sintonia)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -51,7 +51,27 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 21/09: o Poco F4 mediu 17–20 FPS no chão; onda 18 fechada
+### >>> COMECE POR AQUI — 21/09, tarde: o chão do Poco F4 de 16 para 34 FPS (medido); gelo vira chão
+
+**FPS resolvido pela medição (commit `9749474`), portão 620 testes, 0 falhas.** Três rodadas da `BancadaDeCortes` no aparelho:
+o jogo inteiro dava 15,7–17 FPS no chão; os custos por quadro eram **sombra macia ALTA (~10 ms)**, **SSAO (~12 ms)** e a
+resolução (a imagem é limitada por pixel: 70% da escala tira ~22 ms). Grama, água, nuvens, HDR e pós custam 0–2,6 ms cada
+(ficam). **Entrou:** SSAO desligado (`URP_Base_Renderer`), macia BAIXA no asset e no sol (a dura mede igual e devolve os
+degraus da foto 24), e a opção **Qualidade** das Configurações passou a mudar de verdade — antes os 3 níveis usavam o mesmo
+asset e ela não fazia nada: **Alta** = o asset (100%, 4 cascatas de 4096, ~25 FPS), **Média (padrão, vetável)** = 85% +
+2 cascatas de 2048 (**34,6 FPS, pior quadro 33 ms**, aparelho a 47 °C), **Baixa** = 70% (~40 FPS). Castelo/queda: 42–52.
+No editor o perfil NÃO se aplica (o asset é o arquivo do projeto; mudar em runtime gravaria no disco): as fotos saem na Alta.
+**A bancada ficou:** `--ei arkana_bancada 1 --es arkana_cortes "base,escala_070,..."` mede qualquer lista sem APK novo.
+
+**Gelo (commit `b9831a0`):** cada célula congelada ganha colisor com o topo na lâmina (padrão do muro); quem nadava ali sobe;
+derreteu, cai e nada; o tiro para no gelo. Teste PlayMode prova no Unity. **Falta:** a laje quase não se distingue da água na
+foto 59 (parece andar sobre a água) — reforçar o visual do gelo (cor/opacidade/rachaduras no `VisualDoTerreno`).
+
+**Teste com toque no aparelho (MIUI com "Depuração USB (segurança)" aceita `adb shell input`):** menu, Grimório (1/12 real:
+"Muro de Pedra" acendeu numa partida), JOGAR, salto — o parceiro salta junto. Achados: a marca do parceiro cobre a mira quando
+ele está bem à frente (no castelo); saltar no começo da rota cai no mar longe da ilha (decidir se o salto espera terra).
+
+### 21/09, manhã: o Poco F4 mediu 17–20 FPS no chão; onda 18 fechada
 
 **O aparelho voltou ao `adb` (21/09) e MEDIU** (APK `arkana-2026-09-19_1725`, partida automática em dupla, `arkana_fps 300`):
 castelo/queda **36–40 FPS**; **no chão, 17–20 FPS a partida inteira** (pior quadro 66–165 ms); bateria a 44 °C. Em 12/09 eram 60 cravados — as ondas 5–17 (sombra 4096×4 cascatas + SSAO, `_Chao` em toda a ilha, 615 árvores, grama, mata, praia, céu) nunca tinham sido medidas. **O gargalo é a GPU:** com o jogo a 17 FPS, `UnityMain` usa 17% de um núcleo e o render 10% (`top -H`). O Diretor tinha mandado ignorar FPS ("o Poco aguenta"); **a medição diz que não aguenta** — é a regra dele de 25/08: FPS se mede, e jogo travando é jogo não funcionando. **Próximo passo, com o celular no USB:** `BancadaDeCortes` (commit `2d8510f`, já no APK `arkana-2026-09-21_1418`): `adb shell am start -n br.com.vstack.arkana/com.unity3d.player.UnityPlayerGameActivity --es arkana_auto partida --ei arkana_fps 300 --ei arkana_bancada 1` e `adb logcat -s Unity | grep "ARKANA BANCADA"` — 15 cortes de 10 s depois do pouso (sem SSAO, sombra 2 cascatas/2048, sem sombra, escala 0,85/0,70, sem HDR, sem pós, sem grama, sem vegetação, chão simples, sem água, sem nuvens, combinado, base de novo). Com a tabela, corta-se o que custa mais e rende menos. MIUI: com "Depuração USB (configurações de segurança)" ligada, `adb shell input tap/swipe` FUNCIONA (21/09) — dá para jogar pelo computador.
