@@ -7,9 +7,9 @@ using Arkana.UI;
 namespace Arkana.Menu
 {
     /// <summary>
-    /// Porta de entrada: Titulo (Selo + wordmark + "toque para comecar") -> Menu (JOGAR / TREINO / ELENCO / CONFIGURACOES)
-    /// -> Elenco e Configuracoes. Tudo por codigo. JOGAR emite Bus.GameStartRequested; TREINO liga PedidoDeTreino (estatico:
-    /// sobrevive a troca de cena, e quem consome zera) e pede a partida do mesmo jeito. Colado no JOGAR, o seletor MODO:
+    /// Porta de entrada: Titulo (Selo + wordmark + "toque para comecar") -> Menu (JOGAR / TREINO / ELENCO | GRIMORIO /
+    /// CONFIGURACOES) -> Elenco, Grimorio e Configuracoes. Tudo por codigo. JOGAR emite Bus.GameStartRequested; TREINO liga
+    /// PedidoDeTreino (estatico: sobrevive a troca de cena, e quem consome zera) e pede a partida do mesmo jeito. Colado no JOGAR, o seletor MODO:
     /// DUPLA | SOLO (ModoDupla, lembrado no PlayerPrefs).
     /// </summary>
     public sealed class Menu : MonoBehaviour
@@ -17,6 +17,7 @@ namespace Arkana.Menu
         public const string T_MARCA = Textos.Marca, T_SUB = Textos.TituloSub, T_TOQUE = Textos.TituloToque;
         public const string T_JOGAR = Textos.MenuJogar, T_TREINO = Textos.MenuTreino, T_CONFIG = Textos.MenuConfig, T_SAIR = Textos.MenuSair;
         public const string T_ELENCO = "ELENCO";   // pedido do coordenador (Textos so' tem "PERSONAGENS"); ponytail: unificar no Core
+        public const string T_GRIMORIO = Textos.GrimorioBotao;
 
         /// <summary>O treino e' a MESMA cena da partida com um pedido diferente. A cena le e ZERA ao consumir.</summary>
         public static bool PedidoDeTreino;
@@ -36,7 +37,8 @@ namespace Arkana.Menu
 
         Canvas _canvas;
         RectTransform _raiz;
-        RectTransform _titulo, _menu, _elenco, _config;
+        RectTransform _titulo, _menu, _elenco, _config, _grimorio;
+        TelaGrimorio _telaGrimorio;
         RectTransform _atual;
         Text _tap;
         CanvasGroup _modoDupla, _modoSolo;
@@ -70,6 +72,7 @@ namespace Arkana.Menu
             _menu = MontarMenu();
             _elenco = null;
             _config = null;
+            _grimorio = null;
             _menu.gameObject.SetActive(false);
             _atual = _titulo;
         }
@@ -146,7 +149,15 @@ namespace Arkana.Menu
             Botao(linha, "BtnJogar", T_JOGAR, OnJogar, true);
             MontarModo(linha);
             Botao(col.transform, "BtnTreino", T_TREINO, () => { PedidoDeTreino = true; OnJogar(); });
-            Botao(col.transform, "BtnElenco", T_ELENCO, () => { if (_elenco == null) _elenco = MontarElenco(); Ir(_elenco); });
+            // ELENCO | GRIMORIO numa linha so' da largura dos outros: mais uma fileira passava dos 437 dp do Poco F4 deitado
+            var linhaElenco = Formas.No(col.transform, "LinhaElenco");
+            Estilo.Tamanho(linhaElenco, Dp.Px(ItemLarguraDp), Estilo.AlturaAlvo(ItemAlturaDp));
+            MeioBotao(linhaElenco, "BtnElenco", T_ELENCO, 0f, () => { if (_elenco == null) _elenco = MontarElenco(); Ir(_elenco); });
+            MeioBotao(linhaElenco, "BtnGrimorio", T_GRIMORIO, 1f, () =>
+            {
+                if (_grimorio == null) _grimorio = MontarGrimorio(); else _telaGrimorio.Montar();   // relê o save: a partida acende pagina
+                Ir(_grimorio);
+            });
             Botao(col.transform, "BtnConfig", T_CONFIG, () => { if (_config == null) _config = MontarConfig(); Ir(_config); });
             Botao(col.transform, "BtnSair", T_SAIR, () => Application.Quit());
             return t;
@@ -161,6 +172,21 @@ namespace Arkana.Menu
             float larg = principal ? JogarLarguraDp : ItemLarguraDp, alt = principal ? JogarAlturaDp : ItemAlturaDp;
             var b = Estilo.Botao(pai, nome, texto, larg, alt, principal ? JogarFonteDp : ItemFonteDp, principal);
             Estilo.Tamanho(b, Dp.Px(larg), Estilo.AlturaAlvo(alt));
+            b.onClick.AddListener(() => acao());
+            return b;
+        }
+
+        /// <summary>KNOB por foto: as metades da linha ELENCO | GRIMORIO — o vao (14 dp: as gemas das laterais, meio para fora
+        /// cada uma, nao se tocam) e a fonte, menor que a do item inteiro.</summary>
+        const float MeioVaoDp = 14f, MeioFonteDp = 16f;
+
+        /// <summary>Metade da linha: a mesma placa do menu, ancorada a' esquerda (0) ou a' direita (1) da linha.</summary>
+        Button MeioBotao(RectTransform linha, string nome, string texto, float ancoraX, Action acao)
+        {
+            var b = Estilo.Botao(linha, nome, texto, (ItemLarguraDp - MeioVaoDp) * 0.5f, ItemAlturaDp, MeioFonteDp);
+            var rt = (RectTransform)b.transform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(ancoraX, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
             b.onClick.AddListener(() => acao());
             return b;
         }
@@ -223,6 +249,15 @@ namespace Arkana.Menu
             AreaSegura.Esticar(t);
             var s = Elenco.Criar(t);
             s.VoltarPedido += () => Ir(_menu);
+            return t;
+        }
+
+        RectTransform MontarGrimorio()
+        {
+            var t = Formas.No(_raiz, "Grimorio");
+            AreaSegura.Esticar(t);
+            _telaGrimorio = TelaGrimorio.Criar(t);
+            _telaGrimorio.VoltarPedido += () => Ir(_menu);
             return t;
         }
 

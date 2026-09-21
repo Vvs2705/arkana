@@ -90,6 +90,136 @@ namespace Arkana.Gameplay
             }
             return false;
         }
+
+        /// <summary>O elemento dos `meus` que FORMA COMBO com os `dele` (Sintonia.ComboDe: mesmo elemento nao funde). Prefere
+        /// o que funde com TODOS os dele (a manopla dele alterna: fora do par, todo tiro dele casa); senao o 1o que funde com
+        /// algum. Null = sem combo (so' o mesmo elemento, ou maos nuas).</summary>
+        public static Elemento? ElementoDoCombo(Elemento[] dele, Elemento[] meus)
+        {
+            if (dele == null || dele.Length == 0 || meus == null) return null;
+            Elemento? algum = null;
+            for (int i = 0; i < meus.Length; i++)
+            {
+                int casa = 0;
+                for (int j = 0; j < dele.Length; j++) if (Sintonia.ComboDe(dele[j], meus[i]).HasValue) casa++;
+                if (casa == dele.Length) return meus[i];
+                if (casa > 0 && !algum.HasValue) algum = meus[i];
+            }
+            return algum;
+        }
+
+        /// <summary>O elemento DELE que casa com o `meu` (o 1o que funde): e' o par do nome do combo que a HUD anuncia.</summary>
+        public static Elemento ParDe(Elemento[] dele, Elemento meu)
+        {
+            for (int j = 0; j < dele.Length; j++) if (Sintonia.ComboDe(dele[j], meu).HasValue) return dele[j];
+            return dele[0];
+        }
+
+        /// <summary>A MANOPLA alterna os dois elementos tiro a tiro (ArmaSlot.ElementoDoDisparo, o unico que anda o giro): no
+        /// pacto o parceiro atira so' o que funde. Gira ate' a PROXIMA saida ser `el` — num par, no maximo uma volta extra.
+        /// Luva de um elemento (ou `el` fora do par): nada a girar.</summary>
+        public static void Alinhar(ArmaSlot slot, Elemento escolhido, Elemento el)
+        {
+            Elemento[] els = slot.Elementos(escolhido);
+            if (els.Length != 2 || (els[0] != el && els[1] != el)) return;
+            if (slot.ElementoDoDisparo(escolhido) == el) slot.ElementoDoDisparo(escolhido);   // passou do `el`: volta a ele
+        }
+    }
+
+    /// <summary>
+    /// O PING DE SINTONIA (GDD §18.7), puro — mora no PARCEIRO BOT, que e' quem responde. O jogador pede "COMBO?" num alvo
+    /// (o anel da Sintonia pronto); depois de ACEITE_S o parceiro RESPONDE: aceita com o elemento que funde com o do jogador
+    /// (manopla: o do par que casa) e o PACTO prende o foco dele naquele alvo por PACTO_S — ou RECUSA, sem fingir, quando so'
+    /// tem o mesmo elemento (ou maos nuas, ou esta' sem Sintonia). O pacto acaba ao disparar/falhar a Sintonia (o parceiro
+    /// entrou em recarga e ja' nao canaliza), ao alvo cair ou morrer, a um dos dois cair, ou no fim do tempo.
+    /// Como o Roblox provou (roblox/src/src/server/Sintonia.luau: propose/accept/sealPact) — reescrito, nao traduzido.
+    /// </summary>
+    public sealed class PingDeSintonia
+    {
+        /// <summary>s — game feel SOCIAL, nao balanceamento (os numeros do Roblox): RECARGA_S = anti-spam do ping; PROPOSTA_S =
+        /// quanto o "COMBO?" espera resposta; PACTO_S = quanto o alvo combinado dura; ACEITE_S = a "reacao" do parceiro (o
+        /// aceite no mesmo quadro do toque parece maquina). KNOB por aparelho.</summary>
+        public const float RECARGA_S = 2f, PROPOSTA_S = 6f, PACTO_S = 12f, ACEITE_S = 0.5f;
+
+        public enum Fase { Nada, Proposto, Aceito, Recusado }
+
+        public Fase Estado { get; private set; }
+        /// <summary>O inimigo combinado (o mesmo que o jogador ve' marcado).</summary>
+        public IEntidade Alvo { get; private set; }
+        /// <summary>Quem pediu (o jogador).</summary>
+        public IEntidade Jogador { get; private set; }
+        /// <summary>O elemento do jogador que casa e o que o parceiro escolheu (validos no Aceito; no Proposto so' o do jogador).</summary>
+        public Elemento ElJogador { get; private set; }
+        public Elemento ElParceiro { get; private set; }
+        /// <summary>O pacto vale: o parceiro prende o foco e a arma neste alvo.</summary>
+        public bool Pactuado => Estado == Fase.Aceito;
+        /// <summary>O combo que VAI sair (null fora do pacto).</summary>
+        public ComboSintonia? Combo => Pactuado ? Sintonia.ComboDe(ElJogador, ElParceiro) : null;
+        /// <summary>Hora de responder (o dono chama Responder com os elementos da luva dele).</summary>
+        public bool Responde => Estado == Fase.Proposto && _agora - _desde >= ACEITE_S;
+
+        readonly IEntidade _eu;
+        Elemento[] _dele;
+        float _agora, _desde, _pingEm = float.NegativeInfinity;
+
+        public PingDeSintonia(IEntidade eu) { _eu = eu; }
+
+        /// <summary>Vivo e nao derrubado (o derrubado nao conjura; a reserva de esvaecimento deixa Viva true).</summary>
+        public static bool DePe(IEntidade e) => e != null && e.Vital != null && e.Vital.Viva && !Derrubado.Esta(e);
+
+        /// <summary>Um inimigo de pe' do jogador: o que o ping aceita como alvo (caiu = o pacto acaba).</summary>
+        public static bool AlvoValido(IEntidade jogador, IEntidade alvo) => Dupla.AlvoValido(jogador, alvo) && !Derrubado.Esta(alvo);
+
+        /// <summary>O alvo do ping: o inimigo SOB A MIRA; sem ninguem na mira, o ULTIMO que o jogador acertou. Null = nenhum.</summary>
+        public static IEntidade AlvoDoPing(IEntidade jogador, IEntidade sobAMira, IEntidade ultimoAcertado) =>
+            AlvoValido(jogador, sobAMira) ? sobAMira : AlvoValido(jogador, ultimoAcertado) ? ultimoAcertado : null;
+
+        /// <summary>O jogador pode pedir: e' do meu time, os dois de pe', ele armado (`dele` = os elementos da luva), a Sintonia
+        /// DELE pronta e fora do anti-spam. (Sem dupla nao ha' parceiro, entao nem ha' este objeto a perguntar.)</summary>
+        public bool PodePropor(IEntidade jogador, Elemento[] dele) =>
+            _agora >= _pingEm && dele != null && dele.Length > 0 && Dupla.Aliado(_eu, jogador) && DePe(jogador) && DePe(_eu)
+            && Sintonia.CooldownRestante(jogador) <= 0f;
+
+        /// <summary>"COMBO?" no `alvo`. Pedido novo substitui o anterior (o alvo muda). False = nao pode ou alvo invalido.</summary>
+        public bool Propor(IEntidade jogador, IEntidade alvo, Elemento[] dele)
+        {
+            if (!PodePropor(jogador, dele) || !AlvoValido(jogador, alvo)) return false;
+            Jogador = jogador;
+            Alvo = alvo;
+            _dele = dele;
+            ElJogador = dele[0];
+            Estado = Fase.Proposto;
+            _desde = _agora;
+            _pingEm = _agora + RECARGA_S;
+            return true;
+        }
+
+        /// <summary>A resposta, com os elementos da MINHA luva: aceita com o que funde, ou recusa com honestidade. Parceiro em
+        /// recarga da Sintonia tambem recusa (nao ha' combo a fazer agora).</summary>
+        public void Responder(Elemento[] meus)
+        {
+            if (!Responde) return;
+            Elemento? el = Dupla.ElementoDoCombo(_dele, meus);
+            if (!el.HasValue || Sintonia.CooldownRestante(_eu) > 0f) { Estado = Fase.Recusado; _desde = _agora; return; }
+            ElParceiro = el.Value;
+            ElJogador = Dupla.ParDe(_dele, el.Value);
+            Estado = Fase.Aceito;
+            _desde = _agora;
+        }
+
+        /// <summary>O relogio e os fins: pedido sem resposta em PROPOSTA_S, pacto em PACTO_S; antes disso, alvo caido/morto, um
+        /// dos dois caido, ou a Sintonia do pacto ja' resolvida (o parceiro em recarga e sem canalizar = disparou ou falhou).
+        /// A recusa segura ACEITE_S e volta a Nada: quem le' por borda (a HUD) a ve', e um "sem combo" velho nao fica pendurado.</summary>
+        public void Tick(float dt)
+        {
+            _agora += dt;
+            if (Estado == Fase.Recusado && _agora - _desde >= ACEITE_S) Estado = Fase.Nada;
+            if (Estado != Fase.Proposto && Estado != Fase.Aceito) return;
+            bool acabou = _agora - _desde >= (Pactuado ? PACTO_S : PROPOSTA_S)
+                || !AlvoValido(Jogador, Alvo) || !DePe(Jogador) || !DePe(_eu)
+                || (Pactuado && Sintonia.CooldownRestante(_eu) > 0f && !Sintonia.Canalizando(_eu));
+            if (acabou) Estado = Fase.Nada;
+        }
     }
 
     /// <summary>
@@ -97,7 +227,8 @@ namespace Arkana.Gameplay
     /// contra-jogada legivel: VISTO (&lt;12 m), OUVIDO (&lt;18 m so' quem se MOVE — ficar parado esconde),
     /// DISPARO (&lt;30 m, Bus.Disparo — conjurar denuncia), REVIDE (tomar dano ensina quem bateu, sem limite).
     /// Presa e' todo mago de OUTRO time (Combat.MesmoTime); no solo cada um e' o seu time, entao segue FFA.
-    /// FOCO DA DUPLA: quem o `Parceiro` acerta vira o meu alvo (o mesmo alvo e' o que faz a Sintonia acontecer).
+    /// FOCO DA DUPLA: quem o `Parceiro` acerta vira o meu alvo (o mesmo alvo e' o que faz a Sintonia acontecer). O PACTO do
+    /// Ping de Sintonia (Preso) manda mais que tudo isso ate' acabar.
     /// Memoria curta: alvo morto ou alem de MEMORIA e' esquecido.
     /// So' procura alvo NOVO quando esta' sem nenhum (senao vira pinball entre passantes).
     /// OCULTO (invisivel, penumbra parada — o corpo decide): a visao so' o pega colado (VISAO_OCULTO, o brilho de perto) e os
@@ -118,6 +249,9 @@ namespace Arkana.Gameplay
         public Vector3? Pista { get; private set; }
         /// <summary>O aliado cujo ACERTO vira o meu alvo (o jogador, para o parceiro dele; o outro da dupla inimiga). Null = sozinho.</summary>
         public IEntidade Parceiro;
+        /// <summary>O alvo do PACTO (Ping de Sintonia): prende o foco — acerto do parceiro, disparo ouvido, revide e memoria nao
+        /// o tiram. Null = solto.</summary>
+        public IEntidade Preso { get; private set; }
 
         private readonly IEntidade _eu;
         private float _acc;
@@ -144,6 +278,13 @@ namespace Arkana.Gameplay
         public void Esquecer() { Alvo = null; }
         public Vector3? ConsumirPista() { Vector3? p = Pista; Pista = null; return p; }
 
+        /// <summary>O pacto prende (`alvo`) ou solta (null) o foco. Solto, o alvo fica o que era: a memoria de sempre decide.</summary>
+        public void Prender(IEntidade alvo)
+        {
+            Preso = alvo;
+            if (alvo != null) Alvo = alvo;
+        }
+
         public bool AlvoVivo => Alvo != null && Alvo.Vital != null && Alvo.Vital.Viva;
 
         /// <summary>Relogio: varre a cada PERCEPCAO_S. `velocidadeDe` = m/s horizontal de cada mago (passos); `ocultoDe` = a
@@ -158,6 +299,7 @@ namespace Arkana.Gameplay
 
         public void Varrer(IList<IEntidade> magos, Func<IEntidade, float> velocidadeDe, Func<IEntidade, bool> ocultoDe = null)
         {
+            if (Preso != null) { Alvo = Preso; return; }   // o pacto manda (alem da MEMORIA tambem: o parceiro vai ate' ele)
             if (Alvo != null && (!AlvoVivo || Dist(Alvo.Pos) > MEMORIA || !Dupla.AlvoValido(_eu, Alvo))) Alvo = null;
             // sumiu da vista: larga o alvo e vai ate' onde o viu por ultimo (disparo e revide o devolvem)
             if (Alvo != null && ocultoDe != null && ocultoDe(Alvo) && Dist(Alvo.Pos) >= VISAO_OCULTO) { Pista = Alvo.Pos; Alvo = null; }
@@ -181,7 +323,7 @@ namespace Arkana.Gameplay
         /// <summary>Conjurou perto = entregou a posicao. So' LARGA o alvo atual se o disparo veio de MAIS PERTO.</summary>
         public void OuvirDisparo(IEntidade quem, Vector3 pos)
         {
-            if (quem == null || quem == _eu || !Vivo || Combat.MesmoTime(_eu, quem)) return;   // o disparo do aliado nao denuncia ninguem
+            if (quem == null || quem == _eu || !Vivo || Preso != null || Combat.MesmoTime(_eu, quem)) return;   // o disparo do aliado nao denuncia ninguem
             float d = Dist(pos);
             if (d >= AUDICAO_DISPARO) return;
             if (AlvoVivo && d >= Dist(Alvo.Pos)) return;
@@ -194,7 +336,7 @@ namespace Arkana.Gameplay
         public void Revidar(IEntidade alvo, float dano, Elemento el, IEntidade fonte, bool escudo)
         {
             if (fonte != null && fonte == Parceiro && alvo != _eu) { Focar(alvo); return; }
-            if (alvo != _eu || fonte == null || fonte == _eu || !Vivo || Combat.MesmoTime(_eu, fonte)) return;
+            if (alvo != _eu || fonte == null || fonte == _eu || !Vivo || Preso != null || Combat.MesmoTime(_eu, fonte)) return;
             Alvo = fonte;
             Pista = fonte.Pos;
         }
@@ -202,7 +344,7 @@ namespace Arkana.Gameplay
         /// <summary>O alvo do parceiro vira o meu (se for presa: aliado e morto nao entram).</summary>
         public void Focar(IEntidade alvo)
         {
-            if (!Vivo || !Dupla.AlvoValido(_eu, alvo)) return;
+            if (!Vivo || Preso != null || !Dupla.AlvoValido(_eu, alvo)) return;
             Alvo = alvo;
             Pista = alvo.Pos;
         }
@@ -222,7 +364,7 @@ namespace Arkana.Gameplay
     /// para ele); armado persegue, encara e atira com erro; foge da zona; loot no caminho e' do auto-upgrade
     /// (Loot.TentarAutoUpgrade, na casca); salta do castelo num instante sorteado da rota.
     /// EM DUPLA (Escolta): a tempestade manda > o ALIADO CAIDO (vai ate' ele e fica perto: o Derrubado canaliza por
-    /// proximidade) > a presa > ACOMPANHAR o parceiro a 4–8 m (so' quem Segue: o parceiro do jogador e o 2o de cada dupla
+    /// proximidade) > a presa (a do PACTO, a qualquer distancia) > ACOMPANHAR o parceiro a 4–8 m (so' quem Segue: o parceiro do jogador e o 2o de cada dupla
     /// inimiga) > vagar; desarmado caca a luva de elemento diferente do parceiro.
     /// </summary>
     public sealed class DecisaoBot
@@ -237,6 +379,8 @@ namespace Arkana.Gameplay
             public Vector3? Socorrer;
             /// <summary>Elementos da luva do parceiro: desarmado, prefere a luva de OUTRO elemento (null = qualquer).</summary>
             public Elemento[] Evitar;
+            /// <summary>O alvo e' o do PACTO (Ping de Sintonia): persegue a qualquer distancia — o combo combinado e' o combate.</summary>
+            public bool Pacto;
         }
 
         public const float CHASE_DIST = 20f, ATTACK_DIST = 12f;
@@ -317,7 +461,7 @@ namespace Arkana.Gameplay
                 }
                 if (foraDaZona || socorro) s.Dir = Rumo(pos, Destino, socorro ? Dupla.SOCORRO_M : 0f);   // atira andando para o caido
             }
-            else if (armado && vivo && dist < CHASE_DIST && !foraDaZona && !socorro)
+            else if (armado && vivo && (dist < CHASE_DIST || escolta.Pacto) && !foraDaZona && !socorro)
             {
                 s.Dir = Plano(alvo.Pos - pos);
             }
@@ -394,6 +538,8 @@ namespace Arkana.Gameplay
         public Pawn Pawn { get; private set; }
         public PercepcaoBot Percepcao { get; private set; }
         public DecisaoBot Decisao { get; private set; }
+        /// <summary>O Ping de Sintonia que o jogador pede a ESTE bot (so' o parceiro dele recebe pedido; nos outros fica em Nada).</summary>
+        public PingDeSintonia Ping { get; private set; }
         /// <summary>O outro da dupla (null = sozinho, o solo de hoje). Para o parceiro do jogador, o Pawn do jogador.</summary>
         public IEntidade Parceiro { get; private set; }
         /// <summary>Acompanha o parceiro (salta junto, persegue no ar, fica a 4–8 m). O lider da dupla inimiga nao segue.</summary>
@@ -409,6 +555,7 @@ namespace Arkana.Gameplay
             b.Pawn = pawn;
             b.Percepcao = new PercepcaoBot(pawn);
             b.Decisao = new DecisaoBot(seed);
+            b.Ping = new PingDeSintonia(pawn);
             b.Percepcao.Ligar();
             Kits.KitDef kit = Kits.De(slug);
             if (!Kits.Magos.ContainsKey(kit.Slug)) pawn.SetTint(TINTS[((seed % TINTS.Length) + TINTS.Length) % TINTS.Length]);
@@ -427,12 +574,24 @@ namespace Arkana.Gameplay
 
         public void Embarcar(Castelo castelo) { _castelo = castelo; Pawn.Embarcar(castelo); }
 
+        /// <summary>O Ping do bot dono deste corpo (null = nao e' bot). A HUD e o jogador perguntam pelo ParceiroVivo.</summary>
+        public static PingDeSintonia PingDe(IEntidade corpo)
+        {
+            var p = corpo as Pawn;
+            Bot b = p != null ? p.GetComponent<Bot>() : null;
+            return b != null ? b.Ping : null;
+        }
+
         void OnEnable() { if (Percepcao != null) Percepcao.Ligar(); }
         void OnDisable() { if (Percepcao != null) Percepcao.Desligar(); }
 
         void Update()
         {
             if (Pawn == null || !Pawn.Viva) return;
+            // o PING: responde na hora dele e o pacto prende o foco (solto, a percepcao volta a' de sempre)
+            Ping.Tick(Time.deltaTime);
+            if (Ping.Responde) Ping.Responder(Dupla.ElementosDe(Pawn));
+            Percepcao.Prender(Ping.Pactuado ? Ping.Alvo : null);
             Pawn guia = Segue ? Parceiro as Pawn : null;
             if (Pawn.Queda.NoAr)
             {
@@ -457,7 +616,11 @@ namespace Arkana.Gameplay
             Pawn.Stick = new Vector2(s.Dir.x, s.Dir.z);
             Pawn.EncararDir = s.Encarar;
             if (s.Esquivar) Pawn.Dodge(s.DirEsquiva);
-            if (s.Atirar) Pawn.Atirar(s.DirTiro);
+            if (s.Atirar)
+            {
+                if (Ping.Pactuado) Dupla.Alinhar(Pawn.Slot, Pawn.Elemento, Ping.ElParceiro);   // a manopla vai com o elemento que funde
+                Pawn.Atirar(s.DirTiro);
+            }
         }
 
         /// <summary>O que a dupla pede neste quadro. Sozinho: o default (a decisao de hoje).</summary>
@@ -471,6 +634,7 @@ namespace Arkana.Gameplay
             IEntidade caido = Dupla.AliadoCaido(Pawn, arena);
             if (caido != null) e.Socorrer = caido.Pos;
             if (!Pawn.Slot.Armado) e.Evitar = Dupla.ElementosDe(Parceiro);   // so' desarmado caca luva
+            e.Pacto = Ping.Pactuado;
             return e;
         }
 

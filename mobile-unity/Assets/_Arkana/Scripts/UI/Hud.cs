@@ -271,12 +271,8 @@ namespace Arkana.UI
         public const string T_ALTITUDE = "{0} m";            // ponytail: mover para Textos quando o CORE quiser
         public const string T_ABATE = "{0} derrubado";
         public const string T_ELIMINADO = "<color=#FF6B5C>ELIMINADO:</color> {0}";   // o rotulo no vermelho do X do kill feed, o nome em branco
-        public const string T_COLOCACAO = "COLOCAÇÃO", T_COLOCACAO_NUM = "#{0}", T_ABATES = "ABATES";   // idem (Textos.cs e' de outra frente hoje)
         public static IReadOnlyDictionary<string, string> Estados => Textos.HudEstados;
         static readonly Color CorZona = new Color(0.55f, 0.35f, 1f);
-        // veredito: vermelho-escuro que ainda le' em 46dp sobre o miolo (~3,5:1; o #8B0000 "de verdade" some no preto);
-        // a vitoria e' o Estilo.Ouro
-        static readonly Color CorDerrota = new Color(0.78f, 0.17f, 0.15f);
         static readonly Color CorPerigo = new Color(1f, 0.52f, 0.46f);   // rotulo do ABANDONAR: a unica acao que custa a partida
         // a PLACA (fio + miolo) e' a das barras: relogio, kill feed, altimetro, carrossel e avisos falam o mesmo idioma.
         // Fio/icone sao propriedade (nao static readonly): a paleta do Estilo passa pelo ColorUtility, e inicializador
@@ -317,6 +313,10 @@ namespace Arkana.UI
         public MarcasDeAlvo Marcas { get; private set; }
         /// <summary>A HUD da DUPLA: faixa da Sintonia, anel de recarga, SINTONIA PRONTA e ESPECTANDO (HudDupla.cs).</summary>
         public HudDupla Dupla { get; private set; }
+        /// <summary>Os numeros da partida para o cartao do fim (SeloDoCampeao.cs): zera no MatchStarted.</summary>
+        public CronicaDaPartida Cronica { get; private set; }
+        /// <summary>A tela de FIM: o cartao do campeao (SeloDoCampeao.cs).</summary>
+        public SeloDoCampeao Cartao { get; private set; }
         /// <summary>DUPLAS vivas no topo (&lt; 0 = partida solo: o topo diz BOTS).</summary>
         public int Duplas => _duplas;
         public IEntidade Jogador { get; private set; }
@@ -350,12 +350,6 @@ namespace Arkana.UI
         readonly List<HudLogica.Numero> _numerosMortos = new List<HudLogica.Numero>();
         /// <summary>dp que o numero sobe na vida inteira (freando) e a fracao FINAL da vida em que ele some.</summary>
         const float NumSobeDp = 34f, NumSomeFrac = 0.4f;
-        RectTransform _fim, _fimPlaca, _fimChipColocacao, _fimChipAbates;
-        CanvasGroup _fimGrupo;
-        Image _fimFio, _fimBrilho, _fimLosango;
-        Text _fimTexto, _fimColocacao, _fimAbates;
-        float _fimT = 1f;   // 0 -> 1 durante a entrada da placa; 1 = pousada
-        bool _fimVitoria;
         RectTransform _pausaOverlay;
         RectTransform _olhar;
         Vector2 _telaAtual;
@@ -383,9 +377,12 @@ namespace Arkana.UI
         const float VinhetaCaidoMin = 0.22f, VinhetaCaidoMax = 0.45f, VinhetaCaidoHz = 0.9f;   // 0,4-0,72 tomava a tela (foto 29)
         static readonly Color CorVinhetaCaido = new Color(0.78f, 0.05f, 0.04f);
 
+        /// <summary>A ordem do canvas da HUD (o cartao do fim mora acima: SeloDoCampeao.Ordem).</summary>
+        public const int OrdemDoCanvas = 10;
+
         public static Hud Criar()
         {
-            var canvas = Formas.CanvasTelaCheia("HUD", 10);
+            var canvas = Formas.CanvasTelaCheia("HUD", OrdemDoCanvas);
             var hud = canvas.gameObject.AddComponent<Hud>();
             hud._canvas = canvas;
             hud.Montar();
@@ -396,6 +393,7 @@ namespace Arkana.UI
         {
             _raiz = (RectTransform)_canvas.transform;
             Logica = new HudLogica((float)Balance.Feedback.NumMergeS, (float)Balance.Feedback.NumLifeS);
+            Cronica = new CronicaDaPartida();   // no Criar, antes do Partida.Iniciar: pega o MatchStarted desta partida
             Aviso = new AvisoLogica((float)Balance.Feedback.VignetteMinS, (float)Balance.Feedback.ArcDurS, (int)Balance.Feedback.ArcMax, Estados.Keys);
 
             // grade de tela: escurece topo e rodape (leitura), o meio fica livre. EM DEGRADE: o retangulo chapado do
@@ -622,7 +620,7 @@ namespace Arkana.UI
         }
 
         /// <summary>Ancora num PONTO do pai (ancora 0..1) com pivo, posicao e tamanho em px.</summary>
-        static void Fixar(RectTransform rt, Vector2 ancora, Vector2 pivo, Vector2 pos, Vector2 tam)
+        internal static void Fixar(RectTransform rt, Vector2 ancora, Vector2 pivo, Vector2 pos, Vector2 tam)
         {
             rt.anchorMin = ancora; rt.anchorMax = ancora; rt.pivot = pivo;
             rt.anchoredPosition = pos; rt.sizeDelta = tam;
@@ -820,65 +818,13 @@ namespace Arkana.UI
         }
 
         // ---------- tela de FIM (veredito) ----------
-        const float FimL = 500f, FimA = 252f;   // dp da placa grande: cabe nos ~437dp de altura do Poco F4 deitado
-        const float FimTituloY = 52f, FimOrnamentoY = 94f, FimChipsY = 108f, FimChipX = 72f;   // dp a partir do topo da placa
-        const float FimEntraS = 0.35f;          // a placa POUSA: esvaece e encolhe de 1,12 para 1 (relogio sem escala)
 
-        /// <summary>
-        /// Tela de FIM no idioma da HUD (antes: texto solto numa coluna sobre veu chapado). Veu que escurece o jogo, PLACA
-        /// grande de fio na cor do veredito; titulo com BRILHO atras (VITORIA em ouro, respirando; DERROTA em vermelho-escuro),
-        /// ornamento, colocacao e abates em dois chips e os botoes-placa lado a lado. Cor/numeros sao do MostrarFim.
-        /// </summary>
+        /// <summary>A tela de FIM e' o CARTAO DO CAMPEAO (SeloDoCampeao.cs, GDD §18.6); aqui so' os botoes viram pedidos.</summary>
         void MontarFim()
         {
-            var meio = new Vector2(0.5f, 0.5f);
-            var sup = new Vector2(0.5f, 1f);
-            var inf = new Vector2(0.5f, 0f);
-            _fim = Formas.No(_raiz, "Fim");
-            AreaSegura.Esticar(_fim);
-            _fimGrupo = _fim.gameObject.AddComponent<CanvasGroup>();   // a entrada esvaece veu + placa de uma vez
-            var veu = Formas.Imagem(_fim, "Veu", null, new Color(0.01f, 0.015f, 0.03f, 0.62f));
-            AreaSegura.Esticar(veu.rectTransform);
-            veu.raycastTarget = true;   // o toque nao vaza para o joystick/olhar atras
-            _fimFio = Placa(_fim, "Placa", Dp.Px(14f));
-            _fimPlaca = _fimFio.rectTransform;
-            // a altura segue o botao (AlturaAlvo sobe em dpi baixo): o rodape nunca invade os chips
-            Fixar(_fimPlaca, meio, meio, Vector2.zero, new Vector2(Dp.Px(FimL), Dp.Px(FimA - 50f) + Estilo.AlturaAlvo(50f)));
-            // brilho: a sombra macia (disco que esvaece ate' a borda) esticada atras do titulo, na cor do veredito
-            _fimBrilho = Formas.Imagem(_fimPlaca, "Brilho", Formas.Sombra(), Color.white);
-            Fixar(_fimBrilho.rectTransform, sup, meio, new Vector2(0f, -Dp.Px(FimTituloY)), new Vector2(Dp.Px(420f), Dp.Px(118f)));
-            _fimTexto = Formas.Texto(_fimPlaca, "Titulo", "", 46f, Color.white);
-            _fimTexto.fontStyle = FontStyle.Bold;
-            _fimTexto.GetComponent<Shadow>().effectDistance = new Vector2(Dp.Px(1.5f), -Dp.Px(1.5f));   // 1px some num titulo de 46dp
-            Fixar(_fimTexto.rectTransform, sup, meio, new Vector2(0f, -Dp.Px(FimTituloY)), new Vector2(Dp.Px(FimL), Dp.Px(64f)));
-            _fimLosango = Ornamento(_fimPlaca, -Dp.Px(FimOrnamentoY), Dp.Px(320f));
-            _fimColocacao = ChipFim(_fimPlaca, "ChipColocacao", T_COLOCACAO, out _fimChipColocacao);
-            _fimAbates = ChipFim(_fimPlaca, "ChipAbates", T_ABATES, out _fimChipAbates);
-            // botoes lado a lado no rodape da placa: JOGAR DE NOVO cheio (a acao que o dedo procura) e MENU
-            const float bl = 210f, bm = 150f, vao = 14f, meia = (bl + vao + bm) * 0.5f;
-            var de_novo = BotaoPlaca(_fimPlaca, "BtnJogarDeNovo", T_JOGAR_DE_NOVO, bl, Estilo.Ouro, true);
-            Fixar((RectTransform)de_novo.transform, inf, inf, new Vector2(Dp.Px(bl * 0.5f - meia), Dp.Px(20f)), ((RectTransform)de_novo.transform).sizeDelta);
-            de_novo.onClick.AddListener(() => ReiniciarPedido?.Invoke());
-            var menu = BotaoPlaca(_fimPlaca, "BtnMenu", T_MENU, bm, Estilo.Texto, false);
-            Fixar((RectTransform)menu.transform, inf, inf, new Vector2(Dp.Px(meia - bm * 0.5f), Dp.Px(20f)), ((RectTransform)menu.transform).sizeDelta);
-            menu.onClick.AddListener(() => MenuPedido?.Invoke());
-            _fim.gameObject.SetActive(false);
-        }
-
-        /// <summary>Chip do fim: placa pequena, numero grande em negrito em cima e o rotulo fosco embaixo. Devolve o numero.</summary>
-        static Text ChipFim(RectTransform pai, string nome, string rotulo, out RectTransform chip)
-        {
-            var sup = new Vector2(0.5f, 1f);
-            var inf = new Vector2(0.5f, 0f);
-            chip = Placa(pai, nome, Dp.Px(8f)).rectTransform;
-            Fixar(chip, sup, sup, Vector2.zero, new Vector2(Dp.Px(130f), Dp.Px(56f)));
-            var n = Formas.Texto(chip, "Numero", "", 24f, Color.white);
-            n.fontStyle = FontStyle.Bold;
-            Fixar(n.rectTransform, sup, sup, new Vector2(0f, -Dp.Px(4f)), new Vector2(Dp.Px(130f), Dp.Px(30f)));
-            var r = Formas.Texto(chip, "Rotulo", rotulo, 10f, Estilo.TextoFosco);
-            r.fontStyle = FontStyle.Bold;
-            Fixar(r.rectTransform, inf, inf, new Vector2(0f, Dp.Px(5f)), new Vector2(Dp.Px(130f), Dp.Px(16f)));
-            return n;
+            Cartao = new SeloDoCampeao(_canvas, T_JOGAR_DE_NOVO, T_MENU);
+            Cartao.JogarDeNovo.onClick.AddListener(() => ReiniciarPedido?.Invoke());
+            Cartao.Voltar.onClick.AddListener(() => MenuPedido?.Invoke());
         }
 
         /// <summary>Ornamento das placas grandes: fio fosco com um losango no meio. Devolve o losango (quem chama pinta).</summary>
@@ -955,6 +901,7 @@ namespace Arkana.UI
             AreaSegura.NoRect(_altimetroBox, l.Altimetro);
             AreaSegura.NoRect(_killFeed, l.KillFeed);
             Dupla.Layout(l);
+            Cartao.Layout(tela, m);
             Mapa.Layout(l.Minimapa, l.Bussola, l.MapaGrande);
             // olhar livre: da fronteira do joystick (35%) ate' a borda direita
             _olhar.anchorMin = new Vector2(0.35f, 0); _olhar.anchorMax = Vector2.one; _olhar.offsetMin = Vector2.zero; _olhar.offsetMax = Vector2.zero;
@@ -1011,6 +958,8 @@ namespace Arkana.UI
             Bus.QuedaFase -= OnQuedaFase; Bus.QuedaAltura -= OnQuedaAltura; Bus.CasteloRota -= OnCasteloRota; Bus.MatchStarted -= OnMatchStarted; Bus.MatchOver -= OnMatchOver;
             ConfigLogica.Mudou -= AplicarConfig;
             if (Dupla != null) Dupla.Desligar();
+            if (Cronica != null) Cronica.Desligar();
+            if (Cartao != null) Cartao.Destruir();
             if (Pausado) Time.timeScale = 1f;
         }
 
@@ -1039,7 +988,8 @@ namespace Arkana.UI
             _escudo.Encher(_escudoVal, _escudoMax);
             _escudo.Linha.gameObject.SetActive(_escudoMax > 0f);
             if (_escudoMax > 0f) PintarEscudo();
-            _fim.gameObject.SetActive(false);
+            Cartao.Esconder();
+            Cronica.Jogador = jogador;
             _restante = (float)Balance.Match.DurationS;
             _botsVivos = (int)Balance.Match.Bots;
             _treino = false;
@@ -1058,38 +1008,15 @@ namespace Arkana.UI
         /// <summary>No TREINO nao existe relogio nem contagem que importe: o canto diz o que a cena e'.</summary>
         public void ModoTreino() { _treino = true; _duplas = -1; }
 
-        /// <summary>O veredito: cor (fio, titulo, brilho, losango), colocacao (so' fora do treino, que nao tem ranking) e abates.</summary>
+        /// <summary>O veredito no CARTAO: a cronica fecha a colocacao e o parceiro NA HORA (lidos da arena: o numero do quadro
+        /// anterior ainda contava o time do jogador que acabou de cair) e o cartao carimba — num canvas proprio, com o desta
+        /// HUD desligado ate' a partida seguinte (a captura da tela e' o card: nada de combate por cima nem atraves dele).</summary>
         public void MostrarFim(bool vitoria)
         {
-            _fimVitoria = vitoria;
             Mapa.Fechar();
-            Color cor = vitoria ? Estilo.Ouro : CorDerrota;
-            _fimTexto.text = vitoria ? T_VITORIA : T_DERROTA;
-            _fimTexto.color = cor;
-            _fimFio.color = cor;
-            _fimLosango.color = cor;
-            // brilho fraco de proposito: titulo e brilho tem a MESMA cor, e brilho forte vira borrao que come o contraste
-            _fimBrilho.color = Formas.ComAlfa(cor, vitoria ? 0.34f : 0.18f);
-            _fimBrilho.canvasRenderer.SetAlpha(1f);
-            bool rank = !_treino;
-            _fimChipColocacao.gameObject.SetActive(rank);
-            _fimColocacao.text = string.Format(T_COLOCACAO_NUM, HudLogica.Colocacao(vitoria, RestantesNoFim()));
-            _fimColocacao.color = vitoria ? Estilo.Ouro : Color.white;
-            _fimAbates.text = Logica.Abates.ToString();
-            _fimChipColocacao.anchoredPosition = new Vector2(-Dp.Px(FimChipX), -Dp.Px(FimChipsY));
-            _fimChipAbates.anchoredPosition = new Vector2(rank ? Dp.Px(FimChipX) : 0f, -Dp.Px(FimChipsY));
-            _fimT = 0f;
-            PintarFim(0f);   // ja' nasce transparente e grande: o primeiro quadro nao pisca a placa pousada
-            _fim.gameObject.SetActive(true);
-        }
-
-        /// <summary>Quem ficou na frente: bots de pe' no solo; TIMES vivos na dupla, lidos NA HORA do veredito (o numero do
-        /// quadro anterior ainda contava o time do jogador que acabou de cair).</summary>
-        int RestantesNoFim()
-        {
-            if (_duplas < 0) return _botsVivos;
             var p = Arkana.Gameplay.Partida.Atual;
-            return p != null ? p.TimesVivos : _duplas;
+            Cronica.Fechar(vitoria, p != null ? p.Arena : null);
+            Cartao.Mostrar(vitoria, _treino, Cronica, _pawn != null ? _pawn.Slug : SelecaoPersonagem.MagoEscolhido);
         }
 
         /// <summary>Espectando, os controles do corpo somem (o dedo do eliminado nao tem o que mover); de volta, voltam. Pegar e
@@ -1104,21 +1031,6 @@ namespace Arkana.UI
             Salto.gameObject.SetActive(on);
         }
 
-        /// <summary>Por frame so' com a tela de fim no ar: a entrada (ate' pousar) e, na vitoria, o brilho respirando (alfa
-        /// pelo CanvasRenderer: nao refaz malha). Pousada e sem vitoria, nao toca em nada.</summary>
-        void PintarFim(float dt)
-        {
-            if (_fimT < 1f)
-            {
-                _fimT = Mathf.Min(_fimT + dt / FimEntraS, 1f);
-                float e = 1f - (1f - _fimT) * (1f - _fimT);   // chega rapido, pousa devagar
-                _fimGrupo.alpha = e;
-                float s = Mathf.Lerp(1.12f, 1f, e);
-                _fimPlaca.localScale = new Vector3(s, s, 1f);
-            }
-            if (_fimVitoria) _fimBrilho.canvasRenderer.SetAlpha(0.72f + 0.28f * Mathf.Sin(Time.unscaledTime * 0.9f * 2f * Mathf.PI));
-        }
-
         void AplicarConfig(ConfigLogica cfg)
         {
             _mostraFps = cfg.Bool(ConfigLogica.K_CONTADOR_FPS);
@@ -1130,7 +1042,7 @@ namespace Arkana.UI
 
         void OnHp(float cur, float max) { _hp.Valor(cur, max); }
         void OnMana(float cur, float max) { _mana.Valor(cur, max); }
-        void OnMatchStarted() { _fim.gameObject.SetActive(false); }
+        void OnMatchStarted() { Cartao.Esconder(); }
         void OnMatchOver(bool vitoria) { MostrarFim(vitoria); }
         void OnAbate(string nome) { Logica.Abater(nome); }
         /// <summary>Morto nao esta' mais caido (a costura sai sem EntityReerguida): painel e vinheta saem, a tela de FIM assume.
@@ -1417,7 +1329,8 @@ namespace Arkana.UI
             Dupla.Pintar(dt, _duplas >= 0 && !_treino, espectado);
             // minimapa, mapa grande e bussola: leem a partida, o jogador e o yaw da camera (Minimapa.cs)
             Mapa.Pintar(dt, espectado ?? Jogador, espectado != null ? Arkana.Gameplay.Queda.POUSOU : (_pawn != null ? _pawn.Queda.Fase : null));
-            if (_fim.gameObject.activeSelf) PintarFim(dt);
+            Cronica.Tick(Time.deltaTime);   // o tempo vivo anda no relogio do JOGO (a pausa nao conta)
+            if (Cartao.Visivel) Cartao.Pintar(dt);
             if (_mostraFps) _fps.text = string.Format(T_FPS, Mathf.RoundToInt(1f / Mathf.Max(dt, 0.0001f)));
             // rotulo da arma: pulso -> espera -> apaga
             _armaRotulo.enabled = Logica.ArmaRotuloVisivel;

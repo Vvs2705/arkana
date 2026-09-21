@@ -49,6 +49,7 @@ namespace Arkana.Gameplay
             hud.ElementoEscolhido += EscolherElemento;
             hud.Tatica.Tocado += Tatica;       // o KitRunner do Pawn decide (cooldown, carga, silencio); o botao so' pede
             hud.Suprema.Tocado += Suprema;
+            hud.Dupla.PediuCombo += PedirCombo;   // o anel da Sintonia pronto: "COMBO?" ao parceiro
         }
 
         /// <summary>Embarca no castelo da partida (a camera vai ao coracao dele).</summary>
@@ -95,6 +96,19 @@ namespace Arkana.Gameplay
         // depois de girar a camera, a muralha da Pyra nascia atras dela, fora da tela (diag da foto 17 de 12/09).
         public void Tatica() { Pawn.YawAlvo = Camera.Logica.Yaw; Pawn.UsarTatica(); }
         public void Suprema() { Pawn.YawAlvo = Camera.Logica.Yaw; Pawn.UsarSuprema(); }
+
+        /// <summary>O PING DE SINTONIA (GDD §18.7): pede o combo ao parceiro no inimigo SOB A MIRA — sem ninguem na mira, no
+        /// ultimo que acertei. Quem responde e prende o foco e' o Ping do parceiro (Bot); sem alvo, a faixa diz o que fazer.</summary>
+        public void PedirCombo()
+        {
+            Partida m = Partida.Atual;
+            PingDeSintonia ping = Bot.PingDe(m != null ? m.ParceiroVivo() : null);
+            Elemento[] meus = Dupla.ElementosDe(Pawn);
+            if (ping == null || _hud == null || !ping.PodePropor(Pawn, meus)) return;
+            MarcasLogica marcas = _hud.Marcas.Logica;
+            IEntidade alvo = PingDeSintonia.AlvoDoPing(Pawn, marcas.SobAMira, marcas.UltimoAcertado);
+            if (!ping.Propor(Pawn, alvo, meus)) _hud.Dupla.Logica.SemAlvo();
+        }
 
         /// <summary>UM botao, tres leituras: no castelo salta; no ar abre/fecha o planeio; no chao pula.</summary>
         public void Salto()

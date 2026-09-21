@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Arkana.Core;
 using Arkana.Gameplay;
@@ -10,6 +12,8 @@ namespace Arkana.UI
     /// Logica PURA da HUD da DUPLA (contrato 17G): o texto do topo (DUPLAS n / BOTS n), a FAIXA DA SINTONIA (canalizando ->
     /// disparou | quebrada, o nome do combo nas duas cores dos elementos), a RECARGA da Sintonia do jogador com o "SINTONIA
     /// PRONTA" na BORDA de ficar pronta, e o "ESPECTANDO · nome". Tick(dt) e' o relogio; nada aqui decide jogo.
+    /// O PING DE SINTONIA (GDD §18.7) conta a conversa da dupla na MESMA faixa — "COMBO?" -> "PARCEIRO: ACEITO / → combo" ou
+    /// "SEM COMBO" — e nunca por cima da Sintonia de verdade (canalizando, disparou, quebrada). E o toque do ANEL (NoAnel).
     /// </summary>
     public sealed class DuplaHudLogica
     {
@@ -19,8 +23,14 @@ namespace Arkana.UI
         public const float DisparoS = 1f, QuebradaS = 1.5f, EntraS = 0.08f, SaiS = 0.35f, PuloS = 0.2f, Pico = 1.3f, PerdidaS = 1f;
         /// <summary>s que o "SINTONIA PRONTA" fica e o esvaecer do fim.</summary>
         public const float ProntaS = 1.8f, ProntaSaiS = 0.5f;
+        /// <summary>s que o "PARCEIRO: ACEITO / → combo" segura na faixa (o pacto continua na marca do alvo). KNOB por foto.</summary>
+        public const float RespostaS = 2f;
+        /// <summary>O TOQUE DO ANEL vai de fora do QUADRADO do ataque ate' ToqueMult x o meio-lado dele (88 dp -> 77 dp do
+        /// centro; o anel desenhado mora a 1,22x). Maior que o desenho de proposito: dedo nao acerta traco de 4 dp. KNOB por aparelho.</summary>
+        public const float ToqueMult = 1.75f;
 
-        public enum Faixa { Nada, Canalizando, Disparou, Quebrada }
+        /// <summary>Nada/Canalizando/Disparou/Quebrada = a Sintonia; Combo/Aceito/SemCombo/SemAlvo = o PING.</summary>
+        public enum Faixa { Nada, Canalizando, Disparou, Quebrada, Combo, Aceito, SemCombo, SemAlvo }
 
         public Faixa Estado { get; private set; }
         public ComboSintonia Combo { get; private set; }
@@ -28,6 +38,8 @@ namespace Arkana.UI
         /// <summary>0..1 da recarga da Sintonia do jogador (1 = pronta).</summary>
         public float Recarga { get; private set; } = 1f;
         public bool Pronta { get; private set; } = true;
+        /// <summary>O elemento do jogador no "COMBO?" (a cor do pedido).</summary>
+        public Elemento ElPing { get; private set; }
 
         float _desde = -99f, _dur = 1f, _prontaDesde = -99f;
 
@@ -85,8 +97,48 @@ namespace Arkana.UI
         public void Disparou(ComboSintonia c) { Combo = c; Estado = Faixa.Disparou; _desde = Agora; }
         public void Falhou(ComboSintonia c) { Combo = c; Estado = Faixa.Quebrada; _desde = Agora; }
 
+        /// <summary>O TOQUE DO ANEL em `p` (px de tela): fora do retangulo do ataque (o alvo de toque dele e' o quadrado
+        /// inteiro: nada que hoje dispara vira pedido), dentro de ToqueMult x o meio-lado e fora dos outros botoes (`evitar`).</summary>
+        public static bool NoAnel(Vector2 p, Rect disparo, Rect[] evitar)
+        {
+            if (disparo.Contains(p)) return false;
+            float r = disparo.width * 0.5f * ToqueMult;
+            if ((p - disparo.center).sqrMagnitude > r * r) return false;
+            for (int i = 0; evitar != null && i < evitar.Length; i++) if (evitar[i].Contains(p)) return false;
+            return true;
+        }
+
+        bool Sintonizando => Estado == Faixa.Canalizando || Estado == Faixa.Disparou || Estado == Faixa.Quebrada;
+
+        /// <summary>O jogador pediu: "COMBO?" na cor do elemento dele.</summary>
+        public void Pingou(Elemento el) { if (Sintonizando) return; ElPing = el; Estado = Faixa.Combo; _desde = Agora; }
+        /// <summary>O parceiro respondeu: o combo que vai sair (aceito) ou null (sem combo).</summary>
+        public void Respondeu(ComboSintonia? c)
+        {
+            if (Sintonizando) return;
+            if (c.HasValue) { Combo = c.Value; Estado = Faixa.Aceito; } else Estado = Faixa.SemCombo;
+            _desde = Agora;
+        }
+        /// <summary>Tocou no anel sem alvo: diz o que fazer, em vez de engolir o toque calado.</summary>
+        public void SemAlvo() { if (Sintonizando) return; Estado = Faixa.SemAlvo; _desde = Agora; }
+        /// <summary>O pedido morreu sem resposta (um dos dois caiu, o alvo caiu): o "COMBO?" sai.</summary>
+        public void Calar() { if (Estado == Faixa.Combo) Estado = Faixa.Nada; }
+
         float Idade => Agora - _desde;
-        float Segura => Estado == Faixa.Disparou ? DisparoS : Estado == Faixa.Quebrada ? QuebradaS : _dur + PerdidaS;
+        float Segura
+        {
+            get
+            {
+                switch (Estado)
+                {
+                    case Faixa.Disparou: return DisparoS;
+                    case Faixa.Quebrada: case Faixa.SemCombo: case Faixa.SemAlvo: return QuebradaS;
+                    case Faixa.Aceito: return RespostaS;
+                    case Faixa.Combo: return PingDeSintonia.PROPOSTA_S;
+                    default: return _dur + PerdidaS;
+                }
+            }
+        }
 
         /// <summary>0..1 do anel da canalizacao (enche em CanalizacaoS); o disparo o deixa cheio.</summary>
         public float Progresso => Estado == Faixa.Canalizando ? Mathf.Clamp01(Idade / _dur) : Estado == Faixa.Disparou ? 1f : 0f;
@@ -101,12 +153,12 @@ namespace Arkana.UI
             }
         }
 
-        /// <summary>O CARIMBO do disparo (pico -> 1, saida quadratica); fora do disparo, 1.</summary>
+        /// <summary>O CARIMBO do disparo e do aceite (pico -> 1, saida quadratica); fora deles, 1.</summary>
         public float Escala
         {
             get
             {
-                if (Estado != Faixa.Disparou) return 1f;
+                if (Estado != Faixa.Disparou && Estado != Faixa.Aceito) return 1f;
                 float f = Mathf.Clamp01(Idade / PuloS);
                 return 1f + (Pico - 1f) * (1f - f) * (1f - f);
             }
@@ -156,9 +208,15 @@ namespace Arkana.UI
     /// do anel verde da mira) e o "SINTONIA PRONTA" acima da fileira da esquiva (so' em DUPLA, com o jogador de pe').
     /// (3) A placa ESPECTANDO · nome no rodape central. Tudo transitorio ou fora da coluna da mira (PONTE A11). Assina o Bus
     /// no construtor; Desligar solta.
+    /// (4) O PING DE SINTONIA (GDD §18.7): tocar no ANEL pronto, com o parceiro de pe', emite PediuCombo (o Player decide o
+    /// alvo e pede ao parceiro); a faixa conta a resposta, lida do Ping do parceiro (Bot.PingDe). O toque do anel e' uma
+    /// coroa por FORA do retangulo do ataque (DuplaHudLogica.NoAnel): o botao de ataque nao perde toque nenhum.
     /// </summary>
     public sealed class HudDupla
     {
+        /// <summary>O jogador tocou no anel da Sintonia pronto (o Player.PedirCombo escuta).</summary>
+        public event Action PediuCombo;
+
         const float CaptionDp = 10f, NomeDp = 18f, BarraDp = 3f, RaioDp = 9f;
         static readonly Color CorQuebrada = new Color(1f, 0.42f, 0.36f);   // o vermelho do X do kill feed
         static readonly Color CorApagada = new Color(0.55f, 0.55f, 0.6f);
@@ -177,6 +235,14 @@ namespace Arkana.UI
         ComboSintonia _comboPintado;
         IEntidade _espectado;
         float _larguraMax = 1f, _altura = 1f;
+        // (4) o ping: o parceiro de pe' visto, o Ping dele, a ultima fase pintada, e o toque do anel
+        readonly RectTransform _toque;
+        readonly Rect[] _evitar = new Rect[3];
+        Rect _disparo;
+        bool _captura;
+        IEntidade _par;
+        PingDeSintonia _ping;
+        PingDeSintonia.Fase _pingVisto;
 
         public HudDupla(RectTransform raiz)
         {
@@ -238,6 +304,13 @@ namespace Arkana.UI
             _anel.enabled = _anelTrilho.enabled = false;
             _pronta.gameObject.SetActive(false);
 
+            // (4) o toque do anel: um quadro invisivel em volta do ataque, filtrado pela coroa (ToqueDoAnel). Irmao DEPOIS dos
+            // controles (a Hud cria a HudDupla depois deles): ganha o raio so' onde o filtro deixa, o resto cai no botao de baixo
+            var toque = Formas.Imagem(raiz, "ToqueAnelSintonia", null, new Color(0f, 0f, 0f, 0.001f));
+            toque.raycastTarget = true;
+            _toque = toque.rectTransform;
+            _toque.gameObject.AddComponent<ToqueDoAnel>().Dono = this;
+
             Bus.SintoniaCanalizando += AoCanalizar;
             Bus.SintoniaDisparou += AoDisparar;
             Bus.SintoniaFalhou += AoFalhar;
@@ -257,6 +330,10 @@ namespace Arkana.UI
             Logica.Zerar();
             _estadoPintado = (DuplaHudLogica.Faixa)(-1);
             _espectado = null;
+            _par = null;
+            _ping = null;
+            _pingVisto = PingDeSintonia.Fase.Nada;
+            _captura = false;
             _espectando.gameObject.SetActive(false);
         }
 
@@ -276,13 +353,38 @@ namespace Arkana.UI
             AreaSegura.NoRect(_anel.rectTransform, l.AnelSintonia);
             AreaSegura.NoRect(_pronta, l.SintoniaPronta);
             AreaSegura.NoRect(_espectando, l.Espectando);
+            _disparo = l.Disparo;
+            _evitar[0] = l.Esquiva; _evitar[1] = l.Salto; _evitar[2] = l.Carrossel;
+            float r = l.Disparo.width * 0.5f * DuplaHudLogica.ToqueMult;
+            AreaSegura.NoRect(_toque, new Rect(l.Disparo.center.x - r, l.Disparo.center.y - r, 2f * r, 2f * r));
         }
+
+        /// <summary>O filtro do toque (px de tela): o anel so' pega o dedo PRONTO, e so' na coroa.</summary>
+        internal bool Captura(Vector2 p) => _captura && DuplaHudLogica.NoAnel(p, _disparo, _evitar);
+        internal void Tocou() { if (_captura) PediuCombo?.Invoke(); }
 
         /// <summary>Por quadro (dt sem escala). `dupla` = partida em dupla (o anel so' existe nela); `espectado` = o parceiro
         /// que a camera segue com o jogador fora (null = jogando).</summary>
         public void Pintar(float dt, bool dupla, IEntidade espectado)
         {
             Logica.Tick(dt);
+            bool vivo = Jogador != null && Jogador.Vital != null && Jogador.Vital.Viva;
+            bool anel = dupla && vivo && espectado == null;
+            // (4) o PING: o Ping mora no parceiro (quem responde); a faixa pinta cada fase NOVA. Antes da faixa: a resposta
+            // deste quadro ja' sai pintada nele
+            Partida m = anel ? Partida.Atual : null;
+            IEntidade par = m != null ? m.ParceiroVivo() : null;
+            if (par != _par) { _par = par; _ping = Bot.PingDe(par); }
+            _captura = anel && Logica.Pronta && _ping != null && PingDeSintonia.DePe(Jogador) && PingDeSintonia.DePe(par);
+            PingDeSintonia.Fase f = _ping != null ? _ping.Estado : PingDeSintonia.Fase.Nada;
+            if (f != _pingVisto)
+            {
+                _pingVisto = f;
+                if (f == PingDeSintonia.Fase.Proposto) Logica.Pingou(_ping.ElJogador);
+                else if (f == PingDeSintonia.Fase.Aceito) Logica.Respondeu(_ping.Combo);
+                else if (f == PingDeSintonia.Fase.Recusado) Logica.Respondeu(null);
+                else Logica.Calar();
+            }
             // (1) faixa: texto, cores e largura so' quando o estado/combo muda; por quadro, alfa, escala e o trilho
             bool faixa = Logica.Estado != DuplaHudLogica.Faixa.Nada;
             if (_faixa.gameObject.activeSelf != faixa) _faixa.gameObject.SetActive(faixa);
@@ -295,8 +397,6 @@ namespace Arkana.UI
                 _barra.rectTransform.anchorMax = new Vector2(Logica.Progresso, 1f);
             }
             // (2) anel: a recarga do jogador, so' em dupla e de pe'
-            bool vivo = Jogador != null && Jogador.Vital != null && Jogador.Vital.Viva;
-            bool anel = dupla && vivo && espectado == null;
             if (anel)
             {
                 Logica.Recarregar(Sintonia.CooldownRestante(Jogador), Balance.Sintonia.CooldownS);
@@ -320,7 +420,8 @@ namespace Arkana.UI
             }
         }
 
-        /// <summary>Estado novo na faixa: o texto (o nome em duas cores, ou QUEBRADA), os losangos, o brilho e a largura.</summary>
+        /// <summary>Estado novo na faixa: o texto (o nome em duas cores, a conversa do ping, ou a recusa), os losangos, o brilho
+        /// e a largura.</summary>
         void PintarFaixa()
         {
             _estadoPintado = Logica.Estado;
@@ -329,32 +430,53 @@ namespace Arkana.UI
             DuplaHudLogica.ElementosDe(Logica.Combo, out ea, out eb);
             Color a = Estilo.CorElemento(ea), b = Estilo.CorElemento(eb);
             string nome = Textos.ComboNome(Logica.Combo);
-            bool quebrada = Logica.Estado == DuplaHudLogica.Faixa.Quebrada;
-            if (quebrada)
+            bool trilho = false;
+            switch (Logica.Estado)
             {
-                _caption.text = nome;
-                _caption.color = Estilo.TextoFosco;
-                _nome.text = Textos.SintoniaQuebrada;
-                _nome.color = CorQuebrada;
-                _losA.color = _losB.color = CorApagada;
-                _brilho.color = Formas.ComAlfa(CorQuebrada, 0.22f);
+                case DuplaHudLogica.Faixa.Quebrada: Apagada(nome, Textos.SintoniaQuebrada, CorQuebrada); break;
+                case DuplaHudLogica.Faixa.SemCombo: Apagada(Textos.Parceiro, Textos.PingSemCombo, CorQuebrada); break;
+                case DuplaHudLogica.Faixa.SemAlvo: Apagada(Textos.Sintonia, Textos.PingSemAlvo, Color.white); break;
+                case DuplaHudLogica.Faixa.Combo:
+                    Color p = Estilo.CorElemento(Logica.ElPing);
+                    Acesa(Textos.Sintonia, Textos.PingCombo, p, p, p);
+                    break;
+                case DuplaHudLogica.Faixa.Aceito:
+                    Acesa(Textos.PingAceito, string.Format(Textos.PingVai, DuplaHudLogica.Bicolor(nome, a, b)), Color.white, a, b);
+                    break;
+                default:   // canalizando / disparou: o nome nas duas cores e o trilho
+                    Acesa(Textos.Sintonia, DuplaHudLogica.Bicolor(nome, a, b), Color.white, a, b);
+                    trilho = true;
+                    break;
             }
-            else
-            {
-                _caption.text = Textos.Sintonia;
-                _caption.color = Estilo.Ouro;
-                _nome.text = DuplaHudLogica.Bicolor(nome, a, b);
-                _nome.color = Color.white;
-                _losA.color = a;
-                _losB.color = b;
-                _brilho.color = Formas.ComAlfa(Color.Lerp(a, b, 0.5f), 0.3f);
-                _barra.color = a;
-            }
-            _barraTrilho.gameObject.SetActive(!quebrada);
+            _barraTrilho.gameObject.SetActive(trilho);
             float w = Mathf.Min(Mathf.Ceil(_nome.preferredWidth + Dp.Px(64f)), _larguraMax);
             w = Mathf.Max(w, Dp.Px(180f));
             _placa.sizeDelta = new Vector2(w, _altura);
             _brilho.rectTransform.sizeDelta = new Vector2(w + Dp.Px(80f), _altura + Dp.Px(44f));
+        }
+
+        /// <summary>A faixa acesa: caption no ouro, o texto em `cor` (rich text leva as cores dele), losangos e brilho em a/b.</summary>
+        void Acesa(string caption, string texto, Color cor, Color a, Color b)
+        {
+            _caption.text = caption;
+            _caption.color = Estilo.Ouro;
+            _nome.text = texto;
+            _nome.color = cor;
+            _losA.color = a;
+            _losB.color = b;
+            _brilho.color = Formas.ComAlfa(Color.Lerp(a, b, 0.5f), 0.3f);
+            _barra.color = a;
+        }
+
+        /// <summary>A faixa apagada (quebrada, recusa, sem alvo): caption fosco, losangos cinza, o texto em `cor`.</summary>
+        void Apagada(string caption, string texto, Color cor)
+        {
+            _caption.text = caption;
+            _caption.color = Estilo.TextoFosco;
+            _nome.text = texto;
+            _nome.color = cor;
+            _losA.color = _losB.color = CorApagada;
+            _brilho.color = Formas.ComAlfa(cor == Color.white ? CorApagada : cor, 0.22f);
         }
 
         static Image Losango(RectTransform placa, float ancoraX)
@@ -375,5 +497,16 @@ namespace Arkana.UI
             rt.anchoredPosition = new Vector2(0f, y);
             rt.sizeDelta = new Vector2(0f, h);
         }
+    }
+
+    /// <summary>O toque do ANEL DA SINTONIA: filtro de raio (a coroa, so' pronto — senao o dedo cai no que esta' embaixo:
+    /// ataque, esquiva, salto, olhar) e o pedido no pressionar, como os outros botoes.</summary>
+    public sealed class ToqueDoAnel : MonoBehaviour, IPointerDownHandler, ICanvasRaycastFilter
+    {
+        internal HudDupla Dono;
+
+        public bool IsRaycastLocationValid(Vector2 sp, Camera cam) => Dono != null && Dono.Captura(sp);
+
+        public void OnPointerDown(PointerEventData e) { if (Dono != null) Dono.Tocou(); }
     }
 }

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ArkanaSintoniaZona
+  m_Shader: {fileID: 4800000, guid: ee0af25972bd4438a22b94f39e42c5b6, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Escala: 0.32
+    - _Periodo: 0
+    m_Colors:
+    - _Anel: {r: 0, g: 0.05, b: 0, a: 0}
+    - _Brilho: {r: 4.5, g: 1.6, b: 0.3, a: 1}
+    - _Cor: {r: 0.1, g: 0.035, b: 0.02, a: 0.95}
+    - _Enche: {r: 2, g: 0.45, b: 0, a: 0}
+    - _Onda: {r: 0, g: 0, b: 0, a: 0}
+    - _Rolagem: {r: 0.04, g: 0.015, b: -0.02, a: 0.03}
+    - _Veio: {r: 1, g: 5, b: 0.9, a: 0.9}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

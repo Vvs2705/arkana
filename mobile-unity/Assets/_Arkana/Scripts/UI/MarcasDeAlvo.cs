@@ -15,7 +15,9 @@ namespace Arkana.UI
     /// mais perto primeiro. Todo corpo da arena e' medido todo quadro: o rastro precisa do valor de ANTES do golpe (o
     /// Bus.DamageApplied sai depois que a vida ja' caiu). Nada aqui desenha.
     /// ALIADO (Dupla.Aliado) nunca recebe marca de inimigo: o PARCEIRO tem a dele, AZUL e permanente (nome + vida; fora de
-    /// vista, presa na borda com a seta — NaBorda).
+    /// vista, presa na borda com a seta — NaBorda — e DESLIZADA para fora dos controles e da coluna da mira — Deslizar).
+    /// O PING DE SINTONIA le' daqui o alvo (SobAMira, senao UltimoAcertado) e o alvo pedido/pactuado ganha a MARCA DO PACTO
+    /// (MarcaDoPacto: o losango nas cores dos dois elementos).
     /// </summary>
     public sealed class MarcasLogica
     {
@@ -66,6 +68,8 @@ namespace Arkana.UI
         public float Agora { get; private set; }
         /// <summary>O inimigo SOB A MIRA mais perto neste quadro (null = nenhum): o parceiro bot mira o mesmo (contrato 17G).</summary>
         public IEntidade SobAMira { get; private set; }
+        /// <summary>O ultimo inimigo que o jogador ACERTOU (o alvo do ping quando ninguem esta' na mira). Null = nenhum.</summary>
+        public IEntidade UltimoAcertado { get; private set; }
         /// <summary>O parceiro medido (null = sem dupla, ou fora) e a vida dele com rastro.</summary>
         public IEntidade Parceiro { get; private set; }
         public Rastro VidaParceiro;
@@ -82,6 +86,7 @@ namespace Arkana.UI
         public void Acertou(IEntidade alvo)
         {
             if (alvo == null || alvo.Vital == null) return;
+            UltimoAcertado = alvo;
             Marca m = Pegar(alvo);
             m.Ate = Agora + SeguraS;
             m.Calado = -99f;
@@ -92,6 +97,7 @@ namespace Arkana.UI
         public void Esquecer(IEntidade alvo)
         {
             Marca m;
+            if (alvo != null && alvo == UltimoAcertado) UltimoAcertado = null;
             if (alvo == null || !_marcas.TryGetValue(alvo, out m)) return;
             m.Ate = -99f;
             m.Alfa = 0f;
@@ -147,6 +153,20 @@ namespace Arkana.UI
             Parceiro = parceiro;
         }
 
+        /// <summary>A MARCA DO PACTO (Ping de Sintonia): o alvo PEDIDO ganha o losango na cor do elemento do jogador; ACEITO, nas
+        /// DUAS cores (jogador | parceiro) e selado. Sem pedido vivo (nada, recusado) ou com o alvo caido/morto = sem marca.</summary>
+        public static bool MarcaDoPacto(PingDeSintonia ping, out IEntidade alvo, out Elemento a, out Elemento b, out bool selado)
+        {
+            alvo = null; a = b = Elemento.Fogo; selado = false;
+            if (ping == null || (ping.Estado != PingDeSintonia.Fase.Proposto && ping.Estado != PingDeSintonia.Fase.Aceito)) return false;
+            if (!PingDeSintonia.AlvoValido(ping.Jogador, ping.Alvo)) return false;
+            alvo = ping.Alvo;
+            selado = ping.Pactuado;
+            a = ping.ElJogador;
+            b = selado ? ping.ElParceiro : a;
+            return true;
+        }
+
         /// <summary>Espaco da camera (x direita, y cima, olha para -z) -> viewport para a marca do parceiro. Na frente, a
         /// projecao; ATRAS, um ponto muito longe na direcao (x, -z) — de lado e para baixo — que o NaBorda prende na borda (a
         /// projecao pura espelharia quem esta' as costas para a frente da tela).</summary>
@@ -156,6 +176,79 @@ namespace Arkana.UI
             if (z > 0.01f) return new Vector2(0.5f + 0.5f * c.x / (z * tanMeiaV * aspecto), 0.5f + 0.5f * c.y / (z * tanMeiaV));
             Vector2 d = new Vector2(c.x, -Mathf.Max(c.z, 0.01f));
             return new Vector2(0.5f, 0.5f) + d.normalized * 100f;
+        }
+
+        /// <summary>A caixa (viewport) em que a marca do parceiro fica presa quando ele sai da vista: longe dos cantos da HUD
+        /// (barras, relogio e minimapa em cima, joystick e botoes embaixo) e da faixa de aviso. KNOB por foto.</summary>
+        public static readonly Rect CaixaDaBorda = Rect.MinMaxRect(0.2f, 0.26f, 0.8f, 0.8f);
+        /// <summary>dp: o respiro entre a marca presa e cada zona proibida, a largura da COLUNA DA MIRA (PONTE A11: o centro nao
+        /// recebe mobilia) e o passo da busca pelo contorno. KNOB por foto.</summary>
+        public const float FolgaBordaDp = 6f, ColunaMiraDp = 160f, PassoBordaDp = 4f;
+
+        /// <summary>As ZONAS PROIBIDAS da marca presa na borda (px de tela), com FolgaBordaDp de respiro: os controles (joystick,
+        /// ataque e o anel dele, esquiva, tatica, suprema, salto, carrossel, pegar), o topo da HUD (barras, abates, relogio,
+        /// pausa, minimapa, bussola, faixa da Sintonia) e a COLUNA DA MIRA, a faixa central de alto a baixo.</summary>
+        public static void ZonasProibidas(HudLayout l, Vector2 tela, float px, List<Rect> saida)
+        {
+            saida.Clear();
+            Rect[] hud = { l.Joystick, l.AnelSintonia, l.Disparo, l.Esquiva, l.Tatica, l.Suprema, l.Salto, l.Carrossel, l.Pegar,
+                l.Barras, l.KillFeed, l.Topo, l.Pausa, l.Minimapa, l.Bussola, l.Sintonia };
+            float f = FolgaBordaDp * px;
+            for (int i = 0; i < hud.Length; i++) saida.Add(Rect.MinMaxRect(hud[i].xMin - f, hud[i].yMin - f, hud[i].xMax + f, hud[i].yMax + f));
+            float c = ColunaMiraDp * px * 0.5f;
+            saida.Add(new Rect(tela.x * 0.5f - c, 0f, 2f * c, tela.y));
+        }
+
+        /// <summary>A marca presa em `pos` (no contorno da `caixa`, px) DESLIZA pelo contorno ate' a posicao livre mais perto: o
+        /// retangulo dela (`meia` = meio tamanho com a seta, px) nao cruza nenhuma zona `proibida`. Passos de `passo` px,
+        /// alternando os dois sentidos. Primeiro so' do MESMO LADO da tela (a marca nao atravessa a mira: o parceiro as costas
+        /// e a' direita fica a' direita — do outro lado ela mentiria onde ele esta'); sem lugar la', qualquer lado. Sem posicao
+        /// livre no contorno inteiro, fica onde estava.</summary>
+        public static Vector2 Deslizar(Vector2 pos, Rect caixa, Vector2 meia, IList<Rect> proibidas, float passo)
+        {
+            if (Livre(pos, meia, proibidas) || passo <= 0f) return pos;
+            float t0 = NoContorno(caixa, pos), volta = 2f * (caixa.width + caixa.height), lado = pos.x - caixa.center.x;
+            for (int passe = 0; passe < 2; passe++)
+                for (float d = passo; d <= volta * 0.5f; d += passo)
+                    for (int s = 1; s >= -1; s -= 2)
+                    {
+                        Vector2 a = NoContorno(caixa, t0 + s * d);
+                        if ((passe == 1 || (a.x - caixa.center.x) * lado >= 0f) && Livre(a, meia, proibidas)) return a;
+                    }
+            return pos;
+        }
+
+        /// <summary>O retangulo de meio tamanho `meia` em `p` nao cruza nenhuma zona.</summary>
+        public static bool Livre(Vector2 p, Vector2 meia, IList<Rect> proibidas)
+        {
+            var r = new Rect(p - meia, 2f * meia);
+            for (int i = 0; proibidas != null && i < proibidas.Count; i++) if (r.Overlaps(proibidas[i])) return false;
+            return true;
+        }
+
+        /// <summary>O contorno da caixa como uma linha: `t` (px) anda de baixo-esquerda para a direita, sobe, volta por cima e
+        /// desce pela esquerda (da' a volta).</summary>
+        static Vector2 NoContorno(Rect c, float t)
+        {
+            float w = c.width, h = c.height;
+            t = Mathf.Repeat(t, 2f * (w + h));
+            if (t < w) return new Vector2(c.xMin + t, c.yMin);
+            t -= w;
+            if (t < h) return new Vector2(c.xMax, c.yMin + t);
+            t -= h;
+            if (t < w) return new Vector2(c.xMax - t, c.yMax);
+            return new Vector2(c.xMin, c.yMax - (t - w));
+        }
+
+        /// <summary>O inverso: o `t` do ponto do contorno (pelo lado mais perto).</summary>
+        static float NoContorno(Rect c, Vector2 p)
+        {
+            float baixo = Mathf.Abs(p.y - c.yMin), dir = Mathf.Abs(p.x - c.xMax), cima = Mathf.Abs(p.y - c.yMax), esq = Mathf.Abs(p.x - c.xMin);
+            float m = Mathf.Min(Mathf.Min(baixo, dir), Mathf.Min(cima, esq));
+            if (m == baixo) return p.x - c.xMin;
+            if (m == dir) return c.width + (p.y - c.yMin);
+            if (m == cima) return c.width + c.height + (c.xMax - p.x);
+            return 2f * c.width + c.height + (c.yMax - p.y);
         }
 
         /// <summary>Prende `vp` na `caixa` (viewport): dentro = no lugar (false); fora = na BORDA, na direcao do centro para
@@ -212,6 +305,11 @@ namespace Arkana.UI
         readonly Tela[] _telas;
         readonly Color[] _niveis;
         readonly TelaParceiro _parceiro;
+        readonly TelaPacto _pacto;
+        readonly List<Rect> _zonas = new List<Rect>(20);
+        Vector2 _telaZonas;
+        IEntidade _parVisto;
+        PingDeSintonia _ping;
 
         public MarcasDeAlvo(RectTransform pai)
         {
@@ -223,6 +321,7 @@ namespace Arkana.UI
             _telas = new Tela[MarcasLogica.Max];
             for (int i = 0; i < _telas.Length; i++) _telas[i] = new Tela(raiz, i);
             _parceiro = new TelaParceiro(raiz);   // depois das de inimigo: o aliado desenha por cima
+            _pacto = new TelaPacto(raiz);         // por ultimo: o alvo combinado le' por cima de tudo
             // ponytail: corpo (CharacterController) nao tampa a visada — o do proprio jogador cruzava a linha de perto. Parede
             // ATRAS de um corpo passa, e moita sem colisor nao esconde: RaycastNonAlloc com a lista toda se isso aparecer em jogo.
             Logica.Visada = (a, b) =>
@@ -239,7 +338,9 @@ namespace Arkana.UI
             Camera cam = Camera.main;
             if (p != null && cam != null) Logica.Atualizar(dt, p.Arena, jogador, cam.transform.position, cam.transform.forward);
             else Logica.Atualizar(dt, null, jogador, Vector3.zero, Vector3.forward);
-            Logica.MedirParceiro(dt, p != null ? p.ParceiroVivo() : null);
+            IEntidade par = p != null ? p.ParceiroVivo() : null;
+            Logica.MedirParceiro(dt, par);
+            if (par != _parVisto) { _parVisto = par; _ping = Bot.PingDe(par); }   // o Ping mora no parceiro (quem responde)
             Posicionar();
         }
 
@@ -251,17 +352,20 @@ namespace Arkana.UI
             int n = cam != null ? vis.Count : 0;
             // a mais PERTO no ultimo irmao usado: desenha por cima das de longe
             for (int k = 0; k < _telas.Length; k++) _telas[k].Pintar(k < n ? vis[n - 1 - k] : null, cam, _niveis);
-            _parceiro.Pintar(cam != null ? Logica.Parceiro : null, cam, Logica.VidaParceiro);
+            if (cam != null && cam.pixelRect.size != _telaZonas)   // o HudLayout desta tela (a foto troca o alvo): 1x por tamanho
+            {
+                _telaZonas = cam.pixelRect.size;
+                MarcasLogica.ZonasProibidas(HudLayout.Calcular(_telaZonas, AreaSegura.Atual(), Dp.Px(1f)), _telaZonas, Dp.Px(1f), _zonas);
+            }
+            _parceiro.Pintar(cam != null ? Logica.Parceiro : null, cam, Logica.VidaParceiro, _zonas);
+            _pacto.Pintar(_ping, cam, Logica.Agora);
         }
-
-        /// <summary>A caixa (viewport) em que a marca do parceiro fica presa quando ele sai da vista: longe dos cantos da HUD
-        /// (barras, relogio e minimapa em cima, joystick e botoes embaixo) e da faixa de aviso. KNOB por foto.</summary>
-        static readonly Rect CaixaDaBorda = Rect.MinMaxRect(0.2f, 0.26f, 0.8f, 0.8f);
 
         /// <summary>
         /// A marca do PARCEIRO: a mesma placa das de inimigo com o fio no AZUL-ALIADO, o nome e a vida (com rastro) no azul.
         /// Permanente (nao esvaece, nao conta no teto). Na vista, pousa acima da cabeca; fora dela (ou as costas), presa na
-        /// borda da CaixaDaBorda com a SETA apontando para onde ele esta'.
+        /// borda da CaixaDaBorda com a SETA apontando para onde ele esta' — e deslizada pelo contorno para fora dos controles
+        /// e da coluna da mira (o aparelho mostrou a marca em cima da SUPREMA com o parceiro as costas).
         /// </summary>
         sealed class TelaParceiro
         {
@@ -301,7 +405,11 @@ namespace Arkana.UI
                 _rt.gameObject.SetActive(false);
             }
 
-            public void Pintar(IEntidade e, Camera cam, MarcasLogica.Rastro vida)
+            /// <summary>dp que a seta sai do meio da placa (o miolo dela a 9 dp da borda + meia seta de 7): entra no tamanho da
+            /// marca que desliza.</summary>
+            const float SetaDp = 16f;
+
+            public void Pintar(IEntidade e, Camera cam, MarcasLogica.Rastro vida, List<Rect> zonas)
             {
                 bool liga = e != null && cam != null;
                 if (liga != _ligada) { _ligada = liga; _rt.gameObject.SetActive(liga); }
@@ -313,7 +421,16 @@ namespace Arkana.UI
                 Vector2 vp = MarcasLogica.ParaViewport(c, Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad), aspecto);
                 Vector2 pos;
                 float ang;
-                bool borda = MarcasLogica.NaBorda(vp, CaixaDaBorda, aspecto, out pos, out ang);
+                bool borda = MarcasLogica.NaBorda(vp, MarcasLogica.CaixaDaBorda, aspecto, out pos, out ang);
+                if (borda)
+                {
+                    // presa: desliza para fora dos controles e da coluna da mira (px de tela); a seta segue apontando para ele
+                    Vector2 tela = r.size, meia = _rt.sizeDelta * 0.5f + Vector2.one * Dp.Px(SetaDp);
+                    Rect cv = MarcasLogica.CaixaDaBorda;
+                    Rect caixa = Rect.MinMaxRect(cv.xMin * tela.x, cv.yMin * tela.y, cv.xMax * tela.x, cv.yMax * tela.y);
+                    Vector2 p = MarcasLogica.Deslizar(Vector2.Scale(pos, tela), caixa, meia, zonas, Dp.Px(MarcasLogica.PassoBordaDp));
+                    pos = new Vector2(p.x / Mathf.Max(tela.x, 1f), p.y / Mathf.Max(tela.y, 1f));
+                }
                 _rt.anchorMin = _rt.anchorMax = pos;
                 if (borda != _borda)
                 {
@@ -329,6 +446,67 @@ namespace Arkana.UI
                 }
                 Tela.Ancorar(_rastro, vida.Fantasma, ref _rv);
                 Tela.Ancorar(_vida, vida.Frac, ref _fv);
+            }
+        }
+
+        /// <summary>
+        /// A MARCA DO PACTO: um LOSANGO acima da placa do alvo, metade na cor do elemento do jogador e metade na do parceiro
+        /// (as duas metades sao o mesmo losango cortado na vertical: Filled horizontal a 0,5), com contorno escuro e o fio no
+        /// ouro. PEDIDO: uma cor so' e pulsando (esperando resposta); SELADO: as duas cores, maior e parado. Na vista so'
+        /// (o parceiro, que e' quem precisa achar o alvo, e' bot: a marca e' para o jogador lembrar o que combinou).
+        /// </summary>
+        sealed class TelaPacto
+        {
+            /// <summary>dp: o lado do losango, o centro dele acima do topo da cabeca (a placa do inimigo tem ~28 dp) e as escalas
+            /// do pedido (pulso) e do selado. KNOB por foto.</summary>
+            const float LadoDp = 18f, AcimaDp = 44f, PulsoHz = 1.6f, Pulso = 0.12f, Selado = 1.3f;
+            readonly RectTransform _rt;
+            readonly Image _a, _b;
+            bool _ligada;
+
+            public TelaPacto(RectTransform pai)
+            {
+                _rt = Formas.No(pai, "MarcaPacto");
+                _rt.anchorMin = _rt.anchorMax = _rt.pivot = new Vector2(0.5f, 0.5f);
+                _rt.sizeDelta = Vector2.one * Dp.Px(LadoDp);
+                var halo = Formas.Imagem(_rt, "Halo", Formas.Halo(), new Color(0f, 0f, 0f, 0.55f));
+                halo.rectTransform.sizeDelta = _rt.sizeDelta * 2.2f;
+                var contorno = Formas.Imagem(_rt, "Contorno", Formas.Losango(), Estilo.NoiteFunda);
+                contorno.rectTransform.sizeDelta = _rt.sizeDelta + Vector2.one * Dp.Px(5f);
+                _a = Metade("A", Image.OriginHorizontal.Left);
+                _b = Metade("B", Image.OriginHorizontal.Right);
+                var fio = Formas.Imagem(_rt, "Fio", Formas.LosangoAnel(), Estilo.Ouro);
+                fio.rectTransform.sizeDelta = _rt.sizeDelta + Vector2.one * Dp.Px(5f);
+                _rt.gameObject.SetActive(false);
+            }
+
+            Image Metade(string nome, Image.OriginHorizontal lado)
+            {
+                var m = Formas.Imagem(_rt, nome, Formas.Losango(), Color.white);
+                AreaSegura.Esticar(m.rectTransform);
+                m.type = Image.Type.Filled;
+                m.fillMethod = Image.FillMethod.Horizontal;
+                m.fillOrigin = (int)lado;
+                m.fillAmount = 0.5f;
+                return m;
+            }
+
+            public void Pintar(PingDeSintonia ping, Camera cam, float agora)
+            {
+                IEntidade alvo;
+                Elemento ea, eb;
+                bool selado;
+                bool liga = MarcasLogica.MarcaDoPacto(ping, out alvo, out ea, out eb, out selado) && cam != null;
+                Vector3 vp = liga ? NaTela(cam, Topo(alvo)) : Vector3.zero;
+                liga = liga && vp.z > 0f;
+                if (liga != _ligada) { _ligada = liga; _rt.gameObject.SetActive(liga); }
+                if (!liga) return;
+                _rt.anchorMin = _rt.anchorMax = new Vector2(vp.x, vp.y);
+                _rt.anchoredPosition = new Vector2(0f, Dp.Px(AcimaDp));
+                _a.color = Estilo.CorElemento(ea);   // o setter do uGUI ignora cor igual: parado nao refaz malha
+                _b.color = Estilo.CorElemento(eb);
+                float s = selado ? Selado : 1f + Pulso * Mathf.Sin(agora * PulsoHz * 2f * Mathf.PI);
+                _rt.localScale = new Vector3(s, s, 1f);
             }
         }
 

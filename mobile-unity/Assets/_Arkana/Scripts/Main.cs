@@ -208,6 +208,8 @@ namespace Arkana
         /// <summary>Esta partida e' em DUPLA (Menu.ModoDupla fora do treino), lido no toque do JOGAR.</summary>
         public bool Dupla { get; private set; }
         public Hud Hud { get; private set; }
+        /// <summary>O Grimorio de Descobertas da partida (18C): ouve o Bus, acende pagina e grava UM inteiro no aparelho.</summary>
+        public Grimorio Grimorio { get; private set; }
         public ArkMenu Menu { get; private set; }
         public Sfx Sfx { get; private set; }
         public Castelo Castelo { get; private set; }
@@ -473,6 +475,11 @@ namespace Arkana
                 Hud.ReiniciarPedido += () => Fluxo.Reiniciar();
                 Hud.MenuPedido += VoltarAoMenu;
                 Hud.AbandonarPedido += VoltarAoMenu;
+                // O GRIMORIO (18C) liga ANTES do Partida.Iniciar (ouve o MatchStarted); o aviso e' filho da HUD (nasce e morre
+                // com ela, fora da coluna da mira) e ticka o relogio dele.
+                Grimorio = new Grimorio();
+                Grimorio.Ligar();
+                AvisoGrimorio.Criar(Hud.transform, Grimorio);
             }));
             p.Add(new Passo("jogador", Textos.CarregaMagos, () =>
             {
@@ -589,6 +596,7 @@ namespace Arkana
             if (Carregando) { Carregando = false; Application.backgroundLoadingPriority = _prioridade; }
             if (Tela != null) { Destroy(Tela.gameObject); Tela = null; }
             if (Partida != null) { Partida.Encerrar(); Partida = null; }
+            if (Grimorio != null) { Grimorio.Desligar(); Grimorio = null; }
             if (Sfx != null) Sfx.PosOuvinte = null;
             if (Hud != null) { Destroy(Hud.gameObject); Hud = null; }
             if (Player != null && Player.Camera != null) Destroy(Player.Camera.gameObject);   // a camera nao e' filha da arena

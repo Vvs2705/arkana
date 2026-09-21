@@ -33,7 +33,7 @@ namespace Arkana.Core
         {
             "Água conduz Raio — cuidado onde pisa.",
             "Fogo na grama e nas árvores se espalha, e a mata queimada vira carvão: a cobertura some.",
-            "Fogo na grama alta revela quem estava escondido nela.",
+            "Sintonia: acerte o mesmo alvo que o parceiro com OUTRO elemento, quase juntos — as duas magias se fundem num combo.",
             "Água congela o lago por 10 s e vira ponte — mas o Fogo derrete, e quem está em cima cai.",
             "Raio na água eletrocuta todo mundo que está nela. Saia da água antes do raio.",
             "Terra ergue um muro de pedra de 60 de vida: cobertura na hora, que qualquer dano derruba.",
@@ -47,6 +47,7 @@ namespace Arkana.Core
             "A Manopla lendária só sai do Baú Celestial. Canalize perto dele: sair do raio cancela.",
             "A tempestade arcana fecha a ilha em fases. Fora da zona, a vida escorre a cada segundo.",
             "No ar, toque o salto de novo para abrir ou fechar o planeio.",
+            "Em dupla, com a Sintonia pronta, toque no anel em volta do ataque: o parceiro aceita o combo no inimigo da sua mira.",
         };
 
         // ---------------------------------------------------------------- menu principal
