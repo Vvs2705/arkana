@@ -15,17 +15,34 @@ foi encerrado em 09/09/2026 e o Capacitor antes dele, em 20/08.
 
 ## Gerar APK de desenvolvimento
 
-O Unity está instalado com o módulo Android (SDK, NDK e JDK próprios). O build
-sai por linha de comando, sem abrir o editor:
+O Unity está instalado com o módulo Android (SDK, NDK, JDK e Gradle próprios,
+embutidos no editor). O build sai por linha de comando, sem abrir o editor:
 
-```bash
-"/c/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe" -batchmode -nographics -quit \
-  -projectPath mobile-unity -executeMethod Build.Android -logFile mobile-unity/Logs/build.log
+```
+powershell -File mobile-unity\build_apk.ps1
 ```
 
-O método `Build.Android` é escrito no passo 0 (`Assets/Editor/Build.cs`). APKs
-são artefato local e ficam fora do git; o APK datado vai sempre para a mesma
-pasta do clone principal, venha de worktree ou não (ordem do Diretor, 27/08).
+Por dentro: `Unity.exe -batchmode -nographics -buildTarget Android -executeMethod
+Arkana.EditorTools.Build.Android` (método em `mobile-unity/Assets/_Arkana/Editor/Build.cs`,
+log em `mobile-unity/Builds/build.log`). Exige o Unity Hub aberto (licença Personal;
+o script abre). Produção é IL2CPP, **só ARM64**, release, assinada com a keystore
+de debug. APKs são artefato local e ficam fora do git; o APK datado vai sempre
+para `mobile-unity/Builds/testes/` do clone principal, venha de worktree ou não
+(ordem do Diretor, 27/08).
+
+## Emulador (desde 23/09/2026)
+
+| Item | Valor |
+|---|---|
+| AVD | `arkana_api35` — Android 15 (API 35), `google_apis/x86_64` com tradução ARM64, 2400×1080 paisagem, 2 GB, GPU do host |
+| Aceleração | WHPX (funciona nesta máquina; `mobile-unity/habilitar_whpx.bat` é contingência) |
+| SDK | `%LOCALAPPDATA%\Android\Sdk` (emulator 37.1.11; platform-tools 37.0.1 é o adb da cadeia) |
+| Variante de build | `Arkana.EditorTools.Build.AndroidEmulador` → `Builds/arkana-emulador.apk`: ARM64+x86_64, GLES3 fixo, Development; a produção continua ARM64-only |
+| Esteira | `mobile-unity/emulador.ps1 [-Build]` → adb → `install -r` → partida automática (`arkana_auto`) → espera → screencap + logcat → PASS/FAIL em `Logs/emulador/<data>/` |
+
+O emulador **não mede desempenho** (GPU do PC ≠ Adreno 650): serve para instalar,
+abrir, jogar sem dedo, achar crash e ler log quando não há cabo. FPS e veredito
+visual continuam no Poco F4. Uso em `mobile-unity/00-LEIA.md`.
 
 ## Estado de publicação
 

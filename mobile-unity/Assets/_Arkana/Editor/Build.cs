@@ -95,11 +95,64 @@ namespace Arkana.EditorTools
         [MenuItem("Arkana/Build Android")]
         public static void Android()
         {
+            if (!Buildar("arkana.apk", BuildOptions.None) && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
+        /// <summary>
+        /// VARIANTE PARA EMULADOR (emulador.ps1 -> -executeMethod Arkana.EditorTools.Build.AndroidEmulador).
+        /// POR QUE: o AVD x86_64 recusa o APK de producao (so' ARM64: INSTALL_FAILED_NO_MATCHING_ABIS), e Vulkan em GPU
+        /// virtual e' o caminho fragil — entao ARM64+x86_64, GLES3 fixo e Development (stack trace IL2CPP, Profiler).
+        /// A producao (Android) continua ARM64-only com Graphics API automatica: o finally devolve o ProjectSettings.asset
+        /// ao estado de producao mesmo se o build falhar.
+        /// </summary>
+        [MenuItem("Arkana/Build/APK para emulador")]
+        public static void AndroidEmulador()
+        {
+            Debug.Log("Arkana.Build: variante EMULADOR (ARM64+x86_64, GLES3, Development)");
+            bool ok;
+            try
+            {
+                ok = Buildar("arkana-emulador.apk", BuildOptions.Development, () =>
+                {
+                    PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.X86_64;
+                    PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+                    PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
+                });
+            }
+            finally
+            {
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, true);
+                LimparListaDeGraphicsApis();
+                AssetDatabase.SaveAssets();
+            }
+            if (!ok && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
+        /// <summary>
+        /// SetUseDefaultGraphicsAPIs(true) deixa a entrada "AndroidPlayer / m_Automatic: 1" na lista; a producao tem a lista
+        /// VAZIA (m_BuildTargetGraphicsAPIs: []). Limpa a lista para o .asset em disco voltar byte a byte ao de producao.
+        /// </summary>
+        static void LimparListaDeGraphicsApis()
+        {
+            var ps = AssetDatabase.LoadAssetAtPath<Object>("ProjectSettings/ProjectSettings.asset");
+            if (ps == null) { Debug.LogWarning("Arkana.Build: ProjectSettings.asset nao carregou; a lista de Graphics API fica como esta'."); return; }
+            var so = new SerializedObject(ps);
+            SerializedProperty lista = so.FindProperty("m_BuildTargetGraphicsAPIs");
+            if (lista == null) return;
+            lista.ClearArray();
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>O miolo comum: settings, cena por codigo, BuildPlayer. `ajustes` roda DEPOIS do ApplySettings (variantes).</summary>
+        static bool Buildar(string nomeApk, BuildOptions opcoes, System.Action ajustes = null)
+        {
             string root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string apk = Path.Combine(root, "Builds", "arkana.apk");
+            string apk = Path.Combine(root, "Builds", nomeApk);
             Directory.CreateDirectory(Path.GetDirectoryName(apk));
 
             ApplySettings();
+            if (ajustes != null) ajustes();
             MainSceneBuilder.Build();
 
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
@@ -107,18 +160,18 @@ namespace Arkana.EditorTools
                 scenes = new[] { ScenePath },
                 locationPathName = apk,
                 target = BuildTarget.Android,
-                options = BuildOptions.None,
+                options = opcoes,
             });
             BuildSummary s = report.summary;
             Debug.Log(string.Format("BuildSummary: result={0} time={1} errors={2} warnings={3} output={4}",
                 s.result, s.totalTime, s.totalErrors, s.totalWarnings, s.outputPath));
-            if (s.result == BuildResult.Succeeded) return;
+            if (s.result == BuildResult.Succeeded) return true;
 
             foreach (BuildStep step in report.steps)
                 foreach (BuildStepMessage msg in step.messages)
                     if (msg.type == LogType.Error || msg.type == LogType.Exception)
                         Debug.LogError("[" + step.name + "] " + msg.content);
-            if (Application.isBatchMode) EditorApplication.Exit(1);
+            return false;
         }
     }
 }

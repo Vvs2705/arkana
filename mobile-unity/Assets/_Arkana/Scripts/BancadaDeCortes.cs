@@ -46,6 +46,7 @@ namespace Arkana
         LightShadows _sombraSol;
         SoftShadowQuality _suave;
         readonly List<ScriptableRendererFeature> _ssao = new List<ScriptableRendererFeature>();
+        bool _ssaoLigado;   // estado REAL do asset; desde 21/09 e' desligado e o build nem leva os recursos do SSAO
 
         void OnEnable() { Bus.QuedaFase += AoFase; }
         void OnDisable() { Bus.QuedaFase -= AoFase; }
@@ -58,11 +59,12 @@ namespace Arkana
             _escala = _urp.renderScale; _cascatas = _urp.shadowCascadeCount; _resSombra = _urp.mainLightShadowmapResolution;
             _distSombra = _urp.shadowDistance; _hdr = _urp.supportsHDR;
             AcharSsao();
+            _ssaoLigado = _ssao.Count > 0 && _ssao[0].isActive;
             foreach (Light l in FindObjectsByType<Light>(FindObjectsSortMode.None))
                 if (l.type == LightType.Directional && (_sol == null || l.intensity > _sol.intensity)) _sol = l;
             if (_sol != null) { _sombraSol = _sol.shadows; _suave = _sol.GetUniversalAdditionalLightData().softShadowQuality; }
             Debug.Log("ARKANA BANCADA inicio escala=" + _escala + " cascatas=" + _cascatas + " sombra=" + _resSombra + " dist=" + _distSombra
-                + " hdr=" + _hdr + " ssao=" + _ssao.Count + " tela=" + Screen.width + "x" + Screen.height);
+                + " hdr=" + _hdr + " ssao=" + _ssao.Count + (_ssaoLigado ? " ligado" : " desligado") + " tela=" + Screen.width + "x" + Screen.height);
             yield return new WaitForSecondsRealtime(DEPOIS_DO_POUSO);
             string pedidos = PartidaPeloAdb.CortesPedidos();
             string[] cortes = string.IsNullOrEmpty(pedidos) ? CortesPadrao : pedidos.Split(',');
@@ -116,7 +118,9 @@ namespace Arkana
         {
             _urp.renderScale = _escala; _urp.shadowCascadeCount = _cascatas; _urp.mainLightShadowmapResolution = _resSombra;
             _urp.shadowDistance = _distSombra; _urp.supportsHDR = _hdr;
-            foreach (ScriptableRendererFeature rf in _ssao) rf.SetActive(true);
+            // Restaurar ao que ERA, nunca a "ligado": religar SSAO num build que o retirou faz o URP reclamar
+            // "Couldn't find the required resources for the ScreenSpaceAmbientOcclusion" a cada quadro (visto no AVD, 23/09)
+            foreach (ScriptableRendererFeature rf in _ssao) rf.SetActive(_ssaoLigado);
             Camera cam = Camera.main;
             if (cam != null) cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
             Ligados(true, true, true);

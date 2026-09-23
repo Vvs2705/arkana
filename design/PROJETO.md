@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 21/09/2026, tarde (chão do Poco F4 de 16 para 34 FPS medido; Qualidade real; gelo vira chão; onda 18: combos no relevo, Selo do Campeão, Grimório, Ping de Sintonia)
+> **Atualizado em:** 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,41 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — 23/09: a esteira CODAR → BUILD → EMULADOR → TESTAR → LOG existe e passou numa partida inteira
+
+**Auditoria técnica** (arquivo único `ARKANA_AUDITORIA_TECNICA_ANDROID.md` na raiz, 31 seções + 4 anexos): o retrato da máquina, do
+projeto e do git. Achado P0 resolvido no mesmo dia: `main` estava **93 commits e 729 MB de LFS à frente do GitHub** desde 09/09 —
+push feito (`origin/main` = `0a94c2f` antes desta leva). Atenção: em repo com LFS, `git push --dry-run` NÃO é seco — o hook sobe os objetos.
+
+**Emulador (funciona, sem Android Studio):** `sdkmanager` do SDK avulso instalou `emulator` 37.1.11 + `system-images;android-35;google_apis;x86_64`;
+AVD `arkana_api35` (2400×1080 paisagem, 2 GB, GPU do host) boota em 50 s com **WHPX** — a auditoria da manhã tinha deduzido "sem
+aceleração" do `InstallState`, mas `emulator -accel-check` diz "WHPX usable"; `mobile-unity/habilitar_whpx.bat` ficou de contingência
+(admin + reinício). **Regra: Unity e emulador nunca juntos** (8 GB). O emulador NÃO mede FPS (GPU do PC); serve para instalar, abrir,
+jogar sem dedo, achar crash e ler log quando não há cabo. A régua continua o Poco F4.
+
+**Variante de build** `Arkana.EditorTools.Build.AndroidEmulador` (`Build.cs`): ARM64+x86_64, GLES3 fixo, Development, saída
+`Builds/arkana-emulador.apk` (274 MB, 8,5 min); o `finally` devolve o `ProjectSettings.asset` byte a byte à produção (que segue ARM64-only,
+release). **Esteira** `mobile-unity/emulador.ps1 [-Build] [-Auto partida] [-Espera s] [-Bancada]`: adb (o do SDK avulso, 37.0.1, unificado
+com `kill-server`) → `install -r` → `am start` com os extras de sempre → espera → screencap + logcat → PASS/FAIL em `Logs/emulador/<data>/`.
+
+**Rodadas de 23/09 no AVD:** 1ª FAIL (Android-ism: o aviso "Viewing full screen / Got it" tira o foco e o Unity pausa a 0 quadros — a
+esteira passou a marcar `immersive_mode_confirmations confirmed`); 2ª PASS 150 s; 3ª **PASS a partida inteira** (570 s, fim da partida
+"DERROTA #2 de 7 duplas", Selo, MENU → título → JOGAR → 2ª partida); toques por `adb shell input` provaram andar, TÁTICA (parede de fogo,
+recarga) e SALTO; o tiro por toque ficou inconclusivo no quadro. **Bug que só o emulador mostrou:** a `BancadaDeCortes` restaurava o SSAO
+como LIGADO, mas desde `9749474` ele está desligado no asset e o build nem leva os recursos — 50 mil linhas "Couldn't find the required
+resources for the ScreenSpaceAmbientOcclusion" numa partida, e a linha `base` da bancada media com esse ruído. Corrigido: guarda e
+restaura o estado real (`_ssaoLigado`). **Conferir a próxima bancada no Poco F4** — as medições feitas com bancada depois de 21/09 tarde
+carregavam esse erro por quadro.
+
+**Blender:** 5.2.1 instalado; **não existe MCP nem ponte** além de `blender.exe -b --python` (5,4 s de partida, funciona). Os 20 magos já
+vêm rigados (28 ossos, pesos, 13–15 takes) — rig manual não economiza crédito nos magos atuais. `otimizar.py`/`desneon.py` compatíveis com
+o 5.2 por API; `fundir_animacoes.py` tem risco no 5.x (slotted actions) e carrega a proibição de 27/08. Decisão: sem MCP; Blender headless
+só para o determinístico (retoque de textura, escala/eixo, retarget entre magos, clipe pontual); Meshy só para corpo novo ou gesto fora da biblioteca.
+
+**Fila:** disparo por toque no AVD (prova com dois quadros ou log); portão vermelho para a bancada (hoje é MonoBehaviour sem teste);
+repetir a bancada no Poco F4 com a correção; `SwappyDisplayManager couldn't find libgame.so` (1 linha E/, inofensiva, investigar);
+keystore de release (G6); o resto da fila de 21/09 continua abaixo.
 
 ### >>> COMECE POR AQUI — 21/09, tarde: o chão do Poco F4 de 16 para 34 FPS (medido); gelo vira chão
 
