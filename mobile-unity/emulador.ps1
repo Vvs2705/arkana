@@ -145,6 +145,10 @@ $null = NoAparelho "shell am force-stop $Pacote"
 # Aparelho/AVD novo mostra o aviso "Viewing full screen / Got it" na 1a vez em modo imersivo; o Unity perde o foco e
 # PAUSA (runInBackground=0) - zero quadros, zero "ARKANA FPS" (visto no AVD em 23/09). Marcar como confirmado resolve.
 $null = NoAparelho "shell settings put secure immersive_mode_confirmations confirmed"
+# Aparelho no cabo costuma estar com a tela dormindo: acorda e dispensa a tela de bloqueio (so' funciona sem PIN;
+# com PIN o Diretor destrava na mao). Sem tela acesa o Unity nao desenha e a rodada sai FAIL sem "ARKANA FPS".
+$null = NoAparelho "shell input keyevent KEYCODE_WAKEUP"
+$null = NoAparelho "shell wm dismiss-keyguard"
 $Extras = "--ei arkana_fps $Fps"
 if ($Auto -ne "nenhum") { $Extras = "--es arkana_auto $Auto $Extras" }
 if ($Bancada) { $Extras += " --ei arkana_bancada 1" }

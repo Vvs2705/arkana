@@ -36,3 +36,20 @@ lote"; o perfil da Véu é um 90° de verdade, o do Basalto não. Era caso a cas
 **`tools/meshy/meshy.py` RECUSA criar personagem pela API** — a API não tem a
 etapa de marcação de articulações do rig, e o resultado anima como robô.
 Personagem se cria no site, um por um. `prop` (cenário) segue liberado.
+
+## Blender + Claude Code (24/09/2026)
+
+Blender 5.2.1 em `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe` (fora do PATH).
+Duas pontes, as duas provadas:
+
+- **Script (reproduzível):** `blender.exe -b --python tools/blender/<script>.py -- args`. É o caminho
+  para tudo que é determinístico (decimar, fundir, medir, exportar).
+- **MCP (conversa com a cena aberta):** add-on `mcp-for-blender` (Ahuja, ex-`blender-mcp`) instalado em
+  `%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\blender_mcp.py` e ativado; servidor registrado
+  no Claude Code em escopo de usuário (`claude mcp get blender`), com `BLENDER_MCP_SAFE_MODE=1`. Para usar:
+  abrir o Blender, painel `N` → aba **MCP for Blender** → **Start MCP Server** (porta 9876, só localhost).
+  A tool `execute_blender_code` roda Python dentro do Blender: nunca aponte para o master, sempre para cópia.
+
+Os 20 magos já vêm rigados da Meshy (28 ossos, 13–15 clipes); o Blender entra para retoque, escala/eixo,
+retarget entre magos e clipe pontual — não para refazer rig. `tools/blender/fundir_animacoes.py` precisa ser
+revalidado no 5.x antes de qualquer uso (mudança de API das ações).
