@@ -150,8 +150,8 @@ namespace Arkana.World
                 ter.drawInstanced = true;
                 ter.heightmapPixelError = 4f;
                 ter.basemapDistance = 1200f;
-                ter.treeDistance = 1800f;
-                ter.treeBillboardDistance = 400f;
+                ter.treeDistance = 5000f;
+                ter.treeBillboardDistance = 5000f;   // sem impostor: as pecas do kit nao usam o shader de arvore do Terrain
                 t[bi, bj] = ter;
             }
             for (int bj = 0; bj < Blocos; bj++)
@@ -374,6 +374,7 @@ namespace Arkana.World
                 for (int s = (k == 0 ? 0 : 1); s <= passos; s++)
                 {
                     float u = s / (float)passos;
+                    if (Mathf.Lerp(a.z, b.z, u) < 0.8f) break;   // a fita acaba na foz: dali e' mar
                     float x = a.x + dir.x * len * u, y = a.y + dir.y * len * u;
                     float z = Mathf.Lerp(a.z, b.z, u) + 0.15f, w = Mathf.Lerp(a.meia, b.meia, u) + 7f;
                     v.Add(U(x - nor.x * w, y - nor.y * w, z));
@@ -422,8 +423,9 @@ namespace Arkana.World
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.78f, 0.80f, 0.84f);
-            RenderSettings.fogStartDistance = 1500f;
-            RenderSettings.fogEndDistance = 9000f;
+            // longe e leve (doc §8.2: "neblina so' como acabamento leve e distante"): a 1500 m ela lavava a vista de mapa
+            RenderSettings.fogStartDistance = 4000f;
+            RenderSettings.fogEndDistance = 18000f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.42f, 0.47f, 0.62f);
             RenderSettings.ambientEquatorColor = new Color(0.55f, 0.48f, 0.42f);
@@ -657,10 +659,12 @@ namespace Arkana.World
             // pedras do kit espalhadas (cobertura solida, doc §3.2): encostas, costa e transicoes
             g = Grupo("ARKANA_20_Pedras");
             string[] pedras = { "17-rocha-basalto-modular", "18-pedregulho", "41-monolito-basalto", "47-rocha-costa" };
-            for (int k = 0, feitas = 0; k < 6000 && feitas < 500; k++)
+            for (int k = 0, feitas = 0; k < 20000 && feitas < 260; k++)
             {
                 float x = Rn(D.x0, D.x1), y = Rn(D.y0, D.y1), h = Altura(x, y);
                 if (h < 1f || LagoQ(x, y) < 1.05f || PertoDoRio(x, y, 5f) || EmPiso(x, y)) continue;
+                // em grupos, nas encostas e na costa (cobertura legivel), nao salpicadas pela ilha toda
+                if (Declive(x, y) < 12f && h > 6f && Mathf.PerlinNoise(x * 0.006f + 3f, y * 0.006f + 9f) < 0.62f) continue;
                 string p = pedras[h < 6f ? 3 : rnd.Next(3)];
                 Peca(g, p, x, y, Rn(2f, 5f), Rn(0f, 360f), h - 0.5f);
                 feitas++;
