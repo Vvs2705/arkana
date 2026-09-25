@@ -33,7 +33,22 @@ namespace Arkana.World
             rocha.SetFloat("_Smoothness", 0.05f);
             foreach (Tunel t in S.tuneis) Objeto(grupos[t.regiao], t.id, MalhaTunel(t.p), rocha);
             int k = 0;
-            foreach (Salao s in S.saloes) Objeto(grupos[s.regiao], s.id, MalhaSalao(s, 77 + k++), rocha);
+            foreach (Salao s in S.saloes)
+            {
+                Objeto(grupos[s.regiao], s.id, MalhaSalao(s, 77 + k++), rocha);
+                // uma luz por salao (doc §8.3: R10 azul/violeta + calor pontual; R12 azul profundo/violeta; R11 ambar das lanternas).
+                // Tuneis ficam escuros de proposito: 140 luzes em celular nao cabe — cristais emissivos entram depois (vetavel).
+                Color cor = s.regiao == "R12" ? new Color(0.45f, 0.30f, 0.95f) : s.regiao == "R10" ? new Color(0.35f, 0.55f, 1f) : new Color(1f, 0.72f, 0.35f);
+                var luz = new GameObject(s.id + "_Luz") { hideFlags = HideFlags.DontSave };
+                luz.transform.SetParent(grupos[s.regiao], false);
+                luz.transform.position = U(s.x, s.y, s.piso + s.altura * 0.55f);
+                Light l = luz.AddComponent<Light>();
+                l.type = LightType.Point;
+                l.color = cor;
+                l.range = Mathf.Max(s.largura, s.comprimento) * 0.9f;
+                l.intensity = 6f;
+                l.shadows = LightShadows.None;
+            }
             foreach (Poco p in S.pocos)
             {
                 Objeto(grupos["R11"], "R11_Poco_" + p.id, MalhaPoco(p.x, p.y, p.piso, p.topo + 5f, p.raio), rocha);
