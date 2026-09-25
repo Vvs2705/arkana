@@ -25,6 +25,7 @@ namespace Arkana.World
         [Serializable] public class Ponte { public float y, x0, x1, z, largura; }
         [Serializable] public class Regiao { public string id, nome; public float x, y, ex, ey, z; }
         [Serializable] public class No { public string id; public float x, y, z; }
+        [Serializable] public class Rota { public string id; public float[] x, y; }
         [Serializable]
         public class Dados
         {
@@ -37,6 +38,7 @@ namespace Arkana.World
             public Ponte ponte;
             public Regiao[] regioes;
             public No[] nos;
+            public Rota[] rotas;
         }
 
         public Dados D { get; private set; }
@@ -202,6 +204,7 @@ namespace Arkana.World
                     terra = Mathf.Max(terra, Mathf.InverseLerp(1.1f, 0.6f, Mathf.Sqrt(rx * rx + ry * ry)));
                 }
                 terra *= Mathf.Lerp(0.55f, 1f, Mathf.PerlinNoise(x * 0.05f, y * 0.05f));
+                terra = Mathf.Max(terra, Mathf.InverseLerp(7f, 4f, DistRota(x, y)) * Mathf.Lerp(0.75f, 1f, Mathf.PerlinNoise(x * 0.2f, y * 0.2f)));
                 rocha = Mathf.Clamp01(rocha);
                 areia = Mathf.Clamp01(areia) * (1 - rocha);
                 mata = Mathf.Clamp01(mata) * (1 - rocha) * (1 - areia);
@@ -238,7 +241,7 @@ namespace Arkana.World
             {
                 float x = (float)(D.x0 + rnd.NextDouble() * (D.x1 - D.x0)), y = (float)(D.y0 + rnd.NextDouble() * (D.y1 - D.y0));
                 float h = Altura(x, y);
-                if (h < 6f || h > 470f || Declive(x, y) > 28f || LagoQ(x, y) < 1.15f || PertoDoRio(x, y, 30f) || EmPiso(x, y)) continue;
+                if (h < 6f || h > 470f || Declive(x, y) > 28f || LagoQ(x, y) < 1.15f || PertoDoRio(x, y, 30f) || EmPiso(x, y) || DistRota(x, y) < 9f) continue;
                 float fx = (x - flo.x) / (flo.ex * 0.55f), fy = (y - flo.y) / (flo.ey * 0.55f);
                 float densidade = Mathf.Sqrt(fx * fx + fy * fy) < 1f ? 0.9f : Mathf.Clamp01(Mathf.PerlinNoise(x * 0.004f + 11f, y * 0.004f + 7f) * 2.2f - 1.1f);
                 if (rnd.NextDouble() > densidade) continue;
@@ -309,6 +312,21 @@ namespace Arkana.World
                 if ((ap - ab * u).magnitude < Mathf.Lerp(a.meia, b.meia, u) + margem) return true;
             }
             return false;
+        }
+
+        /// <summary>Distancia (m) ate' a rota de superficie mais proxima (doc §5).</summary>
+        float DistRota(float x, float y)
+        {
+            float melhor = 1e9f;
+            if (D.rotas == null) return melhor;
+            foreach (Rota r in D.rotas)
+                for (int k = 0; k + 1 < r.x.Length; k++)
+                {
+                    Vector2 a = new Vector2(r.x[k], r.y[k]), ab = new Vector2(r.x[k + 1], r.y[k + 1]) - a, ap = new Vector2(x, y) - a;
+                    float u = Mathf.Clamp01(Vector2.Dot(ap, ab) / ab.sqrMagnitude);
+                    melhor = Mathf.Min(melhor, (ap - ab * u).magnitude);
+                }
+            return melhor;
         }
 
         bool EmPiso(float x, float y)
@@ -552,7 +570,17 @@ namespace Arkana.World
             {
                 Vector2 p = Espalhar(v, 330f);
                 if (Declive(p.x, p.y) > 14f || (p - new Vector2(v.x + 60f, v.y - 60f)).magnitude < 45f) continue;
-                Casa(g, p.x, p.y, Rn(10f, 16f), Rn(8f, 13f), Rn(0f, 180f), casas % 4 == 0);
+                float cw = Rn(10f, 16f), cd = Rn(8f, 13f), cr = Rn(0f, 180f);
+                Casa(g, p.x, p.y, cw, cd, cr, casas % 4 == 0);
+                if (casas % 3 == 0)   // quintal: 3 modulos de cerca na frente da casa
+                {
+                    Vector2 fr = new Vector2(Mathf.Sin(cr * Mathf.Deg2Rad), Mathf.Cos(cr * Mathf.Deg2Rad)), la = new Vector2(fr.y, -fr.x);
+                    for (int m = -1; m <= 1; m++)
+                    {
+                        Vector2 c = p + fr * (cd * 0.5f + 5f) + la * (m * 3f);
+                        Peca(g, "mestre-025-vila-cerca-madeira", c.x, c.y, 1f, cr);
+                    }
+                }
                 casas++;
             }
             Bloco(g, "R04_Poco", PrimitiveType.Cylinder, v.x + 60f, v.y - 60f, -9999f, new Vector3(3f, 3f, 1.2f), 0f, PedraEsc);
@@ -577,9 +605,22 @@ namespace Arkana.World
             Regiao a6 = R("R06");
             for (int k = 0; k < 10; k++)
             {
-                Vector2 p = Espalhar(a6, 55f);
-                GameObject b = Bloco(g, "R06_Barraca", PrimitiveType.Cube, p.x, p.y, -9999f, new Vector3(3.2f, 3.2f, 3.2f), Rn(0f, 360f), Lona);
-                b.transform.rotation = Quaternion.Euler(45f, Rn(0f, 360f), 0f);
+                float a = k * 36f * Mathf.Deg2Rad, d = Rn(38f, 55f);   // anel de barracas viradas para o centro
+                Peca(g, "mestre-053-acampamento-barraca", a6.x + Mathf.Cos(a) * d, a6.y + Mathf.Sin(a) * d, 1f, -k * 36f + 90f);
+            }
+            for (int k = 0; k < 3; k++)
+            {
+                Vector2 p = Espalhar(a6, 22f);
+                float r = Rn(0f, 180f);
+                Peca(g, "mestre-058-acampamento-mesa", p.x, p.y, 1f, r);
+                Vector2 o = new Vector2(Mathf.Cos(r * Mathf.Deg2Rad), -Mathf.Sin(r * Mathf.Deg2Rad)) * 0.9f;
+                Peca(g, "mestre-055-acampamento-banco", p.x + o.y, p.y + o.x, 1f, r);
+                Peca(g, "mestre-055-acampamento-banco", p.x - o.y, p.y - o.x, 1f, r);
+            }
+            for (int k = 0; k < 9; k++)
+            {
+                Vector2 p = Espalhar(a6, 45f);
+                Peca(g, "mestre-028-acampamento-barril", p.x, p.y, 1f, Rn(0f, 360f));
             }
             for (int k = 0; k < 2; k++)
                 Bloco(g, "R06_Abrigo", PrimitiveType.Cube, a6.x - 20f + k * 40f, a6.y + 30f, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
@@ -588,7 +629,7 @@ namespace Arkana.World
                 Vector2 p = Espalhar(a6, 35f);
                 Bloco(g, "R06_Fogueira", PrimitiveType.Cylinder, p.x, p.y, -9999f, new Vector3(1.6f, 1.6f, 0.3f), 0f, Escuro);
             }
-            for (int k = 0; k < 14; k++)
+            for (int k = 0; k < 12; k++)
             {
                 Vector2 p = Espalhar(a6, 50f);
                 Peca(g, "mestre-027-acampamento-caixa-madeira", p.x, p.y, 1f, Rn(0f, 360f));
@@ -606,7 +647,9 @@ namespace Arkana.World
                 Bloco(g, "R07_Galpao_Teto", PrimitiveType.Cube, p.x, p.y, Altura(p.x, p.y) + 12f, new Vector3(w, d * 0.7f, 3f), rot, Metal);
             }
             for (int k = 0; k < 4; k++)
-                Bloco(g, "R07_Tanque", PrimitiveType.Cylinder, r7.x + 90f + k * 18f, r7.y - 70f, -9999f, new Vector3(12f, 12f, 16f), 0f, Metal);
+                Peca(g, "mestre-064-industrial-tanque", r7.x + 90f + k * 18f, r7.y - 70f, 2.4f, k * 40f);
+            for (int k = 0; k < 10; k++)   // linha de canos (escala 1,5: 6 m por modulo) ligando os tanques aos galpoes
+                Peca(g, "mestre-062-industrial-cano-reto", r7.x + 100f - k * 9f, r7.y - 52f, 1.5f, 0f);
             Bloco(g, "R07_Torre_Industrial", PrimitiveType.Cube, r7.x - 20f, r7.y + 40f, -9999f, new Vector3(10f, 10f, 75f), 0f, Ferrugem);
             Bloco(g, "R07_Torre_Topo", PrimitiveType.Cylinder, r7.x - 20f, r7.y + 40f, Altura(r7.x - 20f, r7.y + 40f) + 75f, new Vector3(14f, 14f, 6f), 0f, Metal);
             for (int k = 0; k < 2; k++)
@@ -630,6 +673,16 @@ namespace Arkana.World
             }
             Bloco(g, "R08_Heliponto", PrimitiveType.Cylinder, b8.x - 10f, b8.y + 70f, -9999f, new Vector3(28f, 28f, 0.4f), 0f, Concreto);
             Bloco(g, "R08_Deposito", PrimitiveType.Cube, b8.x + 20f, b8.y - 80f, -9999f, new Vector3(20f, 15f, 6f), 0f, Concreto);
+            for (int k = 0; k < 14; k++)   // barreiras em zigue-zague no portao e cobertura no patio (doc §3.2: 15-35 m)
+            {
+                float x = k < 6 ? b8.x - 60f + k * 6f : b8.x + Rn(-120f, 120f), y = k < 6 ? b8.y - 150f + (k % 2) * 4f : b8.y + Rn(-100f, 100f);
+                Peca(g, "mestre-073-militar-barreira-concreto", x, y, 1f, k < 6 ? 0f : Rn(0f, 180f));
+            }
+            for (int k = 0; k < 12; k++)
+            {
+                Vector2 p = new Vector2(b8.x + 20f + Rn(-18f, 18f), b8.y - 65f + Rn(-6f, 6f));
+                Peca(g, "mestre-074-militar-caixa-militar", p.x, p.y, 1f, Rn(0f, 90f));
+            }
             float hx = 190f, hy = 150f;
             foreach (var c in new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) })
                 Bloco(g, "R08_Torre_Vigia", PrimitiveType.Cube, b8.x + c.x * hx, b8.y + c.y * hy, -9999f, new Vector3(4f, 4f, 15f), 0f, Metal);
@@ -666,7 +719,7 @@ namespace Arkana.World
             for (int k = 0, feitas = 0; k < 20000 && feitas < 260; k++)
             {
                 float x = Rn(D.x0, D.x1), y = Rn(D.y0, D.y1), h = Altura(x, y);
-                if (h < 1f || LagoQ(x, y) < 1.05f || PertoDoRio(x, y, 5f) || EmPiso(x, y)) continue;
+                if (h < 1f || LagoQ(x, y) < 1.05f || PertoDoRio(x, y, 5f) || EmPiso(x, y) || DistRota(x, y) < 8f) continue;
                 // em grupos, nas encostas e na costa (cobertura legivel), nao salpicadas pela ilha toda
                 if (Declive(x, y) < 12f && h > 6f && Mathf.PerlinNoise(x * 0.006f + 3f, y * 0.006f + 9f) < 0.62f) continue;
                 string p = pedras[h < 6f ? 3 : rnd.Next(3)];

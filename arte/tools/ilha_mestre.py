@@ -71,6 +71,23 @@ PATAMARES = [
     (850, 950, 220, 50, 130), (-450, -1050, 135, 200, 360), (-600, -350, 125, 80, 180),
     (-500, -250, 116, 20, 50), (-450, -1950, 10, 25, 60),
 ]
+# rotas de superficie (doc §5), pontos (x, y); a ponte liga S06/S15 (oeste) a S12/S14 (leste)
+ROTAS = [
+    ("S01", [(0, 520), (-60, 800), (-100, 1100)]),
+    ("S02", [(-470, 200), (-800, 400), (-1080, 520)]),
+    ("S03", [(-330, -120), (-600, -300), (-820, -340)]),
+    ("S04", [(460, 120), (620, -100), (690, -200)]),
+    ("S05", [(820, -200), (1150, -20), (1450, 80)]),
+    ("S06", [(-60, -250), (-40, -600), (10, -950), (40, -1050)]),
+    ("S07", [(-1150, 760), (-800, 1000), (-450, 1100)]),
+    ("S08", [(-1100, 470), (-1000, 100), (-920, -250)]),
+    ("S09", [(-250, 1450), (-450, 1650), (-550, 1780)]),
+    ("S10", [(100, 1250), (500, 1100), (820, 960)]),
+    ("S12", [(700, -330), (500, -700), (360, -1050)]),
+    ("S13", [(1550, -150), (1450, -700), (1300, -1180)]),
+    ("S14", [(360, -1050), (650, -1180), (1050, -1320)]),
+    ("S15", [(-880, -450), (-500, -800), (40, -1050)]),
+]
 ILHOTAS = [(-120, 250, 40, 9), (150, 80, 30, 7), (60, 330, 25, 6), (-250, 60, 35, 8)]  # x, y, raio, altura
 NOS_U = {"U01": (850, 950, 220), "U02": (1000, 1100, 160), "U03": (900, 700, 125), "U04": (1150, 250, 95),
          "U05": (700, -300, 125), "U06": (-1050, 450, 160), "U07": (-900, 100, 110), "U08": (-500, -250, 115),
@@ -153,6 +170,16 @@ def main():
         r1 = max(r1, r0 + dz / math.tan(math.radians(12)))
         w = 1 - smooth(r0, r1, np.hypot(X - px, Y - py))
         h = h * (1 - w) + pz * w
+    # rotas: faixa de ~10 m com o relevo alisado ao longo do caminho (tira o degrau e o calombo do trajeto)
+    liso = ndimage.gaussian_filter(h, 10)
+    drot = np.full((N, N), 1e9)
+    for _, pts in ROTAS:
+        for (ax, ay), (bx, by) in zip(pts[:-1], pts[1:]):
+            vx, vy = bx - ax, by - ay
+            u = np.clip(((X - ax) * vx + (Y - ay) * vy) / (vx * vx + vy * vy), 0, 1)
+            drot = np.minimum(drot, np.hypot(X - (ax + u * vx), Y - (ay + u * vy)))
+    w = 1 - smooth(5.0, 20.0, drot)
+    h = h * (1 - w) + liso * w
     # lago (bacia com borda acima da agua, ilhotas)
     th = np.arctan2((Y - LAGO["cy"]) / LAGO["b"], (X - LAGO["cx"]) / LAGO["a"])
     q = np.hypot((X - LAGO["cx"]) / LAGO["a"], (Y - LAGO["cy"]) / LAGO["b"]) / \
@@ -248,6 +275,7 @@ def main():
         "rio": [dict(x=a, y=b, z=c, meia=e) for a, b, c, e in RIO], "canion": list(CANION), "ponte": PONTE,
         "regioes": [dict(id=a, nome=b, x=c[0], y=c[1], ex=e[0], ey=e[1], z=f) for a, b, c, e, f in REGIOES],
         "nos": [dict(id=k, x=v[0], y=v[1], z=v[2]) for k, v in NOS_U.items()],
+        "rotas": [dict(id=k, x=[p[0] for p in pts], y=[p[1] for p in pts]) for k, pts in ROTAS],
         "medicoes": m,
     }
     with open(os.path.join(RES, "ilha-mestre.json"), "w", encoding="utf-8") as f:
