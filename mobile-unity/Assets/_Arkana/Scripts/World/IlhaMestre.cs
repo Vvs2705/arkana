@@ -740,7 +740,7 @@ namespace Arkana.World
                 Vector2 p = new Vector2(b8.x + 20f + Rn(-18f, 18f), b8.y - 65f + Rn(-6f, 6f));
                 Peca(g, "mestre-074-militar-caixa-militar", p.x, p.y, 1f, Rn(0f, 90f));
             }
-            float hx = 190f, hy = 150f;
+            float hx = 150f, hy = 125f;   // medido 25/09: 190 x 150 passava da falesia (o plato de 150 m vai ate x 1400 e y -1475)
             foreach (var c in new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) })
                 if (Peca(g, "mestre-076-militar-torre-de-vigia", b8.x + c.x * hx, b8.y + c.y * hy, 1f, 45f) == null)
                     Bloco(g, "R08_Torre_Vigia", PrimitiveType.Cube, b8.x + c.x * hx, b8.y + c.y * hy, -9999f, new Vector3(4f, 4f, 15f), 0f, Metal);
