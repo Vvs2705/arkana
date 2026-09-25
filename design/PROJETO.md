@@ -51,7 +51,23 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 25/09: nova visão da ilha (Documento Mestre, 4,8 km) + Unity ao vivo pelo MCP
+### >>> COMECE POR AQUI — 25/09, tarde: a BASE da ilha do Documento Mestre existe no Unity (cena IlhaMestre)
+
+**Abrir:** `mobile-unity/Assets/_Arkana/Scenes/IlhaMestre.unity` (o componente `IlhaMestre` reconstrói tudo em ~10–15 s; menu de
+contexto "Reconstruir"). **Relevo:** `python arte/tools/ilha_mestre.py [pasta_previa]` gera `Resources/ilha-mestre-altura.bytes`
+(2049², uint16, −40..660 m) + `ilha-mestre.json` e MEDE (doc §18), saindo com erro fora da meta. Medido: extensão 4781×4383 m,
+terra 14,25 km², acessível 10,83 km², maior componente 95,8%, borda do lago 105,8 > 105, cume 602 m, rio só desce, ponte L–O
+com encontros a 126 m, rio a 47,8 m sob ela. **Unity:** 16 Terrain nativos (4×4 de 513), 5 camadas CC0 do Poly Haven
+RECOLORIDAS na paleta das concepts (`arte/tools/texturas_terreno.py`), mar/lago/rio no `ArkanaAgua`, céu `ArkanaCeu`, sol da
+tarde do SO, ~9 mil árvores do kit (35/36/37/51) como instâncias do Terrain, 260 pedras em grupos, blockout das 12 regiões
+(templo, vila 30 casas, ponte L–O + travessia Z80, acampamento com a caixa 027, indústria, base, torre 58 m, árvore gigante,
+entradas U). **Armadilhas:** o namespace `Arkana.Terrain` esconde `UnityEngine.Terrain` (qualificar); textura CC0 pelo NOME
+engana (leafy_grass é bege, rocky_terrain_02 verde) — medir a cor; lago recortado no platô virava buraco com parede de 20 m
+(margem em rampa 1,0→1,55); câmeras DontSave não aparecem para o `manage_camera` (usar a Main Camera). **Falta (base → jogo):**
+integrar ao jogo (castelo/queda, zona, bots, loot usam a `Ilha` de 600 m), peças do kit substituindo blockout, subterrâneo,
+rotas S01–S16 físicas, pontos de início por time, linhas claras em cruz no mar (shader de água na origem).
+
+### 25/09: nova visão da ilha (Documento Mestre, 4,8 km) + Unity ao vivo pelo MCP
 
 **Decisões do Diretor (25/09) — substituem as anteriores sobre a ilha:**
 - A ilha segue o **Documento Mestre** (`C:\Users\VINICIUS\Downloads\ARKANA_Documento_Mestre_Blender.md`, v1.0): **4.800 × 4.400 m**,
