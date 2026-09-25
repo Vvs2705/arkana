@@ -593,11 +593,29 @@ namespace Arkana.World
             Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs - 1f, new Vector3(120f, 90f, 5f), 0f, Pedra);
             Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 4f, new Vector3(20f, 20f, 45f), 0f, Pedra);
             Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 49f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
-            Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 55f, t.y + 10f, -9999f, new Vector3(18f, 30f, 6f), 0f, PedraEsc);
+            // escadaria do kit sobe para LESTE (o modulo sobe em +Y local: giro -90 poe o topo no terraco); blockout se faltar
+            if (Peca(g, "mestre-046-templo-escadaria", t.x - 55f, t.y + 10f, 1f, -90f, Altura(t.x - 70f, t.y + 10f) - 0.2f) == null)
+                Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 55f, t.y + 10f, -9999f, new Vector3(18f, 30f, 6f), 0f, PedraEsc);
             for (int k = 0; k < 10; k++)
             {
                 Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y - 45f, 2.6f, 0f);
                 Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y + 65f, 2.6f, 0f);
+                if (k % 3 == 1) Peca(g, "mestre-014-templo-pilar-quebrado", t.x - 40f + k * 10f, t.y - 58f, 1f, Rn(0f, 360f));
+            }
+            // arcos nas 4 entradas do patio, muros arruinados na borda e parapeito no terraco superior (kit leva 4)
+            Peca(g, "mestre-026-templo-arco", t.x - 100f, t.y + 10f, 1.2f, 90f);
+            Peca(g, "mestre-026-templo-arco", t.x + 100f, t.y + 10f, 1.2f, 90f);
+            Peca(g, "mestre-026-templo-arco", t.x, t.y - 80f, 1.2f, 0f);
+            Peca(g, "mestre-026-templo-arco", t.x, t.y + 100f, 1.2f, 0f);
+            for (int k = 0; k < 6; k++)
+            {
+                Peca(g, "mestre-013-templo-muro-ruina", t.x - 75f + k * 30f + (k >= 3 ? 30f : 0f), t.y - 78f, 1f, Rn(-8f, 8f));
+                Peca(g, "mestre-013-templo-muro-ruina", t.x - 75f + k * 30f + (k >= 3 ? 30f : 0f), t.y + 98f, 1f, Rn(-8f, 8f));
+            }
+            for (int k = 0; k < 18; k++)
+            {
+                Peca(g, "mestre-043-templo-parapeito", t.x - 47f + k * 6f, t.y + 10f - 45f, 1f, 0f, zs + 1.5f);
+                Peca(g, "mestre-043-templo-parapeito", t.x - 47f + k * 6f, t.y + 10f + 45f, 1f, 0f, zs + 1.5f);
             }
             Peca(g, "24-estatua-vigia", t.x - 50f, t.y - 5f, 3f, 90f);
             Peca(g, "24-estatua-vigia", t.x - 50f, t.y + 25f, 3f, 90f);

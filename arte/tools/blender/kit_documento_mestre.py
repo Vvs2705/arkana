@@ -693,6 +693,75 @@ def peca_071():
     return partes, (zinco, conc)
 
 
+def peca_046():
+    """046 — escadaria de blocos do templo: 18 m de largura, 20 degraus (0,3 x 1,5 m) subindo 6 m, com muretas laterais."""
+    pedra = mat_foto("pedra-templo")
+    partes, W, n, alt, prof = [], 18.0, 20, 0.3, 1.5
+    for i in range(n):
+        partes.append(caixa((W, prof, alt), (0, -n * prof / 2 + prof * (i + 0.5), alt * (i + 0.5)), mat=pedra))
+        # o miolo atras de cada degrau (senao a escada e' oca por baixo): um bloco ate' o fundo
+        partes.append(caixa((W, prof * (n - i - 1) + 0.01, alt), (0, prof * (i + 1) + (prof * (n - i - 1)) / 2 - n * prof / 2, alt * (i + 0.5)), mat=pedra))
+    partes.append(caixa((W, n * prof, 0.3), (0, 0, -0.15 + 0.15), mat=pedra))   # base
+    for s in (-1, 1):
+        for i in range(0, n, 2):
+            partes.append(caixa((1.0, prof * 2, alt * (i + 2) + 0.9), (s * (W / 2 + 0.5), -n * prof / 2 + prof * (i + 1), (alt * (i + 2) + 0.9) / 2), mat=pedra))
+    return partes, (pedra,)
+
+
+def peca_026():
+    """026 — arco de pedra do templo: vao de 6 m, 8 m de altura, pilares 1,4 m, arco em 9 aduelas com a chave saliente."""
+    pedra = mat_foto("pedra-templo")
+    partes, vao, hp, R = [], 6.0, 4.6, 3.0
+    for s in (-1, 1):
+        partes.append(caixa((1.4, 1.6, hp), (s * (vao / 2 + 0.7), 0, hp / 2), mat=pedra))
+        partes.append(caixa((1.8, 2.0, 0.5), (s * (vao / 2 + 0.7), 0, hp + 0.25), mat=pedra))
+    N = 9
+    for i in range(N):
+        t = math.pi * (i + 0.5) / N
+        seg = 2 * (R + 0.7) * math.sin(math.pi / (2 * N)) + 0.06
+        partes.append(caixa((seg, 1.6, 1.4), ((R + 0.7) * math.cos(t), 0, hp + (R + 0.7) * math.sin(t)), (0, -(math.pi / 2 + t), 0), mat=pedra))
+    partes.append(caixa((1.6, 2.0, 1.8), (0, 0, hp + R + 0.7 + 0.2), mat=pedra))   # chave
+    return partes, (pedra,)
+
+
+def peca_014():
+    """014 — pilar quadrado quebrado: 1,4 x 1,4 m, 5 m, topo partido em degrau com lascas."""
+    pedra = mat_foto("pedra-templo")
+    partes = [caixa((2.0, 2.0, 0.5), (0, 0, 0.25), mat=pedra), caixa((1.4, 1.4, 3.2), (0, 0, 0.5 + 1.6), mat=pedra),
+              caixa((1.4, 0.7, 1.3), (0, -0.35, 3.7 + 0.65), mat=pedra), caixa((0.7, 0.7, 0.6), (-0.35, -0.35, 5.0 + 0.3), mat=pedra),
+              caixa((0.9, 0.8, 0.5), (1.6, 0.9, 0.25), (0.1, 0, 0.6), mat=pedra), caixa((0.6, 0.6, 0.4), (-1.5, -1.2, 0.2), (0, 0.15, 0.3), mat=pedra)]
+    return partes, (pedra,)
+
+
+def peca_013():
+    """013 — muro antigo arruinado: 12 m, blocos de 1,5 x 0,8 m em fiadas desencontradas, topo irregular, blocos caidos."""
+    pedra = mat_foto("pedra-templo")
+    partes, L, e = [], 12.0, 0.9
+    alturas = [3.6, 3.2, 2.6, 1.8, 1.2, 1.6, 2.4, 3.0]   # perfil do topo por trecho de 1,5 m
+    for k in range(8):
+        for j in range(int(alturas[k] / 0.8) + 1):
+            z0 = j * 0.8
+            if z0 >= alturas[k]:
+                break
+            h = min(0.8, alturas[k] - z0)
+            desl = 0.75 if j % 2 else 0.0
+            partes.append(caixa((1.5 - 0.04, e, h - 0.04), (-L / 2 + 0.75 + k * 1.5 + desl * 0.0, 0, z0 + h / 2), mat=pedra))
+    for k, (x, y, r) in enumerate([(-2.0, 1.6, 0.3), (3.5, -1.8, 0.8), (5.2, 1.4, 0.1)]):   # blocos caidos
+        partes.append(caixa((1.5, 0.9, 0.8), (x, y, 0.4), (0, 0, r), mat=pedra))
+    return partes, (pedra,)
+
+
+def peca_043():
+    """043 — parapeito com vazados: modulo de 6 m, 1,2 m de altura, base, balaustres quadrados e corrimao."""
+    pedra = mat_foto("pedra-templo")
+    partes = [caixa((6.0, 0.5, 0.3), (0, 0, 0.15), mat=pedra), caixa((6.0, 0.45, 0.25), (0, 0, 1.2 - 0.125), mat=pedra)]
+    for i in range(7):
+        partes.append(caixa((0.35, 0.35, 0.65), (-2.7 + i * 0.9, 0, 0.3 + 0.325), mat=pedra))
+    for s in (-1, 1):
+        partes.append(caixa((0.5, 0.5, 1.2), (s * 2.75, 0, 0.6), mat=pedra))
+    return partes, (pedra,)
+
+
 def peca_080():
     """080 — torre de luz 12 m: mastro trelicado (4 pernas + travessas), plataforma e 4 refletores no topo."""
     zinco, conc = mat_foto("zinco"), mat_foto("concreto")
@@ -743,10 +812,10 @@ def peca_076():
     return partes, (zinco, tabua)
 
 
-ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071"}
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071", "046", "026", "014", "013", "043"}
 
 
-PECAS = {"095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+PECAS = {"046": peca_046, "026": peca_026, "014": peca_014, "013": peca_013, "043": peca_043, "095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
          "078": peca_078, "079": peca_079, "076": peca_076,
          "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}
