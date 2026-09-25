@@ -46,7 +46,7 @@ namespace Arkana.World
                 l.type = LightType.Point;
                 l.color = cor;
                 l.range = Mathf.Max(s.largura, s.comprimento) * 0.9f;
-                l.intensity = 6f;
+                l.intensity = l.range * 0.4f;   // medido 25/09: 6 deixava o salao de 320 m preto; o URP cai com o quadrado da distancia
                 l.shadows = LightShadows.None;
             }
             foreach (Poco p in S.pocos)
