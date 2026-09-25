@@ -435,10 +435,15 @@ namespace Arkana.World
 
         void Atmosfera()
         {
-            var sol = new GameObject("Sol_Tarde_SO") { hideFlags = HideFlags.DontSave };
-            sol.transform.SetParent(raiz, false);
-            sol.transform.rotation = Quaternion.Euler(36f, 45f, 0f);   // vem do sudoeste, vai para nordeste (doc §8.2)
-            Light l = sol.AddComponent<Light>();
+            // na cena Main ja' existe o sol do jogo (Sol): reaproveita a luz em vez de acender uma segunda
+            Light l = RenderSettings.sun != null && RenderSettings.sun.type == LightType.Directional ? RenderSettings.sun : null;
+            if (l == null)
+            {
+                var sol = new GameObject("Sol_Tarde_SO") { hideFlags = HideFlags.DontSave };
+                sol.transform.SetParent(raiz, false);
+                l = sol.AddComponent<Light>();
+            }
+            l.transform.rotation = Quaternion.Euler(36f, 45f, 0f);   // vem do sudoeste, vai para nordeste (doc §8.2)
             l.type = LightType.Directional;
             l.color = new Color(1f, 0.92f, 0.80f);
             l.intensity = 1.7f;

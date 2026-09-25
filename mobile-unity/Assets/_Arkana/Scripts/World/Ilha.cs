@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using Arkana.Gameplay;
 
 namespace Arkana.World
 {
@@ -24,10 +25,10 @@ namespace Arkana.World
         /// far da camera (1.000 m): la' o mar ja' e' cor de nevoa e encosta no ceu, que abaixo do
         /// horizonte e' a mesma cor. O combate perto fica limpo.
         /// </summary>
-        public const float NevoaInicio = 180f, NevoaFim = 900f;
+        public static float NevoaInicio = 180f, NevoaFim = 900f;   // a IlhaMestre (4,8 km) empurra para 4.000/14.000
         public static readonly Color CorNevoa = new Color(0.93f, 0.76f, 0.55f);   // fog_light_color do Godot
         /// <summary>Far padrao da camera do jogo: a nevoa tem que fechar antes dele.</summary>
-        public const float FarDaCamera = 1000f;
+        public static float FarDaCamera = 1000f;
 
         /// <summary>
         /// O mar e' uma grade de 6 km que SEGUE a camera em passos de um quad: a borda fica a 3 km, alem do
@@ -46,6 +47,10 @@ namespace Arkana.World
         [SerializeField] bool comVegetacao = true;
 
         public Relevo Relevo { get; private set; }
+        /// <summary>A ilha do Documento Mestre, quando esta' na cena (Main.UsarIlhaMestre): o gameplay le' o chao por aqui.</summary>
+        public RelevoMestre Mestre { get; private set; }
+        /// <summary>O chao que o gameplay consulta: a IlhaMestre se existir, senao a ilha procedural.</summary>
+        public IRelevo Chao => Mestre != null ? (IRelevo)Mestre : Relevo;
         public Vegetacao Vegetacao { get; private set; }
         public Grama Grama { get; private set; }
         public Ruinas Ruinas { get; private set; }
@@ -57,13 +62,13 @@ namespace Arkana.World
         /// <summary>Altura do chao em (x, z); sem ilha na cena, plano em y = 0.</summary>
         public static float AlturaDoChao(float x, float z)
         {
-            return Atual != null && Atual.Relevo != null ? Atual.Relevo.Altura(x, z) : 0f;
+            return Atual != null && Atual.Chao != null ? Atual.Chao.Altura(x, z) : 0f;
         }
 
         /// <summary>Superficie d'agua em (x, z) ou Relevo.Seco; sem ilha, tudo e' seco.</summary>
         public static float SuperficieDaAgua(float x, float z)
         {
-            return Atual != null && Atual.Relevo != null ? Atual.Relevo.SuperficieDaAgua(x, z) : Relevo.Seco;
+            return Atual != null && Atual.Chao != null ? Atual.Chao.SuperficieDaAgua(x, z) : Relevo.Seco;
         }
 
         /// <summary>Fracao de nevoa numa superficie a `d` metros de profundidade de vista (a formula LINEAR do Unity).</summary>
@@ -97,6 +102,7 @@ namespace Arkana.World
         static void NevoaDaCamera(ScriptableRenderContext ctx, Camera cam)
         {
             if (cam == null || !RenderSettings.fog) return;
+            if (cam.farClipPlane < FarDaCamera) cam.farClipPlane = FarDaCamera;   // a camera do jogo nasce com 1.000 m
             float inicio, fim;
             DistanciasDaNevoa(cam.transform.position.y, cam.farClipPlane, out inicio, out fim);
             RenderSettings.fogStartDistance = inicio;
@@ -111,6 +117,16 @@ namespace Arkana.World
         public void Montar()
         {
             Atual = this;
+            // Ilha do Documento Mestre na cena: ela ja' construiu terreno, agua e atmosfera; aqui so' o adaptador do chao.
+            // Nada da ilha procedural e' montado (dois mares em y = 0 brigariam) e Relevo fica nulo — quem e' tipado
+            // Relevo (minimapa, vitrine, terreno reativo) ja' trata nulo.
+            var mestre = FindFirstObjectByType<IlhaMestre>();
+            if (mestre != null && mestre.D != null)
+            {
+                Mestre = new RelevoMestre(mestre);
+                NevoaInicio = 4000f; NevoaFim = 14000f; FarDaCamera = 15000f;
+                return;
+            }
             Relevo = new Relevo(escala, seed);
             Transform velho = transform.Find("Gerado");
             if (velho != null) Destroy(velho.gameObject);

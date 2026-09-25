@@ -175,7 +175,7 @@ namespace Arkana.Gameplay
             Vital = VidaDe(Slug);
             Slot = new ArmaSlot(this) { AutoUpgrade = !ehPlayer };   // decisao 5: o player equipa apertando PEGAR
             Loc = new Locomocao();
-            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Chao : null;
             Agua = new Agua(relevo);
             // a Queda enxerga o topo das pedras/arvores/ruinas, nao so' o terreno (senao pousa DENTRO delas — foto de 11/09)
             Queda = new Queda(relevo != null ? new ChaoComObstaculos(relevo) : null, transform.position, ehPlayer);
@@ -474,7 +474,7 @@ namespace Arkana.Gameplay
         public bool Teleportar(Vector3 destino)
         {
             if (!Viva || Queda.NoAr) return false;
-            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Chao : null;
             transform.position = PousoSeguro(relevo, transform.position, destino, ChaoComObstaculos.Topo);
             Physics.SyncTransforms();   // o CharacterController le' a pose nova no proximo Move
             Loc.Parar();

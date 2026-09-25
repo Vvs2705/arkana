@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Arkana.Core;
+using Arkana.Gameplay;
 
 namespace Arkana.World
 {
@@ -13,10 +14,13 @@ namespace Arkana.World
     /// </summary>
     public sealed class RotaDoCastelo
     {
-        /// <summary>Altura de voo (m sobre o mar). E' o TETO da queda: ~9,5 s de ar.</summary>
-        public const float Altura = 320f;
-        /// <summary>Janela de decisao, em segundos. NAO escala com o mapa: mapa maior = castelo mais rapido.</summary>
-        public const float Duracao = 22f;
+        /// <summary>Altura de voo (m sobre o mar) na ilha de 600 m. E' o TETO da queda: ~9,5 s de ar.</summary>
+        public const float AlturaBase = 320f;
+        /// <summary>Janela de decisao, em segundos, na ilha de 600 m. NAO escala com o mapa: mapa maior = castelo mais rapido.</summary>
+        public const float DuracaoBase = 22f;
+        /// <summary>Altura e duracao DESTA rota: na ilha do Documento Mestre (4,8 km, cume a 602 m) o castelo voa a 760 m e a
+        /// travessia de ~6 km leva 75 s (~80 m/s) — vetavel; 22 s dariam 270 m/s e ninguem escolheria onde cair.</summary>
+        public readonly float Altura, Duracao;
         /// <summary>Ponta da rota como fracao do lado: entra de fora da ilha e sai pelo outro lado.</summary>
         public const float Margem = 0.62f;
         /// <summary>Desvio lateral maximo (fracao do lado). Sem ele toda rota cruzaria o centro.</summary>
@@ -29,11 +33,14 @@ namespace Arkana.World
         public readonly Vector3 Inicio;
         public readonly Vector3 Fim;
 
-        public RotaDoCastelo(int seed, Relevo relevo)
+        public RotaDoCastelo(int seed, IRelevo relevo)
         {
             Seed = seed;
             // Fiacao defensiva: sem ilha, a ilha padrao (Escala 2 = 600 m).
-            Lado = relevo != null ? relevo.Lado : Relevo.BaseLado * 2f;
+            Lado = relevo is Relevo r ? r.Lado : relevo is RelevoMestre m ? m.Lado : Relevo.BaseLado * 2f;
+            bool grande = Lado > 1000f;
+            Altura = grande ? 760f : AlturaBase;
+            Duracao = grande ? 75f : DuracaoBase;
             var rng = new Sorteio(seed);
             float ang = rng.Float() * Mathf.PI * 2f;
             var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
@@ -115,7 +122,7 @@ namespace Arkana.World
         bool anunciado;
 
         /// <summary>Poe um castelo em rota. seed &lt; 0 = sorteia por partida (o seed fica em SeedDaRota).</summary>
-        public static Castelo Criar(Transform parent, Relevo relevo, int seed = -1)
+        public static Castelo Criar(Transform parent, IRelevo relevo, int seed = -1)
         {
             var go = new GameObject("Castelo");
             if (parent != null) go.transform.SetParent(parent, false);
@@ -137,20 +144,20 @@ namespace Arkana.World
         void Start()
         {
             if (Rota == null)
-                Definir(new RotaDoCastelo(RotaDoCastelo.SeedPadrao, Ilha.Atual != null ? Ilha.Atual.Relevo : null));
+                Definir(new RotaDoCastelo(RotaDoCastelo.SeedPadrao, Ilha.Atual != null ? Ilha.Atual.Chao : null));
             if (transform.childCount == 0) MontarVisual();
             if (!anunciado)
             {
                 anunciado = true;
                 // A HUD/minimapa desenham a linha por onde da' pra saltar. UI OBSERVA.
-                Bus.EmitCasteloRota(Rota.Inicio, Rota.Fim, RotaDoCastelo.Duracao);
+                Bus.EmitCasteloRota(Rota.Inicio, Rota.Fim, Rota.Duracao);
             }
         }
 
         void Update()
         {
             if (Rota == null) return;
-            Progresso += Time.deltaTime / RotaDoCastelo.Duracao;
+            Progresso += Time.deltaTime / Rota.Duracao;
             transform.position = Rota.PosicaoEm(Progresso);
             for (int i = 0; i < passageiros.Count; i++)
                 if (passageiros[i] != null) passageiros[i].transform.position = PosicaoDoPortao;

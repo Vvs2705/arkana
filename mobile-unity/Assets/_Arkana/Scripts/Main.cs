@@ -335,11 +335,16 @@ namespace Arkana
 
         /// <summary>Ilha e Sol SE FALTAREM (a cena so' tem Main + luz + camera). Nascem no boot e atravessam partidas.
         /// Sem log: o BootTests reprova qualquer log inesperado.</summary>
+        /// <summary>A partida acontece na ilha do Documento Mestre (25/09/2026). false = a ilha procedural de 600 m.</summary>
+        public const bool UsarIlhaMestre = true;
+
         Ilha GarantirIlha()
         {
             Ilha ilha = Ilha.Atual;
             if (ilha == null)
             {
+                if (UsarIlhaMestre && FindFirstObjectByType<IlhaMestre>() == null)
+                    _meus.Add(new GameObject("IlhaMestre", typeof(IlhaMestre)));   // OnEnable -> Construir(), antes da Ilha
                 ilha = new GameObject("Ilha").AddComponent<Ilha>();   // Awake -> Montar()
                 _meus.Add(ilha.gameObject);
             }
@@ -389,7 +394,7 @@ namespace Arkana
             yield return null;   // a tela desenha o primeiro quadro (0%) antes de qualquer peso
             FecharQuadro();
 
-            Relevo relevo = GarantirIlha().Relevo;   // a do boot, quase sempre
+            IRelevo relevo = GarantirIlha().Chao;   // a do boot, quase sempre
             _arena = new GameObject(NomeArena).transform;
             Montagem.Vaga[] vagas = Montagem.Bots(Dupla);
             Vector3[] nasc = Nascimentos(relevo, seed, 1 + vagas.Length);
@@ -465,7 +470,7 @@ namespace Arkana
         /// antes do Embarcar do jogador; o Voo por ultimo, com todo corpo na arena. A HUD e a camera do jogador nascem
         /// APAGADAS (nada de Update com arena pela metade, nada de desenhar o mundo atras da tela) e acendem no aquecer.
         /// </summary>
-        List<Passo> Passos(string slug, bool treino, int seed, Relevo relevo, Vector3[] nasc, int corpos, Montagem.Vaga[] vagas)
+        List<Passo> Passos(string slug, bool treino, int seed, IRelevo relevo, Vector3[] nasc, int corpos, Montagem.Vaga[] vagas)
         {
             var p = new List<Passo>();
             p.Add(new Passo("hud", Textos.CarregaArena, () =>
@@ -644,9 +649,9 @@ namespace Arkana
 
         /// <summary>[0] = jogador (sorteado pelo seed), o resto para os bots. Sem ilha: centro + anel de 30 m (Main.gd) com
         /// `total` pontos (os corpos da partida).</summary>
-        static Vector3[] Nascimentos(Relevo relevo, int seed, int total)
+        static Vector3[] Nascimentos(IRelevo relevo, int seed, int total)
         {
-            Vector3[] n = relevo != null ? relevo.Nascimentos : null;
+            Vector3[] n = relevo is Relevo r ? r.Nascimentos : relevo is RelevoMestre rm ? rm.Nascimentos : null;
             if (n == null || n.Length < 2)
             {
                 var pts = new Vector3[total];
