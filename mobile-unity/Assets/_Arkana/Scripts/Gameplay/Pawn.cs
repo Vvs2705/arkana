@@ -300,7 +300,8 @@ namespace Arkana.Gameplay
             // rede de seguranca: a verdade do chao e' a ilha (sem colisor, ou atravessou a malha)
             Vector3 pos = transform.position;
             float chao = Ilha.AlturaDoChao(pos.x, pos.z);
-            if (pos.y < chao) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
+            // (dentro de caverna/tunel da IlhaMestre o chao verdadeiro e' a casca, abaixo da superficie: a rede nao puxa)
+            if (pos.y < chao && !Ilha.Subterraneo(pos)) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
             Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
 
             Virar(dt);

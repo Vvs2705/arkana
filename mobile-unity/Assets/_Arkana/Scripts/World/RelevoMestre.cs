@@ -65,6 +65,33 @@ namespace Arkana.World
             return nivel != Relevo.Seco && h < nivel ? nivel : Relevo.Seco;
         }
 
+        /// <summary>Dentro de um vazio do subterraneo (tunel, salao ou poco), com folga de 1-2 m.</summary>
+        public bool Subterraneo(Vector3 p)
+        {
+            IlhaMestre.Sub s = m.S;
+            if (s == null) return false;
+            foreach (IlhaMestre.Tunel t in s.tuneis)
+                for (int i = 0; i + 4 < t.p.Length; i += 5)
+                {
+                    float dx = p.x - t.p[i], dz = p.z - t.p[i + 1];
+                    float r = t.p[i + 3] * 0.5f + 1f;
+                    if (dx * dx + dz * dz < r * r && p.y >= t.p[i + 2] - 2f && p.y <= t.p[i + 2] + t.p[i + 4] + 1f) return true;
+                }
+            foreach (IlhaMestre.Salao sl in s.saloes)
+            {
+                float g = -sl.giro * Mathf.Deg2Rad, dx = p.x - sl.x, dz = p.z - sl.y;
+                float lx = dx * Mathf.Cos(g) - dz * Mathf.Sin(g), lz = dx * Mathf.Sin(g) + dz * Mathf.Cos(g);
+                float ex = sl.largura * 0.5f + 1f, ez = sl.comprimento * 0.5f + 1f;
+                if (lx * lx / (ex * ex) + lz * lz / (ez * ez) < 1f && p.y >= sl.piso - 2f && p.y <= sl.piso + sl.altura + 1f) return true;
+            }
+            foreach (IlhaMestre.Poco pc in s.pocos)
+            {
+                float dx = p.x - pc.x, dz = p.z - pc.y, r = pc.raio + 1f;
+                if (dx * dx + dz * dz < r * r && p.y >= pc.piso - 2f && p.y <= pc.topo + 6f) return true;
+            }
+            return false;
+        }
+
         public bool PodePousar(float x, float z) => SuperficieDaAgua(x, z) == Relevo.Seco && Altura(x, z) >= Relevo.PraiaY;
     }
 }

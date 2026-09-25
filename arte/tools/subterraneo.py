@@ -2,7 +2,8 @@
 
 Uso:  python arte/tools/subterraneo.py <pasta>
 Le o relevo (Resources/ilha-mestre-altura.bytes) e grava:
-  Resources/ilha-mestre-subterraneo.json   saloes, tuneis (pontos x, y, piso, largura, altura a cada ~6 m), pocos, medicoes
+  Resources/ilha-mestre-subterraneo.json   saloes, tuneis (p = x, y, piso, largura, altura a cada ~6 m, achatado), pocos,
+                                           medicoes — o IlhaMestre.Subterraneo.cs constroi as MESMAS cascas e os buracos
   <pasta>/subterraneo-R10.gltf, -R11.gltf, -R12.gltf   cascas FECHADAS (o Blender funde com remesh de voxel) + escadas
   <pasta>/buracos.png   2048 x 2048, norte em cima: onde o chao do Terrain passa por dentro de uma boca (vira buraco)
 Falha (exit 1) se: rocha sobre o teto < 12 m fora das bocas; declive > 30 %; tunel sob o lago; ligacao do §7.2 faltando.
@@ -342,7 +343,8 @@ def main(pasta):
         pts, a, b, curto = tracar(t, 1000 + k)
         m = medir(t[0], pts, a, b)
         medidas.append(m)
-        tuneis.append(dict(id=t[0], regiao=t[1], de=t[2], para=t[3], pontos=np.round(pts, 2).tolist()))
+        # "p" achatado (x, y, piso, largura, altura por ponto): o JsonUtility do Unity nao le lista de listas
+        tuneis.append(dict(id=t[0], regiao=t[1], de=t[2], para=t[3], p=np.round(pts, 2).ravel().tolist()))
         if curto:
             falhas.append(f"{t[0]}: curto demais para o desnivel (ponta teve de descer)")
         if m["declive_max"] > DECL_MAX + 0.01:
@@ -414,7 +416,7 @@ def main(pasta):
             objs = []
             for k, t in enumerate(tuneis):
                 if t["regiao"] == reg:
-                    V, F = casca_tunel(np.array(t["pontos"]))
+                    V, F = casca_tunel(np.array(t["p"]).reshape(-1, 5))
                     objs.append((t["id"], V, F, dict(tipo="vazio", regiao=reg)))
             for k, s in enumerate(SALOES):
                 if s[1] == reg:

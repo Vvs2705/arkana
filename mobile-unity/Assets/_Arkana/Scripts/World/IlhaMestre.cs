@@ -15,7 +15,7 @@ namespace Arkana.World
     /// Convencao do doc: +X leste, +Y norte, +Z cima -> Unity (x, z, y).
     /// </summary>
     [ExecuteAlways]
-    public sealed class IlhaMestre : MonoBehaviour
+    public sealed partial class IlhaMestre : MonoBehaviour
     {
         const int Blocos = 4, Res = 513, Alfa = 512;
 
@@ -42,6 +42,9 @@ namespace Arkana.World
         }
 
         public Dados D { get; private set; }
+        /// <summary>Subterraneo (doc §7, R10-R12) de arte/tools/subterraneo.py; nulo se o JSON nao existir.</summary>
+        public Sub S { get; private set; }
+        UnityEngine.Terrain[,] terrenos;
         ushort[] alt;
         int n;
         Transform raiz;
@@ -67,6 +70,7 @@ namespace Arkana.World
             Agua();
             Atmosfera();
             Regioes();
+            Subterraneo();
             Cameras();
         }
 
@@ -81,6 +85,8 @@ namespace Arkana.World
             if (b.Length != n * n * 2) { Debug.LogError($"IlhaMestre: {b.Length} bytes, esperado {n * n * 2}"); return false; }
             alt = new ushort[n * n];
             Buffer.BlockCopy(b, 0, alt, 0, b.Length);
+            var sub = Resources.Load<TextAsset>("ilha-mestre-subterraneo");
+            S = sub != null ? JsonUtility.FromJson<Sub>(sub.text) : null;
             return true;
         }
 
@@ -159,6 +165,7 @@ namespace Arkana.World
                 ter.treeBillboardDistance = 5000f;   // sem impostor: as pecas do kit nao usam o shader de arvore do Terrain
                 t[bi, bj] = ter;
             }
+            terrenos = t;
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
                 t[bi, bj].SetNeighbors(bi > 0 ? t[bi - 1, bj] : null, bj < Blocos - 1 ? t[bi, bj + 1] : null,

@@ -71,6 +71,9 @@ namespace Arkana.World
             return Atual != null && Atual.Chao != null ? Atual.Chao.SuperficieDaAgua(x, z) : Relevo.Seco;
         }
 
+        /// <summary>O ponto esta' dentro de uma caverna/tunel da IlhaMestre (abaixo da superficie, mas em chao valido).</summary>
+        public static bool Subterraneo(Vector3 p) => Atual != null && Atual.Mestre != null && Atual.Mestre.Subterraneo(p);
+
         /// <summary>Fracao de nevoa numa superficie a `d` metros de profundidade de vista (a formula LINEAR do Unity).</summary>
         public static float NevoaEm(float d) => Mathf.Clamp01((d - NevoaInicio) / (NevoaFim - NevoaInicio));
 
