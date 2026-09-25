@@ -82,7 +82,7 @@ namespace Arkana.Gameplay
             Player = null;
             Rodando = true; Acabou = false;
             BotsVivos = Treino ? 0 : bots;
-            Restante = Balance.Match.DurationS;
+            Restante = Zona.RaioDoMapa(_relevo) > Zona.RAIO_GRANDE ? Balance.Match.DurationGrandeS : Balance.Match.DurationS;
             Combat.Reset(); Efeitos.Reset(); Derrubado.Reset();
             Derrubado.Instalar();
             Derrubado.Arena = Arena;

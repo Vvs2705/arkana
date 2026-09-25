@@ -72,17 +72,19 @@ namespace Arkana.Gameplay
             var rng = new System.Random(seed);
             int n = 0;
             float rt = RaioTerra;
-            // varinhas: aneis largos cobrindo a ilha; o ELEMENTO cicla pelos 5 — quem quer um, ANDA
-            for (int i = 0; i < QTD_VARINHA; i++)
+            // varinhas: aneis largos cobrindo a ilha; o ELEMENTO cicla pelos 5 — quem quer um, ANDA.
+            // Na ilha grande (2.200 m) a quantidade cresce com o raio (~100), senao 12 varinhas em 4,8 km e' deserto (vetavel).
+            int qv = Mathf.RoundToInt(QTD_VARINHA * Mathf.Max(1f, rt / (Relevo.BaseRaioTerra * 2f)));
+            for (int i = 0; i < qv; i++)
             {
-                float ang = Mathf.PI * 2f * i / QTD_VARINHA + Faixa(rng, -0.22f, 0.22f);
+                float ang = Mathf.PI * 2f * i / qv + Faixa(rng, -0.22f, 0.22f);
                 float raio = Faixa(rng, VARINHA_R_MIN, VARINHA_R_MAX) * rt;
                 Vector2 alvo = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * raio;
                 if (Por(rng, Arma.VARINHA, alvo, Elementos.Todos[i % Elementos.Todos.Length], 24f)) n++;
             }
             // cajados: 1 por POI. Alvo e busca saem do RAIO DO POI (lago/alagado sao agua: pousa na beira seca)
             Poi[] pois = Pois;
-            int qtd = Mathf.Min(QTD_CAJADO, pois.Length);
+            int qtd = rt > 1000f ? pois.Length : Mathf.Min(QTD_CAJADO, pois.Length);   // ilha grande: 1 cajado por regiao
             for (int i = 0; i < qtd; i++)
             {
                 Poi poi = pois[i];

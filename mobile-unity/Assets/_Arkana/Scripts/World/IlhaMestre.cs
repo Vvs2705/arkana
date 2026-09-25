@@ -194,10 +194,37 @@ namespace Arkana.World
         {
             var a = new float[Alfa, Alfa, k];
             Regiao flo = Array.Find(D.regioes, r => r.id == "R02");
+            var w = new float[5];
             for (int j = 0; j < Alfa; j++)
             for (int i = 0; i < Alfa; i++)
             {
-                float x = ox + (i + 0.5f) / Alfa * sx, y = oy + (j + 0.5f) / Alfa * sy;
+                Pesos(ox + (i + 0.5f) / Alfa * sx, oy + (j + 0.5f) / Alfa * sy, flo, w);
+                for (int c = 0; c < 5 && c < k; c++) a[j, i, c] = w[c];
+            }
+            return a;
+        }
+
+        // cor media MEDIDA de cada camada (sRGB; arte/tools/texturas_terreno.py): grama, mata, rocha, areia, terra
+        static readonly Color[] MediaCamada =
+        {
+            new Color(91 / 255f, 127 / 255f, 57 / 255f), new Color(77 / 255f, 69 / 255f, 43 / 255f), new Color(111 / 255f, 105 / 255f, 97 / 255f),
+            new Color(195 / 255f, 179 / 255f, 141 / 255f), new Color(117 / 255f, 91 / 255f, 59 / 255f),
+        };
+
+        /// <summary>A cor do chao em (x, y) do doc: a mistura das 5 camadas do Terrain (minimapa, fotos, exportacao).</summary>
+        public Color CorDoChao(float x, float y)
+        {
+            var w = new float[5];
+            Pesos(x, y, Array.Find(D.regioes, r => r.id == "R02"), w);
+            Color c = Color.black;
+            for (int k = 0; k < 5; k++) c += MediaCamada[k] * w[k];
+            return c;
+        }
+
+        /// <summary>Pesos das camadas (grama, mata, rocha, areia, terra; somam 1) em (x, y).</summary>
+        void Pesos(float x, float y, Regiao flo, float[] w)
+        {
+            {
                 float h = Altura(x, y), dec = Declive(x, y);
                 float rocha = Mathf.InverseLerp(24f, 34f, dec) + Mathf.InverseLerp(430f, 520f, h);
                 float areia = Mathf.InverseLerp(5f, 2.5f, h) + (LagoQ(x, y) < 1.12f ? Mathf.InverseLerp(110f, 106f, h) : 0f);
@@ -221,9 +248,8 @@ namespace Arkana.World
                 terra = Mathf.Clamp01(terra) * (1 - rocha) * (1 - areia);
                 float grama = Mathf.Max(0f, 1f - rocha - areia - mata - terra);
                 float s = grama + mata + rocha + areia + terra;
-                a[j, i, 0] = grama / s; a[j, i, 1] = mata / s; a[j, i, 2] = rocha / s; a[j, i, 3] = areia / s; a[j, i, 4] = terra / s;
+                w[0] = grama / s; w[1] = mata / s; w[2] = rocha / s; w[3] = areia / s; w[4] = terra / s;
             }
-            return a;
         }
 
         // ------------------------------------------------------------------ vegetacao (instancias do Terrain)

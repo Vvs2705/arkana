@@ -261,6 +261,8 @@ namespace Arkana.Core
         {
             /// <summary>480 s = 70 abertura + 10 formacao + 5 fases (396 s) + folga da queda. Baixar reabre fim por cronometro.</summary>
             public const float DurationS = 480f;
+            /// <summary>Ilha do Documento Mestre: 180 abertura + 10 + 5 fases do Zona.FASES_GRANDE (1.320 s) + folga.</summary>
+            public const float DurationGrandeS = 1800f;
             /// <summary>12 e' o teto estrutural (14 nascimentos) e o passo que se paga sem medir FPS no celular.</summary>
             public const int Bots = 12;
             /// <summary>Modo DUPLA: player + parceiro bot + 6 duplas de bots = 14 corpos (o mesmo teto dos 14 nascimentos).</summary>

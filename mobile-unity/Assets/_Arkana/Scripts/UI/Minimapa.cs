@@ -38,7 +38,8 @@ namespace Arkana.UI
         public static Color Fundo => MarFundo;
 
         /// <summary>Metros de mundo que a textura cobre de lado a lado (centrada na origem). Sem ilha: a padrao.</summary>
-        public static float Extensao(Relevo r) => (r != null ? r.Lado : Relevo.BaseLado * 2f) * MargemMar;
+        public static float Extensao(IRelevo r) =>
+            (r is Relevo rr ? rr.Lado : r is RelevoMestre rm ? rm.Lado : Relevo.BaseLado * 2f) * MargemMar;
 
         /// <summary>Mundo -> uv 0..1 da textura (linha 0 = sul).</summary>
         public static Vector2 Uv(Vector3 p, float extensao) => new Vector2(p.x / extensao + 0.5f, p.z / extensao + 0.5f);
@@ -84,6 +85,41 @@ namespace Arkana.UI
         /// raso ao fundo com espuma na costa. SOMBREADO de relevo com luz do NOROESTE a 45 graus (a convencao de carta:
         /// morro le' como morro, nao como mancha). So' le' o Relevo (imutavel): pode rodar em outra thread.
         /// </summary>
+        /// <summary>A ilha do Documento Mestre: agua pela mesma regra do jogo (mar, lago, rio), chao pela mistura das camadas
+        /// do Terrain (IlhaMestre.CorDoChao) e sombreado de relevo sem exagero (as montanhas tem 600 m de verdade).</summary>
+        public static Color32[] PintarMestre(RelevoMestre r, int n)
+        {
+            float ext = Extensao(r), passo = ext / n, meio = ext * 0.5f;
+            var alt = new float[n * n];
+            for (int j = 0; j < n; j++)
+                for (int i = 0; i < n; i++)
+                    alt[j * n + i] = r.Altura((i + 0.5f) * passo - meio, (j + 0.5f) * passo - meio);
+            var px = new Color32[n * n];
+            float ex = 0.35f / (2f * passo);
+            for (int j = 0; j < n; j++)
+            {
+                float z = (j + 0.5f) * passo - meio;
+                int jc = j * n, jn = Mathf.Min(j + 1, n - 1) * n, js = Mathf.Max(j - 1, 0) * n;
+                for (int i = 0; i < n; i++)
+                {
+                    float x = (i + 0.5f) * passo - meio, h = alt[jc + i];
+                    float agua = r.SuperficieDaAgua(x, z);
+                    if (agua != Relevo.Seco)
+                    {
+                        float d = agua - h;
+                        Color ca = agua > Relevo.AguaY + 0.5f ? Color.Lerp(LagoRaso, LagoFundo, Relevo.Suave(0.5f, 12f, d))
+                                                              : Color.Lerp(MarRaso, MarFundo, Relevo.Suave(0.5f, 20f, d));
+                        px[jc + i] = Color.Lerp(ca, Espuma, (1f - Relevo.Suave(0f, 0.8f, d)) * 0.7f);
+                        continue;
+                    }
+                    Color c = r.CorDoChao(x, z);
+                    float s = Sombra((alt[jc + Mathf.Min(i + 1, n - 1)] - alt[jc + Mathf.Max(i - 1, 0)]) * ex, (alt[jn + i] - alt[js + i]) * ex);
+                    px[jc + i] = new Color(c.r * s, c.g * s, c.b * s, 1f);
+                }
+            }
+            return px;
+        }
+
         public static Color32[] PintarIlha(Relevo r, int n)
         {
             float ext = Extensao(r), passo = ext / n, meio = ext * 0.5f;
@@ -318,7 +354,7 @@ namespace Arkana.UI
         /// <summary>Por quadro (dt sem escala: o zoom anda na pausa tambem). `fase` = a fase da queda do jogador.</summary>
         public void Pintar(float dt, IEntidade jogador, string fase)
         {
-            Relevo relevo = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+            IRelevo relevo = Ilha.Atual != null ? Ilha.Atual.Chao : null;
             float ext = MapaLogica.Extensao(relevo);
             var q = new QuadroDoMapa { Textura = Textura(relevo), Extensao = ext };
             q.TemJogador = jogador != null;
@@ -359,7 +395,7 @@ namespace Arkana.UI
         // ---------- a textura da ilha: pintada UMA vez por processo, fora da thread principal ----------
 
         static Texture2D _textura;
-        static Relevo _texturaDe, _pintandoDe;
+        static IRelevo _texturaDe, _pintandoDe;
         static Task<Color32[]> _pintando;
 
         /// <summary>A ilha ja' subiu para a GPU (a foto cobra: a Task pode falhar calada no aparelho).</summary>
@@ -370,14 +406,16 @@ namespace Arkana.UI
         /// roda numa Task e a thread principal so' sobe o resultado (SetPixels32 + Apply, ~1 MB, uma vez): nada de quadro
         /// travado no carregamento. Null enquanto pinta (a janela mostra o mar fundo) ou se falhar (o jogo segue).
         /// </summary>
-        static Texture2D Textura(Relevo r)
+        static Texture2D Textura(IRelevo r)
         {
             if (r == null) return null;
             if (_textura != null && _texturaDe == r) return _textura;
             if (_pintandoDe != r)
             {
                 _pintandoDe = r;
-                _pintando = Task.Run(() => MapaLogica.PintarIlha(r, MapaLogica.TexturaLado));
+                // a ilha procedural pinta em outra thread (so' aritmetica); a IlhaMestre usa PerlinNoise (Unity): na principal
+                _pintando = r is Relevo rr ? Task.Run(() => MapaLogica.PintarIlha(rr, MapaLogica.TexturaLado))
+                                          : Task.FromResult(MapaLogica.PintarMestre((RelevoMestre)r, MapaLogica.TexturaLado));
             }
             if (_pintando == null || !_pintando.IsCompleted || _pintando.IsFaulted) return null;
             const int n = MapaLogica.TexturaLado;
@@ -447,14 +485,14 @@ namespace Arkana.UI
             _rota.type = Image.Type.Tiled;
             if (comPois)
             {
-                Relevo r = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+                IRelevo r = Ilha.Atual != null ? Ilha.Atual.Chao : null;
                 Poi[] ps = r != null ? r.Pois : new Poi[0];
                 _pois = new RectTransform[ps.Length];
                 _poisM = new Vector3[ps.Length];
                 for (int i = 0; i < ps.Length; i++)
                 {
                     string nome;
-                    if (!Textos.MapaPois.TryGetValue(ps[i].Nome, out nome)) nome = "";
+                    if (!Textos.MapaPois.TryGetValue(ps[i].Nome, out nome)) nome = ps[i].Nome;   // IlhaMestre: o nome da regiao
                     var t = Formas.Texto(_janela, "Poi", nome, 11f, new Color(1f, 1f, 1f, 0.9f));
                     t.fontStyle = FontStyle.Bold;
                     t.GetComponent<Shadow>().effectDistance = new Vector2(Dp.Px(1f), -Dp.Px(1f));

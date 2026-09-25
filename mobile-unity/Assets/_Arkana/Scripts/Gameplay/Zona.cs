@@ -48,6 +48,25 @@ namespace Arkana.Gameplay
             new Fase(30f, 18f, 0.13f, 11.0f),
             new Fase(15f, 25f, 0.00f, 26.0f),
         };
+        /// <summary>
+        /// ILHA DO DOCUMENTO MESTRE (raio de terra 2.200 m): o cronograma do doc §12.1 (raios 1.800/1.000/450/120 m e a
+        /// ultima em zero; contracoes de 4/4/4/3/2 min com pausas de 1 min; 3 min de abertura) — ~25 min de partida.
+        /// Os raios 4.000/2.600 do doc cobrem mar: aqui a 1a contracao ja' sai da costa. VETAVEL: numeros de estudo, nao medidos.
+        /// </summary>
+        public const float ABERTURA_GRANDE_S = 180f;
+        public static readonly Fase[] FASES_GRANDE =
+        {
+            new Fase(60f, 240f, 1800f / 2200f, 1.5f),
+            new Fase(60f, 240f, 1000f / 2200f, 3.0f),
+            new Fase(60f, 240f, 450f / 2200f, 6.0f),
+            new Fase(60f, 180f, 120f / 2200f, 11.0f),
+            new Fase(60f, 120f, 0.00f, 26.0f),
+        };
+        /// <summary>Mapa com raio de terra acima disto usa o cronograma GRANDE.</summary>
+        public const float RAIO_GRANDE = 1000f;
+        public static Fase[] FasesPara(float raioMapa) => raioMapa > RAIO_GRANDE ? FASES_GRANDE : FASES;
+        public static float AberturaPara(float raioMapa) => raioMapa > RAIO_GRANDE ? ABERTURA_GRANDE_S : ABERTURA_S;
+
         /// <summary>Quanto o centro novo foge do velho, como fracao da FOLGA (r_velho - r_novo): contencao por construcao.</summary>
         public const float DESLOCAMENTO = 0.75f;
         /// <summary>s por aplicacao de dano. NUNCA por frame (dano fracionario vira zero e 60 sinais/s).</summary>
@@ -59,6 +78,8 @@ namespace Arkana.Gameplay
         public readonly int SeedDaPartida;
         public readonly float RaioMapa;
         public readonly Circulo[] Plano;
+        /// <summary>As fases DESTA partida (pequena ou grande).</summary>
+        public readonly Fase[] Fases;
 
         public Estado EstadoAtual { get; private set; } = Estado.Inerte;
         /// <summary>0 = antes da 1a fase; 1..5.</summary>
@@ -80,6 +101,7 @@ namespace Arkana.Gameplay
             // Guid, nao `new Random()`: em Mono o sem-seed usa TickCount e duas partidas no mesmo ms sairiam iguais.
             SeedDaPartida = seed < 0 ? (System.Guid.NewGuid().GetHashCode() & 0x7FFFFFFF) | 1 : seed;
             RaioMapa = RaioDoMapa(relevo);
+            Fases = FasesPara(RaioMapa);
             Plano = Planejar(relevo, SeedDaPartida);
             // NASCE NA BORDA: `Dentro()` responde SIM para todo mundo durante a queda.
             Raio = RaioMapa;
@@ -95,14 +117,15 @@ namespace Arkana.Gameplay
             float mapa = RaioDoMapa(relevo);
             Vector3 c = Vector3.zero;
             float r = mapa;
-            var saida = new Circulo[FASES.Length];
-            for (int i = 0; i < FASES.Length; i++)
+            Fase[] fases = FasesPara(mapa);
+            var saida = new Circulo[fases.Length];
+            for (int i = 0; i < fases.Length; i++)
             {
-                float novoR = FASES[i].Frac * mapa;
+                float novoR = fases[i].Frac * mapa;
                 float folga = Mathf.Max(r - novoR, 0f) * DESLOCAMENTO;
                 c = SortearCentro(relevo, rng, c, folga);
                 r = novoR;
-                saida[i] = new Circulo { Centro = c, Raio = r, Dps = FASES[i].Dps };
+                saida[i] = new Circulo { Centro = c, Raio = r, Dps = fases[i].Dps };
             }
             return saida;
         }
@@ -129,7 +152,7 @@ namespace Arkana.Gameplay
         public bool Ativa => EstadoAtual != Estado.Inerte && EstadoAtual != Estado.Abertura;
         public bool Fechando => EstadoAtual == Estado.Fecha;
         /// <summary>Antes da 1a fase fechar, a zona nao doi.</summary>
-        public float DpsAtual => FaseAtual <= 0 ? 0f : FASES[Mathf.Min(FaseAtual, FASES.Length) - 1].Dps;
+        public float DpsAtual => FaseAtual <= 0 ? 0f : Fases[Mathf.Min(FaseAtual, Fases.Length) - 1].Dps;
         /// <summary>CILINDRO, nao esfera: subir no plato nao tira ninguem do circulo.</summary>
         public bool Dentro(Vector3 pos) => Dist(pos) <= Raio;
         private float Dist(Vector3 pos) => new Vector2(pos.x - Centro.x, pos.z - Centro.z).magnitude;
@@ -143,8 +166,8 @@ namespace Arkana.Gameplay
         {
             if (EstadoAtual != Estado.Inerte) return;
             EstadoAtual = Estado.Abertura;
-            Armar(ABERTURA_S);
-            Bus.EmitZonaAbertura(ABERTURA_S);
+            Armar(AberturaPara(RaioMapa));
+            Bus.EmitZonaAbertura(AberturaPara(RaioMapa));
         }
 
         /// <summary>Um passo. `alvos` = os pawns da arena (o dano varre 1x por TICK_S). Inerte = nada acontece.</summary>
@@ -203,7 +226,7 @@ namespace Arkana.Gameplay
             EstadoAtual = Estado.Espera;
             if (FaseAtual >= Plano.Length) { Restante = 0f; return; }  // a tempestade tomou o mapa
             Circulo alvo = Plano[FaseAtual];
-            float espera = FASES[FaseAtual].Espera;
+            float espera = Fases[FaseAtual].Espera;
             Armar(espera);
             Bus.EmitZonaAvisou(FaseAtual + 1, alvo.Centro, alvo.Raio, espera);
         }
@@ -214,7 +237,7 @@ namespace Arkana.Gameplay
             Circulo alvo = Plano[FaseAtual];
             FaseAtual++;
             EstadoAtual = Estado.Fecha;
-            float dur = FASES[FaseAtual - 1].Fecha;
+            float dur = Fases[FaseAtual - 1].Fecha;
             _raioDe = Raio; _raioPara = alvo.Raio;
             _centroDe = Centro; _centroPara = alvo.Centro;
             Armar(dur);

@@ -41,6 +41,7 @@ namespace Arkana.World
         public Vector3[] Nascimentos { get; }
 
         public float Altura(float x, float z) => m.Altura(x, z);
+        public Color CorDoChao(float x, float z) => m.CorDoChao(x, z);
 
         public float SuperficieDaAgua(float x, float z)
         {
