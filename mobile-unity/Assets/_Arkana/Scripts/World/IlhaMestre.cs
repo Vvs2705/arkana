@@ -88,6 +88,9 @@ namespace Arkana.World
 
         public float Altura(float x, float y)
         {
+            // fora do mapa e' mar aberto. Grudar na borda fazia os 4 cabos (a 7 m da borda, agua rasa) pintarem
+            // uma faixa "rasa" do mar inteiro alinhada aos eixos — a cruz clara (medido 25/09).
+            if (x < D.x0 || x > D.x1 || y < D.y0 || y > D.y1) return D.fundo;
             float fx = Mathf.Clamp((x - D.x0) / (D.x1 - D.x0) * (n - 1), 0, n - 1.001f);
             float fy = Mathf.Clamp((y - D.y0) / (D.y1 - D.y0) * (n - 1), 0, n - 1.001f);
             int i = (int)fx, j = (int)fy;
