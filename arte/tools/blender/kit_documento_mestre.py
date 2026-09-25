@@ -615,12 +615,12 @@ def peca_095():
     # fundo: colunas verticais ate' o arco
     for k in range(10):
         x = -W / 2 + 1.5 + k * 3.0
-        h = H0 + math.sqrt(max(R * R - x * x, 0.0))
+        h = H0 + math.sqrt(max(R * R - (abs(x) + 1.5) ** 2, 0.0)) * 0.985 - 0.1   # abaixo da corda dos paineis: sem dentes
         partes.append(caixa((3.0, 0.3, h - 0.3), (x, D / 2, 0.3 + (h - 0.3) / 2), mat=zinco))
     # frente: portal aberto de 12 x 9 (pilares + verga) e o resto fechado ate' o arco
     for k in range(10):
         x = -W / 2 + 1.5 + k * 3.0
-        h = H0 + math.sqrt(max(R * R - x * x, 0.0))
+        h = H0 + math.sqrt(max(R * R - (abs(x) + 1.5) ** 2, 0.0)) * 0.985 - 0.1
         if abs(x) < 6.0:
             partes.append(caixa((3.0, 0.3, h - 9.0), (x, -D / 2, 9.0 + (h - 9.0) / 2), mat=zinco))
         else:
