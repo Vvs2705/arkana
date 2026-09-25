@@ -631,6 +631,68 @@ def peca_095():
     return partes, (zinco, conc)
 
 
+def trelica(B, z0, z1, esp, mat, passo=4.0):
+    """Mastro trelicado quadrado de lado B entre z0 e z1: 4 pernas, travessas e diagonais a cada `passo`."""
+    partes = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            partes.append(caixa((esp, esp, z1 - z0), (sx * B / 2, sy * B / 2, (z0 + z1) / 2), mat=mat))
+    z = z0 + passo
+    while z < z1 - 0.5:
+        for s in (-1, 1):
+            partes.append(caixa((B, esp * 0.6, esp * 0.6), (0, s * B / 2, z), mat=mat))
+            partes.append(caixa((esp * 0.6, B, esp * 0.6), (s * B / 2, 0, z), mat=mat))
+            partes.append(caixa((math.hypot(B, passo), esp * 0.5, esp * 0.5), (0, s * B / 2, z - passo / 2), (0, math.atan2(passo, B), 0), mat=mat))
+            partes.append(caixa((esp * 0.5, math.hypot(B, passo), esp * 0.5), (s * B / 2, 0, z - passo / 2), (-math.atan2(passo, B), 0, 0), mat=mat))
+        z += passo
+    return partes
+
+
+def peca_098():
+    """098 — torre industrial 72 m (doc: 65-85 m, silhueta distinta): base de concreto 14 x 14, mastro trelicado que
+    afunila, tanque/cabeca cilindrica no topo, plataformas a 24 e 48 m e chamine lateral."""
+    zinco, conc = mat_foto("zinco"), mat_foto("concreto")
+    partes = [caixa((14.0, 14.0, 3.0), (0, 0, 1.5), mat=conc)]
+    partes += trelica(9.0, 3.0, 30.0, 0.7, zinco, 5.0)
+    partes += trelica(6.5, 30.0, 56.0, 0.55, zinco, 4.5)
+    partes += trelica(4.5, 56.0, 66.0, 0.45, zinco, 4.0)
+    for z, b in ((24.0, 10.5), (48.0, 8.0)):
+        partes.append(caixa((b, b, 0.3), (0, 0, z), mat=zinco))
+        for s in (-1, 1):
+            partes.append(caixa((b, 0.1, 1.1), (0, s * b / 2, z + 0.7), mat=zinco))
+            partes.append(caixa((0.1, b, 1.1), (s * b / 2, 0, z + 0.7), mat=zinco))
+    partes.append(cilindro(4.2, 6.0, (0, 0, 69.0), (0, 0, 0), zinco))
+    partes.append(cilindro(1.1, 34.0, (6.5, 0, 20.0), (0, 0, 0), conc))   # chamine
+    partes.append(cilindro(1.4, 1.2, (6.5, 0, 37.5), (0, 0, 0), zinco))
+    return partes, (zinco, conc)
+
+
+def peca_071():
+    """071 — guindaste de porto/patio: mastro trelicado 40 m, lanca trelicada 34 m com carrinho e gancho,
+    contra-lanca com lastro de concreto e cabine."""
+    zinco, conc = mat_foto("zinco"), mat_foto("concreto")
+    partes = [caixa((6.0, 6.0, 1.2), (0, 0, 0.6), mat=conc)]
+    partes += trelica(2.6, 1.2, 40.0, 0.35, zinco, 3.5)
+    partes.append(caixa((3.0, 3.0, 2.2), (0, 0, 41.0), mat=zinco))          # giro
+    partes.append(caixa((2.2, 2.0, 2.2), (2.8, 0, 41.0), mat=zinco))         # cabine
+    for s in (-1, 1):                                                        # lanca: 2 banzos + diagonais
+        partes.append(caixa((34.0, 0.25, 0.25), (17.0 + 1.5, s * 0.9, 42.2), mat=zinco))
+        partes.append(caixa((34.0, 0.25, 0.25), (17.0 + 1.5, s * 0.9, 40.4), mat=zinco))
+    for k in range(9):
+        x = 3.0 + k * 3.8
+        partes.append(caixa((0.2, 1.8, 0.2), (x, 0, 42.2), mat=zinco))
+        partes.append(caixa((math.hypot(3.8, 1.8), 0.15, 0.15), (x + 1.9, 0, 41.3), (0, math.atan2(1.8, 3.8), 0), mat=zinco))
+    partes.append(caixa((12.0, 1.6, 0.4), (-6.5, 0, 42.0), mat=zinco))       # contra-lanca
+    partes.append(caixa((3.0, 2.4, 2.4), (-11.0, 0, 41.2), mat=conc))        # lastro
+    partes.append(caixa((0.12, 0.12, 22.0), (-0.5, 0, 53.0), mat=zinco))   # torre de estais
+    partes.append(caixa((math.hypot(31.0, 22.0), 0.08, 0.08), (15.0, 0, 53.0), (0, math.atan2(22.0, 31.0), 0), mat=zinco))   # estai da lanca
+    partes.append(caixa((math.hypot(11.0, 22.0), 0.08, 0.08), (-6.0, 0, 53.0), (0, -math.atan2(22.0, 11.0), 0), mat=zinco))  # estai da contra-lanca
+    partes.append(caixa((1.6, 1.6, 0.6), (24.0, 0, 40.0), mat=zinco))        # carrinho
+    partes.append(caixa((0.06, 0.06, 18.0), (24.0, 0, 30.7), mat=zinco))     # cabo
+    partes.append(caixa((0.9, 0.5, 1.2), (24.0, 0, 21.2), mat=zinco))        # gancho
+    return partes, (zinco, conc)
+
+
 def peca_080():
     """080 — torre de luz 12 m: mastro trelicado (4 pernas + travessas), plataforma e 4 refletores no topo."""
     zinco, conc = mat_foto("zinco"), mat_foto("concreto")
@@ -681,10 +743,10 @@ def peca_076():
     return partes, (zinco, tabua)
 
 
-ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080"}
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071"}
 
 
-PECAS = {"095": peca_095, "080": peca_080, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+PECAS = {"095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
          "078": peca_078, "079": peca_079, "076": peca_076,
          "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}

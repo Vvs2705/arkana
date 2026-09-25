@@ -702,11 +702,15 @@ namespace Arkana.World
                 Peca(g, "mestre-064-industrial-tanque", r7.x + 90f + k * 18f, r7.y - 70f, 2.4f, k * 40f);
             for (int k = 0; k < 10; k++)   // linha de canos (escala 1,5: 6 m por modulo) ligando os tanques aos galpoes
                 Peca(g, "mestre-062-industrial-cano-reto", r7.x + 100f - k * 9f, r7.y - 52f, 1.5f, 0f);
-            Bloco(g, "R07_Torre_Industrial", PrimitiveType.Cube, r7.x - 20f, r7.y + 40f, -9999f, new Vector3(10f, 10f, 75f), 0f, Ferrugem);
-            Bloco(g, "R07_Torre_Topo", PrimitiveType.Cylinder, r7.x - 20f, r7.y + 40f, Altura(r7.x - 20f, r7.y + 40f) + 75f, new Vector3(14f, 14f, 6f), 0f, Metal);
+            if (Peca(g, "mestre-098-industrial-torre", r7.x - 20f, r7.y + 40f, 1f, 0f) == null)   // torre 72 m do kit; blockout se faltar
+            {
+                Bloco(g, "R07_Torre_Industrial", PrimitiveType.Cube, r7.x - 20f, r7.y + 40f, -9999f, new Vector3(10f, 10f, 75f), 0f, Ferrugem);
+                Bloco(g, "R07_Torre_Topo", PrimitiveType.Cylinder, r7.x - 20f, r7.y + 40f, Altura(r7.x - 20f, r7.y + 40f) + 75f, new Vector3(14f, 14f, 6f), 0f, Metal);
+            }
             for (int k = 0; k < 2; k++)
             {
                 float x = r7.x + 60f - k * 150f, y = r7.y + 120f;
+                if (Peca(g, "mestre-071-industrial-guindaste", x, y, 1f, k * 140f + 20f) != null) continue;
                 Bloco(g, "R07_Guindaste", PrimitiveType.Cube, x, y, -9999f, new Vector3(3f, 3f, 40f), 0f, Ferrugem);
                 Bloco(g, "R07_Guindaste_Lanca", PrimitiveType.Cube, x + 14f, y, Altura(x, y) + 38f, new Vector3(34f, 2f, 2f), 0f, Ferrugem);
             }
