@@ -64,7 +64,14 @@ para a superfície quem está numa caverna (`Ilha.Subterraneo`). **Base militar:
 passava da falésia; o platô de 150 m vai até x 1.400 / y −1.475).
 **Armadilhas do Play pelo MCP:** sem foco o editor congela o Play (`Application.runInBackground = true` por execute_code);
 NUNCA ff em main nem focar o Unity durante um teste em Play (o auto-refresh recompila e o domain reload apaga a partida).
-**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, nascimentos de trio, S16 e peças que ainda são blockout.
+**TRIO (25/09, medido):** `Balance.Match.TamanhoDoTime = 3`, `TimesInimigos = 5` (`DuplasInimigas` virou alias) →
+`Montagem.Times(times, tamanho)`: líder + seguidores em lados alternados, e os 2 parceiros do jogador POR ÚLTIMO
+(`Main.Bots[0]` segue inimigo). `Main.Parceiro` = o 1º parceiro (ping, marca azul, cartão); o 2º só joga. Partida ao vivo:
+18 corpos, 6 times, 2 parceiros pousaram a ~70 m e em 20 s estavam a 5 e 12 m do jogador; 59 fps; 525 testes EditMode
+passando. Textos: "TRIOS {0}", "ÚLTIMO TRIO DE PÉ", modo "TRIO". **Limites conhecidos (vetáveis):** só o 1º parceiro tem
+marca/ponto no minimapa/ping; cada bot foca o alvo de UM aliado; para 40–60 corpos medir a percepção dos bots (O(n²)) no
+aparelho antes de subir `TimesInimigos`.
+**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, marca do 2º parceiro, S16 e peças que ainda são blockout.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
