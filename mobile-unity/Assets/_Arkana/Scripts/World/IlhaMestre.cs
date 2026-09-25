@@ -537,6 +537,21 @@ namespace Arkana.World
             return g;
         }
 
+        /// <summary>Laje inclinada de `larg` m entre dois pontos do doc (x, y, z): rampa, passarela ou varanda. Topo em z.</summary>
+        GameObject Rampa(Transform pai, string nome, float ax, float ay, float az, float bx, float by, float bz, float larg, Color cor)
+        {
+            GameObject g = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            g.name = nome;
+            g.hideFlags = HideFlags.DontSave;
+            g.transform.SetParent(pai, false);
+            Vector3 a = U(ax, ay, az - 0.5f), b = U(bx, by, bz - 0.5f);
+            g.transform.position = (a + b) * 0.5f;
+            g.transform.rotation = Quaternion.LookRotation(b - a, Vector3.up);
+            g.transform.localScale = new Vector3(larg, 1f, (b - a).magnitude + larg * 0.5f);
+            g.GetComponent<Renderer>().sharedMaterial = Mat(cor);
+            return g;
+        }
+
         GameObject Peca(Transform pai, string recurso, float x, float y, float esc, float rotY, float z = -9999f)
         {
             var src = Resources.Load<GameObject>(recurso);
@@ -665,7 +680,16 @@ namespace Arkana.World
                     Bloco(g, "R05_Pilar", PrimitiveType.Cube, px, pt.y, fundo, new Vector3(9f, 12f, pt.z - 2f - fundo), 0f, Pedra);
                 }
             }
-            Bloco(g, "R05_Travessia_Inferior_Z80", PrimitiveType.Cube, cxp, pt.y - 170f, 79f, new Vector3(comp * 0.8f, 8f, 1f), 0f, Madeira);
+            // travessia inferior (doc §5.1): varandas na rocha a Z 80 + ponte secundaria 170 m ao sul da principal, ligando
+            // os dois lados do desfiladeiro por rampas desde os encontros (126 m) — e a boca U10 do subterraneo (150, -1050, 80).
+            // O canion a Z 80 vai de x ~109 a ~205 em y = -1220 (medido no relevo): a ponte cobre so' o vao. Vetavel: rampas de ~34 %.
+            float ys = pt.y - 170f;
+            Rampa(g, "R05_Rampa_Oeste", 45f, pt.y - 30f, pt.z + 0.5f, 105f, ys + 25f, 80.5f, 5f, Pedra);
+            Rampa(g, "R05_Varanda_Oeste_Z80", 150f, pt.y - 5f, 80f, 107f, ys + 25f, 80f, 5f, PedraEsc);
+            Rampa(g, "R05_Ponte_Secundaria", 103f, ys, 80f, 212f, ys, 80f, 6f, Madeira);
+            for (int sgn = -1; sgn <= 1; sgn += 2)
+                Rampa(g, "R05_Ponte_Secundaria_Parapeito", 103f, ys + sgn * 3f, 81f, 212f, ys + sgn * 3f, 81f, 0.3f, Madeira);
+            Rampa(g, "R05_Rampa_Leste", 210f, ys + 25f, 80.5f, 355f, pt.y - 30f, pt.z + 0.5f, 5f, Pedra);
 
             // R06 acampamento: barracas, abrigos, fogueiras e as caixas do kit (027)
             g = Grupo("ARKANA_R06_Acampamento");
