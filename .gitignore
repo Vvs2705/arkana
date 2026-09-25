@@ -13,6 +13,8 @@ mobile-unity/.vs/
 mobile-unity/crashlytics-build.properties
 # cena temporaria do Test Framework: existe enquanto um teste PlayMode roda (entrou num commit de 12/09 por isso)
 mobile-unity/Assets/InitTestScene*
+# fotos do MCP for Unity (manage_camera salva aqui antes de devolver a imagem)
+mobile-unity/Assets/Screenshots*
 *.apk
 *.aab
 
