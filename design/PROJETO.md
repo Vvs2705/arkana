@@ -80,7 +80,11 @@ Leva 4 (templo): 046 escadaria (20 degraus, muretas), 026 arco (9 aduelas), 014 
 043 parapeito — R03 usa escadaria oeste, 4 arcos nas entradas, 12 muros na borda, 36 parapeitos no terraço, pilares.
 **Travessia inferior (R05):** rampas de pedra dos dois encontros (126 m) até Z 80, varanda na parede oeste até a boca U10,
 ponte secundária de madeira só no vão (x 103–212 em y −1.220) com parapeitos — `Rampa()` é o helper (laje inclinada).
-**Falta:** APK + Poco F4 (o último teste do dia), S16, árvore gigante (orgânica: Tripo depois).
+**S16 (anel exterior):** `arte/tools/rota_anel.py` acha o caminho de menor custo no relevo (Dijkstra em grade de 19 m,
+custo 1 + 40·tan(declive), teto 22°, sem água) entre 8 pontos a ~80 % do raio; 13,6 km, 55 pontos colados em ROTAS.
+Relevo regenerado (metas OK) e subterrâneo revalidado (rocha ≥ 12 m mantida). Achado: o anel corta o pátio da base (platô
+plano, sem dano) e entra pelo norte do lago em vez de contornar — vetável; para forçar fora, subir RAIO em rota_anel.py.
+**Falta:** APK + Poco F4 (o último teste do dia), árvore gigante (orgânica: Tripo depois), réplica Blender v003.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
