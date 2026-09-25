@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
+> **Atualizado em:** 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,32 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — 25/09: nova visão da ilha (Documento Mestre, 4,8 km) + Unity ao vivo pelo MCP
+
+**Decisões do Diretor (25/09) — substituem as anteriores sobre a ilha:**
+- A ilha segue o **Documento Mestre** (`C:\Users\VINICIUS\Downloads\ARKANA_Documento_Mestre_Blender.md`, v1.0): **4.800 × 4.400 m**,
+  12 regiões, subterrâneo; **Zona Industrial e Base Militar entram no mundo**. Substitui a ilha de 600 m e o plano de 2,4 km (27/08).
+- Referência de formato: **PUBG Mobile**. **Times de 3**, média de **40–60 personagens** (13–20 times) → início por TIME, 300 m entre times.
+- Tamanho **não** se decide medindo FPS (o mapa inteiro só é visto de cima; em jogo a câmera 3ª pessoa desenha só a tela).
+  Desempenho vira engenharia: carregar a ilha por partes e simplificar o que está longe (o Unity hoje NÃO tem isso: malha única).
+- **O máximo possível direto no Unity** (Terrain, água, vegetação, luz, montagem, medições). **Blender só** para o que o Unity não faz:
+  cavernas/túneis (Terrain não tem teto), prédios, ponte, árvore gigante, kit modular. A regra §21.13 do doc ("não integrar com engine") caiu.
+- As concept arts virão do Diretor para o projeto; olhar antes de modelar cada região.
+
+**Verificação do doc (24–25/09, 3 raias + script):** a conta fecha (13/13, rio desce, nenhum túnel sob o lago, 134 posições cabem a 300 m),
+mas há erros de geometria a corrigir na construção: **ponte N–S corre PARALELA ao rio** (5,7°; 231 de 300 m do tabuleiro sobre o rio) →
+girar para L–O, encontros (50,−1050) e (350,−1050); travessia inferior não cruza o rio → 120–220 m ao SUL da ponte; túnel U14–U10 passa no
+vazio do cânion (piso 65, rio 44) → mergulhar ~40 m; U12–U14 rente ao leito (0,9 m de rocha) → piso ~20; acampamento sem rota para a floresta.
+**Em aberto (perguntar):** como a Sintonia (desenhada para DUPLA) funciona em trio; se o doc entra em `design/cenario/` como fonte da verdade.
+
+**MCP for Unity instalado e provado (25/09):** pacote `com.coplaydev.unity-mcp` v10.2.0 (MIT) no `manifest.json`; servidor HTTP local
+`127.0.0.1:8080/mcp` liga sozinho ao abrir o Unity (EditorPrefs AutoStartOnLoad); telemetria desligada (env `UNITY_MCP_DISABLE_TELEMETRY`
++ EditorPrefs). 48 ferramentas; provado: foto da Scene View devolvida à IA e `execute_code` (C#) rodando no editor. O próprio pacote
+registra o Claude Code em escopo LOCAL do repositório (remove o de usuário) — as ferramentas só aparecem numa sessão NOVA do Claude Code.
+Armadilhas: (1) o Unity só abre com o **Unity Hub rodando** (licença; sem ele sai com 198); (2) a foto é gravada em `Assets/Screenshots`
+antes de voltar (ignorado no git); (3) editor aberto trava o projeto para o batchmode da esteira — testar `manage_build` de dentro do editor.
+Plugin oficial da Unity para o Claude Code (29 skills): cartão oferecido ao Diretor, instalação é um clique dele.
 
 ### >>> COMECE POR AQUI — 23/09: a esteira CODAR → BUILD → EMULADOR → TESTAR → LOG existe e passou numa partida inteira
 
