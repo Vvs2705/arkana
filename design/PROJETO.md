@@ -84,7 +84,11 @@ ponte secundária de madeira só no vão (x 103–212 em y −1.220) com parapei
 custo 1 + 40·tan(declive), teto 22°, sem água) entre 8 pontos a ~80 % do raio; 13,6 km, 55 pontos colados em ROTAS.
 Relevo regenerado (metas OK) e subterrâneo revalidado (rocha ≥ 12 m mantida). Achado: o anel corta o pátio da base (platô
 plano, sem dano) e entra pelo norte do lago em vez de contornar — vetável; para forçar fora, subir RAIO em rota_anel.py.
-**Falta:** APK + Poco F4 (o último teste do dia), árvore gigante (orgânica: Tripo depois), réplica Blender v003.
+**APK do dia:** `mobile-unity/Builds/testes/arkana-2026-09-25_1632.apk` (465 MB, 25 min, 0 erros) — ilha nova, trio,
+subterrâneo, zona §12.1, minimapa, kit levas 2–4; NÃO tem o S16 (entrou em main depois do build). Buildado pelo editor
+aberto: o diálogo "Active Input Handling: Both" parou o build 20 min até clicar Ignore (memória: unity-abre-o-checkout-central).
+O build reescreve `Scenes/Main.unity` e `Settings/URP_Base.asset` (sombra 50→60) — ficaram fora do commit, com os ProjectSettings.
+**Falta:** jogar o APK no Poco F4 (o Diretor), árvore gigante (orgânica: Tripo depois), réplica Blender v003 com as peças novas.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
