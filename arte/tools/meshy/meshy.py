@@ -244,7 +244,8 @@ def prop(slug: str, vistas: list[str], alvo_poly: int) -> None:
     Saida: cenario/<slug>/origem/ (fora do git, como o origem dos personagens:
     a URL da Meshy MORRE em dias — o arquivo local e' a unica copia crua).
     """
-    pasta = RAIZ / "cenario" / slug / "arte"
+    # 25/09: cenario/<slug>/arte virou arte/cenario/<slug>/ na reorganizacao de 27/08.
+    pasta = RAIZ / "arte" / "cenario" / slug
     if not pasta.exists():
         sys.exit(f"ERRO: {pasta} nao existe")
     uris = []
@@ -272,8 +273,10 @@ def prop(slug: str, vistas: list[str], alvo_poly: int) -> None:
     print(f"  task: {tid}")
     t = esperar("/multi-image-to-3d", tid, "prop")
 
-    dest = RAIZ / "cenario" / slug / "origem"
-    baixar(t["model_urls"]["glb"], dest / f"{slug.split('-', 1)[-1]}.glb")
+    # Um conjunto (ex.: documento-mestre) tem varias pecas na mesma pasta: o nome sai da 1a vista.
+    dest = pasta / "origem"
+    nome = vistas[0]
+    baixar(t["model_urls"]["glb"], dest / f"{nome}.glb")
     for i, tex in enumerate(t.get("texture_urls") or []):
         for papel, chave_url in (
             ("albedo", "base_color"), ("normal", "normal"),
@@ -281,7 +284,7 @@ def prop(slug: str, vistas: list[str], alvo_poly: int) -> None:
         ):
             if tex.get(chave_url):
                 sufixo = f"_{i}" if i else ""
-                baixar(tex[chave_url], dest / f"{papel}{sufixo}.png")
+                baixar(tex[chave_url], dest / f"{nome}.{papel}{sufixo}.png")
     print(f"  creditos usados: {t.get('consumed_credits', '?')}")
 
 
