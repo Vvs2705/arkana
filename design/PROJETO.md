@@ -51,6 +51,24 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
+
+**Jogo (validado no editor, 25/09):** `Main.UsarIlhaMestre = true` → `GarantirIlha` cria a `IlhaMestre` antes da `Ilha`;
+`Ilha.Montar` vê a IlhaMestre e só cria o adaptador `RelevoMestre : IRelevo` (`Ilha.Chao`; `Relevo` fica nulo — minimapa,
+vitrine e terreno reativo já tratam nulo). Castelo: `RotaDoCastelo(seed, IRelevo)` voa a 760 m por 75 s (vetável) quando o lado
+> 1 km; névoa 4.000/14.000 e far 15.000 (o `NevoaDaCamera` empurra o far de toda câmera). **Medido:** partida automática pelo
+MCP (`scratchpad/teste_queda.py`): castelo entra de fora, salto a 45 % em (−573, 596, −62), pouso em y = 139,7 com chão 139,6,
+13 bots, 50 fps no editor, 0 erros (só o aviso "Nature/Soft Occlusion" das árvores). **Falta:** andar no Poco F4 (o APK ainda
+não foi gerado com isto), zona/loot escalados (12 itens em 4,8 km é deserto), minimapa da ilha nova, nascimentos de trio.
+
+**Subterrâneo:** `arte/tools/subterraneo.py` (traçado de todos os nós U01–U15 do doc §7, 28 túneis = 11,0 km, 15 salões/câmaras,
+2 poços com escada em caracol) → `Resources/ilha-mestre-subterraneo.json` + cascas glTF + `buracos.png`. **Regras medidas
+(exit 1 se falhar):** rocha ≥ 12 m sobre o teto fora dos 120 m de boca, declive ≤ 30 % (envoltória inferior 1D), nenhum túnel sob
+o lago, todas as ligações do §7.2 presentes. Túneis U14–U10 e U12–U14 mergulham a ~19 m para passar SOB o rio (leito 38 m). Está no
+`ARKANA_Ilha_Mestre_v002.blend` (coleções ARKANA_R10/R11/R12 dentro de REGIOES; bocas = atributo "buraco" + Geometry Nodes no
+terreno; materiais com backface culling — de fora vê-se o interior). **Não está no Unity ainda** (o JSON está; falta o construtor
+gerar as cascas e `SetHoles` nas 651 células). **Tripo3D:** só para qualidade das peças orgânicas — NÃO é necessário para validar.
+
 ### >>> 25/09, noite (2): a MESMA ilha também está no Blender — `arte/cenario/documento-mestre/ARKANA_Ilha_Mestre_v001.blend`
 
 Montada ao vivo pelo MCP do Blender (o Diretor acompanhou): relevo (malha 1025² com DISPLACE do mapa de alturas), chão com a
