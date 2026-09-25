@@ -39,8 +39,8 @@ namespace Arkana.Tests
                 Assert.Greater(ini, Mapa.RaioTerra, "entra de fora da ilha (seed " + r.Seed + ")");
                 Assert.Greater(fim, Mapa.RaioTerra, "sai pelo outro lado (seed " + r.Seed + ")");
                 Assert.Less(r.DistanciaAoCentro, Mapa.RaioTerra * 0.5f, "passa a menos de meia-terra do centro");
-                Assert.AreEqual(RotaDoCastelo.Altura, r.Inicio.y, 1e-3f);
-                Assert.AreEqual(RotaDoCastelo.Altura, r.Fim.y, 1e-3f);
+                Assert.AreEqual(r.Altura, r.Inicio.y, 1e-3f);
+                Assert.AreEqual(r.Altura, r.Fim.y, 1e-3f);
             }
         }
 
@@ -81,7 +81,8 @@ namespace Arkana.Tests
             // Queda.gd: 55 m/s terminal, 40 m/s2, planeio a 60 m sobre o chao (12 m/s desce, 16 anda),
             // freio 90. Pousando a 5 m: ~185 m de alcance horizontal em ~9,5 s de ar.
             float segundos;
-            float alcance = RotaDoCastelo.AlcanceHorizontalDaQueda(5f, out segundos);
+            var rota = new RotaDoCastelo(3103, Mapa);
+            float alcance = rota.AlcanceHorizontalDaQueda(5f, out segundos);
             Assert.IsTrue(alcance > 170f && alcance < 200f, "alcance " + alcance + " m");
             Assert.IsTrue(segundos > 9f && segundos < 10.5f, "tempo no ar " + segundos + " s");
             // O desvio lateral maximo da rota (18% do lado = 108 m) cabe no alcance: do ponto mais
@@ -89,7 +90,7 @@ namespace Arkana.Tests
             Assert.Less(RotaDoCastelo.Desvio * Mapa.Lado, alcance);
             // E a mesa do pico (26 m) tem MENOS ar que o vale, nao mais: alcance cai, nunca sobe.
             float s2;
-            Assert.Less(RotaDoCastelo.AlcanceHorizontalDaQueda(26f, out s2), alcance);
+            Assert.Less(rota.AlcanceHorizontalDaQueda(26f, out s2), alcance);
         }
 
         [Test]
