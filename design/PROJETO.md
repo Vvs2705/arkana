@@ -51,6 +51,19 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 25/09, noite (5): ILHA FLUTUANTE (sem mar) + a regra do REVIVER — decisões do Diretor
+
+**Diretor, 25/09:** "em volta da ilha não precisamos ter o mar" — nenhum jogo de referência tem; a borda é QUEDA: quem
+passa do mapa morre e precisa ser revivido. **Feito:** `IlhaMestre.IlhaFlutuante = true`: sem o plano do mar, o Terrain
+abaixo de 0,5 m vira buraco (sem colisor), `RelevoMestre.VazioY = −25`: o `Pawn` que passa disso morre direto
+(`Combat.MorrerNoVazio`: sem escudo, sem cair derrubado — não há chão lá embaixo). O relevo NÃO mudou (a "praia" ainda
+desce até 0 e some); o visual de ilha no céu (nuvens embaixo, borda rochosa) fica para uma leva de arte. Blender/doc
+seguem com mar até refazer (a réplica v002 está com mar).
+**REVIVER (Diretor, a implementar — como Apex/Warzone, "incentiva a continuar jogando e acreditar que o time possa dar
+um jeito"):** existe uma forma de trazer o morto de volta (comprar/reviver); quem volta vem com o BÁSICO: sem escudo, sem
+manoplas duplas, só a manopla base do elemento de MAIOR VÍNCULO. Hoje existe o `Derrubado` (caído + reerguer por aliado);
+falta o reviver pós-morte (ponto de reanimação/compra, spawn do revivido, kit básico). Vetável: onde/como se compra.
+
 ### >>> 25/09, fim de tarde (4): a ilha de 4,8 km é JOGÁVEL no editor — subterrâneo no Unity, zona §12.1, loot, minimapa
 
 **Medido na 2ª partida automática (editor):** cronômetro 1.800 s, 93 itens de loot (100 varinhas tentadas + 1 cajado por
