@@ -145,7 +145,7 @@ namespace Arkana.World
                 go.hideFlags = HideFlags.DontSave;
                 go.transform.SetParent(raiz, false);
                 go.transform.position = new Vector3(D.x0 + bi * bx, D.fundo, D.y0 + bj * by);
-                UnityEngine.Terrain ter = go.GetComponent<Terrain>();
+                UnityEngine.Terrain ter = go.GetComponent<UnityEngine.Terrain>();
                 if (mt != null) ter.materialTemplate = mt;
                 ter.drawInstanced = true;
                 ter.heightmapPixelError = 4f;
