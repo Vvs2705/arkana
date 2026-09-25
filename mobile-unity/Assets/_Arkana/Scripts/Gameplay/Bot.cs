@@ -46,7 +46,7 @@ namespace Arkana.Gameplay
             for (int i = 0; i < arena.Count; i++)
             {
                 IEntidade e = arena[i];
-                if (!Aliado(eu, e) || e.Vital == null || !e.Vital.Viva || !Derrubado.Esta(e)) continue;
+                if (!Aliado(eu, e) || e.Vital == null || !(Derrubado.Esta(e) || (!e.Vital.Viva && e is Pawn))) continue;   // caido OU eliminado (reviver)
                 float dd = (e.Pos - eu.Pos).sqrMagnitude;
                 if (dd < d2) { d2 = dd; melhor = e; }
             }

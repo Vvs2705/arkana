@@ -302,7 +302,14 @@ namespace Arkana.Gameplay
             float chao = Ilha.AlturaDoChao(pos.x, pos.z);
             // (dentro de caverna/tunel da IlhaMestre o chao verdadeiro e' a casca, abaixo da superficie: a rede nao puxa)
             if (pos.y < chao && !Ilha.Subterraneo(pos)) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
-            if (Viva && Ilha.NoVazio(transform.position)) Combat.MorrerNoVazio(this);   // caiu da borda da ilha flutuante
+            if (NoChao && !Ilha.NoVazio(pos)) UltimoChaoSeguro = pos;
+            if (Viva && Ilha.NoVazio(transform.position))   // caiu da borda da ilha flutuante: morre, e o corpo volta a beira
+            {
+                Combat.MorrerNoVazio(this);
+                if (_cc != null) _cc.enabled = false;
+                transform.position = UltimoChaoSeguro;
+                Physics.SyncTransforms();
+            }
             Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
 
             Virar(dt);
@@ -560,6 +567,22 @@ namespace Arkana.Gameplay
             }
             // o corpo afunda e some (VisualDoAbate): o colisor em pe' viraria parede invisivel para o passo, a camera e a mira
             if (_cc != null) _cc.enabled = false;
+        }
+
+        /// <summary>Ultimo chao seguro (fora do vazio): o corpo de quem cai da borda volta para ca', para o time poder revive-lo.</summary>
+        public Vector3 UltimoChaoSeguro { get; private set; }
+
+        /// <summary>RENASCER (Partida.Reviver): o corpo volta para `pos`, com mana cheia e SO' a luva base do elemento do mago
+        /// (sem escudo — a Partida ja' zerou; sem manopla dupla). O Reviver() (colisor, tinta) roda quando Viva volta.</summary>
+        public void Renascer(Vector3 pos)
+        {
+            if (_cc != null) _cc.enabled = false;
+            Aterrar(pos);
+            Loc.Parar();
+            EscreverMana(Balance.Player.ManaMax);
+            Slot.Equipar(Arma.VARINHA, null, IdentidadeMago.De(Slug).Elemento);
+            if (_morto) Reviver();
+            Physics.SyncTransforms();
         }
 
         private void Reviver()

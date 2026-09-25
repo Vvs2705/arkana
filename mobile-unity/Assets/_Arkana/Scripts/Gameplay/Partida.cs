@@ -69,6 +69,14 @@ namespace Arkana.Gameplay
         private readonly Dictionary<IEntidade, ArmaSlot> _slots = new Dictionary<IEntidade, ArmaSlot>();
         private readonly Dictionary<IEntidade, IEntidade> _ultimoAtacante = new Dictionary<IEntidade, IEntidade>();
         private readonly HashSet<IEntidade> _ultimoDanoAmbiente = new HashSet<IEntidade>();
+        /// <summary>REVIVER (Diretor, 25/09, como Apex/Warzone): um aliado DE PE' junto do corpo do ELIMINADO por REVIVER_S segundos
+        /// traz o morto de volta com o basico — vida parcial, SEM escudo, so' a luva base do elemento dele (Pawn.Renascer).
+        /// Canal por proximidade, como o Derrubado; decai quando ninguem esta' perto. Vetavel: 8 s, raio do Derrubado.</summary>
+        public const float REVIVER_S = 8f;
+        public const float RAIO_REVIVER = Derrubado.RAIO_M;
+        private readonly Dictionary<IEntidade, float> _canalReviver = new Dictionary<IEntidade, float>();
+        /// <summary>Progresso 0..1 do reviver de `morto` (a HUD desenha); 0 se ninguem esta' revivendo.</summary>
+        public float ProgressoReviver(IEntidade morto) { float t; return _canalReviver.TryGetValue(morto, out t) ? t / REVIVER_S : 0f; }
         private readonly HashSet<int> _contados = new HashSet<int>();
 
         public Partida(IRelevo relevo) { _relevo = relevo; }
@@ -80,7 +88,7 @@ namespace Arkana.Gameplay
             Treino = treino || Arkana.Menu.Menu.PedidoDeTreino;
             Arkana.Menu.Menu.PedidoDeTreino = false;   // consumido: a proxima partida nasce limpa
             Seed = seed;
-            Arena.Clear(); Bonecos.Clear(); Projeteis.Clear(); _slots.Clear(); _ultimoAtacante.Clear(); _ultimoDanoAmbiente.Clear();
+            Arena.Clear(); Bonecos.Clear(); Projeteis.Clear(); _slots.Clear(); _ultimoAtacante.Clear(); _ultimoDanoAmbiente.Clear(); _canalReviver.Clear();
             Player = null;
             Rodando = true; Acabou = false;
             BotsVivos = Treino ? 0 : bots;
@@ -185,6 +193,7 @@ namespace Arkana.Gameplay
                 if (e.Vital.Viva) Efeitos.Tick(e, dt);
                 Derrubado d = Derrubado.De(e);
                 if (d != null) d.Tick(dt);
+                if (!e.Vital.Viva && !Bonecos.Contains(e)) TickReviver(e, dt);
             }
             for (int i = 0; i < Bonecos.Count; i++)
             {
@@ -297,6 +306,41 @@ namespace Arkana.Gameplay
         {
             for (int i = 0; i < Arena.Count; i++) if (Arena[i] != Player && Combat.MesmoTime(Arena[i], Player)) return true;
             return false;
+        }
+
+        void TickReviver(IEntidade morto, float dt)
+        {
+            bool alguem = false;
+            for (int i = 0; i < Arena.Count && !alguem; i++)
+            {
+                IEntidade n = Arena[i];
+                alguem = n != morto && Vivo(n) && Combat.MesmoTime(n, morto) && Derrubado.DePe(n)
+                         && (n.Pos - morto.Pos).sqrMagnitude <= RAIO_REVIVER * RAIO_REVIVER;
+            }
+            float t;
+            _canalReviver.TryGetValue(morto, out t);
+            t = alguem ? t + dt : Mathf.Max(t - dt, 0f);
+            if (t >= REVIVER_S) { _canalReviver.Remove(morto); Reviver(morto, morto.Pos); }
+            else if (t > 0f) _canalReviver[morto] = t; else _canalReviver.Remove(morto);
+        }
+
+        /// <summary>Volta o ELIMINADO em `onde`: vida parcial, zero escudo, luva base. So' com a partida rodando e o time vivo.</summary>
+        public bool Reviver(IEntidade morto, Vector3 onde)
+        {
+            if (!Rodando || Acabou || morto == null || morto.Vital == null || Vivo(morto) || Bonecos.Contains(morto)
+                || !Arena.Contains(morto) || AliadoVivo(morto) == null) return false;
+            Vitalidade v = morto.Vital;
+            v.Hp = Mathf.Max(v.HpMax * Derrubado.VIDA_REERGUIDO, 1f);   // nao Reset(): zeraria DanoCausado e encheria o escudo
+            v.Escudo = 0f;
+            if (!morto.EhPlayer) BotsVivos++;
+            _ultimoAtacante.Remove(morto); _ultimoDanoAmbiente.Remove(morto);
+            Efeitos.Esquecer(morto);
+            var corpo = morto as Pawn;
+            if (corpo != null) corpo.Renascer(onde);
+            Bus.EmitShieldChanged(morto, 0f, v.EscudoMax, v.Nivel);
+            if (morto.EhPlayer) Bus.EmitHealthChanged(v.Hp, v.HpMax);
+            Bus.EmitEntityReerguida(morto, null);
+            return true;
         }
 
         /// <summary>O veredito, UMA vez. MatchOver e' na borda; o resto observa.</summary>

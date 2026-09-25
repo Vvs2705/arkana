@@ -109,7 +109,7 @@ namespace Arkana.Gameplay
         /// <summary>Esquadrao = o time do Combat (a pergunta unica). Bot com parceiro de pe' CAI; sozinho, morre.</summary>
         private static bool MesmoEsquadrao(IEntidade a, IEntidade b) => a != b && Combat.MesmoTime(a, b);
 
-        private static bool DePe(IEntidade n) =>
+        public static bool DePe(IEntidade n) =>
             Reanimadores.Contains(n) || (n.Vital != null && n.Vital.Viva && !Esta(n));
 
         /// <summary>JARDIM DA AURORA (§3.7): reerguer 50% mais rapido por `dur` segundos.</summary>

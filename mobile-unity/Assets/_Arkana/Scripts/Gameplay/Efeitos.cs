@@ -40,6 +40,8 @@ namespace Arkana.Gameplay
         }
 
         public static void Reset() => _estados.Clear();
+        /// <summary>Esquece os estados de quem RENASCEU (queimadura/lentidao velhas nao voltam com o corpo).</summary>
+        public static void Esquecer(IEntidade e) { if (e != null) _estados.Remove(e); }
 
         /// <summary>
         /// Resolve o elemento chegando no alvo e devolve o MULTIPLICADOR DE IMPACTO (conducao = +50% no MESMO
