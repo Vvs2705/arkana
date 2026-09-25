@@ -364,7 +364,7 @@ namespace Arkana.World
             for (int i = 0; i < cx; i++)
             {
                 float x = ox + i * passo, y = oy + j * passo;
-                v[j * cx + i] = U(x, y, z);
+                v[j * cx + i] = U(x - ox + passo * 2f, y - oy + passo * 2f, z);
                 c[j * cx + i] = new Color(Mathf.Clamp01(raso(x, y)), 0f, 0f, 1f);
             }
             int t = 0;
@@ -375,7 +375,7 @@ namespace Arkana.World
                 tri[t++] = a; tri[t++] = a + cx; tri[t++] = a + 1;
                 tri[t++] = a + 1; tri[t++] = a + cx; tri[t++] = a + cx + 1;
             }
-            Malha(nome, m, v, c, tri);
+            Malha(nome, m, v, c, tri).transform.position = U(ox - passo * 2f, oy - passo * 2f, 0f);
         }
 
         void FitaDoRio(Material m)
@@ -411,7 +411,7 @@ namespace Arkana.World
             Malha("Rio", m, v.ToArray(), c.ToArray(), tri.ToArray());
         }
 
-        void Malha(string nome, Material m, Vector3[] v, Color[] c, int[] tri)
+        GameObject Malha(string nome, Material m, Vector3[] v, Color[] c, int[] tri)
         {
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = nome };
             mesh.vertices = v;
@@ -425,6 +425,7 @@ namespace Arkana.World
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = m;
             mr.shadowCastingMode = ShadowCastingMode.Off;
+            return go;
         }
 
         // ------------------------------------------------------------------ atmosfera
@@ -568,8 +569,8 @@ namespace Arkana.World
             int casas = 0;
             for (int k = 0; k < 400 && casas < 30; k++)
             {
-                Vector2 p = Espalhar(v, 330f);
-                if (Declive(p.x, p.y) > 14f || (p - new Vector2(v.x + 60f, v.y - 60f)).magnitude < 45f) continue;
+                Vector2 p = Espalhar(v, 210f);
+                if (Declive(p.x, p.y) > 10f || (p - new Vector2(v.x + 60f, v.y - 60f)).magnitude < 45f) continue;
                 float cw = Rn(10f, 16f), cd = Rn(8f, 13f), cr = Rn(0f, 180f);
                 Casa(g, p.x, p.y, cw, cd, cr, casas % 4 == 0);
                 if (casas % 3 == 0)   // quintal: 3 modulos de cerca na frente da casa
@@ -605,7 +606,7 @@ namespace Arkana.World
             Regiao a6 = R("R06");
             for (int k = 0; k < 10; k++)
             {
-                float a = k * 36f * Mathf.Deg2Rad, d = Rn(38f, 55f);   // anel de barracas viradas para o centro
+                float a = k * 36f * Mathf.Deg2Rad, d = Rn(18f, 26f);   // anel de barracas viradas para o centro
                 Peca(g, "mestre-053-acampamento-barraca", a6.x + Mathf.Cos(a) * d, a6.y + Mathf.Sin(a) * d, 1f, -k * 36f + 90f);
             }
             for (int k = 0; k < 3; k++)
@@ -619,19 +620,19 @@ namespace Arkana.World
             }
             for (int k = 0; k < 9; k++)
             {
-                Vector2 p = Espalhar(a6, 45f);
+                Vector2 p = Espalhar(a6, 30f);
                 Peca(g, "mestre-028-acampamento-barril", p.x, p.y, 1f, Rn(0f, 360f));
             }
             for (int k = 0; k < 2; k++)
-                Bloco(g, "R06_Abrigo", PrimitiveType.Cube, a6.x - 20f + k * 40f, a6.y + 30f, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
+                Bloco(g, "R06_Abrigo", PrimitiveType.Cube, a6.x - 16f + k * 32f, a6.y + 34f, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
             for (int k = 0; k < 3; k++)
             {
-                Vector2 p = Espalhar(a6, 35f);
+                Vector2 p = Espalhar(a6, 10f);
                 Bloco(g, "R06_Fogueira", PrimitiveType.Cylinder, p.x, p.y, -9999f, new Vector3(1.6f, 1.6f, 0.3f), 0f, Escuro);
             }
             for (int k = 0; k < 12; k++)
             {
-                Vector2 p = Espalhar(a6, 50f);
+                Vector2 p = Espalhar(a6, 32f);
                 Peca(g, "mestre-027-acampamento-caixa-madeira", p.x, p.y, 1f, Rn(0f, 360f));
             }
 
