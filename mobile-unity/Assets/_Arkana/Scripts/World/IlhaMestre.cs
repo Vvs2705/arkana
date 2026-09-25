@@ -593,8 +593,8 @@ namespace Arkana.World
             Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs - 1f, new Vector3(120f, 90f, 5f), 0f, Pedra);
             Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 4f, new Vector3(20f, 20f, 45f), 0f, Pedra);
             Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 49f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
-            // escadaria do kit sobe para LESTE (o modulo sobe em +Y local: giro -90 poe o topo no terraco); blockout se faltar
-            if (Peca(g, "mestre-046-templo-escadaria", t.x - 55f, t.y + 10f, 1f, -90f, Altura(t.x - 70f, t.y + 10f) - 0.2f) == null)
+            // escadaria do kit sobe para LESTE (o modulo sobe em +Y local; giro +90 leva +Y para +X); blockout se faltar
+            if (Peca(g, "mestre-046-templo-escadaria", t.x - 55f, t.y + 10f, 1f, 90f, Altura(t.x - 70f, t.y + 10f) - 0.2f) == null)
                 Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 55f, t.y + 10f, -9999f, new Vector3(18f, 30f, 6f), 0f, PedraEsc);
             for (int k = 0; k < 10; k++)
             {
