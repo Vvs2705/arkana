@@ -58,7 +58,9 @@ passa do mapa morre e precisa ser revivido. **Feito:** `IlhaMestre.IlhaFlutuante
 abaixo de 0,5 m vira buraco (sem colisor), `RelevoMestre.VazioY = −25`: o `Pawn` que passa disso morre direto
 (`Combat.MorrerNoVazio`: sem escudo, sem cair derrubado — não há chão lá embaixo). O relevo NÃO mudou (a "praia" ainda
 desce até 0 e some); o visual de ilha no céu (nuvens embaixo, borda rochosa) fica para uma leva de arte. Blender/doc
-seguem com mar até refazer (a réplica v002 está com mar).
+seguem com mar até refazer (a réplica v002 está com mar). **Medido em partida (25/09):** jogador pousado, teleportado para
+(−2.700, −30, 0): viva=False, hp=0, não derrubado, PlayerFora=True (a câmera passa ao parceiro). Construir() da ilha com os
+buracos do vazio: ~20 s no editor (o MCP devolve nulo, mas termina).
 **REVIVER (Diretor, a implementar — como Apex/Warzone, "incentiva a continuar jogando e acreditar que o time possa dar
 um jeito"):** existe uma forma de trazer o morto de volta (comprar/reviver); quem volta vem com o BÁSICO: sem escudo, sem
 manoplas duplas, só a manopla base do elemento de MAIOR VÍNCULO. Hoje existe o `Derrubado` (caído + reerguer por aliado);
