@@ -51,6 +51,21 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 25/09, fim de tarde (4): a ilha de 4,8 km é JOGÁVEL no editor — subterrâneo no Unity, zona §12.1, loot, minimapa
+
+**Medido na 2ª partida automática (editor):** cronômetro 1.800 s, 93 itens de loot (100 varinhas tentadas + 1 cajado por
+região), zona 2.200 → 1.800 → 1.000 → 450 → 120 → 0 m com centros em terra (última em (361, −34), leste do lago), minimapa
+pintado (`MapaLogica.PintarMestre`: água pela regra do jogo, chão pelas camadas, sombra de relevo). Duração da partida:
+`Balance.Match.DurationGrandeS` quando o raio de terra > `Zona.RAIO_GRANDE` (1.000 m); os testes da ilha pequena não mudam.
+**Subterrâneo no Unity:** `IlhaMestre.Subterraneo.cs` constrói as MESMAS cascas do Blender a partir do JSON (túneis, salões,
+poços com escada), com MeshCollider e material dos dois lados; `SetHoles` abre 649 células nas bocas; uma luz por salão
+(cores do §8.3; túneis escuros de propósito — 140 luzes não cabem no celular, cristais emissivos depois). O `Pawn` não puxa
+para a superfície quem está numa caverna (`Ilha.Subterraneo`). **Base militar:** perímetro 300 × 250 m (a cerca de 380 × 300
+passava da falésia; o platô de 150 m vai até x 1.400 / y −1.475).
+**Armadilhas do Play pelo MCP:** sem foco o editor congela o Play (`Application.runInBackground = true` por execute_code);
+NUNCA ff em main nem focar o Unity durante um teste em Play (o auto-refresh recompila e o domain reload apaga a partida).
+**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, nascimentos de trio, S16 e peças que ainda são blockout.
+
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
 **Jogo (validado no editor, 25/09):** `Main.UsarIlhaMestre = true` → `GarantirIlha` cria a `IlhaMestre` antes da `Ilha`;
