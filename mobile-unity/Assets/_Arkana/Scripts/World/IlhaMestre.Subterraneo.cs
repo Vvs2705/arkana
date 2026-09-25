@@ -54,7 +54,86 @@ namespace Arkana.World
                 Objeto(grupos["R11"], "R11_Poco_" + p.id, MalhaPoco(p.x, p.y, p.piso, p.topo + 5f, p.raio), rocha);
                 Objeto(grupos["R11"], "R11_Escada_" + p.id, MalhaEscada(p.x, p.y, p.piso, p.topo), Mat(PedraEsc));
             }
+            Cristais(grupos);
             Buracos();
+        }
+
+        /// <summary>
+        /// Luz de custo zero nos tuneis e saloes (doc §8.3: azul/violeta guia para as saidas, ambar nas lanternas de mina):
+        /// cachos de cristais EMISSIVOS a cada ~36 m, no pe' da parede, lados alternados — UMA malha por regiao (3 draw calls).
+        /// Emissivo nao ilumina o chao em volta (sem GI em tempo real); e' marcador visual. Vetavel: espacamento e tamanho.
+        /// </summary>
+        void Cristais(Dictionary<string, Transform> grupos)
+        {
+            var cor = new Dictionary<string, Color>
+            {
+                ["R10"] = new Color(0.35f, 0.6f, 1f), ["R11"] = new Color(1f, 0.7f, 0.3f), ["R12"] = new Color(0.6f, 0.35f, 1f),
+            };
+            var vs = new Dictionary<string, List<Vector3>>();
+            var fs = new Dictionary<string, List<int>>();
+            foreach (string r in grupos.Keys) { vs[r] = new List<Vector3>(); fs[r] = new List<int>(); }
+            var rng = new System.Random(2509);
+            foreach (Tunel t in S.tuneis)
+            {
+                int np = t.p.Length / 5;
+                for (int i = 3; i < np - 3; i += 6)
+                {
+                    float tx = t.p[(i + 1) * 5] - t.p[(i - 1) * 5], ty = t.p[(i + 1) * 5 + 1] - t.p[(i - 1) * 5 + 1];
+                    float len = Mathf.Max(Mathf.Sqrt(tx * tx + ty * ty), 1e-4f);
+                    float lado = (i / 6) % 2 == 0 ? 1f : -1f;
+                    float nx = -ty / len * lado, ny = tx / len * lado;
+                    float w = t.p[i * 5 + 3] * 0.5f - 0.6f;
+                    Cacho(vs[t.regiao], fs[t.regiao], t.p[i * 5] + nx * w, t.p[i * 5 + 1] + ny * w, t.p[i * 5 + 2], -nx, -ny, rng);
+                }
+            }
+            foreach (Salao s in S.saloes)
+                for (int k = 0; k < 8; k++)
+                {
+                    float a = k * Mathf.PI / 4f + 0.3f, g = s.giro * Mathf.Deg2Rad;
+                    float lx = Mathf.Cos(a) * s.largura * 0.42f, ly = Mathf.Sin(a) * s.comprimento * 0.42f;
+                    float x = s.x + lx * Mathf.Cos(g) - ly * Mathf.Sin(g), y = s.y + lx * Mathf.Sin(g) + ly * Mathf.Cos(g);
+                    Cacho(vs[s.regiao], fs[s.regiao], x, y, s.piso, s.x - x, s.y - y, rng, 1.6f);
+                }
+            foreach (string r in grupos.Keys)
+            {
+                if (vs[r].Count == 0) continue;
+                Material m = Mat(cor[r]);
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", cor[r] * 2.5f);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                var g = new GameObject(r + "_Cristais") { hideFlags = HideFlags.DontSave };
+                g.transform.SetParent(grupos[r], false);
+                g.AddComponent<MeshFilter>().sharedMesh = Malha("cristais_" + r, vs[r], fs[r]);
+                g.AddComponent<MeshRenderer>().sharedMaterial = m;   // sem colisor: cristal e' decoracao, nao obstaculo
+            }
+        }
+
+        /// <summary>3 octaedros alongados, inclinados para dentro do vao (dx, dy = direcao do centro), tamanhos sorteados.</summary>
+        static void Cacho(List<Vector3> v, List<int> f, float x, float y, float z, float dx, float dy, System.Random rng, float esc = 1f)
+        {
+            float n = Mathf.Max(Mathf.Sqrt(dx * dx + dy * dy), 1e-4f);
+            dx /= n; dy /= n;
+            for (int k = 0; k < 3; k++)
+            {
+                float alt = (float)(0.8 + rng.NextDouble() * 1.4) * esc, raio = alt * 0.22f;
+                float ox = (float)(rng.NextDouble() - 0.5) * 1.6f, oy = (float)(rng.NextDouble() - 0.5) * 1.6f;
+                float incl = (float)(0.25 + rng.NextDouble() * 0.35);   // tombado para o centro do tunel
+                Vector3 b = U(x + ox, y + oy, z - 0.2f);
+                Vector3 topo = U(x + ox + dx * alt * incl, y + oy + dy * alt * incl, z + alt);
+                Vector3 meio = (b + topo) * 0.5f;
+                int o = v.Count;
+                v.Add(b); v.Add(topo);
+                for (int i = 0; i < 4; i++)
+                {
+                    float a = i * Mathf.PI / 2f + 0.4f;
+                    v.Add(meio + new Vector3(Mathf.Cos(a) * raio, 0f, Mathf.Sin(a) * raio));
+                }
+                for (int i = 0; i < 4; i++)
+                {
+                    int a = o + 2 + i, c = o + 2 + (i + 1) % 4;
+                    f.AddRange(new[] { o, c, a, o + 1, a, c });
+                }
+            }
         }
 
         GameObject Objeto(Transform pai, string nome, Mesh m, Material mat)
