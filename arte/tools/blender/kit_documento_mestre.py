@@ -265,6 +265,15 @@ def main():
     bpy.context.view_layer.objects.active = partes[0]
     bpy.ops.object.join()
     obj = bpy.context.active_object
+    # o join herda a origem da 1a parte (centro de uma viga, a meia altura): a peca
+    # entrava meio enterrada no Unity. Origem = (0,0,0) do mundo = centro da base.
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    zs = [v.co.z for v in obj.data.vertices]
+    xs = [v.co.x for v in obj.data.vertices]
+    ys = [v.co.y for v in obj.data.vertices]
+    assert abs(min(zs)) < 0.02 and abs(max(xs) + min(xs)) < 0.02 and abs(max(ys) + min(ys)) < 0.02, \
+        f"pivo fora do chao/centro: z_min={min(zs):.3f} x=({min(xs):.3f},{max(xs):.3f}) y=({min(ys):.3f},{max(ys):.3f})"
     obj.name = f"mestre_{peca}"
     obj["arkana_id"], obj["spec_version"], obj["generation_seed"] = peca, "1.0", SEED
     assar(obj, mats)
