@@ -8,9 +8,9 @@ namespace Arkana.World
     /// <summary>
     /// A ilha do Documento Mestre (4.800 x 4.400 m), montada a partir de Resources/ilha-mestre-altura.bytes e
     /// ilha-mestre.json — os dois gerados por arte/tools/ilha_mestre.py, que MEDE a ilha (doc §18) e falha fora da meta.
-    /// 16 blocos de Terrain nativo (o Unity simplifica o que esta' longe e poda por bloco), 5 camadas CC0 por altura e
+    /// 16 blocos de UnityEngine.Terrain nativo (o Unity simplifica o que esta' longe e poda por bloco), 5 camadas CC0 por altura e
     /// declive, mar/lago/rio no shader de agua do jogo, sol da tarde vindo do SO (doc §8.2), arvores do kit como
-    /// instancias do Terrain e as 12 regioes em BLOCKOUT (volumes + pecas que o jogo ja' tem).
+    /// instancias do UnityEngine.Terrain e as 12 regioes em BLOCKOUT (volumes + pecas que o jogo ja' tem).
     /// Tudo nasce sob "_gerado" com DontSave: a cena guarda so' este componente; abrir a cena reconstroi.
     /// Convencao do doc: +X leste, +Y norte, +Z cima -> Unity (x, z, y).
     /// </summary>
@@ -120,7 +120,7 @@ namespace Arkana.World
             TerrainLayer[] camadas = Camadas();
             Shader st = Shader.Find("Universal Render Pipeline/Terrain/Lit");
             Material mt = st != null ? new Material(st) { name = "mestre_terreno" } : null;
-            var t = new Terrain[Blocos, Blocos];
+            var t = new UnityEngine.Terrain[Blocos, Blocos];
             var arvores = Arvores(out TreePrototype[] protos);
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
@@ -140,12 +140,12 @@ namespace Arkana.World
                     td.treePrototypes = protos;
                     td.SetTreeInstances(ArvoresDoBloco(arvores, D.x0 + bi * bx, D.y0 + bj * by, bx, by).ToArray(), true);
                 }
-                GameObject go = Terrain.CreateTerrainGameObject(td);
+                GameObject go = UnityEngine.Terrain.CreateTerrainGameObject(td);
                 go.name = $"TER_{bi}_{bj}";
                 go.hideFlags = HideFlags.DontSave;
                 go.transform.SetParent(raiz, false);
                 go.transform.position = new Vector3(D.x0 + bi * bx, D.fundo, D.y0 + bj * by);
-                Terrain ter = go.GetComponent<Terrain>();
+                UnityEngine.Terrain ter = go.GetComponent<Terrain>();
                 if (mt != null) ter.materialTemplate = mt;
                 ter.drawInstanced = true;
                 ter.heightmapPixelError = 4f;
@@ -263,7 +263,7 @@ namespace Arkana.World
             return l;
         }
 
-        /// <summary>O GLB do kit vira UMA malha na raiz (o Terrain so' desenha arvore com MeshRenderer na raiz).</summary>
+        /// <summary>O GLB do kit vira UMA malha na raiz (o UnityEngine.Terrain so' desenha arvore com MeshRenderer na raiz).</summary>
         GameObject Molde(string recurso, out float altura)
         {
             altura = 0f;
