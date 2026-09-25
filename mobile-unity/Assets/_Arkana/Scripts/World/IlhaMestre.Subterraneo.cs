@@ -55,7 +55,6 @@ namespace Arkana.World
                 Objeto(grupos["R11"], "R11_Escada_" + p.id, MalhaEscada(p.x, p.y, p.piso, p.topo), Mat(PedraEsc));
             }
             Cristais(grupos);
-            Buracos();
         }
 
         /// <summary>
@@ -291,6 +290,7 @@ namespace Arkana.World
         void Buracos()
         {
             if (terrenos == null) return;
+            bool vazio = IlhaFlutuante;   // ilha flutuante: o chao abaixo de 0,5 m (o antigo mar) vira buraco — a borda e' queda
             int hr = terrenos[0, 0].terrainData.holesResolution;   // = Res - 1 (512): 2.048 celulas no mapa inteiro
             int total = hr * Blocos;
             float cs = (D.x1 - D.x0) / total, csy = (D.y1 - D.y0) / total;
@@ -308,11 +308,14 @@ namespace Arkana.World
                     if (ch > zmin && ch < zmax) buraco.Add((long)rj * total + ci);
                 }
             }
-            foreach (Tunel t in S.tuneis)
-                for (int i = 0; i + 4 < t.p.Length; i += 5)
-                    Marcar(t.p[i], t.p[i + 1], t.p[i + 3] * 0.5f - 0.5f, t.p[i + 2] - 0.5f, t.p[i + 2] + t.p[i + 4]);
-            foreach (Poco p in S.pocos) Marcar(p.x, p.y, 6.5f, float.MinValue, float.MaxValue);
-            if (buraco.Count == 0) return;
+            if (S != null)
+            {
+                foreach (Tunel t in S.tuneis)
+                    for (int i = 0; i + 4 < t.p.Length; i += 5)
+                        Marcar(t.p[i], t.p[i + 1], t.p[i + 3] * 0.5f - 0.5f, t.p[i + 2] - 0.5f, t.p[i + 2] + t.p[i + 4]);
+                foreach (Poco p in S.pocos) Marcar(p.x, p.y, 6.5f, float.MinValue, float.MaxValue);
+            }
+            if (buraco.Count == 0 && !vazio) return;
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
             {
@@ -321,7 +324,8 @@ namespace Arkana.World
                 for (int j = 0; j < hr; j++)
                 for (int i = 0; i < hr; i++)
                 {
-                    bool furo = buraco.Contains((long)(bj * hr + j) * total + bi * hr + i);
+                    bool furo = buraco.Contains((long)(bj * hr + j) * total + bi * hr + i)
+                                || (vazio && Altura(D.x0 + (bi * hr + i + 0.5f) * cs, D.y0 + (bj * hr + j + 0.5f) * csy) < 0.5f);
                     h[j, i] = !furo;
                     algum |= furo;
                 }

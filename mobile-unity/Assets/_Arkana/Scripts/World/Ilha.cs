@@ -71,6 +71,9 @@ namespace Arkana.World
             return Atual != null && Atual.Chao != null ? Atual.Chao.SuperficieDaAgua(x, z) : Relevo.Seco;
         }
 
+        /// <summary>Caiu da borda da ilha flutuante (IlhaMestre): abaixo de RelevoMestre.VazioY. Sem IlhaMestre, nunca.</summary>
+        public static bool NoVazio(Vector3 p) => Atual != null && Atual.Mestre != null && p.y < RelevoMestre.VazioY;
+
         /// <summary>O ponto esta' dentro de uma caverna/tunel da IlhaMestre (abaixo da superficie, mas em chao valido).</summary>
         public static bool Subterraneo(Vector3 p) => Atual != null && Atual.Mestre != null && Atual.Mestre.Subterraneo(p);
 

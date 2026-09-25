@@ -302,6 +302,7 @@ namespace Arkana.Gameplay
             float chao = Ilha.AlturaDoChao(pos.x, pos.z);
             // (dentro de caverna/tunel da IlhaMestre o chao verdadeiro e' a casca, abaixo da superficie: a rede nao puxa)
             if (pos.y < chao && !Ilha.Subterraneo(pos)) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
+            if (Viva && Ilha.NoVazio(transform.position)) Combat.MorrerNoVazio(this);   // caiu da borda da ilha flutuante
             Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
 
             Virar(dt);

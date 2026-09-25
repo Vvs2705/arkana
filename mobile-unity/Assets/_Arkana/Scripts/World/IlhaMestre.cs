@@ -41,6 +41,9 @@ namespace Arkana.World
             public Rota[] rotas;
         }
 
+        /// <summary>Diretor (25/09): a ilha FLUTUA — sem mar em volta; o que passa da borda cai no vazio e morre (Pawn).
+        /// O relevo continua o mesmo (a "praia" desce ate' 0 e o chao some abaixo de 0,5 m: buraco no Terrain, sem colisor).</summary>
+        public const bool IlhaFlutuante = true;
         public Dados D { get; private set; }
         /// <summary>Subterraneo (doc §7, R10-R12) de arte/tools/subterraneo.py; nulo se o JSON nao existir.</summary>
         public Sub S { get; private set; }
@@ -71,6 +74,7 @@ namespace Arkana.World
             Atmosfera();
             Regioes();
             Subterraneo();
+            Buracos();
             Cameras();
         }
 
@@ -384,7 +388,7 @@ namespace Arkana.World
             Material lago = Ilha.MaterialAgua("MestreLago", 0x35b0f2, 0x0f4f9e, 0.07f, 1f, 1.15f, 1f);
             Material rio = Ilha.MaterialAgua("MestreRio", 0x49c2e6, 0x1a6fa8, 0.10f, 1f, 1.3f, 1f);
             // mar: grade de 50 m sobre a ilha; COLOR.r = o quanto e' raso (o shader pinta turquesa e espuma na beira)
-            Grade("Mar", mar, -6000f, -6000f, 12000f, 12000f, 60f, 0f, (x, y) => Mathf.InverseLerp(-14f, 0f, Altura(x, y)));
+            if (!IlhaFlutuante) Grade("Mar", mar, -6000f, -6000f, 12000f, 12000f, 60f, 0f, (x, y) => Mathf.InverseLerp(-14f, 0f, Altura(x, y)));
             Grade("Lago", lago, D.lago.cx - D.lago.a * 1.3f, D.lago.cy - D.lago.b * 1.3f, D.lago.a * 2.6f, D.lago.b * 2.6f, 10f,
                 D.lago.nivel, (x, y) => Mathf.InverseLerp(D.lago.nivel - 10f, D.lago.nivel, Altura(x, y)));
             FitaDoRio(rio);

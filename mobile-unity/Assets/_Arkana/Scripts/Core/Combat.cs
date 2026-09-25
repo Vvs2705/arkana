@@ -105,6 +105,20 @@ namespace Arkana.Core
         }
 
         /// <summary>
+        /// MORTE NO VAZIO (Diretor, 25/09: a ilha flutua, sem mar — quem cai da borda morre): direta, sem escudo, sem cair
+        /// derrubado (nao ha' chao para rastejar nem quem reerga la' embaixo). Quem reanima depois e' o sistema de reviver.
+        /// </summary>
+        public static void MorrerNoVazio(IEntidade alvo)
+        {
+            if (alvo == null || alvo.Vital == null || !alvo.Vital.Viva) return;
+            Vitalidade v = alvo.Vital;
+            v.Escudo = 0f; v.Hp = 0f;
+            _dot.Remove(alvo);
+            if (alvo.EhPlayer) Bus.EmitHealthChanged(0f, v.HpMax);
+            Bus.EmitEntityDied(alvo);
+        }
+
+        /// <summary>
         /// DoT (queimadura, terreno, nevoa): direto na VIDA e com TETO SOMADO por alvo (DANO.md §3.5).
         /// O orcamento da janela e' TetoDps x Tick; a janela fecha em TickDot(dt), que o dono do loop
         /// (Gameplay) chama UMA vez por frame. Sem TickDot o orcamento nunca renova e o DoT para — de proposito

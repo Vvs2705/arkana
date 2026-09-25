@@ -43,10 +43,13 @@ namespace Arkana.World
         public float Altura(float x, float z) => m.Altura(x, z);
         public Color CorDoChao(float x, float z) => m.CorDoChao(x, z);
 
+        /// <summary>Abaixo disto e' o VAZIO em volta da ilha flutuante: o corpo morre (Pawn). O leito antigo do mar esta' a -40.</summary>
+        public const float VazioY = -25f;
+
         public float SuperficieDaAgua(float x, float z)
         {
             float h = m.Altura(x, z);
-            if (h < Relevo.AguaY) return Relevo.AguaY;
+            if (h < Relevo.AguaY) return IlhaMestre.IlhaFlutuante ? Relevo.Seco : Relevo.AguaY;   // sem mar: a borda e' queda
             IlhaMestre.Lago l = d.lago;
             float th = Mathf.Atan2((z - l.cy) / l.b, (x - l.cx) / l.a);
             float q = Mathf.Sqrt(((x - l.cx) / l.a) * ((x - l.cx) / l.a) + ((z - l.cy) / l.b) * ((z - l.cy) / l.b)) /
