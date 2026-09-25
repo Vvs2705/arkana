@@ -27,6 +27,38 @@ CAMADAS = {
 }
 
 
+# materiais de ARQUITETURA que se repetem (1 u de UV = 2 m no kit): ficam em arte/cenario/texturas e entram
+# embutidos nos GLB das pecas grandes (casa, ponte, galpao...). Assar em 1024 borraria uma ponte de 300 m.
+ARQ = {
+    "pedra-templo": "large_sandstone_blocks", "pedra-rustica": "rustic_stone_wall", "reboco": "clay_plaster",
+    "telha": "clay_roof_tiles_02", "tabua": "brown_planks_05", "zinco": "rusty_corrugated_iron", "concreto": "chipped_concrete",
+}
+ARQ_DIR = os.path.join(RAIZ, "arte", "cenario", "texturas")
+ARQ_ALVO = {"pedra-templo": (168, 158, 138), "pedra-rustica": (150, 142, 125), "reboco": (205, 190, 160), "tabua": (112, 78, 48)}
+
+
+def arquitetura():
+    for nome, slug in ARQ.items():
+        for mapa, chave in (("cor", "Diffuse"), ("normal", "nor_gl")):
+            destino = os.path.join(ARQ_DIR, f"arq-{nome}-{mapa}.png")
+            if not os.path.exists(destino):
+                baixar(slug, chave).save(destino)
+        cor_path = os.path.join(ARQ_DIR, f"arq-{nome}-cor.png")
+        if nome in ARQ_ALVO:   # medido: o nome engana (sandstone cinza-escuro, plaster marrom, planks cinza)
+            foto = np.asarray(baixar(slug, "Diffuse"), dtype=np.float32)
+            Image.fromarray(recolorir(foto, ARQ_ALVO[nome])).save(cor_path)
+        im = Image.open(cor_path).convert("RGB")
+        print(nome, slug, "media:", [int(v) for v in np.asarray(im, dtype=np.float32).reshape(-1, 3).mean(axis=0)])
+
+
+def recolorir(foto, alvo):
+    lum = foto @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    f = np.clip(lum / lum.mean(), 0.35, 1.9)[..., None]
+    alvo_v = np.array(alvo, dtype=np.float32)
+    tom = foto * (alvo_v / foto.reshape(-1, 3).mean(axis=0))
+    return np.clip(0.75 * alvo_v * f + 0.25 * tom, 0, 255).astype(np.uint8)
+
+
 def baixar(slug, chave):
     f = json.loads(urllib.request.urlopen(urllib.request.Request(f"https://api.polyhaven.com/files/{slug}", headers=H), timeout=60).read())
     url = f[chave]["1k"]["jpg"]["url"]
@@ -49,4 +81,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    arquitetura() if "arq" in sys.argv[1:] else main()

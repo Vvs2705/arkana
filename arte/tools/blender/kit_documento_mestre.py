@@ -378,7 +378,258 @@ def peca_086():
     return partes, (mY, fe)
 
 
-PECAS = {"027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
+# ---------------------------------------------------------------- ARQUITETURA (materiais que se repetem, sem assar)
+TEX = __import__("os").path.abspath(__import__("os").path.join(__import__("os").path.dirname(__file__), "..", "..", "cenario", "texturas"))
+
+
+def mat_foto(nome):
+    """Material com a foto CC0 recolorida (arte/cenario/texturas/arq-<nome>-{cor,normal}.png); o GLB a embute."""
+    import os
+    m = bpy.data.materials.get("arq_" + nome)
+    if m:
+        return m
+    m = bpy.data.materials.new("arq_" + nome)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    ci = no(nt, "ShaderNodeTexImage")
+    ci.image = bpy.data.images.load(os.path.join(TEX, f"arq-{nome}-cor.png"))
+    ni = no(nt, "ShaderNodeTexImage")
+    ni.image = bpy.data.images.load(os.path.join(TEX, f"arq-{nome}-normal.png"))
+    ni.image.colorspace_settings.name = "Non-Color"
+    nm = no(nt, "ShaderNodeNormalMap")
+    nt.links.new(ci.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(ni.outputs["Color"], nm.inputs["Color"])
+    nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    bsdf.inputs["Roughness"].default_value = 0.85
+    if nome == "zinco":
+        bsdf.inputs["Metallic"].default_value = 0.5
+    return m
+
+
+def parede(eixo, c, u0, u1, esp, z0, alt, vaos, mat):
+    """Parede ao longo de X (eixo 'x', na linha y=c) ou de Y ('y', x=c), de u0 a u1, com VAOS reais
+    (u_centro, largura, base, topo): pilares entre vaos + verga acima e peitoril abaixo de cada vao."""
+    partes, cortes = [], sorted(vaos)
+    ini = u0
+    def bloco(ua, ub, za, zb):
+        if ub - ua < 0.01 or zb - za < 0.01:
+            return
+        mid, L = (ua + ub) / 2, ub - ua
+        if eixo == "x":
+            partes.append(caixa((L, esp, zb - za), (mid, c, (za + zb) / 2), mat=mat))
+        else:
+            partes.append(caixa((esp, L, zb - za), (c, mid, (za + zb) / 2), mat=mat))
+    for (uc, lg, base, topo) in cortes:
+        bloco(ini, uc - lg / 2, z0, z0 + alt)
+        bloco(uc - lg / 2, uc + lg / 2, z0, z0 + base)
+        bloco(uc - lg / 2, uc + lg / 2, z0 + topo, z0 + alt)
+        ini = uc + lg / 2
+    bloco(ini, u1, z0, z0 + alt)
+    return partes
+
+
+def telhado(W, D, z, beiral, mat, lado=(1, -1), inclin=0.42):
+    """Duas aguas com cumeeira ao longo de X; lado escolhe quais aguas existem (casa danificada perde uma)."""
+    partes, h = [], D * inclin
+    ang = math.atan2(h, D / 2)
+    L = math.hypot(h, D / 2) + beiral
+    for s in lado:
+        # -s: a ponta +Y da agua norte (s=+1) e' o BEIRAL, que desce; com +s o telhado abria para cima
+        partes.append(caixa((W + 2 * beiral, L, 0.22), (0, s * D / 4, z + h / 2), (-s * ang, 0, 0), mat=mat))
+    return partes, h
+
+
+def empena(W, D, z, h, mat):
+    """Triangulos das duas empenas (bmesh), fechando o sotao."""
+    import bmesh
+    partes = []
+    for x in (-W / 2, W / 2):
+        me = bpy.data.meshes.new("empena")
+        bm = bmesh.new()
+        vs = [bm.verts.new((x, -D / 2, z)), bm.verts.new((x, D / 2, z)), bm.verts.new((x, 0, z + h))]
+        vs2 = [bm.verts.new((x + (0.25 if x < 0 else -0.25), v.co.y, v.co.z)) for v in vs]
+        bm.faces.new(vs)
+        bm.faces.new(vs2[::-1])
+        for i in range(3):
+            j = (i + 1) % 3
+            bm.faces.new((vs[i], vs[j], vs2[j], vs2[i]))
+        bm.to_mesh(me)
+        bm.free()
+        o = bpy.data.objects.new("empena", me)
+        bpy.context.collection.objects.link(o)
+        marcar(o, 0.5)
+        me.materials.append(mat)
+        partes.append(o)
+    return partes
+
+
+def casa(W, D, pisos, danificada):
+    """Casa da vila (015/016/103/109): terreo de pedra com porta e janelas VAZADAS, andar de reboco com
+    enxaimel, piso de tabuas, escada interna quando tem 2 andares, telhado de telhas, chamine."""
+    pedra, reboco, tabua, telha = mat_foto("pedra-rustica"), mat_foto("reboco"), mat_foto("tabua"), mat_foto("telha")
+    partes, e, h1, h2 = [], 0.45, 3.2, 2.8
+    porta = (0.0, 1.6, 0.0, 2.5)
+    jan = lambda u: (u, 1.0, 1.0, 2.1)
+    partes += parede("x", -D / 2 + e / 2, -W / 2, W / 2, e, 0, h1, [porta, jan(-W / 3), jan(W / 3)], pedra)
+    partes += parede("x", D / 2 - e / 2, -W / 2, W / 2, e, 0, h1, [jan(-W / 4), jan(W / 4)], pedra)
+    partes += parede("y", -W / 2 + e / 2, -D / 2 + e, D / 2 - e, e, 0, h1, [jan(0)], pedra)
+    partes += parede("y", W / 2 - e / 2, -D / 2 + e, D / 2 - e, e, 0, h1, [(0.0, 1.4, 0.0, 2.4)], pedra)   # porta lateral
+    partes.append(caixa((W - 2 * e, D - 2 * e, 0.12), (0, 0, 0.06), mat=tabua))
+    partes.append(caixa((1.55, 0.08, 2.45), (-0.62, -D / 2 - 0.35, 1.25), (0, 0, math.radians(75)), mat=tabua))  # folha aberta
+    topo = h1
+    if pisos >= 2:
+        # piso do andar deixa o vao da escada (fundo, lado esquerdo)
+        partes.append(caixa((W - 2 * e, D * 0.62, 0.2), (0, -D * 0.19 + e / 2, h1 + 0.1), mat=tabua))
+        partes.append(caixa((W * 0.55, D * 0.38 - e, 0.2), (W * 0.22, D * 0.31 - e / 2, h1 + 0.1), mat=tabua))
+        for i in range(16):   # escada de 16 degraus (espelho 0,2 m, piso 0,3 m) no vao
+            partes.append(caixa((1.0, 0.3, 0.2 * (i + 1)), (-W / 2 + e + 0.6, D / 2 - e - 0.15 - (15 - i) * 0.3, 0.1 * (i + 1)), mat=tabua))
+        z2 = h1 + 0.2
+        partes += parede("x", -D / 2 + 0.15, -W / 2, W / 2, 0.3, z2, h2, [jan(-W / 4), jan(0), jan(W / 4)] if not danificada else [jan(-W / 4)], reboco)
+        partes += parede("x", D / 2 - 0.15, -W / 2, W / 2 if not danificada else 0.0, 0.3, z2, h2, [jan(0)], reboco)
+        partes += parede("y", -W / 2 + 0.15, -D / 2 + 0.3, D / 2 - 0.3, 0.3, z2, h2, [jan(0)], reboco)
+        if not danificada:
+            partes += parede("y", W / 2 - 0.15, -D / 2 + 0.3, D / 2 - 0.3, 0.3, z2, h2, [jan(0)], reboco)
+        for s in (-1, 1):   # enxaimel: vigas nas quinas, no meio e travessas
+            for x in (-W / 2, -W / 6, W / 6, W / 2):
+                partes.append(caixa((0.22, 0.12, h2), (x, s * (D / 2 + 0.02), z2 + h2 / 2), mat=tabua))
+            for zz in (z2 + 0.1, z2 + h2 - 0.1):
+                partes.append(caixa((W, 0.12, 0.2), (0, s * (D / 2 + 0.02), zz), mat=tabua))
+        topo = z2 + h2
+    lados = (1,) if danificada else (1, -1)
+    t, hh = telhado(W, D, topo, 0.5, telha, lados)
+    partes += t
+    partes += empena(W, D, topo, hh, reboco if pisos >= 2 else pedra)
+    partes.append(caixa((0.9, 0.9, hh + 1.6), (W / 2 - 1.2, D / 4, topo + (hh + 1.6) / 2), mat=pedra))   # chamine
+    return partes, (pedra, reboco, tabua, telha)
+
+
+def peca_015():
+    return casa(11.0, 8.5, 2, False)
+
+
+def peca_016():
+    return casa(12.0, 9.0, 2, True)
+
+
+def peca_103():
+    return casa(9.0, 8.0, 1, False)
+
+
+def peca_109():
+    return casa(14.0, 9.5, 2, False)
+
+
+def peca_093():
+    """093 — PONTE principal de arcos (R05): 300 x 16 m, 5 vaos de 60 m, pilares de 90 m ate' o fundo do canion,
+    parapeitos de 1,2 m. O kit assenta pela base: no Unity o topo do tabuleiro vai a Z 125."""
+    pedra = mat_foto("pedra-templo")
+    partes, L, W, dz = [], 300.0, 16.0, 90.0
+    partes.append(caixa((L, W, 1.8), (0, 0, dz - 0.9), mat=pedra))                     # tabuleiro (topo em dz)
+    for s in (-1, 1):
+        partes.append(caixa((L, 0.6, 1.2), (0, s * (W / 2 - 0.3), dz + 0.6), mat=pedra))   # parapeitos
+        for k in range(31):
+            partes.append(caixa((0.8, 0.8, 1.5), (-L / 2 + k * 10, s * (W / 2 - 0.3), dz + 0.75), mat=pedra))
+    vao = L / 5
+    for k in range(1, 5):   # pilares afunilados
+        x = -L / 2 + k * vao
+        partes.append(caixa((10, W + 2, dz * 0.55), (x, 0, dz * 0.275), mat=pedra))
+        partes.append(caixa((7, W, dz * 0.47), (x, 0, dz * 0.55 + dz * 0.235 - 1.8), mat=pedra))
+    r = vao / 2 - 3.5
+    for k in range(5):      # arcos de aduelas sob o tabuleiro
+        cx = -L / 2 + (k + 0.5) * vao
+        for i in range(17):
+            a = math.pi * i / 16
+            partes.append(caixa((3.2, W, 2.4), (cx + r * math.cos(a), 0, dz - 1.8 - r + r * math.sin(a) + 0.2),
+                                (0, -a + math.pi / 2, 0), mat=pedra))
+    return partes, (pedra,)
+
+
+def peca_097():
+    """097 — galpao industrial 40 x 24 m: base de concreto, paredes de zinco com estrutura, portao 8 x 7 VAZADO,
+    telhado de duas aguas de zinco."""
+    zinco, conc = mat_foto("zinco"), mat_foto("concreto")
+    partes, W, D, H = [], 40.0, 24.0, 10.0
+    partes += parede("x", -D / 2, -W / 2, W / 2, 0.3, 1.0, H - 1.0, [(0.0, 8.0, 0.0, 7.0), (-13, 4, 4, 6), (13, 4, 4, 6)], zinco)
+    partes += parede("x", D / 2, -W / 2, W / 2, 0.3, 1.0, H - 1.0, [(0.0, 3.0, 0.0, 3.5)], zinco)
+    partes += parede("y", -W / 2, -D / 2, D / 2, 0.3, 1.0, H - 1.0, [(-5, 4, 4, 6), (5, 4, 4, 6)], zinco)
+    partes += parede("y", W / 2, -D / 2, D / 2, 0.3, 1.0, H - 1.0, [(-5, 4, 4, 6), (5, 4, 4, 6)], zinco)
+    partes += parede("x", -D / 2, -W / 2, W / 2, 0.5, 0.0, 1.0, [(0.0, 8.0, 0.0, 1.0)], conc)
+    partes += parede("x", D / 2, -W / 2, W / 2, 0.5, 0.0, 1.0, [(0.0, 3.0, 0.0, 1.0)], conc)
+    partes += parede("y", -W / 2, -D / 2, D / 2, 0.5, 0.0, 1.0, [], conc)
+    partes += parede("y", W / 2, -D / 2, D / 2, 0.5, 0.0, 1.0, [], conc)
+    for x in range(-20, 21, 8):   # pilares metalicos
+        for s in (-1, 1):
+            partes.append(caixa((0.4, 0.4, H), (x, s * (D / 2 + 0.3), H / 2), mat=conc))
+    t, hh = telhado(W, D, H, 0.8, zinco, inclin=0.18)
+    partes += t
+    partes += empena(W, D, H, hh, zinco)
+    return partes, (zinco, conc)
+
+
+def predio(W, D, pisos):
+    """Predio de concreto da base (comando/alojamento): porta e janelas VAZADAS, laje por andar, platibanda."""
+    conc = mat_foto("concreto")
+    partes, e, hp = [], 0.35, 3.4
+    for p in range(pisos):
+        z0 = p * hp
+        porta = [(0.0, 2.4, 0.0, 3.0)] if p == 0 else []
+        jan = [(u, 1.6, 1.0, 2.4) for u in [-W / 3, -W / 6, W / 6, W / 3]]
+        partes += parede("x", -D / 2, -W / 2, W / 2, e, z0, hp, porta + jan, conc)
+        partes += parede("x", D / 2, -W / 2, W / 2, e, z0, hp, jan[::2], conc)
+        partes += parede("y", -W / 2, -D / 2 + e / 2, D / 2 - e / 2, e, z0, hp, [(0.0, 1.4, 0.0, 2.4)] if p == 0 else [(0.0, 1.6, 1.0, 2.4)], conc)
+        partes += parede("y", W / 2, -D / 2 + e / 2, D / 2 - e / 2, e, z0, hp, [(0.0, 1.6, 1.0, 2.4)], conc)
+        partes.append(caixa((W, D, 0.25), (0, 0, z0 + 0.125 if p == 0 else z0), mat=conc))
+    partes.append(caixa((W, D, 0.3), (0, 0, pisos * hp), mat=conc))
+    for s in (-1, 1):
+        partes.append(caixa((W, 0.3, 0.8), (0, s * D / 2, pisos * hp + 0.55), mat=conc))
+        partes.append(caixa((0.3, D, 0.8), (s * W / 2, 0, pisos * hp + 0.55), mat=conc))
+    return partes, (conc,)
+
+
+def peca_078():   # alojamento (bloco terreo 30 x 10)
+    return predio(30.0, 10.0, 1)
+
+
+def peca_079():   # centro de comando (2 andares 28 x 18)
+    return predio(28.0, 18.0, 2)
+
+
+def peca_076():
+    """076 — torre de vigia 15 m: 4 pernas com contraventos, plataforma, guarita com telhado e escada."""
+    zinco, tabua = mat_foto("zinco"), mat_foto("tabua")
+    partes, B, H = [], 4.0, 12.0
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            partes.append(caixa((0.35, 0.35, H), (sx * B / 2, sy * B / 2, H / 2), mat=zinco))
+    for z in (3.0, 7.0, 11.0):
+        for s in (-1, 1):
+            partes.append(caixa((B, 0.2, 0.2), (0, s * B / 2, z), mat=zinco))
+            partes.append(caixa((0.2, B, 0.2), (s * B / 2, 0, z), mat=zinco))
+    for s in (-1, 1):
+        partes.append(caixa((math.hypot(B, 4), 0.15, 0.15), (0, s * B / 2, 5), (0, math.atan2(4, B), 0), mat=zinco))
+    partes.append(caixa((B + 1.2, B + 1.2, 0.25), (0, 0, H), mat=tabua))
+    partes += parede("x", -(B / 2 + 0.5), -(B / 2 + 0.6), B / 2 + 0.6, 0.15, H, 1.1, [], tabua)
+    partes += parede("x", B / 2 + 0.5, -(B / 2 + 0.6), B / 2 + 0.6, 0.15, H, 1.1, [], tabua)
+    partes += parede("y", -(B / 2 + 0.5), -(B / 2 + 0.5), B / 2 + 0.5, 0.15, H, 1.1, [], tabua)
+    partes += parede("y", B / 2 + 0.5, -(B / 2 + 0.5), B / 2 + 0.5, 0.15, H, 1.1, [(0.0, 0.9, 0.0, 1.1)], tabua)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            partes.append(caixa((0.15, 0.15, 2.4), (sx * (B / 2 + 0.4), sy * (B / 2 + 0.4), H + 1.2), mat=zinco))
+    partes.append(caixa((B + 1.8, B + 1.8, 0.2), (0, 0, H + 2.5), mat=zinco))
+    for s in (-1, 1):   # escada
+        partes.append(caixa((0.1, 0.1, H + 1), (B / 2 + 0.9, s * 0.3, (H + 1) / 2), mat=zinco))
+    for i in range(int(H / 0.35)):
+        partes.append(caixa((0.08, 0.6, 0.06), (B / 2 + 0.9, 0, 0.3 + i * 0.35), mat=zinco))
+    return partes, (zinco, tabua)
+
+
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076"}
+
+
+PECAS = {"015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+         "078": peca_078, "079": peca_079, "076": peca_076,
+         "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}
 
 
@@ -450,6 +701,7 @@ def previa(obj, caminho):
     k = max(obj.dimensions) / 1.0   # enquadra pelo tamanho da peca (a barraca de 3 m saia cortada)
     bpy.ops.object.camera_add(location=(2.3 * k, -2.6 * k, 1.9 * k))
     cam = bpy.context.active_object
+    cam.data.clip_end = max(100.0, 20.0 * k)   # a ponte de 300 m sumia no corte de 100 m
     alvo = bpy.data.objects.new("alvo", None)
     alvo.location = (0, 0, obj.dimensions.z * 0.45)
     bpy.context.collection.objects.link(alvo)
@@ -496,7 +748,15 @@ def main():
         f"pivo fora do chao/centro: z_min={min(zs):.3f} x=({min(xs):.3f},{max(xs):.3f}) y=({min(ys):.3f},{max(ys):.3f})"
     obj.name = f"mestre_{peca}"
     obj["arkana_id"], obj["spec_version"], obj["generation_seed"] = peca, "1.0", SEED
-    assar(obj, mats)
+    if peca in ARQUITETURA:
+        # arquitetura: UV em METROS (1 u = 2 m) e as fotos que se repetem — assar borraria pecas de dezenas de metros
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.cube_project(cube_size=2.0, correct_aspect=True, clip_to_bounds=False, scale_to_bounds=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    else:
+        assar(obj, mats)
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", use_selection=True, export_apply=True)
