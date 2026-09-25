@@ -51,6 +51,7 @@ mobile-unity/**/*.glb filter=lfs diff=lfs merge=lfs -text
 mobile-unity/**/*.png filter=lfs diff=lfs merge=lfs -text
 mobile-unity/**/*.wav filter=lfs diff=lfs merge=lfs -text
 mobile-unity/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+mobile-unity/**/*.bytes filter=lfs diff=lfs merge=lfs -text
 mobile-unity/**/*.unity text eol=lf
 mobile-unity/**/*.prefab text eol=lf
 mobile-unity/**/*.asset text eol=lf

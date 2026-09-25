@@ -18,5 +18,13 @@ autor e licenca neste arquivo antes de entrar numa build distribuida.
 - Nao ha samples de audio, musicas, tilesets ou modelos 3D de terceiros na
   arvore atual.
 
+- Texturas do terreno da ilha do Documento Mestre (25/09/2026), em
+  `mobile-unity/Assets/_Arkana/Resources/terreno-*-{cor,normal}.png`: Poly Haven,
+  licenca CC0 (dominio publico, sem atribuicao obrigatoria) — leafy_grass,
+  forrest_ground_01, rocky_terrain_02, aerial_beach_01, brown_mud_leaves_01
+  (https://polyhaven.com). Mapas 1K, difusa e normal (GL).
+- Concept arts do Documento Mestre (`arte/cenario/documento-mestre/`, 112):
+  geradas pelo Diretor no ChatGPT e fornecidas para uso no projeto.
+
 Antes de publicar, as artes finais devem ter sua origem e permissao documental
 confirmadas aqui, inclusive assets gerados por ferramentas externas.

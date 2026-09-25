@@ -624,7 +624,7 @@ namespace Arkana.World
             return m;
         }
 
-        static Material MaterialAgua(string nome, int rasa, int funda, float onda, float espuma, float banda, float contraste)
+        internal static Material MaterialAgua(string nome, int rasa, int funda, float onda, float espuma, float banda, float contraste)
         {
             if (matAgua.TryGetValue(nome, out Material m) && m != null) return m;
             Shader s = ShaderArkana("ArkanaAgua", "Arkana/Agua");
@@ -649,7 +649,7 @@ namespace Arkana.World
             return matNevoa;
         }
 
-        static Material MaterialCeu()
+        internal static Material MaterialCeu()
         {
             if (matCeu != null) return matCeu;
             Shader s = ShaderArkana("ArkanaCeu", "Arkana/Ceu");
