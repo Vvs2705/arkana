@@ -81,4 +81,10 @@ if __name__ == "__main__":
 #  4. Plantas: import_scene.gltf(planta-<regiao>.gltf); para cada no: matrix_world = Rz(180) @ matrix_world;
 #     "P:" vira instancia de colecao (instance_type COLLECTION) do molde; "B:" vira objeto com a malha primitiva
 #     (cubo 1 m, cilindro r 0,5 x 2 m, esfera r 0,5) e a cor do extras (sRGB -> linear) no slot do OBJETO.
-#  5. Salvar em arte/cenario/documento-mestre/ARKANA_Ilha_Mestre_vNNN.blend (fora do git: ~110 MB, reproduzivel).
+#  5. Subterraneo (25/09, v002): python arte/tools/subterraneo.py <pasta> -> subterraneo-R10/R11/R12.gltf (cascas dos
+#     vazios, normais para dentro, material com backface culling: de fora se ve o interior) + buracos.png. Importar cada
+#     glTF em ARKANA_R10_Caverna_Profunda / R11_Rede_Tuneis / R12_Caverna_Subterranea (filhas de ARKANA_R01_R12_REGIOES).
+#     Bocas no terreno: atributo booleano "buraco" por face do grid (indice = j*1024 + i, i = x, j = y a partir do SO; cada
+#     face cobre 2 x 2 pixels de buracos.png) + modificador Geometry Nodes ARK_Buracos_Terreno (Delete Geometry por esse
+#     atributo). Para inspecionar: ocultar ARKANA_01_TERRENO/20_PEDRAS/21_VEGETACAO.
+#  6. Salvar em arte/cenario/documento-mestre/ARKANA_Ilha_Mestre_vNNN.blend (fora do git: ~110 MB, reproduzivel).

@@ -81,7 +81,7 @@ namespace Arkana.World
         /// `alturaDoChao` m. Acelera a 40 m/s2 ate' 55 m/s, cai reto, freia a 90 m/s2 ao entrar
         /// no planeio (60 m sobre o chao) e plana a 12 m/s descendo / 16 m/s andando.
         /// </summary>
-        public static float AlcanceHorizontalDaQueda(float alturaDoChao, out float segundosNoAr)
+        public float AlcanceHorizontalDaQueda(float alturaDoChao, out float segundosNoAr)
         {
             float t1 = VelQueda / AcelQueda;
             float d1 = 0.5f * AcelQueda * t1 * t1;
