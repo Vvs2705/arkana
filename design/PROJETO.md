@@ -71,7 +71,9 @@ NUNCA ff em main nem focar o Unity durante um teste em Play (o auto-refresh reco
 passando. Textos: "TRIOS {0}", "ÚLTIMO TRIO DE PÉ", modo "TRIO". **Limites conhecidos (vetáveis):** o ping fala só com o 1º parceiro (a marca azul e o ponto no minimapa
 já cobrem os DOIS — `Partida.ParceiroVivo(k)`, medido em partida 25/09); cada bot foca o alvo de UM aliado; para 40–60 corpos medir a percepção dos bots (O(n²)) no
 aparelho antes de subir `TimesInimigos`.
-**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, S16 e peças que ainda são blockout.
+**Kit por script, leva 2 (25/09):** 095 hangar militar (abóbada de zinco, frente aberta) e 080 torre de luz — a base
+usa 2 hangares e 4 torres de luz; cristais emissivos nos túneis/salões (1 malha por região, sem luz real).
+**Falta:** APK + Poco F4 (o último teste do dia), S16, torre industrial/guindastes/templo/árvore gigante ainda blockout.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
