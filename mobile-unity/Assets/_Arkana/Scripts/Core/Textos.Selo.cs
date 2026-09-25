@@ -7,11 +7,11 @@ namespace Arkana.Core
         public const string SeloCampeao = "CAMPEÃO DE ARKANA";
         public const string SeloCampeoes = "CAMPEÕES DE ARKANA";
         public const string SeloUltimoMago = "ÚLTIMO MAGO DE PÉ";
-        public const string SeloUltimaDupla = "ÚLTIMA DUPLA DE PÉ";
+        public const string SeloUltimaDupla = "ÚLTIMO TRIO DE PÉ";
         public const string SeloFimDaPartida = "FIM DA PARTIDA";
         /// <summary>A colocacao: "#4" entra no {0} (o cartao pinta o numero), o total de times no {1}.</summary>
         public const string SeloPosicao = "#{0}";
-        public const string SeloColocacaoDupla = "{0} DE {1} DUPLAS";
+        public const string SeloColocacaoDupla = "{0} DE {1} TRIOS";
         public const string SeloColocacaoSolo = "{0} DE {1} MAGOS";
         public const string SeloComParceiro = "COM {0}";
         public const string SeloAbates = "ABATES";

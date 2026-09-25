@@ -310,13 +310,13 @@ namespace Arkana.Core
         public const string Sintonia = "SINTONIA";
         public const string SintoniaQuebrada = "SINTONIA QUEBRADA";
         public const string SintoniaPronta = "SINTONIA PRONTA";
-        public const string HudDuplas = "DUPLAS {0}";
+        public const string HudDuplas = "TRIOS {0}";
         public const string Espectando = "ESPECTANDO · {0}";
         public const string Parceiro = "PARCEIRO";
         public const string ModoRotulo = "MODO";
-        public const string ModoDupla = "DUPLA";
+        public const string ModoDupla = "TRIO";
         public const string ModoSolo = "SOLO";
-        public const string DuplaEliminada = "DUPLA ELIMINADA";
+        public const string DuplaEliminada = "TRIO ELIMINADO";
 
         /// <summary>O nome do combo na tela (faixa da canalizacao e disparo), ja' com acento.</summary>
         public static string ComboNome(ComboSintonia c)

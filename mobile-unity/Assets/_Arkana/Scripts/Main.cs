@@ -138,7 +138,7 @@ namespace Arkana
         public const int SEM_TIME = -1;
 
         /// <summary>Os bots da partida, na ordem de criacao.</summary>
-        public static Vaga[] Bots(bool dupla) => dupla ? Duplas(Balance.Match.DuplasInimigas) : Solo(Balance.Match.Bots);
+        public static Vaga[] Bots(bool dupla) => dupla ? Times(Balance.Match.TimesInimigos, Balance.Match.TamanhoDoTime) : Solo(Balance.Match.Bots);
 
         /// <summary>Corpos na arena, o jogador incluso.</summary>
         public static int Corpos(bool dupla) => 1 + Bots(dupla).Length;
@@ -150,16 +150,23 @@ namespace Arkana
             return v;
         }
 
-        public static Vaga[] Duplas(int duplas)
+        /// <summary>Duplas (o de antes): `Times(duplas, 2)`.</summary>
+        public static Vaga[] Duplas(int duplas) => Times(duplas, 2);
+
+        /// <summary>`times` times inimigos de `tamanho` corpos (lider + seguidores, pousando em lados alternados) e, POR ULTIMO,
+        /// os `tamanho - 1` parceiros do jogador (Main.Bots[0] continua inimigo: as fotos/testes contam com isso).</summary>
+        public static Vaga[] Times(int times, int tamanho)
         {
-            int n = Mathf.Max(duplas, 0);
-            var v = new Vaga[n * 2 + 1];
+            int n = Mathf.Max(times, 0), k = Mathf.Max(tamanho, 1);
+            var v = new Vaga[n * k + (k - 1)];
             for (int t = 0; t < n; t++)
             {
-                v[t * 2] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = -1 };
-                v[t * 2 + 1] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = t * 2, Lado = (t % 2 == 0) ? 1f : -1f };
+                v[t * k] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = -1 };
+                for (int j = 1; j < k; j++)
+                    v[t * k + j] = new Vaga { Time = t + 1, Nascimento = t + 1, Segue = t * k, Lado = (j % 2 == 1) ? 1f : -1f };
             }
-            v[n * 2] = new Vaga { Time = Combat.TIME_DO_PLAYER, Nascimento = 0, Segue = -1, Parceiro = true, Lado = 1f };
+            for (int j = 1; j < k; j++)
+                v[n * k + j - 1] = new Vaga { Time = Combat.TIME_DO_PLAYER, Nascimento = 0, Segue = -1, Parceiro = true, Lado = (j % 2 == 1) ? 1f : -1f };
             return v;
         }
     }
@@ -308,7 +315,9 @@ namespace Arkana
             Partida.Tick(dt);
             if (Hud != null && !Partida.Treino) AtualizarHud();
             // o parceiro mira o que o jogador tem SOB A MIRA enquanto nao tem alvo (o 1o acerto do jogador ja' o foca pelo Bus)
-            if (Parceiro != null && Hud != null) Parceiro.Percepcao.MiraDoParceiro(Hud.Marcas.Logica.SobAMira);
+            if (Hud != null)
+                for (int i = 0; i < Bots.Count; i++)   // trio: os DOIS parceiros
+                    if (Bots[i] != null && Player != null && Bots[i].Parceiro == (IEntidade)Player.Pawn) Bots[i].Percepcao.MiraDoParceiro(Hud.Marcas.Logica.SobAMira);
             DesenharTiros();
         }
 
@@ -623,13 +632,13 @@ namespace Arkana
             if (v.Parceiro)
             {
                 b.Parear(Player.Pawn, true, v.Lado);   // salta quando o jogador salta, pousa ao lado dele, foca o alvo dele
-                Parceiro = b;
+                if (Parceiro == null) Parceiro = b;   // trio: o 1o parceiro e' o "principal" (ping, marca, cartao); o 2o so' joga
             }
             else if (v.Segue >= 0 && v.Segue < Bots.Count)
             {
                 Bot lider = Bots[v.Segue];
                 b.Parear(lider.Pawn, true, v.Lado);
-                lider.Parear(b.Pawn, false);   // o lider nao segue, mas foca o alvo do outro e o socorre
+                if (lider.Parceiro == null) lider.Parear(b.Pawn, false);   // o lider nao segue, mas foca o alvo do 1o seguidor e o socorre
             }
         }
 

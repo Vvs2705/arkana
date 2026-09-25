@@ -265,8 +265,12 @@ namespace Arkana.Core
             public const float DurationGrandeS = 1800f;
             /// <summary>12 e' o teto estrutural (14 nascimentos) e o passo que se paga sem medir FPS no celular.</summary>
             public const int Bots = 12;
-            /// <summary>Modo DUPLA: player + parceiro bot + 6 duplas de bots = 14 corpos (o mesmo teto dos 14 nascimentos).</summary>
-            public const int DuplasInimigas = 6;
+            /// <summary>Modo em TIME (25/09/2026, ref. PUBG Mobile): TRIO — player + 2 parceiros bots + 5 trios de bots = 18 corpos.
+            /// A meta e' 40-60 no mapa de 4,8 km; subir TimesInimigos so' depois de medir a percepcao dos bots (O(n2)) no aparelho.</summary>
+            public const int TamanhoDoTime = 3;
+            public const int TimesInimigos = 5;
+            /// <summary>Nome antigo (era 6 duplas): os times inimigos, qualquer tamanho.</summary>
+            public const int DuplasInimigas = TimesInimigos;
         }
 
         /// <summary>

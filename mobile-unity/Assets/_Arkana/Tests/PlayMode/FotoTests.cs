@@ -3228,8 +3228,8 @@ namespace Arkana.Tests
             yield return Esperar(1f);   // a tela de carregamento esvaece
             Assert.IsTrue(main.Dupla, "JOGAR com o modo DUPLA monta a partida em dupla");
             Assert.IsNotNull(main.Parceiro, "o parceiro bot nasceu");
-            Assert.AreEqual(14, main.Partida.Arena.Count, "jogador + parceiro + 6 duplas");
-            Assert.AreEqual(7, main.Partida.TimesVivos, "7 times");
+            Assert.AreEqual(Montagem.Corpos(true), main.Partida.Arena.Count, "jogador + parceiros + times inimigos");
+            Assert.AreEqual(Balance.Match.TimesInimigos + 1, main.Partida.TimesVivos, "todos os times vivos");
             Assert.IsTrue(Combat.MesmoTime(main.Player.Pawn, main.Parceiro.Pawn), "o parceiro e' do time do jogador");
 
             // os dois no chao, lado a lado: saem do castelo pela porta (a Queda so' aceita posicao la') e pousam no ato
@@ -3252,7 +3252,7 @@ namespace Arkana.Tests
             sb.AppendLine("54-dupla-parceiro: duplas=" + main.Hud.Duplas + " parceiro=" + par.Nome + " dist=" + Vector3.Distance(eu.Pos, par.Pos).ToString("F1")
                 + " marca=" + (main.Hud.Marcas.Logica.Parceiro == (IEntidade)par) + " pronta=" + main.Hud.Dupla.Logica.ProntaAlfa.ToString("F2")
                 + " recarga=" + main.Hud.Dupla.Logica.Recarga.ToString("F2"));
-            Assert.AreEqual(7, main.Hud.Duplas, "o topo conta DUPLAS");
+            Assert.AreEqual(Balance.Match.TimesInimigos + 1, main.Hud.Duplas, "o topo conta os TIMES");
             Assert.AreSame(par, main.Hud.Marcas.Logica.Parceiro, "o parceiro tem a marca azul");
 
             // a FAIXA DA SINTONIA: canalizando (o trilho enche em CanalizacaoS), depois o falhou
@@ -3499,7 +3499,7 @@ namespace Arkana.Tests
             Assert.IsTrue(main.Hud.Cartao.Visivel, "o cartao no ar");
             Assert.IsFalse(main.Hud.GetComponent<Canvas>().enabled, "com o cartao no ar a HUD de combate inteira sai (nada vaza por ele)");
             Assert.AreEqual(1, cr.Colocacao);
-            Assert.AreEqual(7, cr.Times, "7 duplas");
+            Assert.AreEqual(Balance.Match.TimesInimigos + 1, cr.Times, "todos os times");
             Assert.AreSame(par, cr.Parceiro, "o cartao diz COM o parceiro");
             Assert.AreEqual(3, cr.Abates);
             Assert.AreEqual(2, cr.Sintonias);
@@ -3541,8 +3541,8 @@ namespace Arkana.Tests
             Directory.CreateDirectory(Pasta);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), sb.ToString());
             Assert.AreEqual(FluxoDeJogo.Estado.Fim, main.Fluxo.Atual, "a dupla do jogador inteira fora = derrota");
-            Assert.AreEqual(4, cr.Colocacao, "3 duplas de pe' = #4");
-            Assert.AreEqual(7, cr.Times);
+            Assert.AreEqual(4, cr.Colocacao, "3 times de pe' = #4");
+            Assert.AreEqual(Balance.Match.TimesInimigos + 1, cr.Times);
             Assert.AreSame(par, cr.Parceiro);
         }
 

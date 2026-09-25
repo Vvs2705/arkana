@@ -180,8 +180,9 @@ namespace Arkana.Tests
         public void MontagemDupla_14CorposEm7Times_ParesNoMesmoNascimento_ParceiroNoFim()
         {
             Montagem.Vaga[] v = Montagem.Bots(true);
-            Assert.AreEqual(2 * Balance.Match.DuplasInimigas + 1, v.Length);
-            Assert.AreEqual(14, Montagem.Corpos(true), "jogador + parceiro + 6 duplas");
+            int k = Balance.Match.TamanhoDoTime, times = Balance.Match.TimesInimigos + 1;
+            Assert.AreEqual(k * Balance.Match.TimesInimigos + (k - 1), v.Length);
+            Assert.AreEqual(k * times, Montagem.Corpos(true), "jogador + parceiros + times inimigos");
             var membros = new Dictionary<int, int> { { Combat.TIME_DO_PLAYER, 1 } };   // o jogador ja' esta' no time 0
             var nascimento = new Dictionary<int, int> { { Combat.TIME_DO_PLAYER, 0 } };
             for (int i = 0; i < v.Length; i++)
@@ -198,9 +199,9 @@ namespace Arkana.Tests
                     Assert.AreNotEqual(0f, v[i].Lado, "e pousa AFASTADO, nao empilhado");
                 }
             }
-            Assert.AreEqual(7, membros.Count, "7 times");
-            foreach (KeyValuePair<int, int> kv in membros) Assert.AreEqual(2, kv.Value, "time " + kv.Key + " tem 2");
-            Assert.AreEqual(7, new HashSet<int>(nascimento.Values).Count, "cada dupla no seu nascimento");
+            Assert.AreEqual(times, membros.Count, times + " times");
+            foreach (KeyValuePair<int, int> kv in membros) Assert.AreEqual(k, kv.Value, "time " + kv.Key + " tem " + k);
+            Assert.AreEqual(times, new HashSet<int>(nascimento.Values).Count, "cada time no seu nascimento");
             Montagem.Vaga ultimo = v[v.Length - 1];
             Assert.IsTrue(ultimo.Parceiro, "o parceiro e' o ULTIMO bot (Main.Bots[0] continua inimigo)");
             Assert.AreEqual(Combat.TIME_DO_PLAYER, ultimo.Time);
@@ -229,9 +230,9 @@ namespace Arkana.Tests
         [Test]
         public void PlacaDoTopo_DuplasNaDupla_BotsNoSolo()
         {
-            Assert.AreEqual("DUPLAS 4", DuplaHudLogica.TextoTopo(4, 11));
+            Assert.AreEqual("TRIOS 4", DuplaHudLogica.TextoTopo(4, 11));
             Assert.AreEqual("BOTS 11", DuplaHudLogica.TextoTopo(-1, 11));
-            Assert.AreEqual("DUPLAS 0", DuplaHudLogica.TextoTopo(0, 3), "zero duplas ainda e' modo dupla");
+            Assert.AreEqual("TRIOS 0", DuplaHudLogica.TextoTopo(0, 3), "zero times ainda e' modo em time");
         }
 
         [Test]

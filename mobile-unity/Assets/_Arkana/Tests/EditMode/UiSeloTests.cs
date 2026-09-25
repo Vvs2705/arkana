@@ -137,8 +137,8 @@ namespace Arkana.Tests
             Assert.AreEqual(3, _c.Colocacao, "B e C de pe' = #3");
             Assert.AreEqual(4, _c.Times, "4 duplas na partida, vivas ou nao");
             Assert.AreSame(_par, _c.Parceiro, "o parceiro sai da arena (mesmo time, nao o jogador)");
-            Assert.AreEqual("#3 DE 4 DUPLAS", _c.TextoColocacao());
-            Assert.AreEqual("<color=#FFFFFF>#3</color> DE 4 DUPLAS", _c.TextoColocacao("#FFFFFF"), "so' o numero ganha a cor");
+            Assert.AreEqual("#3 DE 4 TRIOS", _c.TextoColocacao());
+            Assert.AreEqual("<color=#FFFFFF>#3</color> DE 4 TRIOS", _c.TextoColocacao("#FFFFFF"), "so' o numero ganha a cor");
             // o time do jogador cai inteiro: a mesma conta
             Matar(_eu); Matar(_par);
             _c.Fechar(false, arena);
