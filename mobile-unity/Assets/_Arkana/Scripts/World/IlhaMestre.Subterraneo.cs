@@ -316,6 +316,7 @@ namespace Arkana.World
                 foreach (Poco p in S.pocos) Marcar(p.x, p.y, 6.5f, float.MinValue, float.MaxValue);
             }
             if (buraco.Count == 0 && !vazio) return;
+            ushort limiar = (ushort)((0.5f - D.fundo) / D.faixa * 65535f);
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
             {
@@ -324,8 +325,11 @@ namespace Arkana.World
                 for (int j = 0; j < hr; j++)
                 for (int i = 0; i < hr; i++)
                 {
-                    bool furo = buraco.Contains((long)(bj * hr + j) * total + bi * hr + i)
-                                || (vazio && Altura(D.x0 + (bi * hr + i + 0.5f) * cs, D.y0 + (bj * hr + j + 0.5f) * csy) < 0.5f);
+                    // vazio: os 4 cantos da celula abaixo de 0,5 m (direto no mapa de alturas: 4 M celulas, sem Altura())
+                    int gi = bi * hr + i, gj = bj * hr + j;
+                    bool furo = buraco.Contains((long)gj * total + gi)
+                                || (vazio && alt[gj * n + gi] < limiar && alt[gj * n + gi + 1] < limiar
+                                    && alt[(gj + 1) * n + gi] < limiar && alt[(gj + 1) * n + gi + 1] < limiar);
                     h[j, i] = !furo;
                     algum |= furo;
                 }
