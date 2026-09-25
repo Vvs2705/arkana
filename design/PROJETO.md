@@ -51,7 +51,17 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 25/09, noite: ilha do Documento Mestre com KIT real (casas, ponte de arcos, galpões, base) e estradas
+### >>> 25/09, noite (2): a MESMA ilha também está no Blender — `arte/cenario/documento-mestre/ARKANA_Ilha_Mestre_v001.blend`
+
+Montada ao vivo pelo MCP do Blender (o Diretor acompanhou): relevo (malha 1025² com DISPLACE do mapa de alturas), chão com a
+mistura das 5 camadas do Unity, mar/lago/rio, sol do SO, 611 peças e 5.764 árvores (LOD1) como instâncias de coleção, 6.418
+objetos, ~110 MB (fora do git, reproduzível). Caminho: `ExportarIlhaMestre` (Unity sem janela) → `arte/tools/ilha_para_blender.py`
+(planta glTF por região) → montagem descrita no fim do mesmo script. **Conferido:** a vila vista de cima bate com a foto do Unity
+(o glTFast nega o X; o importador do Blender deixa o mundo girado 180° em Z). **Uso:** modelar cavernas/túneis (R10–R12) encaixados
+no relevo real; relevo esculpido no Blender tem de VOLTAR ao `ilha-mestre-altura.bytes` por script (fonte única). **Achado:** a
+cerca leste da base passa da borda da falésia (perímetro 380 × 300 m maior que o platô) — corrigir no `IlhaMestre`.
+
+### 25/09, noite: ilha do Documento Mestre com KIT real (casas, ponte de arcos, galpões, base) e estradas
 
 **Kit por script** (`arte/tools/blender/kit_documento_mestre.py`, headless: `blender -b --factory-startup --python ... -- <NNN> <saida.glb> [previa.png]`):
 21 peças no Unity (`Resources/mestre-NNN-*.glb`). Pequenas (027 caixa, 028 barril, 053 barraca, 058 mesa, 055 banco, 025 cerca, 073 barreira,
