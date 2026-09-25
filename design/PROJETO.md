@@ -73,7 +73,10 @@ já cobrem os DOIS — `Partida.ParceiroVivo(k)`, medido em partida 25/09); cada
 aparelho antes de subir `TimesInimigos`.
 **Kit por script, leva 2 (25/09):** 095 hangar militar (abóbada de zinco, frente aberta) e 080 torre de luz — a base
 usa 2 hangares e 4 torres de luz; cristais emissivos nos túneis/salões (1 malha por região, sem luz real).
-**Falta:** APK + Poco F4 (o último teste do dia), S16, torre industrial/guindastes/templo/árvore gigante ainda blockout.
+Leva 3: 098 torre industrial 72 m (treliça que afunila, tanque no topo, chaminé) e 071 guindaste (mastro 40 m, lança
+34 m, estais, gancho) — `trelica()` é o helper reutilizável. A réplica no Blender (v002) NÃO tem as peças novas: refazer
+pelo caminho ExportarIlhaMestre → ilha_para_blender.py quando precisar.
+**Falta:** APK + Poco F4 (o último teste do dia), S16, templo (módulos), árvore gigante e travessia inferior ainda blockout.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
