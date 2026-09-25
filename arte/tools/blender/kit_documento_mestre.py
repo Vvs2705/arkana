@@ -595,6 +595,63 @@ def peca_079():   # centro de comando (2 andares 28 x 18)
     return predio(28.0, 18.0, 2)
 
 
+def peca_095():
+    """095 — hangar militar 30 x 42 m: piso de concreto, paredes laterais de 4 m, abobada de zinco em 10 paineis
+    (raio 15), fundo fechado, FRENTE ABERTA (portal de 12 x 9) voltada para -Y."""
+    zinco, conc = mat_foto("zinco"), mat_foto("concreto")
+    partes, W, D, H0, R, N = [], 30.0, 42.0, 4.0, 15.0, 10
+    partes.append(caixa((W + 1.0, D + 1.0, 0.3), (0, 0, 0.15), mat=conc))
+    for s in (-1, 1):   # paredes laterais baixas
+        partes += parede("y", s * W / 2, -D / 2, D / 2, 0.3, 0.3, H0, [(-8, 3, 0.7, 2.3), (8, 3, 0.7, 2.3)], zinco)
+    for i in range(N):   # abobada: paineis tangentes ao arco z = H0 + R sin(t), x = R cos(t)
+        t = math.pi * (i + 0.5) / N
+        seg = 2 * R * math.sin(math.pi / (2 * N)) + 0.05
+        partes.append(caixa((seg, D, 0.15), (R * math.cos(t), 0, H0 + R * math.sin(t)), (0, -(math.pi / 2 + t), 0), mat=zinco))
+    for y in [-D / 2 + 0.3 + k * (D - 0.6) / 9 for k in range(10)]:
+        for i in range(N):
+            t = math.pi * (i + 0.5) / N
+            seg = 2 * R * math.sin(math.pi / (2 * N))
+            partes.append(caixa((seg, 0.25, 0.3), ((R - 0.2) * math.cos(t), y, H0 + (R - 0.2) * math.sin(t)), (0, -(math.pi / 2 + t), 0), mat=conc))
+    # fundo: colunas verticais ate' o arco
+    for k in range(10):
+        x = -W / 2 + 1.5 + k * 3.0
+        h = H0 + math.sqrt(max(R * R - x * x, 0.0))
+        partes.append(caixa((3.0, 0.3, h - 0.3), (x, D / 2, 0.3 + (h - 0.3) / 2), mat=zinco))
+    # frente: portal aberto de 12 x 9 (pilares + verga) e o resto fechado ate' o arco
+    for k in range(10):
+        x = -W / 2 + 1.5 + k * 3.0
+        h = H0 + math.sqrt(max(R * R - x * x, 0.0))
+        if abs(x) < 6.0:
+            partes.append(caixa((3.0, 0.3, h - 9.0), (x, -D / 2, 9.0 + (h - 9.0) / 2), mat=zinco))
+        else:
+            partes.append(caixa((3.0, 0.3, h - 0.3), (x, -D / 2, 0.3 + (h - 0.3) / 2), mat=zinco))
+    for s in (-1, 1):
+        partes.append(caixa((0.5, 0.5, 9.0), (s * 6.0, -D / 2, 4.8), mat=conc))
+    partes.append(caixa((12.5, 0.5, 0.6), (0, -D / 2, 9.0), mat=conc))
+    return partes, (zinco, conc)
+
+
+def peca_080():
+    """080 — torre de luz 12 m: mastro trelicado (4 pernas + travessas), plataforma e 4 refletores no topo."""
+    zinco, conc = mat_foto("zinco"), mat_foto("concreto")
+    partes, B, H = [], 1.2, 12.0
+    partes.append(caixa((2.0, 2.0, 0.4), (0, 0, 0.2), mat=conc))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            partes.append(caixa((0.18, 0.18, H), (sx * B / 2, sy * B / 2, 0.4 + H / 2), mat=zinco))
+    for z in [1.6 + k * 2.6 for k in range(4)]:
+        for s in (-1, 1):
+            partes.append(caixa((B, 0.1, 0.1), (0, s * B / 2, z), mat=zinco))
+            partes.append(caixa((0.1, B, 0.1), (s * B / 2, 0, z), mat=zinco))
+            partes.append(caixa((math.hypot(B, 2.6), 0.08, 0.08), (0, s * B / 2, z + 1.3), (0, math.atan2(2.6, B), 0), mat=zinco))
+    partes.append(caixa((2.4, 2.4, 0.12), (0, 0, H + 0.4), mat=zinco))
+    partes.append(caixa((3.2, 0.15, 0.15), (0, 0, H + 1.0), mat=zinco))
+    for k in range(4):   # refletores inclinados para baixo
+        x = -1.2 + k * 0.8
+        partes.append(caixa((0.6, 0.45, 0.5), (x, 0.3, H + 1.05), (0.5, 0, 0), mat=zinco))
+    return partes, (zinco, conc)
+
+
 def peca_076():
     """076 — torre de vigia 15 m: 4 pernas com contraventos, plataforma, guarita com telhado e escada."""
     zinco, tabua = mat_foto("zinco"), mat_foto("tabua")
@@ -624,10 +681,10 @@ def peca_076():
     return partes, (zinco, tabua)
 
 
-ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076"}
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080"}
 
 
-PECAS = {"015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+PECAS = {"095": peca_095, "080": peca_080, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
          "078": peca_078, "079": peca_079, "076": peca_076,
          "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}

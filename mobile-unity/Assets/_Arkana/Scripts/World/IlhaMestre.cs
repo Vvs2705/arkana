@@ -722,12 +722,18 @@ namespace Arkana.World
                 if (Peca(g, "mestre-078-militar-alojamento", ax, ay, 1f, 0f, Altura(ax, ay) - 0.3f) == null)
                     Bloco(g, "R08_Alojamento", PrimitiveType.Cube, ax, ay, -9999f, new Vector3(32f, 11f, 6f), 0f, VerdeMil);
             }
-            for (int k = 0; k < 2; k++)
+            for (int k = 0; k < 2; k++)   // hangares do kit (frente aberta para oeste, o patio); blockout se faltar o GLB
             {
-                GameObject h = Bloco(g, "R08_Hangar", PrimitiveType.Cylinder, b8.x + 80f, b8.y - 40f + k * 55f, -9999f, new Vector3(30f, 30f, 42f), 0f, VerdeMil);
-                h.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
-                h.transform.position = U(b8.x + 80f, b8.y - 40f + k * 55f, Altura(b8.x + 80f, b8.y - 40f + k * 55f));
+                float hx0 = b8.x + 80f, hy0 = b8.y - 40f + k * 55f;
+                if (Peca(g, "mestre-095-militar-hangar", hx0, hy0, 1f, 90f, Altura(hx0, hy0) - 0.3f) == null)
+                {
+                    GameObject h = Bloco(g, "R08_Hangar", PrimitiveType.Cylinder, hx0, hy0, -9999f, new Vector3(30f, 30f, 42f), 0f, VerdeMil);
+                    h.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
+                    h.transform.position = U(hx0, hy0, Altura(hx0, hy0));
+                }
             }
+            foreach (var c in new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) })   // torres de luz
+                Peca(g, "mestre-080-militar-torre-de-luz", b8.x + c.x * 105f, b8.y + c.y * 85f, 1f, 45f);
             Bloco(g, "R08_Heliponto", PrimitiveType.Cylinder, b8.x - 10f, b8.y + 70f, -9999f, new Vector3(28f, 28f, 0.4f), 0f, Concreto);
             Bloco(g, "R08_Deposito", PrimitiveType.Cube, b8.x + 20f, b8.y - 80f, -9999f, new Vector3(20f, 15f, 6f), 0f, Concreto);
             for (int k = 0; k < 14; k++)   // barreiras em zigue-zague no portao e cobertura no patio (doc §3.2: 15-35 m)
