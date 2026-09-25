@@ -51,7 +51,22 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
-### >>> COMECE POR AQUI — 25/09, tarde: a BASE da ilha do Documento Mestre existe no Unity (cena IlhaMestre)
+### >>> COMECE POR AQUI — 25/09, noite: ilha do Documento Mestre com KIT real (casas, ponte de arcos, galpões, base) e estradas
+
+**Kit por script** (`arte/tools/blender/kit_documento_mestre.py`, headless: `blender -b --factory-startup --python ... -- <NNN> <saida.glb> [previa.png]`):
+21 peças no Unity (`Resources/mestre-NNN-*.glb`). Pequenas (027 caixa, 028 barril, 053 barraca, 058 mesa, 055 banco, 025 cerca, 073 barreira,
+074 caixa militar, 062 cano, 064 tanque, 086 trilhos): procedural ASSADO em 1024 (cor × oclusão + normal). Arquitetura (015/016/103/109 casas,
+093 ponte de arcos 300 m, 097 galpão, 078 alojamento, 079 comando, 076 torre de vigia): UV em METROS (1 u = 2 m) + 7 fotos CC0 que se repetem
+(`arte/cenario/texturas/arq-*`, via `python arte/tools/texturas_terreno.py arq`), paredes com VÃOS reais (porta 1,6×2,5, janelas), escada de 16
+degraus na casa de 2 andares. Toda peça sai com base no chão e centro em X/Y (assert no script). **Estradas:** rotas S01–S15 alisadas no relevo e
+pintadas de terra; árvores/pedras fora delas. **Passeio:** Play na cena → `ExploradorMestre` (cápsula 1,80 m, 6/9 m/s, salto 1,2 m, F voa).
+**Armadilhas novas:** comparar nós do Blender com `is` apaga o BSDF (wrapper muda a cada acesso); cilindro criado girado mantém o giro no objeto
+(aplicar antes do join); a câmera de prévia corta em 100 m; a amostra de altura GRUDADA na borda do mapa fazia os cabos pintarem uma cruz "rasa"
+no mar inteiro (fora do mapa = mar fundo). **Ainda blockout:** templo (terraços/torre), torre industrial, guindastes, hangares, torre de observação,
+árvore gigante, entradas U, travessia inferior Z80 sem rampas. **Pago (espera o Diretor):** peças orgânicas (Meshy/Higgsfield: conta gratuita,
+API bloqueada). **Falta ao jogo:** integrar a ilha nova ao `Main` (castelo/queda, zona, bots, loot, início por time de 3), subterrâneo, anel S16.
+
+### 25/09, tarde: a BASE da ilha do Documento Mestre existe no Unity (cena IlhaMestre)
 
 **Abrir:** `mobile-unity/Assets/_Arkana/Scenes/IlhaMestre.unity` (o componente `IlhaMestre` reconstrói tudo em ~10–15 s; menu de
 contexto "Reconstruir"). **Relevo:** `python arte/tools/ilha_mestre.py [pasta_previa]` gera `Resources/ilha-mestre-altura.bytes`
