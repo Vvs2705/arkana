@@ -76,7 +76,9 @@ usa 2 hangares e 4 torres de luz; cristais emissivos nos túneis/salões (1 malh
 Leva 3: 098 torre industrial 72 m (treliça que afunila, tanque no topo, chaminé) e 071 guindaste (mastro 40 m, lança
 34 m, estais, gancho) — `trelica()` é o helper reutilizável. A réplica no Blender (v002) NÃO tem as peças novas: refazer
 pelo caminho ExportarIlhaMestre → ilha_para_blender.py quando precisar.
-**Falta:** APK + Poco F4 (o último teste do dia), S16, templo (módulos), árvore gigante e travessia inferior ainda blockout.
+Leva 4 (templo): 046 escadaria (20 degraus, muretas), 026 arco (9 aduelas), 014 pilar quebrado, 013 muro arruinado,
+043 parapeito — R03 usa escadaria oeste, 4 arcos nas entradas, 12 muros na borda, 36 parapeitos no terraço, pilares.
+**Falta:** APK + Poco F4 (o último teste do dia), S16, árvore gigante (orgânica: Tripo depois) e travessia inferior.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
