@@ -321,9 +321,9 @@
    4383
   ],
   "V02_terra_km2": 14.25,
-  "V02_acessivel_km2": 10.95,
-  "V05_maior_componente": 0.959,
-  "V04_borda_do_lago_min": 109.85,
+  "V02_acessivel_km2": 10.83,
+  "V05_maior_componente": 0.958,
+  "V04_borda_do_lago_min": 105.8,
   "lago_km2": 0.482,
   "cume_max": 601.9,
   "encontro_oeste_z": 126.0,

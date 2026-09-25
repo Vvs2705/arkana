@@ -159,9 +159,11 @@ def main():
         (1 + 0.05 * np.sin(3 * th + 1.1) + 0.035 * np.sin(5 * th + 2.6))
     nivel = LAGO["nivel"]
     fundo = nivel - (0.6 + 24.0 * smooth(0.95, 0.35, q))
-    borda = (q >= 1) & (q < 1.4)
+    # margem em RAMPA ate' o chao em volta (1,0 -> 1,55): antes o lago ficava num buraco com parede de ~20 m
     h = np.where(q < 1, fundo, h)
-    h = np.where(borda, np.maximum(h, nivel + 0.8 + 3.0 * smooth(1.0, 1.4, q)), h)
+    margem = (q >= 1) & (q < 1.55)
+    alvo = np.maximum(h, nivel + 0.8)
+    h = np.where(margem, nivel + 0.8 + (alvo - nivel - 0.8) * smooth(1.0, 1.55, q) ** 1.2, h)
     for (ix, iy, ir, ia) in ILHOTAS:
         di = np.hypot(X - ix, Y - iy)
         h = np.where(di < ir, np.maximum(h, nivel + ia * (1 - (di / ir) ** 2) + 0.3), h)

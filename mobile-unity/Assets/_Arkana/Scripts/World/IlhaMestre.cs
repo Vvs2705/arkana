@@ -196,7 +196,9 @@ namespace Arkana.World
                 foreach (Regiao r in D.regioes)
                 {
                     if (r.id == "R01" || r.id == "R02" || r.id == "R11" || r.id == "R10") continue;
-                    float rx = (x - r.x) / (Mathf.Min(r.ex, r.ey) * 0.28f), ry = (y - r.y) / (Mathf.Min(r.ex, r.ey) * 0.28f);
+                    // borda irregular: raio modulado por ruido (circulo perfeito denunciava o blockout)
+                    float rr = Mathf.Min(r.ex, r.ey) * 0.28f * (0.7f + 0.6f * Mathf.PerlinNoise(x * 0.012f + r.x * 0.001f, y * 0.012f));
+                    float rx = (x - r.x) / rr, ry = (y - r.y) / rr;
                     terra = Mathf.Max(terra, Mathf.InverseLerp(1.1f, 0.6f, Mathf.Sqrt(rx * rx + ry * ry)));
                 }
                 terra *= Mathf.Lerp(0.55f, 1f, Mathf.PerlinNoise(x * 0.05f, y * 0.05f));
@@ -525,20 +527,22 @@ namespace Arkana.World
             // R03 templo: terracos, torre central 45 m, alas com colunas, escadaria, estatuas
             g = Grupo("ARKANA_R03_Templo");
             Regiao t = R("R03");
-            Bloco(g, "R03_Terraco_Inferior", PrimitiveType.Cube, t.x, t.y, t.z - 6f, new Vector3(220f, 180f, 6f), 0f, Pedra);
-            Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, t.z, new Vector3(120f, 90f, 12f), 0f, Pedra);
-            Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, t.z + 12f, new Vector3(20f, 20f, 45f), 0f, Pedra);
-            Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, t.z + 57f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
-            Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 60f, t.y + 10f, t.z - 1f, new Vector3(24f, 30f, 7f), 0f, PedraEsc);
+            // tudo assentado no chao REAL (o gerador ja' faz o monte do santuario a 166 sobre o patio a 150)
+            float zs = Altura(t.x + 10f, t.y + 10f);
+            Bloco(g, "R03_Patio_Lajes", PrimitiveType.Cube, t.x, t.y, Altura(t.x - 30f, t.y) - 1.5f, new Vector3(200f, 160f, 2f), 0f, Pedra);
+            Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs - 1f, new Vector3(120f, 90f, 5f), 0f, Pedra);
+            Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 4f, new Vector3(20f, 20f, 45f), 0f, Pedra);
+            Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 49f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
+            Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 55f, t.y + 10f, -9999f, new Vector3(18f, 30f, 6f), 0f, PedraEsc);
             for (int k = 0; k < 10; k++)
             {
-                Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y - 45f, 2.6f, 0f, t.z);
-                Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y + 65f, 2.6f, 0f, t.z);
+                Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y - 45f, 2.6f, 0f);
+                Peca(g, "38-coluna-ruina", t.x - 40f + k * 10f, t.y + 65f, 2.6f, 0f);
             }
-            Peca(g, "24-estatua-vigia", t.x - 50f, t.y - 5f, 3f, 90f, t.z);
-            Peca(g, "24-estatua-vigia", t.x - 50f, t.y + 25f, 3f, 90f, t.z);
-            Peca(g, "33-obelisco", t.x + 70f, t.y - 60f, 2.5f, 0f, t.z);
-            Peca(g, "33-obelisco", t.x + 70f, t.y + 80f, 2.5f, 0f, t.z);
+            Peca(g, "24-estatua-vigia", t.x - 50f, t.y - 5f, 3f, 90f);
+            Peca(g, "24-estatua-vigia", t.x - 50f, t.y + 25f, 3f, 90f);
+            Peca(g, "33-obelisco", t.x + 70f, t.y - 60f, 2.5f, 0f);
+            Peca(g, "33-obelisco", t.x + 70f, t.y + 80f, 2.5f, 0f);
 
             // R04 vila: 30 casas em 3 faixas de terraco, praca com poco, torrinha arruinada
             g = Grupo("ARKANA_R04_Vila");
