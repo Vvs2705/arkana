@@ -64,7 +64,14 @@ buracos do vazio: ~20 s no editor (o MCP devolve nulo, mas termina).
 **REVIVER (Diretor, a implementar — como Apex/Warzone, "incentiva a continuar jogando e acreditar que o time possa dar
 um jeito"):** existe uma forma de trazer o morto de volta (comprar/reviver); quem volta vem com o BÁSICO: sem escudo, sem
 manoplas duplas, só a manopla base do elemento de MAIOR VÍNCULO. Hoje existe o `Derrubado` (caído + reerguer por aliado);
-falta o reviver pós-morte (ponto de reanimação/compra, spawn do revivido, kit básico). Vetável: onde/como se compra.
+**FEITO (25/09, medido em partida):** `Partida.Reviver` + canal `TickReviver`: um aliado DE PÉ a ≤ 2,4 m do corpo do
+eliminado por 8 s (`REVIVER_S`, vetável; decai se afastar) traz o morto de volta com 30 % de vida, escudo 0 e SÓ a luva
+base (`Arma.VARINHA`) do elemento do mago (`IdentidadeMago.Elemento` — hoje é o "elemento de maior vínculo"; não existe
+vínculo medido por uso). Quem cai no vazio tem o corpo devolvido ao último chão seguro (`Pawn.UltimoChaoSeguro`) para o time
+chegar. Bots vão socorrer o eliminado (`Dupla.AliadoCaido` inclui mortos). Teste: jogador morto no vazio, parceiro ao lado →
+8 s → viva, hp 30, escudo 0, varinha/Fogo, câmera de volta. **Falta:** HUD do progresso (`Partida.ProgressoReviver`),
+"comprar" o reviver (Warzone) — sem economia no jogo ainda — e o nome: no código, "manopla" é a luva LENDÁRIA dupla;
+a "manopla base" do Diretor é a Luva Comum (varinha). Vetável.
 
 ### >>> 25/09, fim de tarde (4): a ilha de 4,8 km é JOGÁVEL no editor — subterrâneo no Unity, zona §12.1, loot, minimapa
 
