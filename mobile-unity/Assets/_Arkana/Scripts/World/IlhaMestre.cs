@@ -571,13 +571,13 @@ namespace Arkana.World
             Regiao v = R("R04");
             int casas = 0;
             string[] tipos = { "mestre-015-vila-casa-inteira", "mestre-109-vila-casa-grande", "mestre-103-vila-casa-terrea", "mestre-016-vila-casa-danificada" };
-            var feitas = new List<Vector2>();
+            var ocupadas = new List<Vector2>();
             for (int k = 0; k < 1500 && casas < 30; k++)
             {
                 Vector2 p = Espalhar(v, 210f);
                 if (Declive(p.x, p.y) > 10f || (p - new Vector2(v.x + 60f, v.y - 60f)).magnitude < 45f) continue;
-                if (feitas.Exists(q => (q - p).magnitude < 20f)) continue;   // casas de 9-14 m nao se atropelam
-                feitas.Add(p);
+                if (ocupadas.Exists(q => (q - p).magnitude < 20f)) continue;   // casas de 9-14 m nao se atropelam
+                ocupadas.Add(p);
                 float cw = Rn(10f, 16f), cd = 9f, cr = Rn(0f, 360f);
                 if (Peca(g, tipos[casas % tipos.Length], p.x, p.y, 1f, cr, Altura(p.x, p.y) - 0.3f) == null)
                     Casa(g, p.x, p.y, cw, cd, cr, casas % 4 == 0);
