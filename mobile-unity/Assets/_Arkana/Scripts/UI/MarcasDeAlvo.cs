@@ -73,6 +73,9 @@ namespace Arkana.UI
         /// <summary>O parceiro medido (null = sem dupla, ou fora) e a vida dele com rastro.</summary>
         public IEntidade Parceiro { get; private set; }
         public Rastro VidaParceiro;
+        /// <summary>TRIO: o 2o parceiro, com a mesma marca (null = nao ha', ou caiu).</summary>
+        public IEntidade Parceiro2 { get; private set; }
+        public Rastro VidaParceiro2;
         /// <summary>LINHA DE VISADA da mira (olho, ponto) -> livre? Sem ela a mira varria pedra e muro e acendia quem esta'
         /// atras (wallhack). Null = tudo livre (o teste puro). O acerto nao pede: quem apanhou foi visto.</summary>
         public System.Func<Vector3, Vector3, bool> Visada;
@@ -151,6 +154,14 @@ namespace Arkana.UI
             float f = Frac(parceiro.Vital.Hp, parceiro.Vital.HpMax);
             if (parceiro != Parceiro) VidaParceiro.Encher(f); else VidaParceiro.Medir(f, dt);
             Parceiro = parceiro;
+        }
+
+        public void MedirParceiro2(float dt, IEntidade parceiro)
+        {
+            if (parceiro == null || parceiro.Vital == null || !parceiro.Vital.Viva) { Parceiro2 = null; return; }
+            float f = Frac(parceiro.Vital.Hp, parceiro.Vital.HpMax);
+            if (parceiro != Parceiro2) VidaParceiro2.Encher(f); else VidaParceiro2.Medir(f, dt);
+            Parceiro2 = parceiro;
         }
 
         /// <summary>A MARCA DO PACTO (Ping de Sintonia): o alvo PEDIDO ganha o losango na cor do elemento do jogador; ACEITO, nas
@@ -304,7 +315,7 @@ namespace Arkana.UI
         public readonly MarcasLogica Logica = new MarcasLogica();
         readonly Tela[] _telas;
         readonly Color[] _niveis;
-        readonly TelaParceiro _parceiro;
+        readonly TelaParceiro _parceiro, _parceiro2;
         readonly TelaPacto _pacto;
         readonly List<Rect> _zonas = new List<Rect>(20);
         Vector2 _telaZonas;
@@ -321,6 +332,7 @@ namespace Arkana.UI
             _telas = new Tela[MarcasLogica.Max];
             for (int i = 0; i < _telas.Length; i++) _telas[i] = new Tela(raiz, i);
             _parceiro = new TelaParceiro(raiz);   // depois das de inimigo: o aliado desenha por cima
+            _parceiro2 = new TelaParceiro(raiz);  // trio: o 2o parceiro, a mesma marca
             _pacto = new TelaPacto(raiz);         // por ultimo: o alvo combinado le' por cima de tudo
             // ponytail: corpo (CharacterController) nao tampa a visada — o do proprio jogador cruzava a linha de perto. Parede
             // ATRAS de um corpo passa, e moita sem colisor nao esconde: RaycastNonAlloc com a lista toda se isso aparecer em jogo.
@@ -340,6 +352,7 @@ namespace Arkana.UI
             else Logica.Atualizar(dt, null, jogador, Vector3.zero, Vector3.forward);
             IEntidade par = p != null ? p.ParceiroVivo() : null;
             Logica.MedirParceiro(dt, par);
+            Logica.MedirParceiro2(dt, p != null ? p.ParceiroVivo(1) : null);
             if (par != _parVisto) { _parVisto = par; _ping = Bot.PingDe(par); }   // o Ping mora no parceiro (quem responde)
             Posicionar();
         }
@@ -358,6 +371,7 @@ namespace Arkana.UI
                 MarcasLogica.ZonasProibidas(HudLayout.Calcular(_telaZonas, AreaSegura.Atual(), Dp.Px(1f)), _telaZonas, Dp.Px(1f), _zonas);
             }
             _parceiro.Pintar(cam != null ? Logica.Parceiro : null, cam, Logica.VidaParceiro, _zonas);
+            _parceiro2.Pintar(cam != null ? Logica.Parceiro2 : null, cam, Logica.VidaParceiro2, _zonas);
             _pacto.Pintar(_ping, cam, Logica.Agora);
         }
 

@@ -374,6 +374,9 @@ namespace Arkana.UI
             IEntidade parceiro = p != null ? p.ParceiroVivo() : null;
             q.TemParceiro = parceiro != null && parceiro != jogador;   // espectando, o "jogador" da HUD ja' e' ele
             if (q.TemParceiro) q.Parceiro = parceiro.Pos;
+            IEntidade parceiro2 = p != null ? p.ParceiroVivo(1) : null;   // trio
+            q.TemParceiro2 = parceiro2 != null && parceiro2 != jogador;
+            if (q.TemParceiro2) q.Parceiro2 = parceiro2.Pos;
             q.TemRota = _temRota && fase == Queda.NO_CASTELO;
             q.RotaA = _rotaA; q.RotaB = _rotaB;
             // zoom: castelo e queda = a ilha inteira (escolher o pouso); no chao, a janela local. Anda em ~1 s
@@ -438,8 +441,8 @@ namespace Arkana.UI
     {
         public Texture2D Textura;
         public float Extensao, Yaw;
-        public bool TemJogador, ZonaAtiva, TemProximo, TemBau, TemRota, TemParceiro;
-        public Vector3 Jogador, ZonaCentro, ProximoCentro, Bau, RotaA, RotaB, Parceiro;
+        public bool TemJogador, ZonaAtiva, TemProximo, TemBau, TemRota, TemParceiro, TemParceiro2;
+        public Vector3 Jogador, ZonaCentro, ProximoCentro, Bau, RotaA, RotaB, Parceiro, Parceiro2;
         public float ZonaRaio, ProximoRaio;
     }
 
@@ -455,7 +458,7 @@ namespace Arkana.UI
         readonly RectTransform _janela;
         readonly RawImage _ilha;
         readonly AnelUi _tinta, _atual, _proximo;
-        readonly Image _rota, _bau, _bauFundo, _cone, _seta, _setaFundo, _parceiro, _parceiroFundo;
+        readonly Image _rota, _bau, _bauFundo, _cone, _seta, _setaFundo, _parceiro, _parceiroFundo, _parceiro2, _parceiro2Fundo;
         readonly RectTransform[] _pois;
         readonly Vector3[] _poisM;
         readonly float _icone;
@@ -509,6 +512,8 @@ namespace Arkana.UI
             _bau = Marca("Bau", Formas.Losango(), Estilo.Ouro, 10.5f);
             _parceiroFundo = Marca("ParceiroFundo", Formas.Disco(), Formas.ComAlfa(Estilo.NoiteFunda, 0.9f), 12f);   // por baixo da seta:
             _parceiro = Marca("Parceiro", Formas.Disco(), Dupla.CorAliado, 8f);                                       // colados, o jogador le' por cima
+            _parceiro2Fundo = Marca("Parceiro2Fundo", Formas.Disco(), Formas.ComAlfa(Estilo.NoiteFunda, 0.9f), 12f);   // trio
+            _parceiro2 = Marca("Parceiro2", Formas.Disco(), Dupla.CorAliado, 8f);
             _cone = Marca("Cone", Formas.Sombra(), new Color(1f, 1f, 1f, 0.32f), 58f);
             _cone.type = Image.Type.Filled; _cone.fillMethod = Image.FillMethod.Radial360;
             _cone.fillOrigin = (int)Image.Origin360.Top; _cone.fillClockwise = true; _cone.fillAmount = ConeGraus / 360f;
@@ -603,6 +608,13 @@ namespace Arkana.UI
                 Vector2 pp = MapaLogica.NaJanela(q.Parceiro, centro, escala);
                 pp = new Vector2(Mathf.Clamp(pp.x, -m, m), Mathf.Clamp(pp.y, -m, m));
                 _parceiro.rectTransform.anchoredPosition = pp; _parceiroFundo.rectTransform.anchoredPosition = pp;
+            }
+            _parceiro2.enabled = _parceiro2Fundo.enabled = q.TemParceiro2;
+            if (q.TemParceiro2)
+            {
+                Vector2 pp = MapaLogica.NaJanela(q.Parceiro2, centro, escala);
+                pp = new Vector2(Mathf.Clamp(pp.x, -m, m), Mathf.Clamp(pp.y, -m, m));
+                _parceiro2.rectTransform.anchoredPosition = pp; _parceiro2Fundo.rectTransform.anchoredPosition = pp;
             }
             // jogador: cone da camera + seta; fora da janela (castelo no mar) ele encosta na borda, nunca some
             _seta.enabled = _setaFundo.enabled = _cone.enabled = q.TemJogador;

@@ -59,6 +59,8 @@ namespace Arkana.Gameplay
 
         /// <summary>O 1o vivo (de pe' ou derrubado) do time do player que nao e' o player; null se nenhum.</summary>
         public IEntidade ParceiroVivo() => AliadoVivo(Player);
+        /// <summary>O k-esimo (0 = o 1o) aliado vivo do player: no TRIO, k = 1 e' o segundo parceiro (marca, minimapa).</summary>
+        public IEntidade ParceiroVivo(int k) => AliadoVivo(Player, k);
 
         /// <summary>Segundos para a suprema encher (o KitRunner pergunta aqui em vez de a Kits no treino).</summary>
         public float SupremaCargaS(float padrao) => Treino ? SUPREMA_TREINO_S : padrao;
@@ -280,12 +282,12 @@ namespace Arkana.Gameplay
         private bool Vivo(IEntidade e) => e != null && e.Vital != null && e.Vital.Viva && !Bonecos.Contains(e);
 
         /// <summary>O 1o vivo do time de `de` que nao e' ele (null se nenhum, ou `de` null).</summary>
-        private IEntidade AliadoVivo(IEntidade de)
+        private IEntidade AliadoVivo(IEntidade de, int k = 0)
         {
             for (int i = 0; i < Arena.Count; i++)
             {
                 IEntidade e = Arena[i];
-                if (e != de && Vivo(e) && Combat.MesmoTime(e, de)) return e;
+                if (e != de && Vivo(e) && Combat.MesmoTime(e, de) && k-- == 0) return e;
             }
             return null;
         }
