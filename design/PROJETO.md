@@ -68,10 +68,10 @@ NUNCA ff em main nem focar o Unity durante um teste em Play (o auto-refresh reco
 `Montagem.Times(times, tamanho)`: líder + seguidores em lados alternados, e os 2 parceiros do jogador POR ÚLTIMO
 (`Main.Bots[0]` segue inimigo). `Main.Parceiro` = o 1º parceiro (ping, marca azul, cartão); o 2º só joga. Partida ao vivo:
 18 corpos, 6 times, 2 parceiros pousaram a ~70 m e em 20 s estavam a 5 e 12 m do jogador; 59 fps; 525 testes EditMode
-passando. Textos: "TRIOS {0}", "ÚLTIMO TRIO DE PÉ", modo "TRIO". **Limites conhecidos (vetáveis):** só o 1º parceiro tem
-marca/ponto no minimapa/ping; cada bot foca o alvo de UM aliado; para 40–60 corpos medir a percepção dos bots (O(n²)) no
+passando. Textos: "TRIOS {0}", "ÚLTIMO TRIO DE PÉ", modo "TRIO". **Limites conhecidos (vetáveis):** o ping fala só com o 1º parceiro (a marca azul e o ponto no minimapa
+já cobrem os DOIS — `Partida.ParceiroVivo(k)`, medido em partida 25/09); cada bot foca o alvo de UM aliado; para 40–60 corpos medir a percepção dos bots (O(n²)) no
 aparelho antes de subir `TimesInimigos`.
-**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, marca do 2º parceiro, S16 e peças que ainda são blockout.
+**Falta:** APK + Poco F4 (o último teste do dia), cristais/luz de túnel, S16 e peças que ainda são blockout.
 
 ### >>> 25/09, tarde (3): a PARTIDA já cai do castelo na ilha nova + o subterrâneo (R10–R12) existe, medido, no Blender v002
 
