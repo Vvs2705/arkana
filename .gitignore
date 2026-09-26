@@ -86,3 +86,6 @@ arte/cenario/ilha-fraturada/_originais-3d/*.glb
 # Ilha do Documento Mestre no Blender (~110 MB): reproduzivel por arte/tools/ilha_para_blender.py; nao vai para o git
 arte/cenario/documento-mestre/*.blend
 arte/cenario/documento-mestre/*.blend1
+
+# pacotes CC0 baixados por arte/tools/cc0.py (grandes, reproduziveis)
+arte/cenario/cc0/
