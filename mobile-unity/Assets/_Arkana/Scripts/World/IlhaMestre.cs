@@ -71,6 +71,7 @@ namespace Arkana.World
             raiz.SetParent(transform, false);
             Terrenos();
             Agua();
+            if (IlhaFlutuante) BaseRochosa();
             Atmosfera();
             Regioes();
             Subterraneo();
