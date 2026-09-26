@@ -633,6 +633,9 @@ namespace Arkana
             IEntidade alvo = null; float melhor = 0f;
             for (int i = 0; i < Bots.Count; i++)
             {
+                // bussola verde no corpo de cada aliado ELIMINADO: e' para la' que o time vai revive-lo
+                bool aliadoMorto = Bots[i] != null && !Bots[i].Pawn.Viva && Combat.MesmoTime(Bots[i].Pawn, Player.Pawn);
+                Hud.Aviso.SetBussola("reviver" + i, aliadoMorto ? Bots[i].Pawn.Pos : Vector3.zero, new Color(0.45f, 1f, 0.6f), aliadoMorto);
                 if (Bots[i] == null || Bots[i].Pawn.Viva || !Combat.MesmoTime(Bots[i].Pawn, Player.Pawn)) continue;
                 float p = Partida.ProgressoReviver(Bots[i].Pawn);
                 if (p > melhor && (Bots[i].Pawn.Pos - Player.Pawn.Pos).sqrMagnitude <= Partida.RAIO_REVIVER * Partida.RAIO_REVIVER * 4f) { melhor = p; alvo = Bots[i].Pawn; }

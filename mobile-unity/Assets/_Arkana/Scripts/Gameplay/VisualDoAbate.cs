@@ -277,6 +277,9 @@ namespace Arkana.Gameplay
             Eliminar(p.Pos, IdentidadeMago.De(p.Slug).Elemento);
             // ponytail: o corpo do JOGADOR fica (a camera e a tela de FIM olham para ele); so' bot/boneco afunda
             if (p.EhPlayer || p.Visual == null) return;
+            // aliado do jogador tambem fica: o corpo e' onde o time o REVIVE (Partida.Reviver) — afundado, ninguem o acharia
+            Partida pa = Partida.Atual;
+            if (pa != null && pa.Player != null && Combat.MesmoTime(p, pa.Player)) return;
             for (int i = 0; i < _corpos.Count; i++) if (_corpos[i].P == p) return;
             Transform v = p.Visual.transform;
             _corpos.Add(new Corpo { P = p, V = v, Base = v.localPosition });

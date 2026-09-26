@@ -1201,12 +1201,12 @@ namespace Arkana.UI
         /// o aviso mostra a propria volta. `alvo` = o morto; `prog` 0..1; `euMorto` = o jogador e' quem volta. prog 0 limpa.</summary>
         public void Revivendo(IEntidade alvo, float prog, bool euMorto)
         {
-            if (prog <= 0f) { if (_reviverNaTela) { Aviso.CanalizarFim(); Aviso.Limpar(AvisoLogica.P_BAU); _reviverNaTela = false; } return; }
+            if (prog <= 0f) { if (_reviverNaTela) { Aviso.CanalizarFim(); Aviso.Limpar(AvisoLogica.P_REVIVER); _reviverNaTela = false; } return; }
             _reviverNaTela = true;
             Color verde = new Color(0.45f, 1f, 0.6f);
             if (!euMorto) { Aviso.Canalizar(prog); _aviso.CorCanal(verde); }
             string nome = alvo is Arkana.Gameplay.Pawn p ? Arkana.Characters.IdentidadeMago.De(p.Slug).Nome : "";
-            Aviso.Avisar(AvisoLogica.P_BAU, euMorto ? string.Format(Textos.SendoRevivido, Mathf.RoundToInt(prog * 100f))
+            Aviso.Avisar(AvisoLogica.P_REVIVER, euMorto ? string.Format(Textos.SendoRevivido, Mathf.RoundToInt(prog * 100f))
                                                     : string.Format(Textos.Revivendo, nome), verde);
         }
         bool _reviverNaTela;

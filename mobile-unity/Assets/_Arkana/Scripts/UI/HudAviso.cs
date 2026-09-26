@@ -11,6 +11,7 @@ namespace Arkana.UI
     /// </summary>
     public sealed class AvisoLogica
     {
+        public const int P_REVIVER = -1;    // revivendo um aliado / sendo revivido: o jogador esta' fazendo isso AGORA
         public const int P_ZONA_FORA = 0;   // morrendo na tempestade AGORA
         public const int P_TELEGRAFO = 1;   // suprema anunciada (janela de fuga)
         public const int P_ZONA = 2;        // proxima parede
