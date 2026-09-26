@@ -312,6 +312,8 @@ namespace Arkana.Core
         public const string SintoniaPronta = "SINTONIA PRONTA";
         public const string HudDuplas = "TRIOS {0}";
         public const string Espectando = "ESPECTANDO · {0}";
+        public const string Revivendo = "REVIVENDO {0}";          // o jogador trazendo um aliado eliminado de volta
+        public const string SendoRevivido = "VOLTANDO · {0}%";    // o jogador eliminado, com um aliado junto do corpo
         public const string Parceiro = "PARCEIRO";
         public const string ModoRotulo = "MODO";
         public const string ModoDupla = "TRIO";

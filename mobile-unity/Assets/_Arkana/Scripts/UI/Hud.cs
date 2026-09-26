@@ -1197,6 +1197,20 @@ namespace Arkana.UI
 
         void OnBauAnunciado(Vector3 pos, float s) { Aviso.SetBussola("bau", pos, Estilo.Ouro); Aviso.Contar(AvisoLogica.P_BAU, s, T_BAU + T_SEP + T_BAU_CAINDO, Estilo.Ouro); }
         void OnBauPousou(Vector3 pos) { Aviso.SetBussola("bau", pos, Estilo.Ouro); Aviso.PararContagem(AvisoLogica.P_BAU); Aviso.Avisar(AvisoLogica.P_BAU, T_BAU_POUSOU, Estilo.Ouro); }
+        /// <summary>REVIVER (Partida.Reviver, 26/09): o anel de canalizar mostra o progresso de quem o jogador revive; eliminado,
+        /// o aviso mostra a propria volta. `alvo` = o morto; `prog` 0..1; `euMorto` = o jogador e' quem volta. prog 0 limpa.</summary>
+        public void Revivendo(IEntidade alvo, float prog, bool euMorto)
+        {
+            if (prog <= 0f) { if (_reviverNaTela) { Aviso.CanalizarFim(); Aviso.Limpar(AvisoLogica.P_BAU); _reviverNaTela = false; } return; }
+            _reviverNaTela = true;
+            Color verde = new Color(0.45f, 1f, 0.6f);
+            if (!euMorto) { Aviso.Canalizar(prog); _aviso.CorCanal(verde); }
+            string nome = alvo is Arkana.Gameplay.Pawn p ? Arkana.Characters.IdentidadeMago.De(p.Slug).Nome : "";
+            Aviso.Avisar(AvisoLogica.P_BAU, euMorto ? string.Format(Textos.SendoRevivido, Mathf.RoundToInt(prog * 100f))
+                                                    : string.Format(Textos.Revivendo, nome), verde);
+        }
+        bool _reviverNaTela;
+
         void OnBauCanalizando(IEntidade pawn, float prog)
         {
             if (pawn != null && !EhJogador(pawn)) return;

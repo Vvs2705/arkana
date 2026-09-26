@@ -623,7 +623,22 @@ namespace Arkana
         }
 
         /// <summary>O topo da HUD: BOTS n no solo, DUPLAS n (times vivos) na dupla.</summary>
-        void AtualizarHud() => Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos, Dupla ? Partida.TimesVivos : -1);
+        void AtualizarHud()
+        {
+            Hud.AtualizarPartida(Partida.Restante, Partida.BotsVivos, Dupla ? Partida.TimesVivos : -1);
+            // reviver: o morto do time com canal aberto (o jogador, ou um aliado que o jogador esta' trazendo de volta)
+            if (Player == null) return;
+            float pj = Partida.ProgressoReviver(Player.Pawn);
+            if (pj > 0f) { Hud.Revivendo(Player.Pawn, pj, true); return; }
+            IEntidade alvo = null; float melhor = 0f;
+            for (int i = 0; i < Bots.Count; i++)
+            {
+                if (Bots[i] == null || Bots[i].Pawn.Viva || !Combat.MesmoTime(Bots[i].Pawn, Player.Pawn)) continue;
+                float p = Partida.ProgressoReviver(Bots[i].Pawn);
+                if (p > melhor && (Bots[i].Pawn.Pos - Player.Pawn.Pos).sqrMagnitude <= Partida.RAIO_REVIVER * Partida.RAIO_REVIVER * 4f) { melhor = p; alvo = Bots[i].Pawn; }
+            }
+            Hud.Revivendo(alvo, melhor, false);
+        }
 
         /// <summary>Registra o time e forma a dupla da vaga (solo: nada — o de hoje). A outra ponta ja' existe: nasceu antes.</summary>
         void Parear(Bot b, Montagem.Vaga v)
