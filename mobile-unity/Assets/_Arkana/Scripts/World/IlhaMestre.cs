@@ -496,9 +496,11 @@ namespace Arkana.World
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.42f, 0.47f, 0.62f);
             RenderSettings.ambientEquatorColor = new Color(0.55f, 0.48f, 0.42f);
-            RenderSettings.ambientGroundColor = new Color(0.28f, 0.27f, 0.24f);
+            // sem mar embaixo, o "chao" do ambiente e' o mar de nuvens iluminado: a base de rocha da ilha flutuante recebe
+            // luz de baixo (0,28 deixava a rocha preta — foto de 26/09)
+            RenderSettings.ambientGroundColor = IlhaFlutuante ? new Color(0.62f, 0.50f, 0.52f) : new Color(0.28f, 0.27f, 0.24f);
             Material ceu = Ilha.MaterialCeu();
-            if (ceu != null) RenderSettings.skybox = ceu;
+            if (ceu != null) { ceu.SetFloat("_Abismo", IlhaFlutuante ? 1f : 0f); RenderSettings.skybox = ceu; }
         }
 
         // ------------------------------------------------------------------ blockout das 12 regioes

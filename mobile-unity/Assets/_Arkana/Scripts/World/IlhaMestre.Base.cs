@@ -73,7 +73,7 @@ namespace Arkana.World
             Texture2D cor = Resources.Load<Texture2D>("terreno-rocha-cor"), nor = Resources.Load<Texture2D>("terreno-rocha-normal");
             if (cor != null) mat.SetTexture("_BaseMap", cor);
             if (nor != null) { mat.SetTexture("_BumpMap", nor); mat.EnableKeyword("_NORMALMAP"); }
-            mat.SetColor("_BaseColor", new Color(0.62f, 0.56f, 0.50f));   // a rocha do Terrain puxada para o terroso da falesia
+            mat.SetColor("_BaseColor", new Color(0.86f, 0.76f, 0.66f));   // a rocha do Terrain puxada para o terroso da falesia
             mat.SetFloat("_Smoothness", 0.08f);
             mat.SetFloat("_Cull", 0f);   // dos dois lados: por uma enseada ve'-se a parede de dentro, nao o ceu
             var go = new GameObject("Base_Rochosa") { hideFlags = HideFlags.DontSave };

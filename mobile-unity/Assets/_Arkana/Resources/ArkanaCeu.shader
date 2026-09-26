@@ -32,6 +32,7 @@ Shader "Arkana/Ceu"
         _Vento("Vento (rad/s)", Range(0, 0.02)) = 0.004
         _RimForca("Forca da borda de luz", Range(0, 2)) = 1
         _CirroForca("Forca do cirro", Range(0, 1)) = 0.2
+        _Abismo("Ilha flutuante: mar de nuvens abaixo do horizonte (0/1)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -66,6 +67,7 @@ Shader "Arkana/Ceu"
                 float _Vento;
                 float _RimForca;
                 float _CirroForca;
+                float _Abismo;
             CBUFFER_END
 
             // KNOBs de forma (fixos: mexer so' com a previa do rascunho aberta)
@@ -206,6 +208,20 @@ Shader "Arkana/Ceu"
                 float faixa = (1.0 - smoothstep(0.0, 0.12, abs(d.y))) * _NevoaNoHorizonte;
                 float abaixo = 1.0 - smoothstep(-0.03, 0.0, d.y);
                 col = lerp(col, (half3)unity_FogColor.rgb, (half)max(faixa, abaixo));
+                // ILHA FLUTUANTE (26/09): abaixo do horizonte nao ha' mar — um MAR DE NUVENS num plano bem abaixo, em faixas
+                // toon (as mesmas cores dos cumulos), que escurece para o lilas-sombra no nadir. Costura na nevoa do horizonte.
+                if (_Abismo > 0.5 && d.y < 0.0)
+                {
+                    float fundo = saturate(-d.y);
+                    half3 abismo = lerp((half3)_Horizonte.rgb, (half3)_Meio.rgb, (half)smoothstep(0.0, 0.3, fundo));
+                    abismo = lerp(abismo, (half3)_NuvemSombra.rgb * 0.75, (half)smoothstep(0.3, 1.0, fundo));
+                    float2 q = d.xz / max(-d.y, 0.03) * 1.6 + _Time.y * _Vento * 25.0;
+                    float n = Ruido(q) * 0.62 + Ruido(q * 2.3 + float2(11.0, 5.0)) * 0.38;
+                    float toon = smoothstep(0.54, 0.57, n) * 0.55 + smoothstep(0.66, 0.69, n) * 0.45;
+                    half3 nuvem = lerp((half3)_NuvemSombra.rgb, lerp((half3)_NuvemMeio.rgb, (half3)_Nuvem.rgb, (half)toon), (half)smoothstep(0.47, 0.54, n));
+                    abismo = lerp(abismo, nuvem, (half)(smoothstep(0.44, 0.5, n) * (1.0 - 0.5 * smoothstep(0.5, 1.0, fundo))));
+                    col = lerp(abismo, (half3)unity_FogColor.rgb, (half)(1.0 - smoothstep(0.0, 0.07, fundo)));
+                }
 
                 // ---- BANDA DE CUMULOS (ramo: o cumulo mais alto termina em base + 1,78 raio)
                 float base = _AlturaBanda;
