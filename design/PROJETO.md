@@ -72,6 +72,11 @@ quadrada de lances de 3 m com patamares até a plataforma a 48 m, sacada a 24 m,
 pátio e 202 terraço do templo (pedra texturizada no lugar dos blocos bege). Helpers novos: `piramide()`, `aduelas()`.
 R03 e R09 sem blockout; 094/096 saíram do lote Tripo (43 peças). Lote de validação: 7 peças (uma por família) em
 `lote-tripo-validacao.txt`. A textura pedra-templo a 2 m/UV parece listrada de perto — vetável: trocar a escala.
+**Kit leva 6 (script):** 203 poço da praça (bocal de pedra, telhadinho, balde), 204 doca do lago (tabuado sobre estacas;
+o pivô é o pé das estacas, tabuado 3,4 m acima), 205 heliponto (concreto 28 m, faixa amarela, H) e 206 torrinha
+arruinada da vila — todos no lugar dos blocos. Helpers: `mat_cor()` (pintura sem textura), `disco()`. Os itens que o
+catálogo dava como "faltando no kit" (heliponto, comando, alojamentos, doca, poço) estão feitos; resta o veículo civil
+(Tripo: 077 caminhão está na validação).
 
 ### >>> 25/09, noite (6): TRIPO assinado (25.000 créditos/mês) — prazo da ARTE: 26/10/2026 — ferramentas instaladas
 
