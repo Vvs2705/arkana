@@ -737,8 +737,8 @@ namespace Arkana.World
                     Peca(g, "cc0-campfire-stand", p.x, p.y, 1f, 0f);   // so' uma com espeto (doc: no maximo 1-2 acesas)
                 for (int b = 0; b < 3; b++)   // colchonetes em volta do fogo
                 {
-                    float ang = (k * 50f + b * 120f) * Mathf.Deg2Rad;
-                    Peca(g, "cc0-bedroll", p.x + Mathf.Cos(ang) * 3.2f, p.y + Mathf.Sin(ang) * 3.2f, 1f, -k * 50f - b * 120f);
+                    float angc = (k * 50f + b * 120f) * Mathf.Deg2Rad;
+                    Peca(g, "cc0-bedroll", p.x + Mathf.Cos(angc) * 3.2f, p.y + Mathf.Sin(angc) * 3.2f, 1f, -k * 50f - b * 120f);
                 }
             }
             // lenha, tabuas, ferramentas, baldes e placa na entrada (sudoeste): o acampamento "vivido" do doc
