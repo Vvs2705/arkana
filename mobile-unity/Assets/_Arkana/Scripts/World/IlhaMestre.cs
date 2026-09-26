@@ -718,13 +718,39 @@ namespace Arkana.World
                 Vector2 p = Espalhar(a6, 30f);
                 Peca(g, "mestre-028-acampamento-barril", p.x, p.y, 1f, Rn(0f, 360f));
             }
+            // 2 abrigos maiores (lona sobre estrutura) e 3 fogueiras com espeto — pecas CC0 do Kenney (cc0_para_unity.py);
+            // o blockout so' aparece se o GLB faltar
             for (int k = 0; k < 2; k++)
-                Bloco(g, "R06_Abrigo", PrimitiveType.Cube, a6.x - 16f + k * 32f, a6.y + 34f, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
+            {
+                float ax = a6.x - 16f + k * 32f, ay = a6.y + 34f;
+                if (Peca(g, "cc0-structure-canvas", ax, ay, 1.6f, 20f * k) == null)
+                    Bloco(g, "R06_Abrigo", PrimitiveType.Cube, ax, ay, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
+                Peca(g, "cc0-workbench", ax + 3.5f, ay - 5.5f, 1f, 20f * k);
+                Peca(g, "cc0-chest", ax - 3f, ay - 5f, 1f, Rn(0f, 360f));
+            }
             for (int k = 0; k < 3; k++)
             {
                 Vector2 p = Espalhar(a6, 10f);
-                Bloco(g, "R06_Fogueira", PrimitiveType.Cylinder, p.x, p.y, -9999f, new Vector3(1.6f, 1.6f, 0.3f), 0f, Escuro);
+                if (Peca(g, "cc0-campfire-pit", p.x, p.y, 1f, Rn(0f, 360f)) == null)
+                    Bloco(g, "R06_Fogueira", PrimitiveType.Cylinder, p.x, p.y, -9999f, new Vector3(1.6f, 1.6f, 0.3f), 0f, Escuro);
+                else if (k == 0)
+                    Peca(g, "cc0-campfire-stand", p.x, p.y, 1f, 0f);   // so' uma com espeto (doc: no maximo 1-2 acesas)
+                for (int b = 0; b < 3; b++)   // colchonetes em volta do fogo
+                {
+                    float ang = (k * 50f + b * 120f) * Mathf.Deg2Rad;
+                    Peca(g, "cc0-bedroll", p.x + Mathf.Cos(ang) * 3.2f, p.y + Mathf.Sin(ang) * 3.2f, 1f, -k * 50f - b * 120f);
+                }
             }
+            // lenha, tabuas, ferramentas, baldes e placa na entrada (sudoeste): o acampamento "vivido" do doc
+            string[] miudos = { "cc0-resource-wood", "cc0-resource-planks", "cc0-tool-axe", "cc0-tool-pickaxe", "cc0-bucket", "cc0-box-large-open" };
+            for (int k = 0; k < 18; k++)
+            {
+                Vector2 p = Espalhar(a6, 34f);
+                Peca(g, miudos[k % miudos.Length], p.x, p.y, 1f, Rn(0f, 360f));
+            }
+            Peca(g, "cc0-signpost", a6.x - 30f, a6.y - 30f, 1.3f, 225f);
+            for (int k = 0; k < 3; k++)
+                Peca(g, "cc0-tent-canvas", a6.x + 40f + k * 7f, a6.y - 20f - k * 5f, 1f, 200f + k * 15f);
             for (int k = 0; k < 12; k++)
             {
                 Vector2 p = Espalhar(a6, 32f);
