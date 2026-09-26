@@ -589,7 +589,9 @@ namespace Arkana.World
             {
                 float rad = a * Mathf.Deg2Rad;
                 float x = D.lago.cx + Mathf.Cos(rad) * D.lago.a * 0.97f, y = D.lago.cy + Mathf.Sin(rad) * D.lago.b * 0.97f;
-                Bloco(g, "R01_Doca", PrimitiveType.Cube, x, y, D.lago.nivel + 0.4f, new Vector3(5f, 26f, 0.5f), -a + 90f, Madeira);
+                // doca do kit (204): o pivo e' o pe' das estacas; o tabuado fica 3,4 m acima dele
+                if (Peca(g, "mestre-204-lago-doca", x, y, 1f, -a + 90f, D.lago.nivel + 0.4f - 3.4f) == null)
+                    Bloco(g, "R01_Doca", PrimitiveType.Cube, x, y, D.lago.nivel + 0.4f, new Vector3(5f, 26f, 0.5f), -a + 90f, Madeira);
             }
             Ilhota ip = D.ilhotas[0];
             for (int k = 0; k < 6; k++)
@@ -677,8 +679,10 @@ namespace Arkana.World
                 }
                 casas++;
             }
-            Bloco(g, "R04_Poco", PrimitiveType.Cylinder, v.x + 60f, v.y - 60f, -9999f, new Vector3(3f, 3f, 1.2f), 0f, PedraEsc);
-            Bloco(g, "R04_Torrinha_Ruina", PrimitiveType.Cube, v.x - 120f, v.y + 90f, -9999f, new Vector3(7f, 7f, 18f), 12f, Pedra);
+            if (Peca(g, "mestre-203-vila-poco", v.x + 60f, v.y - 60f, 1f, 30f) == null)
+                Bloco(g, "R04_Poco", PrimitiveType.Cylinder, v.x + 60f, v.y - 60f, -9999f, new Vector3(3f, 3f, 1.2f), 0f, PedraEsc);
+            if (Peca(g, "mestre-206-vila-torrinha-ruina", v.x - 120f, v.y + 90f, 1f, 12f) == null)
+                Bloco(g, "R04_Torrinha_Ruina", PrimitiveType.Cube, v.x - 120f, v.y + 90f, -9999f, new Vector3(7f, 7f, 18f), 12f, Pedra);
 
             // R05 ponte leste-oeste (corrigida) + travessia inferior a Z 80 ao sul
             g = Grupo("ARKANA_R05_Ponte");
@@ -820,7 +824,8 @@ namespace Arkana.World
             }
             foreach (var c in new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) })   // torres de luz
                 Peca(g, "mestre-080-militar-torre-de-luz", b8.x + c.x * 105f, b8.y + c.y * 85f, 1f, 45f);
-            Bloco(g, "R08_Heliponto", PrimitiveType.Cylinder, b8.x - 10f, b8.y + 70f, -9999f, new Vector3(28f, 28f, 0.4f), 0f, Concreto);
+            if (Peca(g, "mestre-205-militar-heliponto", b8.x - 10f, b8.y + 70f, 1f, 0f) == null)
+                Bloco(g, "R08_Heliponto", PrimitiveType.Cylinder, b8.x - 10f, b8.y + 70f, -9999f, new Vector3(28f, 28f, 0.4f), 0f, Concreto);
             Bloco(g, "R08_Deposito", PrimitiveType.Cube, b8.x + 20f, b8.y - 80f, -9999f, new Vector3(20f, 15f, 6f), 0f, Concreto);
             for (int k = 0; k < 14; k++)   // barreiras em zigue-zague no portao e cobertura no patio (doc §3.2: 15-35 m)
             {

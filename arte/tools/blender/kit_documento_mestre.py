@@ -891,6 +891,92 @@ def peca_096():
     return partes, (pedra, telha)
 
 
+def mat_cor(nome, rgb, rugo=0.8):
+    """Material de cor chapada (pintura, marcacao) — exporta no glTF sem textura."""
+    m = bpy.data.materials.get(nome) or bpy.data.materials.new(nome)
+    m.use_nodes = True
+    b = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    b.inputs["Base Color"].default_value = (rgb[0], rgb[1], rgb[2], 1.0)
+    b.inputs["Roughness"].default_value = rugo
+    return m
+
+
+def disco(r, h, loc, mat, lados=32):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=lados, radius=r, depth=h, location=loc)
+    o = bpy.context.active_object
+    o.data.attributes.new("var", "FLOAT", "POINT").data.foreach_set("value", [0.5] * len(o.data.vertices))
+    o.data.materials.append(mat)
+    return o
+
+
+def peca_203():
+    """203 — poco da praca da vila (R04): bocal de pedra em anel (12 blocos), 2 postes de madeira, travessa com
+    manivela, telhadinho de duas aguas em telha e balde pendurado."""
+    pedra, tabua, telha = mat_foto("pedra-rustica"), mat_foto("tabua"), mat_foto("telha")
+    partes, R = [], 1.5
+    for i in range(12):
+        a = 2 * math.pi * i / 12
+        partes.append(caixa((0.9, 0.45, 1.0), (R * math.cos(a), R * math.sin(a), 0.5), (0, 0, a + math.pi / 2), mat=pedra))
+    partes.append(disco(R - 0.2, 0.2, (0, 0, 0.1), mat_cor("agua_poco", (0.05, 0.12, 0.16), 0.1), 16))
+    for s in (-1, 1):
+        partes.append(caixa((0.22, 0.22, 3.2), (s * 1.9, 0, 1.6), mat=tabua))
+    partes.append(caixa((4.2, 0.2, 0.2), (0, 0, 2.6), mat=tabua))
+    partes.append(caixa((0.12, 0.6, 0.12), (2.15, 0.25, 2.6), mat=tabua))       # manivela
+    partes += telhado(4.6, 2.6, 3.2, 0.2, telha, inclin=0.5)[0]
+    partes.append(caixa((0.02, 0.02, 1.0), (0, 0, 2.05), mat=tabua))            # corda
+    partes.append(disco(0.22, 0.35, (0, 0, 1.4), tabua, 10))                   # balde
+    return partes, (pedra, tabua, telha)
+
+
+def peca_204():
+    """204 — doca de madeira do lago (R01): 26 x 5 m, tabuas com fresta sobre 2 longarinas, estacas a cada 4 m
+    (descem 3 m, entram na agua), 2 cabecos de amarracao na ponta."""
+    tabua = mat_foto("tabua")
+    partes, L, W = [], 26.0, 5.0
+    n = int(L / 0.95)
+    for i in range(n):
+        partes.append(caixa((W, 0.85, 0.12), (0, -L / 2 + 0.475 + i * 0.95, 0.0), mat=tabua))
+    for s in (-1, 1):
+        partes.append(caixa((0.3, L, 0.3), (s * (W / 2 - 0.4), 0, -0.22), mat=tabua))
+    for i in range(7):
+        y = -L / 2 + 1.0 + i * 4.0
+        for s in (-1, 1):
+            partes.append(cilindro(0.18, 3.4, (s * (W / 2 - 0.4), y, -1.7 + 0.06), (0, 0, 0), tabua))
+    for s in (-1, 1):
+        partes.append(cilindro(0.22, 0.7, (s * (W / 2 - 0.6), L / 2 - 0.8, 0.35), (0, 0, 0), tabua))
+    return partes, (tabua,)
+
+
+def peca_205():
+    """205 — heliponto da base (R08, doc: ~28 m de diametro): laje de concreto, faixa de borda pintada e o H."""
+    conc = mat_foto("concreto")
+    branco, amarelo = mat_cor("pintura_branca", (0.85, 0.85, 0.82), 0.6), mat_cor("pintura_amarela", (0.85, 0.65, 0.12), 0.6)
+    partes = [disco(14.0, 0.4, (0, 0, 0.2), conc, 48)]
+    for i in range(24):                                                         # faixa amarela na borda (segmentos)
+        a = 2 * math.pi * i / 24
+        partes.append(caixa((2.6, 0.5, 0.04), (12.8 * math.cos(a), 12.8 * math.sin(a), 0.42), (0, 0, a + math.pi / 2), mat=amarelo))
+    partes.append(caixa((1.4, 9.0, 0.04), (-3.0, 0, 0.42), mat=branco))        # o H
+    partes.append(caixa((1.4, 9.0, 0.04), (3.0, 0, 0.42), mat=branco))
+    partes.append(caixa((6.0, 1.4, 0.04), (0, 0, 0.42), mat=branco))
+    return partes, (conc, branco, amarelo)
+
+
+def peca_206():
+    """206 — torrinha arruinada da vila (R04): torre quadrada 7 x 7 de pedra rustica, paredes com topo quebrado em alturas
+    diferentes (18/14/10/6 m), porta e seteiras, entulho na base."""
+    pedra = mat_foto("pedra-rustica")
+    partes, L, E = [], 7.0, 0.8
+    for eixo, c, alt, vaos in (("x", -L / 2 + E / 2, 18.0, [(0.0, 1.6, 0.0, 2.6), (0.0, 0.5, 6.0, 7.4), (0.0, 0.5, 11.0, 12.4)]),
+                               ("x", L / 2 - E / 2, 10.0, [(0.0, 0.5, 5.0, 6.4)]),
+                               ("y", -L / 2 + E / 2, 14.0, [(0.0, 0.5, 7.0, 8.4)]),
+                               ("y", L / 2 - E / 2, 6.0, [])):
+        u0, u1 = (-L / 2, L / 2) if eixo == "x" else (-L / 2 + E, L / 2 - E)
+        partes += parede(eixo, c, u0, u1, E, 0.0, alt, vaos, pedra)
+    for i, (x, y, r) in enumerate([(4.8, 1.0, 0.4), (4.2, -2.4, 1.1), (-1.5, 5.0, 0.2), (2.0, 4.6, 0.9), (5.4, -0.2, 0.6)]):
+        partes.append(caixa((1.2, 0.8, 0.7), (x, y, 0.35), (0.2 * i, 0, r), mat=pedra))
+    return partes, (pedra,)
+
+
 def peca_201():
     """201 — lajeado do patio do templo: 200 x 160 x 1,2 m em lajes de pedra (textura, nao cor chapada)."""
     pedra = mat_foto("pedra-templo")
@@ -954,10 +1040,10 @@ def peca_076():
     return partes, (zinco, tabua)
 
 
-ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071", "046", "026", "014", "013", "043", "094", "096", "201", "202"}
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071", "046", "026", "014", "013", "043", "094", "096", "201", "202", "203", "204", "205", "206"}
 
 
-PECAS = {"094": peca_094, "096": peca_096, "201": peca_201, "202": peca_202, "046": peca_046, "026": peca_026, "014": peca_014, "013": peca_013, "043": peca_043, "095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+PECAS = {"203": peca_203, "204": peca_204, "205": peca_205, "206": peca_206, "094": peca_094, "096": peca_096, "201": peca_201, "202": peca_202, "046": peca_046, "026": peca_026, "014": peca_014, "013": peca_013, "043": peca_043, "095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
          "078": peca_078, "079": peca_079, "076": peca_076,
          "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}
