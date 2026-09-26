@@ -66,6 +66,12 @@ não usar. Fotos conferidas no editor. **HUD do reviver:** anel de canalizar em 
 "VOLTANDO · N%" para o eliminado (`Hud.Revivendo`, alimentado em `Main.AtualizarHud`); testado em partida (canal a 79 %,
 voltou com a varinha). A foto de câmera NÃO mostra a interface (canvas overlay): conferir UI pela Game view. **Blocos
 escuros das entradas U** removidos (tampavam as bocas reais); só voltam se faltar o JSON do subterrâneo.
+**Kit leva 5 (script, grátis):** 094 torre de observação (fuste oco 11×11, janelas em arco, ESCADA INTERNA em espiral
+quadrada de lances de 3 m com patamares até a plataforma a 48 m, sacada a 24 m, campanário e agulha a ~58 m), 096 santuário
+(embasamento 30×30 com escadaria, arcada andável com altar, 2º corpo com pináculos, campanário, ~49 m), 201 lajeado do
+pátio e 202 terraço do templo (pedra texturizada no lugar dos blocos bege). Helpers novos: `piramide()`, `aduelas()`.
+R03 e R09 sem blockout; 094/096 saíram do lote Tripo (43 peças). Lote de validação: 7 peças (uma por família) em
+`lote-tripo-validacao.txt`. A textura pedra-templo a 2 m/UV parece listrada de perto — vetável: trocar a escala.
 
 ### >>> 25/09, noite (6): TRIPO assinado (25.000 créditos/mês) — prazo da ARTE: 26/10/2026 — ferramentas instaladas
 
