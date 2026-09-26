@@ -762,6 +762,148 @@ def peca_043():
     return partes, (pedra,)
 
 
+def piramide(lado, h, loc, mat):
+    """Telhado piramidal quadrado (cone de 4 lados girado 45 graus), base em loc[2]."""
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=lado / math.sqrt(2), radius2=0, depth=h,
+                                    location=(loc[0], loc[1], loc[2] + h / 2), rotation=(0, 0, math.pi / 4))
+    o = bpy.context.active_object
+    me = o.data
+    me.attributes.new("var", "FLOAT", "POINT").data.foreach_set("value", [0.5] * len(me.vertices))
+    me.materials.append(mat)
+    return o
+
+
+def aduelas(cx, cy, z, raio, esp, eixo, mat, n=7, prof=1.0):
+    """Arco de pedra (aduelas) sobre um vao: semicirculo de raio `raio` com base em z, no plano do eixo ('x' ou 'y')."""
+    partes = []
+    for i in range(n):
+        t = math.pi * (i + 0.5) / n
+        seg = 2 * (raio + esp / 2) * math.sin(math.pi / (2 * n)) + 0.05
+        u, w = (raio + esp / 2) * math.cos(t), z + (raio + esp / 2) * math.sin(t)
+        if eixo == "x":
+            partes.append(caixa((seg, prof, esp), (cx + u, cy, w), (0, -(math.pi / 2 + t), 0), mat=mat))
+        else:
+            partes.append(caixa((prof, seg, esp), (cx, cy + u, w), (math.pi / 2 + t, 0, 0), mat=mat))
+    return partes
+
+
+def peca_094():
+    """094 — torre de observacao R09 (doc: base 16 x 16, 58 m, plataforma principal a 48 m): embasamento em talude,
+    fuste oco de pedra com janelas em arco, escada INTERNA em lances (andavel), sacada de madeira a 24 m, plataforma de
+    observacao a 48 m com guarda-corpo, campanario de 4 arcos e telhado piramidal com agulha."""
+    pedra, tabua, telha = mat_foto("pedra-templo"), mat_foto("tabua"), mat_foto("telha")
+    partes, L, E = [], 11.0, 1.0            # fuste 11 x 11, paredes de 1 m
+    partes.append(caixa((16.0, 16.0, 3.0), (0, 0, 1.5), mat=pedra))            # embasamento em degraus (talude)
+    partes.append(caixa((14.0, 14.0, 3.0), (0, 0, 4.5), mat=pedra))
+    for s in (-1, 1):                                                           # contrafortes nos cantos
+        for r in (-1, 1):
+            partes.append(caixa((2.2, 2.2, 14.0), (s * 6.2, r * 6.2, 7.0), mat=pedra))
+    partes.append(caixa((L, L, 0.4), (0, 0, 6.2), mat=pedra))                  # piso interno
+    z0, z1 = 6.0, 48.0
+    for z in range(int(z0), int(z1), 7):                                        # paredes por andar, com janelas em arco
+        h = min(7.0, z1 - z)
+        porta = [(0.0, 3.0, 0.2, 4.5)] if z == int(z0) else [(0.0, 1.8, 2.0, 5.0)]
+        jan = [(0.0, 1.8, 2.0, 5.0)]
+        partes += parede("x", -L / 2 + E / 2, -L / 2, L / 2, E, z, h, porta, pedra)
+        partes += parede("x", L / 2 - E / 2, -L / 2, L / 2, E, z, h, jan, pedra)
+        partes += parede("y", -L / 2 + E / 2, -L / 2 + E, L / 2 - E, E, z, h, jan, pedra)
+        partes += parede("y", L / 2 - E / 2, -L / 2 + E, L / 2 - E, E, z, h, jan, pedra)
+    for i in range(3):                                                          # escada da porta (frente, -Y)
+        partes.append(caixa((5.0, 1.4, 6.0 - i * 2.0), (0, -L / 2 - 1.2 - i * 1.4, (6.0 - i * 2.0) / 2), mat=pedra))
+    # escada interna em lances ao longo das paredes: cada lance sobe 3 m em 7 m (andavel), patamar no canto
+    lado_int, sub = L - 2 * E, 3.0
+    a = lado_int / 2 - 0.8
+    run = lado_int - 3.2
+    comp, incl = math.hypot(run, sub), math.atan2(sub, run)
+    # espiral quadrada: parede -X subindo para +Y, parede +Y para +X, +X para -Y, -Y para -X; patamar em cada canto
+    voltas = [(-a, 0.0, 0.0, 1.0), (0.0, a, 1.0, 0.0), (a, 0.0, 0.0, -1.0), (0.0, -a, -1.0, 0.0)]
+    z, k = z0 + 0.4, 0
+    while z < z1 - 0.5:
+        ox, oy, tx, ty = voltas[k % 4]
+        if abs(tx) > 0.5:
+            dims, rot = (comp, 1.5, 0.3), (0.0, -incl if tx > 0 else incl, 0.0)
+        else:
+            dims, rot = (1.5, comp, 0.3), (incl if ty > 0 else -incl, 0.0, 0.0)
+        partes.append(caixa(dims, (ox, oy, z + sub / 2), rot, mat=tabua))
+        partes.append(caixa((1.6, 1.6, 0.3), (ox + tx * (run / 2 + 0.8), oy + ty * (run / 2 + 0.8), z + sub), mat=tabua))
+        z += sub
+        k += 1
+    partes.append(caixa((15.0, 15.0, 0.35), (0, 0, 24.0), mat=tabua))          # sacada a 24 m (anel de madeira)
+    partes.append(caixa((15.0, 15.0, 0.4), (0, 0, z1), mat=tabua))             # plataforma de observacao a 48 m
+    for zz in (24.0, z1):                                                       # guarda-corpos
+        for s in (-1, 1):
+            partes.append(caixa((15.0, 0.2, 1.1), (0, s * 7.4, zz + 0.75), mat=tabua))
+            partes.append(caixa((0.2, 15.0, 1.1), (s * 7.4, 0, zz + 0.75), mat=tabua))
+        for s in (-1, 1):                                                       # mao-francesa sob a sacada
+            for r in (-1, 1):
+                partes.append(caixa((0.3, 0.3, 3.0), (s * 6.8, r * 6.8, zz - 1.6), (0.5 * r, -0.5 * s, 0), mat=tabua))
+    for s in (-1, 1):                                                           # campanario: 4 pilares com arcos
+        for r in (-1, 1):
+            partes.append(caixa((1.6, 1.6, 6.0), (s * 4.7, r * 4.7, z1 + 3.2), mat=pedra))
+    for eixo, cc in (("x", -4.7), ("x", 4.7), ("y", -4.7), ("y", 4.7)):
+        if eixo == "x":
+            partes += aduelas(0, cc, z1 + 4.4, 3.2, 1.0, "x", pedra)
+        else:
+            partes += aduelas(cc, 0, z1 + 4.4, 3.2, 1.0, "y", pedra)
+    partes.append(caixa((11.5, 11.5, 0.8), (0, 0, z1 + 6.6), mat=pedra))
+    partes.append(piramide(12.5, 3.8, (0, 0, z1 + 7.0), telha))
+    partes.append(cilindro(0.12, 2.0, (0, 0, z1 + 11.6), (0, 0, 0), pedra))    # agulha: topo a ~58 m
+    return partes, (pedra, tabua, telha)
+
+
+def peca_096():
+    """096 — santuario central do templo (doc: torre quadrada 40-50 m acima do terraco): embasamento 30 x 30 com escadaria
+    frontal, arcada aberta no terreo (altar no centro, andavel), segundo corpo recuado com pinaculos nos cantos, campanario
+    de arcos e telhado piramidal com agulha."""
+    pedra, telha = mat_foto("pedra-templo"), mat_foto("telha")
+    partes = [caixa((30.0, 30.0, 4.0), (0, 0, 2.0), mat=pedra)]
+    for i in range(8):                                                          # escadaria frontal (-Y) ate' o embasamento
+        partes.append(caixa((12.0, 1.2, 4.0 - i * 0.5), (0, -15.0 - 0.6 - i * 1.2, (4.0 - i * 0.5) / 2), mat=pedra))
+    z = 4.0
+    for s in (-1, 1):                                                           # terreo: 4 pilares de canto + arcos nas 4 faces
+        for r in (-1, 1):
+            partes.append(caixa((5.0, 5.0, 12.0), (s * 9.5, r * 9.5, z + 6.0), mat=pedra))
+    for eixo, cc in (("x", -9.5), ("x", 9.5), ("y", -9.5), ("y", 9.5)):
+        if eixo == "x":
+            partes += aduelas(0, cc, z + 8.0, 7.0, 1.6, "x", pedra, n=9, prof=3.0)
+        else:
+            partes += aduelas(cc, 0, z + 8.0, 7.0, 1.6, "y", pedra, n=9, prof=3.0)
+    partes.append(caixa((24.0, 24.0, 2.0), (0, 0, z + 16.0), mat=pedra))       # laje do 1o corpo
+    partes.append(caixa((4.0, 3.0, 1.6), (0, 0, z + 0.8), mat=pedra))           # altar
+    z = 22.0
+    partes.append(caixa((16.0, 16.0, 8.0), (0, 0, z + 4.0), mat=pedra))        # 2o corpo recuado
+    for s in (-1, 1):
+        for r in (-1, 1):
+            partes.append(caixa((2.4, 2.4, 6.0), (s * 10.5, r * 10.5, z + 3.0), mat=pedra))
+            partes.append(piramide(2.6, 3.5, (s * 10.5, r * 10.5, z + 6.0), pedra))   # pinaculos
+    z = 30.0
+    for s in (-1, 1):                                                           # campanario
+        for r in (-1, 1):
+            partes.append(caixa((2.0, 2.0, 8.0), (s * 5.0, r * 5.0, z + 4.0), mat=pedra))
+    for eixo, cc in (("x", -5.0), ("x", 5.0), ("y", -5.0), ("y", 5.0)):
+        if eixo == "x":
+            partes += aduelas(0, cc, z + 5.5, 3.0, 1.0, "x", pedra)
+        else:
+            partes += aduelas(cc, 0, z + 5.5, 3.0, 1.0, "y", pedra)
+    partes.append(caixa((12.5, 12.5, 1.0), (0, 0, z + 9.0), mat=pedra))
+    partes.append(piramide(13.0, 6.5, (0, 0, z + 9.5), telha))
+    partes.append(cilindro(0.18, 3.0, (0, 0, z + 17.5), (0, 0, 0), pedra))      # topo a ~49 m
+    return partes, (pedra, telha)
+
+
+def peca_201():
+    """201 — lajeado do patio do templo: 200 x 160 x 1,2 m em lajes de pedra (textura, nao cor chapada)."""
+    pedra = mat_foto("pedra-templo")
+    return [caixa((200.0, 160.0, 1.2), (0, 0, 0.6), mat=pedra)], (pedra,)
+
+
+def peca_202():
+    """202 — terraco superior do templo: 120 x 90 x 5 m com cornija."""
+    pedra = mat_foto("pedra-templo")
+    partes = [caixa((120.0, 90.0, 5.0), (0, 0, 2.5), mat=pedra), caixa((122.0, 92.0, 0.6), (0, 0, 5.1), mat=pedra)]
+    return partes, (pedra,)
+
+
 def peca_080():
     """080 — torre de luz 12 m: mastro trelicado (4 pernas + travessas), plataforma e 4 refletores no topo."""
     zinco, conc = mat_foto("zinco"), mat_foto("concreto")
@@ -812,10 +954,10 @@ def peca_076():
     return partes, (zinco, tabua)
 
 
-ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071", "046", "026", "014", "013", "043"}
+ARQUITETURA = {"015", "016", "103", "109", "093", "097", "078", "079", "076", "095", "080", "098", "071", "046", "026", "014", "013", "043", "094", "096", "201", "202"}
 
 
-PECAS = {"046": peca_046, "026": peca_026, "014": peca_014, "013": peca_013, "043": peca_043, "095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
+PECAS = {"094": peca_094, "096": peca_096, "201": peca_201, "202": peca_202, "046": peca_046, "026": peca_026, "014": peca_014, "013": peca_013, "043": peca_043, "095": peca_095, "080": peca_080, "098": peca_098, "071": peca_071, "015": peca_015, "016": peca_016, "103": peca_103, "109": peca_109, "093": peca_093, "097": peca_097,
          "078": peca_078, "079": peca_079, "076": peca_076,
          "027": peca_027, "028": peca_028, "053": peca_053, "058": peca_058, "055": peca_055, "025": peca_025,
          "073": peca_073, "074": peca_074, "062": peca_062, "064": peca_064, "086": peca_086}

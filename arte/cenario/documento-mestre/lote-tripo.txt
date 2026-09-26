@@ -41,8 +41,8 @@
 088-subterraneo-parede-caverna|arte/cenario/documento-mestre/088-subterraneo-parede-caverna.png
 091-subterraneo-poca-agua|arte/cenario/documento-mestre/091-subterraneo-poca-agua.png
 092-subterraneo-cogumelo-gigante|arte/cenario/documento-mestre/092-subterraneo-cogumelo-gigante.png
-094-torre-torre-observacao|arte/cenario/documento-mestre/094-torre-torre-observacao.png
-096-templo-santuario|arte/cenario/documento-mestre/096-templo-santuario.png
+# 094-torre-torre-observacao: fora — feito por script (andavel, escada interna)
+# 096-templo-santuario: fora — feito por script (arcada andavel)
 # 098-industrial-torre-industrial: fora — feito por script (kit leva 3)
 099-rocha-cachoeira-rochosa|arte/cenario/documento-mestre/099-rocha-cachoeira-rochosa.png
 100-vegetacao-raizes-pendentes|arte/cenario/documento-mestre/100-vegetacao-raizes-pendentes.png

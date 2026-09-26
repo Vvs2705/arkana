@@ -611,10 +611,17 @@ namespace Arkana.World
             Regiao t = R("R03");
             // tudo assentado no chao REAL (o gerador ja' faz o monte do santuario a 166 sobre o patio a 150)
             float zs = Altura(t.x + 10f, t.y + 10f);
-            Bloco(g, "R03_Patio_Lajes", PrimitiveType.Cube, t.x, t.y, Altura(t.x - 30f, t.y) - 1.5f, new Vector3(200f, 160f, 2f), 0f, Pedra);
-            Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs - 1f, new Vector3(120f, 90f, 5f), 0f, Pedra);
-            Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 4f, new Vector3(20f, 20f, 45f), 0f, Pedra);
-            Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 49f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
+            // pecas de pedra do kit (26/09: lajeado, terraco e santuario por script — textura, nao bloco bege); blockout se faltar
+            if (Peca(g, "mestre-201-templo-patio", t.x, t.y, 1f, 0f, Altura(t.x - 30f, t.y) - 0.7f) == null)
+                Bloco(g, "R03_Patio_Lajes", PrimitiveType.Cube, t.x, t.y, Altura(t.x - 30f, t.y) - 1.5f, new Vector3(200f, 160f, 2f), 0f, Pedra);
+            if (Peca(g, "mestre-202-templo-terraco", t.x + 10f, t.y + 10f, 1f, 0f, zs - 1f) == null)
+                Bloco(g, "R03_Terraco_Superior", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs - 1f, new Vector3(120f, 90f, 5f), 0f, Pedra);
+            // santuario de ~49 m com a escadaria virada para OESTE (o lago; o modulo abre em -Y: giro -90 leva -Y para -X)
+            if (Peca(g, "mestre-096-templo-santuario", t.x + 10f, t.y + 10f, 1f, -90f, zs + 4f) == null)
+            {
+                Bloco(g, "R03_Torre_Santuario", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 4f, new Vector3(20f, 20f, 45f), 0f, Pedra);
+                Bloco(g, "R03_Torre_Coroa", PrimitiveType.Cube, t.x + 10f, t.y + 10f, zs + 49f, new Vector3(14f, 14f, 8f), 45f, PedraEsc);
+            }
             // escadaria do kit sobe para LESTE (o modulo sobe em +Y local; giro +90 leva +Y para +X); blockout se faltar
             if (Peca(g, "mestre-046-templo-escadaria", t.x - 55f, t.y + 10f, 1f, 90f, Altura(t.x - 70f, t.y + 10f) - 0.2f) == null)
                 Bloco(g, "R03_Escadaria_Oeste", PrimitiveType.Cube, t.x - 55f, t.y + 10f, -9999f, new Vector3(18f, 30f, 6f), 0f, PedraEsc);
@@ -841,11 +848,15 @@ namespace Arkana.World
             // R09 torre de observacao: base 16x16 no plato 430, plataforma a 478, topo 488
             g = Grupo("ARKANA_R09_Torre");
             Regiao r9 = R("R09");
-            Bloco(g, "R09_Base", PrimitiveType.Cube, r9.x, r9.y, 430f, new Vector3(16f, 16f, 14f), 0f, PedraEsc);
-            Bloco(g, "R09_Fuste", PrimitiveType.Cube, r9.x, r9.y, 444f, new Vector3(12f, 12f, 34f), 0f, Pedra);
-            Bloco(g, "R09_Plataforma_478", PrimitiveType.Cube, r9.x, r9.y, 477f, new Vector3(18f, 18f, 1f), 0f, Madeira);
-            Bloco(g, "R09_Sala_Observacao", PrimitiveType.Cube, r9.x, r9.y, 478f, new Vector3(9f, 9f, 6f), 0f, Pedra);
-            Bloco(g, "R09_Topo_488", PrimitiveType.Cube, r9.x, r9.y, 484f, new Vector3(6f, 6f, 4f), 45f, Telha);
+            // torre do kit (26/09): fuste oco com escada interna em lances ate' a plataforma a 478 e agulha a ~488; porta ao sul
+            if (Peca(g, "mestre-094-torre-observacao", r9.x, r9.y, 1f, 0f, 430f) == null)
+            {
+                Bloco(g, "R09_Base", PrimitiveType.Cube, r9.x, r9.y, 430f, new Vector3(16f, 16f, 14f), 0f, PedraEsc);
+                Bloco(g, "R09_Fuste", PrimitiveType.Cube, r9.x, r9.y, 444f, new Vector3(12f, 12f, 34f), 0f, Pedra);
+                Bloco(g, "R09_Plataforma_478", PrimitiveType.Cube, r9.x, r9.y, 477f, new Vector3(18f, 18f, 1f), 0f, Madeira);
+                Bloco(g, "R09_Sala_Observacao", PrimitiveType.Cube, r9.x, r9.y, 478f, new Vector3(9f, 9f, 6f), 0f, Pedra);
+                Bloco(g, "R09_Topo_488", PrimitiveType.Cube, r9.x, r9.y, 484f, new Vector3(6f, 6f, 4f), 45f, Telha);
+            }
 
             // R10 entrada da caverna profunda (U01) + entradas de superficie da rede subterranea
             g = Grupo("ARKANA_R10_R11_Entradas");
