@@ -704,7 +704,7 @@ namespace Arkana.World
             for (int k = 0; k < 10; k++)
             {
                 float a = k * 36f * Mathf.Deg2Rad, d = Rn(18f, 26f);   // anel de barracas viradas para o centro
-                Peca(g, "mestre-053-acampamento-barraca", a6.x + Mathf.Cos(a) * d, a6.y + Mathf.Sin(a) * d, 1f, -k * 36f + 90f);
+                Peca(g, "mestre-053-acampamento-barraca", a6.x + Mathf.Cos(a) * d, a6.y + Mathf.Sin(a) * d, 1.8f, -k * 36f + 90f);   // 1,8: em 1 a barraca tinha 2 m (foto 26/09)
             }
             for (int k = 0; k < 3; k++)
             {
@@ -725,7 +725,7 @@ namespace Arkana.World
             for (int k = 0; k < 2; k++)
             {
                 float ax = a6.x - 16f + k * 32f, ay = a6.y + 34f;
-                if (Peca(g, "cc0-structure-canvas", ax, ay, 1.6f, 20f * k) == null)
+                if (Peca(g, "cc0-tent-canvas", ax, ay, 1.9f, 20f * k) == null)   // a structure-canvas renderizava so' a armacao
                     Bloco(g, "R06_Abrigo", PrimitiveType.Cube, ax, ay, -9999f, new Vector3(12f, 8f, 4f), 20f * k, Madeira);
                 Peca(g, "cc0-workbench", ax + 3.5f, ay - 5.5f, 1f, 20f * k);
                 Peca(g, "cc0-chest", ax - 3f, ay - 5f, 1f, Rn(0f, 360f));
