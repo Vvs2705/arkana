@@ -51,6 +51,19 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 25/09, noite (6): TRIPO assinado (25.000 créditos/mês) — prazo da ARTE: 26/10/2026 — ferramentas instaladas
+
+O Diretor assinou o plano grande do Tripo (≈1.660 modelos/mês, lote, DCC Bridge, uso comercial). **Instalado:** SDK
+`tripo3d` (pip); plugin `tripo-3d-for-blender` v0.7.7 ativado no Blender 5.2 (painel N → Tripo: cola a chave lá);
+**Tripo Bridge 1.0.14** como pacote embutido em `mobile-unity/Packages/Tripo3d_Unity_Bridge` (menu Tools → Tripo
+Bridge; só no Chrome/Edge, só no modo editor; ainda NÃO verificado no Unity — abrir e conferir o menu); script
+`arte/tools/tripo.py` (saldo / imagem / texto / lote / baixar) que grava `arte/cenario/<slug>/<slug>.glb` — a chave
+vai em `arte/tools/.env.tripo` (`TRIPO_API_KEY=tsk_...`, ignorada pelo git; eu nunca leio). Lote pronto:
+`arte/cenario/documento-mestre/lote-tripo.txt` com as 50 peças orgânicas do catálogo (12.000 faces, v3.1, PBR, 8 em
+paralelo). **Regra:** validar a 1ª peça de cada família com foto antes de rodar o lote inteiro (créditos). O MCP oficial
+do Tripo está parado (alpha 2025): não usar. Máquina: RTX 3050 6 GB / 8 GB RAM — nada de gerar 3D local. Grátis a
+somar: Mixamo (animações), Kenney/Quaternius (props CC0). **Prazo do Diretor: criação de arte fechada até 26/10.**
+
 ### >>> 25/09, noite (5): ILHA FLUTUANTE (sem mar) + a regra do REVIVER — decisões do Diretor
 
 **Diretor, 25/09:** "em volta da ilha não precisamos ter o mar" — nenhum jogo de referência tem; a borda é QUEDA: quem
