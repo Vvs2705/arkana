@@ -59,7 +59,7 @@ namespace Arkana.World
             for (int a = 0; a < BaseAngulos; a++)
             {
                 int a0 = k * W + a, a1 = a0 + 1, b0 = a0 + W, b1 = b0 + 1;
-                f.AddRange(new[] { a0, a1, b1, a0, b1, b0 });
+                f.AddRange(new[] { a0, b1, a1, a0, b0, b1 });   // normais para FORA (a outra ordem deixava a rocha preta do lado do sol)
             }
             var m = new Mesh { name = "base_rochosa", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             m.SetVertices(v);
