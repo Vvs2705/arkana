@@ -51,6 +51,19 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 26/09, madrugada (7): ilha no céu de verdade (base de rocha + mar de nuvens) e acampamento com peças CC0
+
+Sem Tripo esta noite (assinatura amanhã) e sem APK — decisão do Diretor. **Base de rocha** (`IlhaMestre.Base.cs`): cone
+irregular pendurado sob a costa real (256 direções, 16 anéis, afina até 700 m), rocha do Terrain nos dois lados, sem
+colisor. Armadilha: a 1ª ordem de triângulos deixou as normais para dentro — a rocha ficava preta do lado do sol.
+**Céu** (`ArkanaCeu.shader`, `_Abismo`): abaixo do horizonte, um mar de nuvens em faixas toon (as cores dos cúmulos),
+escurecendo para o lilás no nadir; ligado pela IlhaMestre quando `IlhaFlutuante`. Luz ambiente de baixo 0,28 → 0,62
+(a base recebe o reflexo das nuvens). **Acampamento R06:** peças do Kenney Survival Kit convertidas por
+`arte/tools/blender/cc0_para_unity.py` (escala real, textura embutida → `Resources/cc0-*.glb`, 14 peças): 2 barracas
+grandes, 3 fogueiras (1 com espeto) com colchonetes, bancada, baú, lenha, tábuas, ferramentas, baldes, placa, 3 barracas
+extras; barracas do kit Meshy em 1,8× (tinham 2 m). A `structure-canvas` do Kenney renderiza só a armação (a lona some) —
+não usar. Fotos conferidas no editor.
+
 ### >>> 25/09, noite (6): TRIPO assinado (25.000 créditos/mês) — prazo da ARTE: 26/10/2026 — ferramentas instaladas
 
 O Diretor assinou o plano grande do Tripo (≈1.660 modelos/mês, lote, DCC Bridge, uso comercial). **Instalado:** SDK
