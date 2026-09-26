@@ -51,6 +51,20 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 26/09, fim da madrugada (8): ESTADO ATUAL — o que continuar amanhã
+
+**Fechado nesta leva (tudo em main, 525 testes EditMode verdes):** ilha flutuante com base de rocha e mar de nuvens;
+acampamento com peças CC0 do Kenney; kit por script levas 5–6 (torre de observação andável, santuário, pátio, terraço,
+poço, doca, heliponto, torrinha); reviver completo — canal de 8 s junto ao corpo, volta com 30 % de vida, sem escudo e
+só a varinha; corpo do ALIADO eliminado não afunda mais (VisualDoAbate), bússola verde aponta para ele, aviso
+"REVIVENDO <nome>" com prioridade máxima (`AvisoLogica.P_REVIVER = -1`) e anel verde — conferido na tela de jogo
+(`ScreenCapture.CaptureScreenshot` em Play captura a interface; a câmera do MCP não).
+**Amanhã, nesta ordem:** (1) o Diretor assina o Tripo e cola a chave em `arte/tools/.env.tripo`; (2) rodar
+`python arte/tools/tripo.py lote arte/cenario/documento-mestre/lote-tripo-validacao.txt` (7 peças) e aprovar o estilo
+com foto no Unity; (3) lote completo (43 peças) — árvore gigante primeiro (R02 ainda é blockout); (4) APK pela CLI
+(batchmode, sem o diálogo do Input Handling) e teste no Poco F4. **Pendente de decisão do Diretor:** ProjectSettings,
+cena Main e URP_Base (sombra 50→60) alterados pelo build — fora do commit.
+
 ### >>> 26/09, madrugada (7): ilha no céu de verdade (base de rocha + mar de nuvens) e acampamento com peças CC0
 
 Sem Tripo esta noite (assinatura amanhã) e sem APK — decisão do Diretor. **Base de rocha** (`IlhaMestre.Base.cs`): cone
