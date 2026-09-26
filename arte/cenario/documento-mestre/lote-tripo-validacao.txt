@@ -1,0 +1,9 @@
+# VALIDACAO (1a peca de cada familia) — rodar ANTES do lote inteiro e aprovar o estilo com foto no Unity.
+# python arte/tools/tripo.py lote arte/cenario/documento-mestre/lote-tripo-validacao.txt   (~7 x 40 creditos)
+102-vegetacao-arvore-gigante|arte/cenario/documento-mestre/102-vegetacao-arvore-gigante.png
+009-vegetacao-arvore-comum-a|arte/cenario/documento-mestre/009-vegetacao-arvore-comum-a.png
+038-rocha-rochedo-grupo|arte/cenario/documento-mestre/038-rocha-rochedo-grupo.png
+081-subterraneo-cristal-azul|arte/cenario/documento-mestre/081-subterraneo-cristal-azul.png
+047-templo-estatua-sem-cabeca|arte/cenario/documento-mestre/047-templo-estatua-sem-cabeca.png
+066-industrial-gerador|arte/cenario/documento-mestre/066-industrial-gerador.png
+077-militar-caminhao|arte/cenario/documento-mestre/077-militar-caminhao.png

@@ -31,7 +31,7 @@
 052-templo-fonte|arte/cenario/documento-mestre/052-templo-fonte.png
 056-acampamento-fogueira|arte/cenario/documento-mestre/056-acampamento-fogueira.png
 066-industrial-gerador|arte/cenario/documento-mestre/066-industrial-gerador.png
-071-industrial-guindaste|arte/cenario/documento-mestre/071-industrial-guindaste.png
+# 071-industrial-guindaste: fora — feito por script (kit leva 3)
 077-militar-caminhao|arte/cenario/documento-mestre/077-militar-caminhao.png
 081-subterraneo-cristal-azul|arte/cenario/documento-mestre/081-subterraneo-cristal-azul.png
 082-subterraneo-cristal-violeta|arte/cenario/documento-mestre/082-subterraneo-cristal-violeta.png
@@ -43,11 +43,11 @@
 092-subterraneo-cogumelo-gigante|arte/cenario/documento-mestre/092-subterraneo-cogumelo-gigante.png
 094-torre-torre-observacao|arte/cenario/documento-mestre/094-torre-torre-observacao.png
 096-templo-santuario|arte/cenario/documento-mestre/096-templo-santuario.png
-098-industrial-torre-industrial|arte/cenario/documento-mestre/098-industrial-torre-industrial.png
+# 098-industrial-torre-industrial: fora — feito por script (kit leva 3)
 099-rocha-cachoeira-rochosa|arte/cenario/documento-mestre/099-rocha-cachoeira-rochosa.png
 100-vegetacao-raizes-pendentes|arte/cenario/documento-mestre/100-vegetacao-raizes-pendentes.png
 101-vegetacao-base-arvore-gigante|arte/cenario/documento-mestre/101-vegetacao-base-arvore-gigante.png
 102-vegetacao-arvore-gigante|arte/cenario/documento-mestre/102-vegetacao-arvore-gigante.png
-104-torre-torre-2-vistas|arte/cenario/documento-mestre/104-torre-torre-2-vistas.png
-105-templo-santuario-3-vistas|arte/cenario/documento-mestre/105-templo-santuario-3-vistas.png
-110-templo-santuario-corte-interior|arte/cenario/documento-mestre/110-templo-santuario-corte-interior.png
+# 104-torre-torre-2-vistas: fora — prancha de vistas, nao objeto
+# 105-templo-santuario-3-vistas: fora — prancha de vistas, nao objeto
+# 110-templo-santuario-corte-interior: fora — corte ilustrativo, nao objeto
