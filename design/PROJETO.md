@@ -61,8 +61,12 @@ Bridge; só no Chrome/Edge, só no modo editor; ainda NÃO verificado no Unity �
 vai em `arte/tools/.env.tripo` (`TRIPO_API_KEY=tsk_...`, ignorada pelo git; eu nunca leio). Lote pronto:
 `arte/cenario/documento-mestre/lote-tripo.txt` com as 50 peças orgânicas do catálogo (12.000 faces, v3.1, PBR, 8 em
 paralelo). **Regra:** validar a 1ª peça de cada família com foto antes de rodar o lote inteiro (créditos). O MCP oficial
-do Tripo está parado (alpha 2025): não usar. Máquina: RTX 3050 6 GB / 8 GB RAM — nada de gerar 3D local. Grátis a
-somar: Mixamo (animações), Kenney/Quaternius (props CC0). **Prazo do Diretor: criação de arte fechada até 26/10.**
+do Tripo está parado (alpha 2025): não usar. Máquina: RTX 3050 6 GB / 8 GB RAM — nada de gerar 3D local. **CC0 instalado:** `arte/tools/cc0.py` baixou Kenney *Nature Kit* (330 modelos: árvores, pedras, folhagem) e *Survival
+Kit* (80: barracas, caixas, fogueira) em `arte/cenario/cc0/` (fora do git, reproduzível). Quaternius (Ultimate Nature,
+150 modelos) só sai por pasta do Google Drive (sem link direto): se quiser, baixar a mão em `arte/cenario/cc0/quaternius/`.
+**Mixamo** não se instala: é site (login Adobe, o Diretor tem CC): sobe o FBX do mago (T-pose) → auto-rig → baixa as
+animações (strafe esquerda/direita, pulo, corrida) em FBX "without skin" → Unity importa como Humanoid e retarget.
+**Prazo do Diretor: criação de arte fechada até 26/10.**
 
 ### >>> 25/09, noite (5): ILHA FLUTUANTE (sem mar) + a regra do REVIVER — decisões do Diretor
 
