@@ -850,11 +850,14 @@ namespace Arkana.World
             // R10 entrada da caverna profunda (U01) + entradas de superficie da rede subterranea
             g = Grupo("ARKANA_R10_R11_Entradas");
             Peca(g, "19-arco-calcario-nymara", 850f, 950f, 6f, 200f, 220f);
-            foreach (No u in D.nos)
-            {
-                if (u.id != "U01" && u.id != "U05" && u.id != "U06" && u.id != "U08" && u.id != "U13" && u.id != "U15") continue;
-                Bloco(g, "Entrada_" + u.id, PrimitiveType.Cube, u.x, u.y, Altura(u.x, u.y) - 0.5f, new Vector3(9f, 6f, 7f), 0f, Escuro);
-            }
+            // os blocos escuros que marcavam as entradas SAIRAM (26/09): as bocas agora sao buracos reais no Terrain e as cascas
+            // do subterraneo (IlhaMestre.Subterraneo) — o bloco tampava a entrada. Sem o JSON do subterraneo, volta o marcador.
+            if (S == null)
+                foreach (No u in D.nos)
+                {
+                    if (u.id != "U01" && u.id != "U05" && u.id != "U06" && u.id != "U08" && u.id != "U13" && u.id != "U15") continue;
+                    Bloco(g, "Entrada_" + u.id, PrimitiveType.Cube, u.x, u.y, Altura(u.x, u.y) - 0.5f, new Vector3(9f, 6f, 7f), 0f, Escuro);
+                }
 
             // pedras do kit espalhadas (cobertura solida, doc §3.2): encostas, costa e transicoes
             g = Grupo("ARKANA_20_Pedras");

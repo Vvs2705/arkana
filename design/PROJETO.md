@@ -62,7 +62,10 @@ escurecendo para o lilás no nadir; ligado pela IlhaMestre quando `IlhaFlutuante
 `arte/tools/blender/cc0_para_unity.py` (escala real, textura embutida → `Resources/cc0-*.glb`, 14 peças): 2 barracas
 grandes, 3 fogueiras (1 com espeto) com colchonetes, bancada, baú, lenha, tábuas, ferramentas, baldes, placa, 3 barracas
 extras; barracas do kit Meshy em 1,8× (tinham 2 m). A `structure-canvas` do Kenney renderiza só a armação (a lona some) —
-não usar. Fotos conferidas no editor.
+não usar. Fotos conferidas no editor. **HUD do reviver:** anel de canalizar em verde + "REVIVENDO <nome>" para quem revive,
+"VOLTANDO · N%" para o eliminado (`Hud.Revivendo`, alimentado em `Main.AtualizarHud`); testado em partida (canal a 79 %,
+voltou com a varinha). A foto de câmera NÃO mostra a interface (canvas overlay): conferir UI pela Game view. **Blocos
+escuros das entradas U** removidos (tampavam as bocas reais); só voltam se faltar o JSON do subterrâneo.
 
 ### >>> 25/09, noite (6): TRIPO assinado (25.000 créditos/mês) — prazo da ARTE: 26/10/2026 — ferramentas instaladas
 
