@@ -69,6 +69,16 @@ namespace Arkana.EditorTools
             "Universal Render Pipeline/Particles/Lit",
             "Universal Render Pipeline/Particles/Simple Lit",
             "Universal Render Pipeline/Particles/Unlit",
+            // o chao da IlhaMestre e' UnityEngine.Terrain criado em runtime (27/09: sem estes o APK abriu com a tela escura)
+            "Universal Render Pipeline/Terrain/Lit",
+            "Hidden/Universal Render Pipeline/Terrain/Lit (Add Pass)",
+            "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)",
+            "Hidden/Universal Render Pipeline/Terrain/Lit (Basemap Gen)",
+            "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit",
+            "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePass",
+            "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWavingDoublePass",
+            "Nature/Terrain/BillboardTree",
+            "Hidden/TerrainEngine/BillboardTree",
         };
 
         public static void IncluirShadersDoCodigo()
