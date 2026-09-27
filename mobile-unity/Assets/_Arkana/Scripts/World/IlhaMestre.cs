@@ -163,7 +163,9 @@ namespace Arkana.World
                 go.transform.position = new Vector3(D.x0 + bi * bx, D.fundo, D.y0 + bj * by);
                 UnityEngine.Terrain ter = go.GetComponent<UnityEngine.Terrain>();
                 if (mt != null) ter.materialTemplate = mt;
-                ter.drawInstanced = true;
+                // ponytail: SEM instancing — o material nasce em runtime, o build corta as variantes INSTANCING_ON do
+                // Terrain/Lit e no Poco o chao sumia (27/09). Voltar a true so' com um material-asset instanciado em Resources.
+                ter.drawInstanced = false;
                 ter.heightmapPixelError = 4f;
                 ter.basemapDistance = 1200f;
                 ter.treeDistance = 5000f;
