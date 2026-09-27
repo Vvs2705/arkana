@@ -615,8 +615,23 @@ namespace Arkana.World
             g.transform.localScale = Vector3.one * esc;
             g.transform.position = U(x, y, z < -1000f ? Altura(x, y) : z);
             g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            // material do glTFast -> URP Lit (KitCenario.Domado): no APK as variantes do glTFast saem cortadas e a peca
+            // do Kenney saia LARANJA chapada no Poco (27/09). Um domado por material original.
+            foreach (Renderer r in g.GetComponentsInChildren<Renderer>())
+            {
+                Material[] ms = r.sharedMaterials;
+                for (int i = 0; i < ms.Length; i++)
+                {
+                    if (ms[i] == null) continue;
+                    if (!domados.TryGetValue(ms[i], out Material d)) domados[ms[i]] = d = KitCenario.Domado(ms[i]);
+                    ms[i] = d;
+                }
+                r.sharedMaterials = ms;
+            }
             return g;
         }
+
+        readonly Dictionary<Material, Material> domados = new Dictionary<Material, Material>();
 
         Regiao R(string id) => Array.Find(D.regioes, r => r.id == id);
         float Rn(float a, float b) => (float)(a + rnd.NextDouble() * (b - a));
