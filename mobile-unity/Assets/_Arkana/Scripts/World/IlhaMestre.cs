@@ -138,6 +138,7 @@ namespace Arkana.World
             Material mt = st != null ? new Material(st) { name = "mestre_terreno" } : null;
             var t = new UnityEngine.Terrain[Blocos, Blocos];
             var arvores = Arvores(out TreePrototype[] protos);
+            DetailPrototype[] tufos = MoldeDoTufo();
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
             {
@@ -150,7 +151,9 @@ namespace Arkana.World
                 td.SetHeights(0, 0, h);
                 td.alphamapResolution = Alfa;
                 td.terrainLayers = camadas;
-                td.SetAlphamaps(0, 0, Splat(D.x0 + bi * bx, D.y0 + bj * by, bx, by, camadas.Length));
+                float[,,] splat = Splat(D.x0 + bi * bx, D.y0 + bj * by, bx, by, camadas.Length);
+                td.SetAlphamaps(0, 0, splat);
+                Tufos(td, splat, tufos);
                 if (protos != null)
                 {
                     td.treePrototypes = protos;
@@ -170,6 +173,8 @@ namespace Arkana.World
                 ter.basemapDistance = 1200f;
                 ter.treeDistance = 5000f;
                 ter.treeBillboardDistance = 5000f;   // sem impostor: as pecas do kit nao usam o shader de arvore do Terrain
+                ter.detailObjectDistance = DistanciaDoTufo;
+                ter.detailObjectDensity = 1f;
                 t[bi, bj] = ter;
             }
             terrenos = t;
@@ -177,6 +182,46 @@ namespace Arkana.World
             for (int bi = 0; bi < Blocos; bi++)
                 t[bi, bj].SetNeighbors(bi > 0 ? t[bi - 1, bj] : null, bj < Blocos - 1 ? t[bi, bj + 1] : null,
                                        bi < Blocos - 1 ? t[bi + 1, bj] : null, bj > 0 ? t[bi, bj - 1] : null);
+        }
+
+        // GRAMA DE VERDADE (Diretor, 27/09: "sem gramas"): o tufo da Grama da ilha antiga como DETALHE nativo do Terrain,
+        // so' onde a camada "grama" manda. KNOBs: TufosPorCelula (celula de ~2,3 m) e DistanciaDoTufo.
+        const int TufosPorCelula = 8;
+        const float DistanciaDoTufo = 70f;
+
+        DetailPrototype[] MoldeDoTufo()
+        {
+            var molde = new GameObject("tufo_molde") { hideFlags = HideFlags.DontSave };
+            molde.SetActive(false);   // so' o molde: quem desenha e' o Terrain
+            molde.transform.SetParent(raiz, false);
+            molde.AddComponent<MeshFilter>().sharedMesh = Grama.MalhaTufo(QualitySettings.activeColorSpace == ColorSpace.Linear);
+            Shader s = Shader.Find("Universal Render Pipeline/Lit");
+            if (s != null) molde.AddComponent<MeshRenderer>().sharedMaterial = new Material(s) { name = "mestre_tufo" };
+            return new[]
+            {
+                new DetailPrototype
+                {
+                    prototype = molde, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = false,
+                    minWidth = 1.4f, maxWidth = 2.4f, minHeight = 1.3f, maxHeight = 2.6f, noiseSpread = 0.35f,
+                    healthyColor = Color.white, dryColor = new Color(0.9f, 0.84f, 0.62f),
+                },
+            };
+        }
+
+        /// <summary>Tufos por celula = TufosPorCelula x peso da grama ao quadrado (so' a campina cheia fica densa).</summary>
+        static void Tufos(TerrainData td, float[,,] splat, DetailPrototype[] tufos)
+        {
+            td.SetDetailResolution(Alfa, 32);
+            td.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
+            td.detailPrototypes = tufos;
+            var d = new int[Alfa, Alfa];
+            for (int j = 0; j < Alfa; j++)
+            for (int i = 0; i < Alfa; i++)
+            {
+                float g = splat[j, i, 0];
+                d[j, i] = (int)(g * g * TufosPorCelula + 0.5f);
+            }
+            td.SetDetailLayer(0, 0, 0, d);
         }
 
         static TerrainLayer[] Camadas()

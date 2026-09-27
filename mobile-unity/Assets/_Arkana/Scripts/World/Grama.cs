@@ -590,7 +590,7 @@ namespace Arkana.World
         /// <summary>Tufo de 3 laminas finas e tortas; a ponta encosta no tom do chao (ponta clara vira objeto, nao textura).
         /// A ponta segue a MEDIA da campina (Relevo.CorGrama*, onda 7B): com o chao mais fundo, a ponta de antes (0,42/0,71/0,37)
         /// virava pingo de limao por cima dele.</summary>
-        static Mesh MalhaTufo(bool linear)
+        internal static Mesh MalhaTufo(bool linear)
         {
             var b = new MalhaProc.Construtor();
             var rng = new Sorteio(91);
