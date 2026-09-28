@@ -201,7 +201,7 @@ namespace Arkana.World
 
         // GRAMA DE VERDADE (Diretor, 27/09: "sem gramas"): o tufo da Grama da ilha antiga como DETALHE nativo do Terrain,
         // so' onde a camada "grama" manda. KNOBs: TufosPorCelula (celula de ~2,3 m) e DistanciaDoTufo.
-        const int TufosPorCelula = 6;
+        const int TufosPorCelula = 9;   // folha fina: mais tufos, menos "cone"
         const float DistanciaDoTufo = 70f;
 
         DetailPrototype[] MoldeDoTufo()
@@ -220,7 +220,7 @@ namespace Arkana.World
             tufo.uv = uv;
             molde.AddComponent<MeshFilter>().sharedMesh = tufo;
             var degrade = new Texture2D(1, 8, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "tufo_degrade" };
-            for (int j = 0; j < 8; j++) degrade.SetPixel(0, j, Color.Lerp(new Color(0.34f, 0.40f, 0.34f), Color.white, j / 7f));
+            for (int j = 0; j < 8; j++) degrade.SetPixel(0, j, Color.Lerp(new Color(0.62f, 0.66f, 0.58f), Color.white, j / 7f));
             degrade.Apply();
             Shader s = Shader.Find("Universal Render Pipeline/Lit");
             // INSTANCIADO: o VertexLit sem instancing desenhava o tufo BRANCO (ignora cor e textura). O molde-ASSET com
@@ -241,7 +241,8 @@ namespace Arkana.World
                 new DetailPrototype
                 {
                     prototype = molde, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
-                    minWidth = 1.1f, maxWidth = 1.9f, minHeight = 0.9f, maxHeight = 1.7f, noiseSpread = 0.35f,
+                    minWidth = 0.55f, maxWidth = 0.95f, minHeight = 0.8f, maxHeight = 1.5f, noiseSpread = 0.35f,
+                    positionJitter = 100f,   // 0 = fileiras de plantacao (foto do titulo, 27/09); 100 = espalhado
                     // a media da camada grama (MediaCamada[0]) um pouco mais clara; a seca puxa para o palha
                     healthyColor = new Color(0.44f, 0.60f, 0.30f), dryColor = new Color(0.60f, 0.62f, 0.34f),
                 },
