@@ -64,7 +64,14 @@ grama** — tufo da Grama antiga como DETALHE nativo do Terrain (6 por célula d
 impostor: agora 1,2 km no chão, +3 m por metro de altura da câmera (`IlhaMestre.LateUpdate`) → **31 FPS** no mesmo
 lugar; partida no chão 42–54 FPS. As peças GLB da ilha passam pelo `KitCenario.Domado` (URP Lit, dois lados).
 **Não é defeito:** as barracas LARANJA são a cor do pacote Kenney (iguais no editor); as lonas bege "retas" são a
-barraca 053 vista de lado. Ambas saem com a arte do Tripo. **Segue valendo o bloco (8)** (Tripo → lote → APK).
+barraca 053 vista de lado. Ambas saem com a arte do Tripo.
+**Depois, na mesma noite:** título com o mago num MIRANTE da ilha nova (`RelevoMestre.Mirante` = 700, 500; o pico
+antigo caía dentro do lago); grama fina e espalhada (`positionJitter` 100, 9 tufos/célula). **Abrir o jogo: 57 s → 14 s**
+(log `ARKANA MONTAGEM` por etapa e por região): splat em `Parallel.For` (22 → 7 s) e a ARQUITETURA do kit exportada SEM
+as fotos (`export_image_format="NONE"`): cada casa embutia as mesmas 8 fotos 1024 sem compressão (13 MB por GLB, vila
+15 s); agora as 14 `arq-*` moram uma vez em Resources (comprimidas; normal como NormalMap pela ImportacaoArkana) e
+`IlhaMestre.FotoDaArquitetura` liga pelo material `arq_<nome>`. Kit 165 → 18 MB; **APK 542 → 279 MB**. Conferido no
+editor (vila com pedra, reboco e telha). **Segue valendo o bloco (8)** (Tripo → lote → APK).
 
 ### >>> 26/09, fim da madrugada (8): ESTADO ATUAL — o que continuar amanhã
 
