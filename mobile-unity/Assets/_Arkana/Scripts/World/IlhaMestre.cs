@@ -155,6 +155,7 @@ namespace Arkana.World
             Shader st = Shader.Find("Universal Render Pipeline/Terrain/Lit");
             Material mt = st != null ? new Material(st) { name = "mestre_terreno" } : null;
             var t = new UnityEngine.Terrain[Blocos, Blocos];
+            PrepararPesos();
             var swa = System.Diagnostics.Stopwatch.StartNew();
             var arvores = Arvores(out TreePrototype[] protos);
             msArvores = swa.ElapsedMilliseconds;
@@ -344,6 +345,7 @@ namespace Arkana.World
         /// <summary>Pesos das camadas (grama, mata, rocha, areia, terra; somam 1) em (x, y).</summary>
         void Pesos(float x, float y, Regiao flo, float[] w)
         {
+            if (pisos == null) PrepararPesos();   // CorDoChao fora da montagem; no splat o Terrenos ja' preparou
             {
                 float h = Altura(x, y), dec = Declive(x, y);
                 float rocha = Mathf.InverseLerp(24f, 34f, dec) + Mathf.InverseLerp(430f, 520f, h);
@@ -352,16 +354,19 @@ namespace Arkana.World
                 float mata = Mathf.InverseLerp(1.05f, 0.75f, Mathf.Sqrt(fx * fx + fy * fy)) +
                              Mathf.Clamp01(Mathf.PerlinNoise(x * 0.004f + 11f, y * 0.004f + 7f) * 2.2f - 1.25f);
                 float terra = 0f;
-                foreach (Regiao r in D.regioes)
+                foreach (Regiao r in pisos)
                 {
-                    if (r.id == "R01" || r.id == "R02" || r.id == "R11" || r.id == "R10") continue;
+                    // longe demais ate' para o maior raio (ruido = 1): o peso seria 0 — pula o PerlinNoise (mesmo resultado)
+                    float lim = Mathf.Min(r.ex, r.ey) * 0.28f * 1.3f * 1.1f;
+                    if ((x - r.x) * (x - r.x) + (y - r.y) * (y - r.y) >= lim * lim) continue;
                     // borda irregular: raio modulado por ruido (circulo perfeito denunciava o blockout)
                     float rr = Mathf.Min(r.ex, r.ey) * 0.28f * (0.7f + 0.6f * Mathf.PerlinNoise(x * 0.012f + r.x * 0.001f, y * 0.012f));
                     float rx = (x - r.x) / rr, ry = (y - r.y) / rr;
                     terra = Mathf.Max(terra, Mathf.InverseLerp(1.1f, 0.6f, Mathf.Sqrt(rx * rx + ry * ry)));
                 }
                 terra *= Mathf.Lerp(0.55f, 1f, Mathf.PerlinNoise(x * 0.05f, y * 0.05f));
-                terra = Mathf.Max(terra, Mathf.InverseLerp(7f, 4f, DistRota(x, y)) * Mathf.Lerp(0.75f, 1f, Mathf.PerlinNoise(x * 0.2f, y * 0.2f)));
+                float dr = DistRotaAte(x, y, 7f);   // >= 7 m o peso da estrada e' 0
+                if (dr < 7f) terra = Mathf.Max(terra, Mathf.InverseLerp(7f, 4f, dr) * Mathf.Lerp(0.75f, 1f, Mathf.PerlinNoise(x * 0.2f, y * 0.2f)));
                 rocha = Mathf.Clamp01(rocha);
                 areia = Mathf.Clamp01(areia) * (1 - rocha);
                 mata = Mathf.Clamp01(mata) * (1 - rocha) * (1 - areia);
@@ -471,6 +476,37 @@ namespace Arkana.World
         }
 
         /// <summary>Distancia (m) ate' a rota de superficie mais proxima (doc §5).</summary>
+        // PARA O SPLAT (Pesos, em paralelo): as regioes com piso de terra e a caixa de cada trecho de estrada, montadas
+        // uma vez antes do Parallel.For. Quem esta' fora de todas as caixas nem faz a conta do segmento (27/09).
+        Regiao[] pisos;
+        float[] caixaRota;   // por segmento: xmin, xmax, ymin, ymax, ax, ay, bx, by
+
+        void PrepararPesos()
+        {
+            pisos = Array.FindAll(D.regioes, r => r.id != "R01" && r.id != "R02" && r.id != "R11" && r.id != "R10");
+            var c = new List<float>();
+            if (D.rotas != null)
+                foreach (Rota r in D.rotas)
+                    for (int k = 0; k + 1 < r.x.Length; k++)
+                        c.AddRange(new[] { Mathf.Min(r.x[k], r.x[k + 1]), Mathf.Max(r.x[k], r.x[k + 1]), Mathf.Min(r.y[k], r.y[k + 1]),
+                                           Mathf.Max(r.y[k], r.y[k + 1]), r.x[k], r.y[k], r.x[k + 1], r.y[k + 1] });
+            caixaRota = c.ToArray();
+        }
+
+        /// <summary>Distancia a estrada mais perto, ou `lim` se nenhuma passa a menos de `lim` (igual a DistRota abaixo de lim).</summary>
+        float DistRotaAte(float x, float y, float lim)
+        {
+            float melhor = lim;
+            for (int i = 0; i < caixaRota.Length; i += 8)
+            {
+                if (x < caixaRota[i] - lim || x > caixaRota[i + 1] + lim || y < caixaRota[i + 2] - lim || y > caixaRota[i + 3] + lim) continue;
+                Vector2 a = new Vector2(caixaRota[i + 4], caixaRota[i + 5]), ab = new Vector2(caixaRota[i + 6], caixaRota[i + 7]) - a, ap = new Vector2(x, y) - a;
+                float u = Mathf.Clamp01(Vector2.Dot(ap, ab) / ab.sqrMagnitude);
+                melhor = Mathf.Min(melhor, (ap - ab * u).magnitude);
+            }
+            return melhor;
+        }
+
         float DistRota(float x, float y)
         {
             float melhor = 1e9f;
