@@ -81,10 +81,21 @@ namespace Arkana.World
             Etapa("subterraneo", Subterraneo);
             Etapa("buracos", Buracos);
             Etapa("cameras", Cameras);
-            Debug.Log(log.Append($" total={rel.ElapsedMilliseconds}ms splat={msSplat}ms tufos={msTufos}ms arvores={msArvores}ms"));
+            MarcarGrupo(null);
+            Debug.Log(log.Append($" total={rel.ElapsedMilliseconds}ms splat={msSplat}ms tufos={msTufos}ms arvores={msArvores}ms |{grupos}"));
         }
 
         long msSplat, msTufos, msArvores;
+        // tempo de cada grupo (regiao) na montagem: o grupo anterior fecha quando o proximo abre
+        readonly System.Text.StringBuilder grupos = new System.Text.StringBuilder();
+        readonly System.Diagnostics.Stopwatch relGrupo = new System.Diagnostics.Stopwatch();
+        string grupoAberto;
+        void MarcarGrupo(string nome)
+        {
+            if (grupoAberto != null) grupos.Append($" {grupoAberto}={relGrupo.ElapsedMilliseconds}ms");
+            grupoAberto = nome;
+            relGrupo.Restart();
+        }
 
         bool Carregar()
         {
@@ -299,13 +310,17 @@ namespace Arkana.World
         {
             var a = new float[Alfa, Alfa, k];
             Regiao flo = Array.Find(D.regioes, r => r.id == "R02");
-            var w = new float[5];
-            for (int j = 0; j < Alfa; j++)
-            for (int i = 0; i < Alfa; i++)
+            // uma linha por nucleo: Pesos e' conta pura (le' o heightmap, nao toca objeto da Unity). No Poco o splat
+            // em serie levava 22 s dos ~57 s da montagem (27/09).
+            System.Threading.Tasks.Parallel.For(0, Alfa, j =>
             {
-                Pesos(ox + (i + 0.5f) / Alfa * sx, oy + (j + 0.5f) / Alfa * sy, flo, w);
-                for (int c = 0; c < 5 && c < k; c++) a[j, i, c] = w[c];
-            }
+                var w = new float[5];
+                for (int i = 0; i < Alfa; i++)
+                {
+                    Pesos(ox + (i + 0.5f) / Alfa * sx, oy + (j + 0.5f) / Alfa * sy, flo, w);
+                    for (int c = 0; c < 5 && c < k; c++) a[j, i, c] = w[c];
+                }
+            });
             return a;
         }
 
@@ -625,6 +640,7 @@ namespace Arkana.World
         {
             var g = new GameObject(nome) { hideFlags = HideFlags.DontSave };
             g.transform.SetParent(raiz, false);
+            MarcarGrupo(nome);
             return g.transform;
         }
 
