@@ -75,7 +75,14 @@ editor (vila com pedra, reboco e telha). Em seguida o splat ganhou atalhos EXATO
 PerlinNoise e a conta do segmento; `IlhaMestre.PrepararPesos`): montagem 8,4 s, **1º quadro 11 s** (eram 59). Kenney
 sem laranja de brinquedo: `cc0_para_unity.py` desbota a paleta (saturação ×0,45, brilho ×0,9; KNOBs). **Atenção:** o
 Poco chegou a 47 °C na bateria depois de ~20 ciclos de teste seguidos e o menu caiu para 19 FPS — medir FPS só com o
-aparelho frio. **Segue valendo o bloco (8)** (Tripo → lote → APK).
+aparelho frio. **COLISÃO (achado desta noite):** as peças GLB da IlhaMestre nasciam SEM colisor — casas, torres e
+templo atravessáveis e a ponte de arcos sem tabuleiro (o corpo caía no cânion). `IlhaMestre.Peca` agora põe
+MeshCollider (caixa se a malha não for legível; miudeza < 1,5 m fica sem): 595 colisores; conferido no editor com o
+mago DE PÉ na ponte a 125 m (cânion a 48 m); montagem das regiões 0,65 s no editor. **Tripo preparado:**
+`arte/tools/limpar_recorte.py` tirou a borda neon dos 9 recortes marcados no catálogo (cópias `-limpo.png`, originais
+intactos) e os dois lotes já apontam para elas. EditMode **526/526** (rodar com o domínio recarregado: depois de um
+Play no editor a névoa estática da IlhaMestre vaza e o NevoaTests falha à toa). **Segue valendo o bloco (8)**
+(Tripo → lote → APK).
 
 ### >>> 26/09, fim da madrugada (8): ESTADO ATUAL — o que continuar amanhã
 
