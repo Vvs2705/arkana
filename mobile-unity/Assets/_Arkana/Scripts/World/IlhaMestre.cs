@@ -69,15 +69,22 @@ namespace Arkana.World
             var go = new GameObject("_gerado") { hideFlags = HideFlags.DontSave };
             raiz = go.transform;
             raiz.SetParent(transform, false);
-            Terrenos();
-            Agua();
-            if (IlhaFlutuante) BaseRochosa();
-            Atmosfera();
-            Regioes();
-            Subterraneo();
-            Buracos();
-            Cameras();
+            // o tempo de cada etapa no logcat ("ARKANA MONTAGEM"): no Poco a ilha levava ~60 s para abrir (27/09)
+            var rel = System.Diagnostics.Stopwatch.StartNew();
+            var log = new System.Text.StringBuilder("ARKANA MONTAGEM");
+            void Etapa(string nome, Action f) { long t0 = rel.ElapsedMilliseconds; f(); log.Append($" {nome}={rel.ElapsedMilliseconds - t0}ms"); }
+            Etapa("terrenos", Terrenos);
+            Etapa("agua", Agua);
+            if (IlhaFlutuante) Etapa("base", BaseRochosa);
+            Etapa("atmosfera", Atmosfera);
+            Etapa("regioes", Regioes);
+            Etapa("subterraneo", Subterraneo);
+            Etapa("buracos", Buracos);
+            Etapa("cameras", Cameras);
+            Debug.Log(log.Append($" total={rel.ElapsedMilliseconds}ms splat={msSplat}ms tufos={msTufos}ms arvores={msArvores}ms"));
         }
+
+        long msSplat, msTufos, msArvores;
 
         bool Carregar()
         {
@@ -137,7 +144,9 @@ namespace Arkana.World
             Shader st = Shader.Find("Universal Render Pipeline/Terrain/Lit");
             Material mt = st != null ? new Material(st) { name = "mestre_terreno" } : null;
             var t = new UnityEngine.Terrain[Blocos, Blocos];
+            var swa = System.Diagnostics.Stopwatch.StartNew();
             var arvores = Arvores(out TreePrototype[] protos);
+            msArvores = swa.ElapsedMilliseconds;
             DetailPrototype[] tufos = MoldeDoTufo();
             for (int bj = 0; bj < Blocos; bj++)
             for (int bi = 0; bi < Blocos; bi++)
@@ -151,9 +160,12 @@ namespace Arkana.World
                 td.SetHeights(0, 0, h);
                 td.alphamapResolution = Alfa;
                 td.terrainLayers = camadas;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 float[,,] splat = Splat(D.x0 + bi * bx, D.y0 + bj * by, bx, by, camadas.Length);
                 td.SetAlphamaps(0, 0, splat);
+                msSplat += sw.ElapsedMilliseconds; sw.Restart();
                 Tufos(td, splat, tufos);
+                msTufos += sw.ElapsedMilliseconds;
                 if (protos != null)
                 {
                     td.treePrototypes = protos;
