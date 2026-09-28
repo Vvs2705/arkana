@@ -733,6 +733,18 @@ namespace Arkana.World
                 }
                 r.sharedMaterials = ms;
             }
+            // COLISAO (27/09): a peca GLB nascia SEM colisor — casa, torre e templo atravessaveis e a ponte de arcos sem
+            // tabuleiro (o corpo caia no canion). A forma real, como no KitCenario; malha nao legivel = a caixa inteira.
+            // Miudeza (< 1,5 m: balde, ferramenta) nao colide.
+            foreach (MeshFilter mf in g.GetComponentsInChildren<MeshFilter>())
+            {
+                Mesh malha = mf.sharedMesh;
+                if (malha == null || malha.bounds.size.magnitude * esc < 1.5f) continue;
+                if (malha.isReadable) { mf.gameObject.AddComponent<MeshCollider>().sharedMesh = malha; continue; }
+                BoxCollider bc = mf.gameObject.AddComponent<BoxCollider>();
+                bc.center = malha.bounds.center;
+                bc.size = malha.bounds.size;
+            }
             return g;
         }
 
