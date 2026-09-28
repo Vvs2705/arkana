@@ -186,7 +186,7 @@ namespace Arkana.World
 
         // GRAMA DE VERDADE (Diretor, 27/09: "sem gramas"): o tufo da Grama da ilha antiga como DETALHE nativo do Terrain,
         // so' onde a camada "grama" manda. KNOBs: TufosPorCelula (celula de ~2,3 m) e DistanciaDoTufo.
-        const int TufosPorCelula = 8;
+        const int TufosPorCelula = 6;
         const float DistanciaDoTufo = 70f;
 
         DetailPrototype[] MoldeDoTufo()
@@ -194,16 +194,34 @@ namespace Arkana.World
             var molde = new GameObject("tufo_molde") { hideFlags = HideFlags.DontSave };
             molde.SetActive(false);   // so' o molde: quem desenha e' o Terrain
             molde.transform.SetParent(raiz, false);
-            molde.AddComponent<MeshFilter>().sharedMesh = Grama.MalhaTufo(QualitySettings.activeColorSpace == ColorSpace.Linear);
+            // o detalhe do Terrain pinta = cor saudavel/seca x _MainTex (a cor de vertice do tufo e' ignorada) e RECUSA malha
+            // sem UV ("No texcoord", 27/09: a grama nao aparecia). UV.v = altura -> degrade escuro no pe, claro na ponta.
+            Mesh tufo = Grama.MalhaTufo(QualitySettings.activeColorSpace == ColorSpace.Linear);
+            Vector3[] v = tufo.vertices;
+            float topo = 0.01f;
+            foreach (Vector3 p in v) topo = Mathf.Max(topo, p.y);
+            var uv = new Vector2[v.Length];
+            for (int i = 0; i < v.Length; i++) uv[i] = new Vector2(0.5f, v[i].y / topo);
+            tufo.uv = uv;
+            molde.AddComponent<MeshFilter>().sharedMesh = tufo;
+            var degrade = new Texture2D(1, 8, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "tufo_degrade" };
+            for (int j = 0; j < 8; j++) degrade.SetPixel(0, j, Color.Lerp(new Color(0.34f, 0.40f, 0.34f), Color.white, j / 7f));
+            degrade.Apply();
             Shader s = Shader.Find("Universal Render Pipeline/Lit");
-            if (s != null) molde.AddComponent<MeshRenderer>().sharedMaterial = new Material(s) { name = "mestre_tufo" };
+            if (s != null)
+            {
+                var m = new Material(s) { name = "mestre_tufo" };
+                m.SetTexture("_BaseMap", degrade);
+                molde.AddComponent<MeshRenderer>().sharedMaterial = m;
+            }
             return new[]
             {
                 new DetailPrototype
                 {
                     prototype = molde, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = false,
-                    minWidth = 1.4f, maxWidth = 2.4f, minHeight = 1.3f, maxHeight = 2.6f, noiseSpread = 0.35f,
-                    healthyColor = Color.white, dryColor = new Color(0.9f, 0.84f, 0.62f),
+                    minWidth = 1.1f, maxWidth = 1.9f, minHeight = 0.9f, maxHeight = 1.7f, noiseSpread = 0.35f,
+                    // a media da camada grama (MediaCamada[0]) um pouco mais clara; a seca puxa para o palha
+                    healthyColor = new Color(0.44f, 0.60f, 0.30f), dryColor = new Color(0.60f, 0.62f, 0.34f),
                 },
             };
         }
