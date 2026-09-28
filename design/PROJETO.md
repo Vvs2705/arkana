@@ -71,7 +71,11 @@ antigo caía dentro do lago); grama fina e espalhada (`positionJitter` 100, 9 tu
 as fotos (`export_image_format="NONE"`): cada casa embutia as mesmas 8 fotos 1024 sem compressão (13 MB por GLB, vila
 15 s); agora as 14 `arq-*` moram uma vez em Resources (comprimidas; normal como NormalMap pela ImportacaoArkana) e
 `IlhaMestre.FotoDaArquitetura` liga pelo material `arq_<nome>`. Kit 165 → 18 MB; **APK 542 → 279 MB**. Conferido no
-editor (vila com pedra, reboco e telha). **Segue valendo o bloco (8)** (Tripo → lote → APK).
+editor (vila com pedra, reboco e telha). Em seguida o splat ganhou atalhos EXATOS (regiao/estrada longe: pula o
+PerlinNoise e a conta do segmento; `IlhaMestre.PrepararPesos`): montagem 8,4 s, **1º quadro 11 s** (eram 59). Kenney
+sem laranja de brinquedo: `cc0_para_unity.py` desbota a paleta (saturação ×0,45, brilho ×0,9; KNOBs). **Atenção:** o
+Poco chegou a 47 °C na bateria depois de ~20 ciclos de teste seguidos e o menu caiu para 19 FPS — medir FPS só com o
+aparelho frio. **Segue valendo o bloco (8)** (Tripo → lote → APK).
 
 ### >>> 26/09, fim da madrugada (8): ESTADO ATUAL — o que continuar amanhã
 
