@@ -171,7 +171,7 @@ namespace Arkana.World
                 ter.drawInstanced = false;
                 ter.heightmapPixelError = 4f;
                 ter.basemapDistance = 1200f;
-                ter.treeDistance = 5000f;
+                ter.treeDistance = ArvoreNoChao;   // LateUpdate estica com a altura da camera
                 ter.treeBillboardDistance = 5000f;   // sem impostor: as pecas do kit nao usam o shader de arvore do Terrain
                 ter.detailObjectDistance = DistanciaDoTufo;
                 ter.detailObjectDensity = 1f;
@@ -182,6 +182,21 @@ namespace Arkana.World
             for (int bi = 0; bi < Blocos; bi++)
                 t[bi, bj].SetNeighbors(bi > 0 ? t[bi - 1, bj] : null, bj < Blocos - 1 ? t[bi, bj + 1] : null,
                                        bi < Blocos - 1 ? t[bi + 1, bj] : null, bj > 0 ? t[bi, bj - 1] : null);
+        }
+
+        // ARVORE ATE' ONDE A CAMERA PRECISA (27/09): com 5 km o treino olhando a floresta rodava a 12 FPS no Poco (a arvore
+        // do kit e' malha inteira, sem impostor). KNOB: 1.200 m no chao; do alto (castelo, queda) +3 m por metro de altura.
+        const float ArvoreNoChao = 1200f;
+        float distArvore = -1f;
+
+        void LateUpdate()
+        {
+            Camera c = Camera.main;
+            if (c == null || terrenos == null) return;
+            float d = ArvoreNoChao + Mathf.Max(0f, c.transform.position.y - 150f) * 3f;
+            if (Mathf.Abs(d - distArvore) < 50f) return;
+            distArvore = d;
+            foreach (UnityEngine.Terrain t in terrenos) t.treeDistance = d;
         }
 
         // GRAMA DE VERDADE (Diretor, 27/09: "sem gramas"): o tufo da Grama da ilha antiga como DETALHE nativo do Terrain,
