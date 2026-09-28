@@ -19,6 +19,20 @@ PECAS = {
 }
 
 
+# A paleta do Kenney e' de brinquedo (barraca e saco de dormir LARANJA vivo): no meio da ilha realista destoava
+# (Diretor, 27/09). Saturacao x SATURACAO e brilho x BRILHO — lona e madeira gastas. KNOBs.
+SATURACAO, BRILHO = 0.45, 0.9
+
+
+def desbotar(img):
+    import numpy as np
+    px = np.array(img.pixels[:], dtype=np.float32).reshape(-1, 4)
+    lum = px[:, :3] @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    px[:, :3] = (lum[:, None] + (px[:, :3] - lum[:, None]) * SATURACAO) * BRILHO
+    img.pixels[:] = px.ravel()
+    img.update()
+
+
 def converter(nome, metros):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(FONTE, nome + ".glb"))
@@ -43,8 +57,9 @@ def converter(nome, metros):
     centro = Vector(((mn.x + mx.x) / 2, (mn.y + mx.y) / 2, mn.z))
     obj.data.transform(Matrix.Scale(esc, 4) @ Matrix.Translation(-centro))
     obj.name = "cc0_" + nome
-    for img in bpy.data.images:   # a textura externa entra no GLB
+    for img in bpy.data.images:   # a textura externa entra no GLB, DESBOTADA
         if img.filepath:
+            desbotar(img)
             img.pack()
     saida = os.path.join(DESTINO, f"cc0-{nome}.glb")
     bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", use_selection=False, export_apply=True)
