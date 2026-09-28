@@ -48,8 +48,9 @@ namespace Arkana.Menu
         void LateUpdate()
         {
             Ilha ilha = Ilha.Atual;
-            if (ilha == null || ilha.Relevo == null) return;
-            Vector2 pk = ilha.Relevo.Pico;
+            if (ilha == null || (ilha.Relevo == null && ilha.Mestre == null)) return;
+            // na IlhaMestre o pico da ilha antiga cai DENTRO do lago (o titulo mostrava a ilha de baixo d'agua, 27/09)
+            Vector2 pk = ilha.Mestre != null ? RelevoMestre.Mirante : ilha.Relevo.Pico;
             var pe = new Vector3(pk.x, Ilha.AlturaDoChao(pk.x, pk.y), pk.y);
             if (_mago == null || _reler)
             {

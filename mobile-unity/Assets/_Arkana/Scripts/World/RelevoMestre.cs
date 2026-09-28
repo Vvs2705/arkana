@@ -46,6 +46,9 @@ namespace Arkana.World
         /// <summary>Abaixo disto e' o VAZIO em volta da ilha flutuante: o corpo morre (Pawn). O leito antigo do mar esta' a -40.</summary>
         public const float VazioY = -25f;
 
+        /// <summary>O fundo do TITULO: morro plano a 178 m, 73 m acima do lago, a leste (medido no heightmap). Vetavel.</summary>
+        public static readonly Vector2 Mirante = new Vector2(700f, 500f);
+
         public float SuperficieDaAgua(float x, float z)
         {
             float h = m.Altura(x, z);
