@@ -51,6 +51,21 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 27/09, noite (9): a ilha de 4,8 km NO POCO — quatro defeitos que só o APK mostrava
+
+**Primeiro teste da IlhaMestre no aparelho** (APK por batchmode, `adb` do SDK avulso; como ligar o Poco: memória
+`poco-f4-no-adb`). O Diretor: "chão todo marrom sem gramas, tudo flutuando, longe de ser jogável". Causas e correções:
+(1) **tela escura** — os shaders do Terrain não entravam no APK: `Build.ShadersDoCodigo` ganhou o Terrain/Lit e os
+de detalhe; (2) **chão invisível** (via-se o cone de rocha por dentro, árvores boiando, túneis à mostra) — o Terrain com
+`drawInstanced` e material de runtime perdia a variante INSTANCING_ON no build: `drawInstanced = false`; (3) **sem
+grama** — tufo da Grama antiga como DETALHE nativo do Terrain (6 por célula de ~2,3 m × peso² da camada grama, até
+70 m), com UV (sem UV o Terrain recusa: "No texcoord") e INSTANCIADO com o molde-asset `ArkanaTufoInstancing.mat`
+(o VertexLit sem instancing pintava o tufo de BRANCO); (4) **12 FPS no treino** — árvore do Terrain até 5 km sem
+impostor: agora 1,2 km no chão, +3 m por metro de altura da câmera (`IlhaMestre.LateUpdate`) → **31 FPS** no mesmo
+lugar; partida no chão 42–54 FPS. As peças GLB da ilha passam pelo `KitCenario.Domado` (URP Lit, dois lados).
+**Não é defeito:** as barracas LARANJA são a cor do pacote Kenney (iguais no editor); as lonas bege "retas" são a
+barraca 053 vista de lado. Ambas saem com a arte do Tripo. **Segue valendo o bloco (8)** (Tripo → lote → APK).
+
 ### >>> 26/09, fim da madrugada (8): ESTADO ATUAL — o que continuar amanhã
 
 **Fechado nesta leva (tudo em main, 525 testes EditMode verdes):** ilha flutuante com base de rocha e mar de nuvens;
