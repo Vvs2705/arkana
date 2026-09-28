@@ -153,6 +153,15 @@ namespace Arkana.EditorTools
             }
 
             string nome = System.IO.Path.GetFileNameWithoutExtension(p);
+            if (p.Contains("/Resources/") && nome.StartsWith("arq-"))
+            {
+                // as fotos da arquitetura do kit (IlhaMestre.Peca liga pelo material "arq_<nome>"): repetem em metros
+                imp.wrapMode = TextureWrapMode.Repeat;
+                imp.mipmapEnabled = true;
+                imp.maxTextureSize = 1024;
+                if (nome.EndsWith("-normal")) imp.textureType = TextureImporterType.NormalMap;
+                return;
+            }
             if (p.Contains("/Resources/") && nome.StartsWith("detalhe-"))
             {
                 imp.textureType = TextureImporterType.Default;

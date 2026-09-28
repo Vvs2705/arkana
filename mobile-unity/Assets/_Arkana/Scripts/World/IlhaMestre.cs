@@ -692,7 +692,7 @@ namespace Arkana.World
                 for (int i = 0; i < ms.Length; i++)
                 {
                     if (ms[i] == null) continue;
-                    if (!domados.TryGetValue(ms[i], out Material d)) domados[ms[i]] = d = KitCenario.Domado(ms[i]);
+                    if (!domados.TryGetValue(ms[i], out Material d)) domados[ms[i]] = d = FotoDaArquitetura(KitCenario.Domado(ms[i]), ms[i].name);
                     ms[i] = d;
                 }
                 r.sharedMaterials = ms;
@@ -701,6 +701,18 @@ namespace Arkana.World
         }
 
         readonly Dictionary<Material, Material> domados = new Dictionary<Material, Material>();
+
+        /// <summary>A arquitetura do kit chega SEM foto (kit_documento_mestre.py, 27/09): o material "arq_&lt;nome&gt;" ganha
+        /// Resources/arq-&lt;nome&gt;-cor e -normal, uma copia comprimida para a ilha inteira.</summary>
+        static Material FotoDaArquitetura(Material m, string original)
+        {
+            if (!original.StartsWith("arq_")) return m;
+            string nome = "arq-" + original.Substring(4);
+            Texture2D cor = Resources.Load<Texture2D>(nome + "-cor"), nor = Resources.Load<Texture2D>(nome + "-normal");
+            if (cor != null) { m.SetTexture("_BaseMap", cor); m.SetColor("_BaseColor", Color.white); }
+            if (nor != null) { m.SetTexture("_BumpMap", nor); m.EnableKeyword("_NORMALMAP"); }
+            return m;
+        }
 
         Regiao R(string id) => Array.Find(D.regioes, r => r.id == id);
         float Rn(float a, float b) => (float)(a + rnd.NextDouble() * (b - a));

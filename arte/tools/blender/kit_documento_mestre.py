@@ -383,7 +383,7 @@ TEX = __import__("os").path.abspath(__import__("os").path.join(__import__("os").
 
 
 def mat_foto(nome):
-    """Material com a foto CC0 recolorida (arte/cenario/texturas/arq-<nome>-{cor,normal}.png); o GLB a embute."""
+    """Material com a foto CC0 recolorida (arte/cenario/texturas/arq-<nome>-{cor,normal}.png); o GLB NAO a embute (ver main)."""
     import os
     m = bpy.data.materials.get("arq_" + nome)
     if m:
@@ -1175,7 +1175,11 @@ def main():
         assar(obj, mats)
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
-    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", use_selection=True, export_apply=True)
+    # arquitetura SEM as fotos: as 14 arq-* moram UMA vez em Resources/ (comprimidas pelo Unity) e o jogo liga pelo nome
+    # do material "arq_<nome>" (IlhaMestre.Peca). Embutidas, cada casa carregava as mesmas 8 fotos de 1024 sem compressao:
+    # 13 MB por GLB e ~15 s so' para montar a vila no Poco (27/09).
+    fmt = "NONE" if peca in ARQUITETURA else "AUTO"
+    bpy.ops.export_scene.gltf(filepath=saida, export_format="GLB", use_selection=True, export_apply=True, export_image_format=fmt)
     tris = sum(len(p.vertices) - 2 for p in obj.data.polygons)
     print(f"OK {obj.name}: {tris} tris, {obj.dimensions.x:.2f} x {obj.dimensions.y:.2f} x {obj.dimensions.z:.2f} m -> {saida}")
     if prev:
