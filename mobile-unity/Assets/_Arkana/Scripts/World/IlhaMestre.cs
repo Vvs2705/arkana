@@ -194,8 +194,8 @@ namespace Arkana.World
             var molde = new GameObject("tufo_molde") { hideFlags = HideFlags.DontSave };
             molde.SetActive(false);   // so' o molde: quem desenha e' o Terrain
             molde.transform.SetParent(raiz, false);
-            // o detalhe do Terrain pinta = cor saudavel/seca x _MainTex (a cor de vertice do tufo e' ignorada) e RECUSA malha
-            // sem UV ("No texcoord", 27/09: a grama nao aparecia). UV.v = altura -> degrade escuro no pe, claro na ponta.
+            // o detalhe do Terrain RECUSA malha sem UV ("No texcoord", 27/09: a grama nao aparecia) e ignora a cor de
+            // vertice. UV.v = altura -> o degrade da textura escurece o pe e clareia a ponta.
             Mesh tufo = Grama.MalhaTufo(QualitySettings.activeColorSpace == ColorSpace.Linear);
             Vector3[] v = tufo.vertices;
             float topo = 0.01f;
@@ -208,17 +208,24 @@ namespace Arkana.World
             for (int j = 0; j < 8; j++) degrade.SetPixel(0, j, Color.Lerp(new Color(0.34f, 0.40f, 0.34f), Color.white, j / 7f));
             degrade.Apply();
             Shader s = Shader.Find("Universal Render Pipeline/Lit");
-            if (s != null)
+            // INSTANCIADO: o VertexLit sem instancing desenhava o tufo BRANCO (ignora cor e textura). O molde-ASSET com
+            // "Enable GPU Instancing" segura a variante instanciada do Lit no APK (a mesma licao da ArkanaGramaInstancing).
+            Material molde0 = Resources.Load<Material>("ArkanaTufoInstancing");
+            if (molde0 != null || s != null)
             {
-                var m = new Material(s) { name = "mestre_tufo" };
+                var m = molde0 != null ? new Material(molde0) : new Material(s);
+                m.name = "mestre_tufo";
                 m.SetTexture("_BaseMap", degrade);
+                m.SetColor("_BaseColor", new Color(0.44f, 0.60f, 0.30f));
+                m.SetFloat("_Smoothness", 0.1f);
+                m.enableInstancing = true;
                 molde.AddComponent<MeshRenderer>().sharedMaterial = m;
             }
             return new[]
             {
                 new DetailPrototype
                 {
-                    prototype = molde, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = false,
+                    prototype = molde, usePrototypeMesh = true, renderMode = DetailRenderMode.VertexLit, useInstancing = true,
                     minWidth = 1.1f, maxWidth = 1.9f, minHeight = 0.9f, maxHeight = 1.7f, noiseSpread = 0.35f,
                     // a media da camada grama (MediaCamada[0]) um pouco mais clara; a seca puxa para o palha
                     healthyColor = new Color(0.44f, 0.60f, 0.30f), dryColor = new Color(0.60f, 0.62f, 0.34f),
