@@ -728,7 +728,7 @@ namespace Arkana.World
                 for (int i = 0; i < ms.Length; i++)
                 {
                     if (ms[i] == null) continue;
-                    if (!domados.TryGetValue(ms[i], out Material d)) domados[ms[i]] = d = FotoDaArquitetura(KitCenario.Domado(ms[i]), ms[i].name);
+                    if (!domados.TryGetValue(ms[i], out Material d)) domados[ms[i]] = d = FotoDaArquitetura(KitCenario.Domado(ms[i]), ms[i]);
                     ms[i] = d;
                 }
                 r.sharedMaterials = ms;
@@ -752,8 +752,12 @@ namespace Arkana.World
 
         /// <summary>A arquitetura do kit chega SEM foto (kit_documento_mestre.py, 27/09): o material "arq_&lt;nome&gt;" ganha
         /// Resources/arq-&lt;nome&gt;-cor e -normal, uma copia comprimida para a ilha inteira.</summary>
-        static Material FotoDaArquitetura(Material m, string original)
+        static Material FotoDaArquitetura(Material m, Material orig)
         {
+            string original = orig.name;
+            // o Domado so' leva a cor: o RELEVO do glTF (peca do Tripo, 30/09) vem junto
+            Texture rel = orig.HasProperty("normalTexture") ? orig.GetTexture("normalTexture") : null;
+            if (rel != null) { m.SetTexture("_BumpMap", rel); m.EnableKeyword("_NORMALMAP"); }
             if (!original.StartsWith("arq_")) return m;
             string nome = "arq-" + original.Substring(4);
             Texture2D cor = Resources.Load<Texture2D>(nome + "-cor"), nor = Resources.Load<Texture2D>(nome + "-normal");
@@ -1083,6 +1087,15 @@ namespace Arkana.World
 
         void ArvoreGigante(Transform g, float x, float y, float tronco, float altura)
         {
+            // TRIPO (30/09): a arte 102 pelo caminho VALIDADO site -> Blender (otimizar.py: 45 mil tris, 1024) -> Resources.
+            // Direto do site ela tinha 293 mil tris e 117 MB de textura; no jogo as duas ficam iguais (design/cenario/TRIPO-STUDIO.md).
+            GameObject t = Peca(g, "tripo-102-arvore-gigante", x, y, 1f, Rn(0f, 360f), Altura(x, y) - 1f);
+            if (t != null)
+            {
+                Bounds b = t.GetComponentInChildren<Renderer>().bounds;
+                if (b.size.y > 0.01f) t.transform.localScale *= altura / b.size.y;   // a arvore do doc: altura em metros
+                return;
+            }
             float z = Altura(x, y);
             Bloco(g, "Arvore_Tronco", PrimitiveType.Cylinder, x, y, z, new Vector3(tronco, tronco, altura * 0.75f), 0f, Casca);
             for (int k = 0; k < 6; k++)
