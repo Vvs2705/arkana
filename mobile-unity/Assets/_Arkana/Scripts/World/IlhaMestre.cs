@@ -791,7 +791,8 @@ namespace Arkana.World
             Ilhota ip = D.ilhotas[0];
             for (int k = 0; k < 6; k++)
                 Peca(g, "38-coluna-ruina", ip.x + Mathf.Cos(k * 1.05f) * 11f, ip.y + Mathf.Sin(k * 1.05f) * 11f, 2.2f, k * 60f);
-            Peca(g, "24-estatua-vigia", ip.x, ip.y, 2.5f, 180f);
+            // TRIPO 047 (30/09): a estatua sem cabeca do catalogo; o kit antigo so' se o GLB faltar
+            if (Peca(g, "tripo-047-estatua-sem-cabeca", ip.x, ip.y, 1.2f, 180f) == null) Peca(g, "24-estatua-vigia", ip.x, ip.y, 2.5f, 180f);
 
             // R02 floresta: arvore principal oca (doc §4.2: base 280, 180-220 m, tronco 35-50 m) + gigantes secundarias
             g = Grupo("ARKANA_R02_Floresta");
@@ -843,8 +844,8 @@ namespace Arkana.World
                 Peca(g, "mestre-043-templo-parapeito", t.x - 47f + k * 6f, t.y + 10f - 45f, 1f, 0f, zs + 1.5f);
                 Peca(g, "mestre-043-templo-parapeito", t.x - 47f + k * 6f, t.y + 10f + 45f, 1f, 0f, zs + 1.5f);
             }
-            Peca(g, "24-estatua-vigia", t.x - 50f, t.y - 5f, 3f, 90f);
-            Peca(g, "24-estatua-vigia", t.x - 50f, t.y + 25f, 3f, 90f);
+            foreach (float dy in new[] { -5f, 25f })
+                if (Peca(g, "tripo-047-estatua-sem-cabeca", t.x - 50f, t.y + dy, 1.4f, 90f) == null) Peca(g, "24-estatua-vigia", t.x - 50f, t.y + dy, 3f, 90f);
             Peca(g, "33-obelisco", t.x + 70f, t.y - 60f, 2.5f, 0f);
             Peca(g, "33-obelisco", t.x + 70f, t.y + 80f, 2.5f, 0f);
 
@@ -981,6 +982,8 @@ namespace Arkana.World
             }
             for (int k = 0; k < 4; k++)
                 Peca(g, "mestre-064-industrial-tanque", r7.x + 90f + k * 18f, r7.y - 70f, 2.4f, k * 40f);
+            for (int k = 0; k < 4; k++)   // TRIPO 066 (30/09): geradores enferrujados ao pe' dos tanques
+                Peca(g, "tripo-066-gerador-industrial", r7.x + 92f + k * 18f, r7.y - 88f, 1f, 90f + Rn(-8f, 8f));
             for (int k = 0; k < 10; k++)   // linha de canos (escala 1,5: 6 m por modulo) ligando os tanques aos galpoes
                 Peca(g, "mestre-062-industrial-cano-reto", r7.x + 100f - k * 9f, r7.y - 52f, 1.5f, 0f);
             if (Peca(g, "mestre-098-industrial-torre", r7.x - 20f, r7.y + 40f, 1f, 0f) == null)   // torre 72 m do kit; blockout se faltar
@@ -999,6 +1002,8 @@ namespace Arkana.World
             // R08 base militar: comando, alojamentos, hangares, torres de vigia, heliponto de 28 m, cerca com brechas
             g = Grupo("ARKANA_R08_Base");
             Regiao b8 = R("R08");
+            for (int k = 0; k < 3; k++)   // TRIPO 077 (30/09): caminhoes militares abandonados em frente ao comando
+                Peca(g, "tripo-077-caminhao-militar", b8.x + 38f + k * 11f, b8.y + 34f, 1f, 90f + Rn(-12f, 12f));
             if (Peca(g, "mestre-079-militar-comando", b8.x, b8.y, 1f, 0f, Altura(b8.x, b8.y) - 0.3f) == null)
                 Bloco(g, "R08_Comando", PrimitiveType.Cube, b8.x, b8.y, -9999f, new Vector3(30f, 20f, 10f), 0f, Concreto);
             for (int k = 0; k < 3; k++)
@@ -1079,6 +1084,8 @@ namespace Arkana.World
                 if (h < 1f || LagoQ(x, y) < 1.05f || PertoDoRio(x, y, 5f) || EmPiso(x, y) || DistRota(x, y) < 8f) continue;
                 // em grupos, nas encostas e na costa (cobertura legivel), nao salpicadas pela ilha toda
                 if (Declive(x, y) < 12f && h > 6f && Mathf.PerlinNoise(x * 0.006f + 3f, y * 0.006f + 9f) < 0.62f) continue;
+                // TRIPO 038 (30/09): 1 em 3 nas encostas e' o rochedo do Tripo (8 m na escala 1); o kit continua no resto
+                if (h >= 6f && rnd.Next(3) == 0 && Peca(g, "tripo-038-rochedo-grupo", x, y, Rn(0.6f, 1.4f), Rn(0f, 360f), h - 0.8f) != null) { feitas++; continue; }
                 string p = pedras[h < 6f ? 3 : rnd.Next(3)];
                 Peca(g, p, x, y, Rn(2f, 5f), Rn(0f, 360f), h - 0.5f);
                 feitas++;

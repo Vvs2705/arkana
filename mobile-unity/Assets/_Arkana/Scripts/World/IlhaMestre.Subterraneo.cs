@@ -48,6 +48,23 @@ namespace Arkana.World
                 l.range = Mathf.Max(s.largura, s.comprimento) * 0.9f;
                 l.intensity = l.range * 0.4f;   // medido 25/09: 6 deixava o salao de 320 m preto; o URP cai com o quadrado da distancia
                 l.shadows = LightShadows.None;
+                // TRIPO 081 (30/09): 3 aglomerados de cristal por salao, junto da parede, BRILHANDO na cor da propria textura
+                for (int c = 0; c < 3; c++)
+                {
+                    float a = c * 2.1f + 0.5f, gr = s.giro * Mathf.Deg2Rad;
+                    float lx = Mathf.Cos(a) * s.largura * 0.38f, ly = Mathf.Sin(a) * s.comprimento * 0.38f;
+                    float cx = s.x + lx * Mathf.Cos(gr) - ly * Mathf.Sin(gr), cy = s.y + lx * Mathf.Sin(gr) + ly * Mathf.Cos(gr);
+                    GameObject cr = Peca(grupos[s.regiao], "tripo-081-cristal-azul", cx, cy, Rn(1.2f, 2.2f), Rn(0f, 360f), s.piso - 0.3f);
+                    if (cr == null) break;
+                    foreach (Renderer r in cr.GetComponentsInChildren<Renderer>())
+                    {
+                        Material m = r.sharedMaterial;   // o domado e' um so' por material: acender uma vez acende todos
+                        if (m.IsKeywordEnabled("_EMISSION")) continue;
+                        m.EnableKeyword("_EMISSION");
+                        m.SetTexture("_EmissionMap", m.GetTexture("_BaseMap"));
+                        m.SetColor("_EmissionColor", Color.white * 1.6f);
+                    }
+                }
             }
             foreach (Poco p in S.pocos)
             {
