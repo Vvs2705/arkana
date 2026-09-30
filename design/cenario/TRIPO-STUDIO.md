@@ -40,7 +40,7 @@ para retexturizar ou rigar o que já temos.
    Peça grande ou de chão (árvore, rocha, estátua) → testar também **Malha Smart** (malha limpa e leve).
 2. Enviar ao Blender pela ponte → `otimizar.py` (escala real, textura 1024, sem metal) → `Resources/` → IlhaMestre.
 3. Validar a 1ª peça de cada família com foto no celular antes de gerar a família inteira.
-4. Orçamento: ~50 peças orgânicas × 65–100 ≈ 3.000–5.000 créditos. Sobra para refazer, rigar bichos e o Terra Nova.
+4. Orçamento: ~50 peças orgânicas × 65–100 ≈ 3.000–5.000 créditos. Sobra para refazer, rigar bichos e o Chronicles of Existence.
 
 ## Chronicles of Existence (COE)
 Action RPG mobile em Unity 6 (mesma versão do ARKANA), pasta `MEUS PROJETOS/chronicles-of-existence`, **sem nenhuma
