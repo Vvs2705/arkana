@@ -35,7 +35,27 @@ para retexturizar ou rigar o que já temos.
 - A ponte do Unity só aceita FBX/OBJ/ZIP e grava em `Assets/TripoModels/`.
 - A aba do site precisa ficar aberta: fechar a aba derruba a ponte.
 
-## Fluxo ARKANA (proposto — vetável)
+## TESTE A × B (30/09) — VALIDADO com a árvore gigante (102)
+Uma geração (H3.1, 300 mil polígonos, textura 2K, Ultra + PBR = **45 créditos**), levada pelos dois caminhos:
+
+| | A: site → Unity direto | B: site → Blender (`otimizar.py`) → Unity |
+|---|---|---|
+| Triângulos | 293.502 | 45.000 |
+| Arquivo | 13,5 MB | 1,8 MB |
+| Memória de textura no Unity | 117 MB (3 × 2048, sem compressão) | 13 MB (2 × 1024) |
+| Visual na distância de jogo | igual | igual |
+| Trabalho | nenhum, mas inviável no celular | 12 s de script automático (tamanho, pé no chão, textura, relevo) |
+
+**Veredito: B (site → Blender → jogo).** Uma árvore crua passaria sozinha do orçamento de um quadro inteiro.
+O "direto" só competiria gerando já leve no site (contagem de polígonos baixa ou Remesh pago) — e ainda assim o jogo
+precisa de escala, pé no chão e textura 1024, que o script do Blender faz de graça. Vetável.
+**Transporte:** a ponte (DCC Bridge) liga, mas o site move o painel dela para uma **janela flutuante (Picture-in-Picture)**
+que só abre com clique humano; comandada por mim ela não envia nada. Então: **Exportar → GLB 2K (download)** →
+`otimizar.py` → `Resources/`. Com o Diretor clicando, a ponte ao Blender também serve de transporte.
+Resultado no jogo: `Resources/tripo-102-arvore-gigante.glb` no centro da Floresta Gigante (205 m) e nas 5 gigantes
+secundárias; master cru em `arte/cenario/documento-mestre/102-vegetacao-arvore-gigante-tripo.glb`.
+
+## Fluxo ARKANA (validado em 30/09 — vetável)
 1. Site: imagem `-limpo.png` do catálogo → **Modelo HD H3.1**, textura 8K DESLIGADA (celular usa 1024; economiza).
    Peça grande ou de chão (árvore, rocha, estátua) → testar também **Malha Smart** (malha limpa e leve).
 2. Enviar ao Blender pela ponte → `otimizar.py` (escala real, textura 1024, sem metal) → `Resources/` → IlhaMestre.
