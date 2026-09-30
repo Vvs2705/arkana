@@ -51,6 +51,15 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 30/09, manhã (11): lote de validação do Tripo no jogo — as 6 famílias + regra da Malha Smart
+
+No jogo (editor conferido por foto): rochedo 038 (76 nas encostas), estátua 047 (templo, no piso real, e ilhota),
+gerador 066 (4 no R07), caminhão 077 (3 no R08), cristal 081 (45 nos salões, brilhando) e árvore comum 009 pela
+**Malha Smart** (2 mil tris, espécie principal da floresta). Regra validada: repetida aos milhares → Malha Smart;
+única/dezenas → HD → Blender. Saldo **24.630** (225 perdidos num erro de upload — ver `design/cenario/TRIPO-STUDIO.md`).
+**APK `arkana-2026-09-30_1139` pronto na pasta de testes, NÃO instalado** (Poco fora do USB). **Continuar:** instalar e
+fotografar no Poco; lote das peças orgânicas por família (lista em `lote-tripo.txt`), vegetação miúda pela Malha Smart.
+
 ### >>> 30/09, madrugada (10): TRIPO em uso — 1ª peça no jogo, caminho validado
 
 Conta Tripo Studio **vsouz009, plano Max, 25.155 créditos** (API descartada pelo Diretor). Análise completa, custos,
