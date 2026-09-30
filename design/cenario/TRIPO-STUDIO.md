@@ -1,6 +1,6 @@
 # Tripo Studio — análise da conta e como usar (30/09/2026)
 
-Conta **vsouz009**, plano **Max** (mensal, US$ 90): **25.200 créditos**. Vale para o ARKANA e para o Terra Nova.
+Conta **vsouz009**, plano **Max** (mensal, US$ 90): **25.200 créditos**. Vale para o ARKANA e para o **Chronicles of Existence (COE)**.
 Decisão do Diretor: **sem API** — criar no site e mandar pelas pontes (DCC Bridge).
 
 ## O que o plano Max dá (página de preços, conferida hoje)
@@ -42,9 +42,12 @@ para retexturizar ou rigar o que já temos.
 3. Validar a 1ª peça de cada família com foto no celular antes de gerar a família inteira.
 4. Orçamento: ~50 peças orgânicas × 65–100 ≈ 3.000–5.000 créditos. Sobra para refazer, rigar bichos e o Terra Nova.
 
-## Terra Nova (SimUrban, Three.js)
-Não há ponte para Three.js, mas o GLB exportado entra direto. Usos: prédios, carros/ônibus/trem, props de rua.
-Preferir **Malha Smart / Smart Lowpoly** (muitas cópias na tela) e textura baixa.
+## Chronicles of Existence (COE)
+Action RPG mobile em Unity 6 (mesma versão do ARKANA), pasta `MEUS PROJETOS/chronicles-of-existence`, **sem nenhuma
+arte própria ainda** — o Tripo é o caminho natural para personagens (rig + animação do site), a vila de Auren e props.
+O COE já tem o próprio pipeline (`docs/arte/PIPELINE.md`: Tripo → Blender → Unity, orçamento de tris por categoria,
+ASTC) e regra de proveniência (`docs/arte/PROVENIENCIA.md`: só concept PRÓPRIO entra no gerador). A comparação
+"Unity direto × Blender" feita no ARKANA vale para ele.
 
 ## Creator Hub — Mission TRIPOssible (fundo de projetos)
 - Aberto o ano todo, análise contínua, **resposta em até 10 dias úteis**, inscrição **grátis**, sem exclusividade.
@@ -59,8 +62,8 @@ Preferir **Malha Smart / Smart Lowpoly** (muitas cópias na tela) e textura baix
   Discord; depois nome do projeto, o que quer criar, caminho, como o Tripo ajuda, que apoio quer, formato,
   metas/orçamento/prazo.
 - **Veredito:** o ARKANA se encaixa bem em *Made with Tripo — Games* (battle royale mobile com a ilha montada com
-  Tripo). Inscrever DEPOIS das primeiras peças do Tripo no jogo, com foto e vídeo do celular. O Terra Nova encaixa
-  pior (a cidade é procedural): só como segunda proposta, ou dentro de *Powered by Tripo*.
+  Tripo). Inscrever DEPOIS das primeiras peças do Tripo no jogo, com foto e vídeo do celular. O **COE também encaixa
+  bem** (RPG sem arte ainda: toda a arte sairia do Tripo) — duas propostas separadas, uma por jogo.
 
 ## Outros ganhos
 - **Indicação:** 30 créditos por compartilhamento qualificado (com limite diário); amigo que se cadastra = 300 para
