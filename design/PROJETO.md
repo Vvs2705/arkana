@@ -51,6 +51,18 @@ aparelho apareceu em `adb devices`.
 
 ## CONTINUAR DAQUI
 
+### >>> 30/09, madrugada (10): TRIPO em uso — 1ª peça no jogo, caminho validado
+
+Conta Tripo Studio **vsouz009, plano Max, 25.155 créditos** (API descartada pelo Diretor). Análise completa, custos,
+Creator Hub (Mission TRIPOssible — inscrever o ARKANA e o Chronicles of Existence DEPOIS de ter peças do Tripo no
+jogo) e o **teste A×B**: `design/cenario/TRIPO-STUDIO.md`. **Caminho validado: site → Exportar GLB 2K → `otimizar.py`
+(45 mil tris, 1024, com relevo) → `Resources/`** (direto: 293 mil tris e 117 MB de textura; no jogo igual). A ponte
+(DCC Bridge) não envia quando o navegador é comandado por mim (janela PiP exige clique humano). **No jogo:** árvore
+gigante 102 no centro da Floresta Gigante (205 m) e nas 5 secundárias, com colisão. Ainda NÃO foi para o celular.
+**Continuar:** (1) gerar as outras 6 de validação (009, 038-limpo, 081, 047, 066, 077; ~45 créditos cada, 2K,
+~300 mil polígonos) e passar pelo mesmo caminho; (2) APK com a árvore + colisão e foto no Poco (aparelho frio);
+(3) lote das peças orgânicas por família. O Blender guarda as duas árvores de teste só na cena aberta (não salva).
+
 ### >>> 27/09, noite (9): a ilha de 4,8 km NO POCO — quatro defeitos que só o APK mostrava
 
 **Primeiro teste da IlhaMestre no aparelho** (APK por batchmode, `adb` do SDK avulso; como ligar o Poco: memória
