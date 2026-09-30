@@ -55,6 +55,25 @@ que só abre com clique humano; comandada por mim ela não envia nada. Então: *
 Resultado no jogo: `Resources/tripo-102-arvore-gigante.glb` no centro da Floresta Gigante (205 m) e nas 5 gigantes
 secundárias; master cru em `arte/cenario/documento-mestre/102-vegetacao-arvore-gigante-tripo.glb`.
 
+## Lote de validação (30/09) — as 6 famílias no jogo
+| Peça | Como | Tris no jogo | Onde |
+|---|---|---|---|
+| 038 rochedo | HD → Blender | 6 mil | 1 em 3 pedras de encosta (76 no mapa) |
+| 047 estátua sem cabeça | HD → Blender | 10 mil | templo (no piso real, `Piso()` por raio) e ilhota do lago |
+| 066 gerador | HD → Blender | 8 mil | 4 ao pé dos tanques (R07) |
+| 077 caminhão | HD → Blender | 12 mil | 3 em frente ao comando (R08) |
+| 081 cristal | HD → Blender | 5 mil | 3 por salão das cavernas (45), brilhando com a própria textura |
+| 009 árvore comum | **Malha Smart** (P2.0, triângulos, 3 mil pedidos → 2.079) → Blender só textura 512 | 2 mil | espécie principal da floresta (milhares) |
+
+**Regra nova (validada):** peça que se repete aos MILHARES (árvore, moita, capim) vai pela **Malha Smart** — a HD
+reduzida a 3 mil no Blender vira placas lisas; a Smart sai leve e com folha de verdade. Peça única ou de dezenas vai
+pela **HD → Blender**. A Malha Smart P2.0 teve 1 teste grátis; o preço normal é 100 créditos (4 variações) + 30 da textura.
+**Erro que custou 225 créditos:** na página de resultado, trocar a imagem pelo campo de arquivo NÃO troca a imagem
+usada — 5 gerações saíram como a árvore anterior. Agora: página NOVA para cada peça e foto do painel antes de gerar.
+Gasto do dia: 45 (árvore gigante) + 270 (lote, 225 perdidos) + 225 (refeitas) + 30 (textura Smart) = 570 → saldo 24.630.
+Download: botão Exportar (clique humano). O Chrome passou a bloquear downloads do site depois de 2 seguidos por
+script — o Diretor liberou na barra do navegador.
+
 ## Fluxo ARKANA (validado em 30/09 — vetável)
 1. Site: imagem `-limpo.png` do catálogo → **Modelo HD H3.1**, textura 8K DESLIGADA (celular usa 1024; economiza).
    Peça grande ou de chão (árvore, rocha, estátua) → testar também **Malha Smart** (malha limpa e leve).
