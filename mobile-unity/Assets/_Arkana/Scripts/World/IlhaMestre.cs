@@ -383,7 +383,10 @@ namespace Arkana.World
 
         List<Arv> Arvores(out TreePrototype[] protos)
         {
-            string[] rec = { "35-arvore-copa", "36-pinheiro", "37-moita", "51-tronco-musgo" };
+            // TRIPO 009 (30/09): a arvore comum do catalogo pela MALHA SMART do site (2 mil tris, textura 512) — a HD reduzida
+            // a 3 mil no Blender virava placas lisas; a Smart sai leve e com folha de verdade (teste em design/cenario/TRIPO-STUDIO.md)
+            string copa = Resources.Load<GameObject>("tripo-009-arvore-comum") != null ? "tripo-009-arvore-comum" : "35-arvore-copa";
+            string[] rec = { copa, "36-pinheiro", "37-moita", "51-tronco-musgo" };
             float[] altura = { 22f, 20f, 2.2f, 1.2f };   // alvo em metros (doc §9 R02: arvores comuns 12-35 m)
             var lista = new List<TreePrototype>();
             var escala = new List<float>();
@@ -766,6 +769,17 @@ namespace Arkana.World
             return m;
         }
 
+        /// <summary>O chao DE VERDADE em (x, y) do doc: o topo do colisor mais alto (patio, laje, ponte) ou o terreno.
+        /// A estatua do templo afundava no patio posta pelo Altura() do terreno (foto 30/09).</summary>
+        float Piso(float x, float y)
+        {
+            Physics.SyncTransforms();
+            float topo = Altura(x, y);
+            foreach (RaycastHit h in Physics.RaycastAll(U(x, y, 3000f), Vector3.down, 4000f))
+                topo = Mathf.Max(topo, h.point.y);
+            return topo;
+        }
+
         Regiao R(string id) => Array.Find(D.regioes, r => r.id == id);
         float Rn(float a, float b) => (float)(a + rnd.NextDouble() * (b - a));
 
@@ -845,7 +859,7 @@ namespace Arkana.World
                 Peca(g, "mestre-043-templo-parapeito", t.x - 47f + k * 6f, t.y + 10f + 45f, 1f, 0f, zs + 1.5f);
             }
             foreach (float dy in new[] { -5f, 25f })
-                if (Peca(g, "tripo-047-estatua-sem-cabeca", t.x - 50f, t.y + dy, 1.4f, 90f) == null) Peca(g, "24-estatua-vigia", t.x - 50f, t.y + dy, 3f, 90f);
+                if (Peca(g, "tripo-047-estatua-sem-cabeca", t.x - 50f, t.y + dy, 1.4f, 90f, Piso(t.x - 50f, t.y + dy)) == null) Peca(g, "24-estatua-vigia", t.x - 50f, t.y + dy, 3f, 90f);
             Peca(g, "33-obelisco", t.x + 70f, t.y - 60f, 2.5f, 0f);
             Peca(g, "33-obelisco", t.x + 70f, t.y + 80f, 2.5f, 0f);
 
@@ -1003,7 +1017,7 @@ namespace Arkana.World
             g = Grupo("ARKANA_R08_Base");
             Regiao b8 = R("R08");
             for (int k = 0; k < 3; k++)   // TRIPO 077 (30/09): caminhoes militares abandonados em frente ao comando
-                Peca(g, "tripo-077-caminhao-militar", b8.x + 38f + k * 11f, b8.y + 34f, 1f, 90f + Rn(-12f, 12f));
+                Peca(g, "tripo-077-caminhao-militar", b8.x + 38f + k * 11f, b8.y + 46f, 1f, 90f + Rn(-12f, 12f));
             if (Peca(g, "mestre-079-militar-comando", b8.x, b8.y, 1f, 0f, Altura(b8.x, b8.y) - 0.3f) == null)
                 Bloco(g, "R08_Comando", PrimitiveType.Cube, b8.x, b8.y, -9999f, new Vector3(30f, 20f, 10f), 0f, Concreto);
             for (int k = 0; k < 3; k++)
