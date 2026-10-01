@@ -29,9 +29,11 @@ if (Test-Path $Apk) {
     $Root = Split-Path -Parent (Resolve-Path (Join-Path $Proj $Common))
     $Dest = Join-Path $Root "mobile-unity\Builds\testes"
     New-Item -ItemType Directory -Force $Dest | Out-Null
+    # So o APK atual fica: os anteriores sao apagados (ordem do Diretor de 01/10/2026 — disco cheio).
+    Remove-Item (Join-Path $Dest "*.apk") -Force -ErrorAction SilentlyContinue
     $Stamped = Join-Path $Dest ("arkana-" + (Get-Date -Format "yyyy-MM-dd_HHmm") + ".apk")
-    Copy-Item $Apk $Stamped -Force
-    "APK: $Stamped ($([math]::Round((Get-Item $Apk).Length / 1MB, 1)) MB)"
+    Move-Item $Apk $Stamped -Force
+    "APK: $Stamped ($([math]::Round((Get-Item $Stamped).Length / 1MB, 1)) MB)"
 } else {
     "APK NAO GERADO (Unity exit code $($P.ExitCode)). Leia $Log."
 }

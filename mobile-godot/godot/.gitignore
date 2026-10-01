@@ -1,6 +1,0 @@
-.godot/
-android/build/
-android/.build_version
-*.apk
-*.aab
-build/

@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://characters/_shot_mago.gd" id="1_shot_mago"]
-
-[node name="ShotMago" type="Node3D"]
-script = ExtResource("1_shot_mago")
