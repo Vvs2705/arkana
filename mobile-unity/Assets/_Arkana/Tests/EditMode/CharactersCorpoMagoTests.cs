@@ -165,5 +165,52 @@ namespace Arkana.Tests
             }
             Assert.Ignore("nenhum FBX do elenco");
         }
+
+        // ------------------------------------------------------------------ 04/10: Mecanim Humanoid (BLOCO C)
+
+        /// <summary>O ANIMATION VALIDATION SET (escolhido por DADO em 04/10): o mais compacto que pisa (Fizz, 0,95 m, quadril a
+        /// 30% da altura), a mediana do elenco (Corvomante, 1,80 m, escala 1,00) e o maior/mais largo (Basalto, 2,30 m, ombro
+        /// 75,6 cm). A Pip (0,60 m) voa a 1,2 m e nunca pisa: patinar e pousar nao aparecem nela.</summary>
+        public static readonly string[] ValidationSet = { "16-fizz", "05-corvomante", "18-basalto" };
+
+        [Test]
+        public void Humanoide_OEsqueletoDaMeshyViraAvatarHumanoValido_NosVinte()
+        {
+            var linhas = new System.Text.StringBuilder("slug | avatar humano | braco abaixo da horizontal no bind (graus)\n");
+            var falhas = new System.Collections.Generic.List<string>();
+            int vistos = 0;
+            foreach (string slug in Arkana.Core.Kits.Slugs)
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Pasta + slug + ".fbx");
+                if (prefab == null) continue;
+                vistos++;
+                GameObject g = Object.Instantiate(prefab);
+                try
+                {
+                    Avatar av = EsqueletoHumano.Construir(g, out string faltando);
+                    bool ok = av != null && av.isValid && av.isHuman;
+                    float braco = EsqueletoHumano.BracoAbaixoDaHorizontal(g.transform);
+                    linhas.AppendLine(slug + " | " + (ok ? "OK" : "FALHOU " + faltando) + " | " + braco.ToString("F0"));
+                    if (!ok) falhas.Add(slug + (faltando != null ? " (sem " + faltando + ")" : ""));
+                    if (av != null) Object.DestroyImmediate(av);
+                }
+                finally { Object.DestroyImmediate(g); }
+            }
+            System.IO.Directory.CreateDirectory("Logs");
+            System.IO.File.WriteAllText("Logs/humanoide.txt", linhas.ToString());
+            Assert.AreEqual(20, vistos, "os 20 FBX existem");
+            CollectionAssert.IsEmpty(falhas, "Avatar humano:\n" + linhas);
+            foreach (string slug in ValidationSet) StringAssert.Contains(slug + " | OK", linhas.ToString(), "o Validation Set fecha");
+        }
+
+        [Test]
+        public void Humanoide_ColunaInvertidaDaMeshy_OSpineDoMecanimEOFilhoDoHips()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Pasta + "05-corvomante.fbx");
+            Transform hips = EsqueletoHumano.Osso(prefab.transform, "Hips");
+            Transform baseDaColuna = EsqueletoHumano.Osso(prefab.transform, "Spine02");
+            Assert.AreSame(hips, baseDaColuna.parent, "a base da coluna e' o Spine02 (o Spine e' o topo): o mapa automatico erraria");
+            Assert.IsNull(EsqueletoHumano.Osso(prefab.transform, "pine02"), "nome exato: nada de 'contem'");
+        }
     }
 }
