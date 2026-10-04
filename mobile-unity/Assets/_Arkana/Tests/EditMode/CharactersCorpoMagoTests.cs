@@ -333,12 +333,12 @@ namespace Arkana.Tests
                 Assert.Greater(a.length, 0.1f, a.name + ": clipe vazio");
                 Assert.IsTrue(a.isHumanMotion, a.name + ": humanoide");
                 nomes.Add(a.name);
-                bool laco = a.name.Contains("walk") || a.name.Contains("run-") || a.name.Contains("sprint") || a.name == "standing-idle"
+                bool laco = a.name.StartsWith("loc-") || a.name.Contains("walk") || a.name.Contains("run-") || a.name.Contains("sprint") || a.name == "standing-idle"
                     || a.name == "queda-no-ar" || a.name == "rastejar" || a.name == "boiar";
                 Assert.AreEqual(laco, a.isLooping, a.name + ": laco");
             }
-            foreach (string obrigatorio in new[] { "standing-idle", "standing-run-forward", "standing-run-left", "standing-run-right",
-                         "standing-run-back", "standing-walk-left", "standing-1h-magic-attack-01", "standing-jump-running", "queda-no-ar", "derrubado" })
+            foreach (string obrigatorio in new[] { "loc-parado", "loc-correr-frente", "loc-correr-esq", "loc-correr-dir",
+                         "loc-correr-tras", "loc-andar-esq", "loc-sprint", "standing-1h-magic-attack-01", "standing-jump-running", "queda-no-ar", "derrubado" })
                 Assert.IsTrue(nomes.Contains(obrigatorio), "falta " + obrigatorio);
         }
     }

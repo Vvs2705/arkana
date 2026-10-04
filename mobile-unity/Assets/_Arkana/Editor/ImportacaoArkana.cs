@@ -53,7 +53,7 @@ namespace Arkana.EditorTools
         /// <summary>Clipes que repetem: parados, passadas, a queda no ar, rastejar e boiar. Transicao ("-to-"), pulo, golpe,
         /// magia e morte tocam uma vez.</summary>
         public static bool EmLaco(string nome) =>
-            (nome.Contains("idle") && !nome.Contains("-to-")) || nome.Contains("walk") || nome.Contains("sprint")
+            nome.StartsWith("loc-", System.StringComparison.Ordinal) || (nome.Contains("idle") && !nome.Contains("-to-")) || nome.Contains("walk") || nome.Contains("sprint")
             || (nome.Contains("run") && !nome.Contains("jump")) || nome == "queda-no-ar" || nome == "rastejar" || nome == "boiar";
 
         /// <summary>

@@ -57,13 +57,17 @@ namespace Arkana.EditorTools
 
         /// <summary>A passada: (clipe, velocidade de reserva no corpo em m/s normalizados, direcao). A posicao no blend e' a
         /// velocidade de raiz MEDIDA no clipe; a reserva so' vale se o clipe vier parado no lugar.</summary>
+        /// A PASSADA E' A GENERICA do Mixamo ("loc-*": Unarmed + Left/Right Strafe + Standard Sprint), nao a do pacote de mago:
+        /// a do pacote anda com o braco direito jogado PARA TRAS (medido igual no X Bot de origem: retarget fiel), e na camera
+        /// do jogo, atras do ombro, esse braco aparece ERGUIDO AO LADO DA CABECA parado e correndo (folha 61, 04/10). O pacote
+        /// segue nas magias, golpes, pulo, derrubado. VETAVEL: trocar os nomes aqui e rodar o menu.
         static readonly (string clipe, float reserva, Vector2 dir)[] Passada =
         {
-            ("standing-walk-forward", 1.4f, Vector2.up), ("standing-walk-back", 1.2f, Vector2.down),
-            ("standing-walk-left", 1.3f, Vector2.left), ("standing-walk-right", 1.3f, Vector2.right),
-            ("standing-run-forward", 3.6f, Vector2.up), ("standing-run-back", 3.0f, Vector2.down),
-            ("standing-run-left", 3.2f, Vector2.left), ("standing-run-right", 3.2f, Vector2.right),
-            ("standing-sprint-forward", 5.6f, Vector2.up),
+            ("loc-andar-frente", 1.4f, Vector2.up), ("loc-andar-tras", 1.2f, Vector2.down),
+            ("loc-andar-esq", 1.3f, Vector2.left), ("loc-andar-dir", 1.3f, Vector2.right),
+            ("loc-correr-frente", 3.6f, Vector2.up), ("loc-correr-tras", 3.0f, Vector2.down),
+            ("loc-correr-esq", 3.2f, Vector2.left), ("loc-correr-dir", 3.2f, Vector2.right),
+            ("loc-sprint", 5.6f, Vector2.up),
         };
 
         public static AnimationClip Clipe(string nome)
@@ -102,7 +106,7 @@ namespace Arkana.EditorTools
                 hideFlags = HideFlags.HideInHierarchy,
             };
             AssetDatabase.AddObjectToAsset(bt, ac);
-            AnimationClip idle = Exigir("standing-idle", rel);
+            AnimationClip idle = Exigir("loc-parado", rel);
             bt.AddChild(idle, Vector2.zero);
             foreach (var p in Passada)
             {
