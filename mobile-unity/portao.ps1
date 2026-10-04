@@ -47,7 +47,7 @@ function Passada([string]$Plataforma, [string]$Log, [string]$Xml) {
     }
     # o motivo de cada ignorado, agrupado (classe + mensagem): um ignorado novo aparece aqui em vez de virar "passou"
     $R.SelectNodes("//test-case[@result='Skipped']") | Group-Object { "$($_.classname.Split('.')[-1]): $($_.reason.message.'#cdata-section')" } |
-        ForEach-Object { Write-Host "  ignorado ($Plataforma) x$($_.Count) — $($_.Name)" }
+        ForEach-Object { Write-Host "  ignorado ($Plataforma) x$($_.Count) - $($_.Name)" }
     # Write-Host de proposito: dentro de function, string solta vira valor de RETORNO e some da tela.
     Write-Host "  $Plataforma`: $([int]$Run.passed) passaram, $([int]$Run.failed) falharam, $([int]$Run.skipped) ignorados de $([int]$Run.total) (Unity exit $($P.ExitCode))"
     return @([int]$Run.passed, [int]$Run.failed, [int]$Run.skipped)
