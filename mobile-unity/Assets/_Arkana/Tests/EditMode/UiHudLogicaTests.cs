@@ -432,5 +432,44 @@ namespace Arkana.Tests
             Assert.AreNotEqual(vermelho, deut, "deuteranopia devolve o erro nos canais que sobram");
             Assert.Greater(deut.b, 0f);
         }
+
+        // ------------------------------------------------------------------ 04/10: HUD configuravel (BLOCO G)
+
+        [Test]
+        public void Layout_Espelhado_JoystickADireita_FogoAEsquerda_RespeitandoOEntalhe()
+        {
+            float px = 395f / 160f;   // Poco F4 deitado
+            var tela = new Vector2(2400, 1080);
+            var m = new Margens { Esq = 80f, Dir = 0f, Topo = 0f, Baixo = 0f };   // entalhe da camera a esquerda
+            HudLayout p = HudLayout.Calcular(tela, m, px), e = HudLayout.Calcular(tela, m, px, 1f, true);
+            Assert.Less(p.Joystick.center.x, tela.x / 2f);
+            Assert.Greater(e.Joystick.center.x, tela.x / 2f, "canhoto: joystick a direita");
+            Assert.Less(e.Disparo.center.x, tela.x / 2f, "e o Fogo a esquerda");
+            Assert.AreEqual(tela.x - m.Dir - p.Disparo.xMax, e.Disparo.xMin - m.Esq, 0.01f, "a mesma folga da borda, contada do entalhe");
+            Assert.AreEqual(p.Minimapa, e.Minimapa, "so' os controles trocam de lado");
+            Assert.AreEqual(p.Barras, e.Barras);
+        }
+
+        [Test]
+        public void Layout_EscalaDosBotoes_CresceSemSobrepor_EEncolheSemPassarDe48dp()
+        {
+            float px = 395f / 160f;
+            var tela = new Vector2(2400, 1080);
+            var m = new Margens();
+            HudLayout n = HudLayout.Calcular(tela, m, px), g = HudLayout.Calcular(tela, m, px, 1.4f), p = HudLayout.Calcular(tela, m, px, 0.8f);
+            Assert.Greater(g.Disparo.width, n.Disparo.width, "1,4: maior");
+            Assert.Less(p.Disparo.width, n.Disparo.width, "0,8: menor");
+            Assert.AreEqual(n.Disparo, HudLayout.Calcular(tela, m, px, 1f).Disparo, "o padrao nao muda");
+            foreach (HudLayout l in new[] { g, p, HudLayout.Calcular(tela, m, px, 1.4f, true) })
+            {
+                Rect[] toque = { l.Disparo, l.Esquiva, l.Tatica, l.Suprema, l.Pegar, l.Salto, l.Joystick, l.Carrossel };
+                for (int i = 0; i < toque.Length; i++)
+                {
+                    Assert.GreaterOrEqual(Mathf.Min(toque[i].width, toque[i].height), Dp.AlvoMinimoDp * px - 0.01f, "alvo de toque >= 48 dp");
+                    Assert.IsTrue(toque[i].xMin >= -0.01f && toque[i].xMax <= tela.x + 0.01f, "dentro da tela");
+                    for (int j = i + 1; j < toque.Length; j++) Assert.IsFalse(toque[i].Overlaps(toque[j]), "sem sobrepor: " + i + " x " + j);
+                }
+            }
+        }
     }
 }

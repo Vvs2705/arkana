@@ -368,7 +368,7 @@ namespace Arkana.UI
             if (cam != null && cam.pixelRect.size != _telaZonas)   // o HudLayout desta tela (a foto troca o alvo): 1x por tamanho
             {
                 _telaZonas = cam.pixelRect.size;
-                MarcasLogica.ZonasProibidas(HudLayout.Calcular(_telaZonas, AreaSegura.Atual(), Dp.Px(1f)), _telaZonas, Dp.Px(1f), _zonas);
+                MarcasLogica.ZonasProibidas(HudLayout.DaConfig(_telaZonas, AreaSegura.Atual(), Dp.Px(1f)), _telaZonas, Dp.Px(1f), _zonas);
             }
             _parceiro.Pintar(cam != null ? Logica.Parceiro : null, cam, Logica.VidaParceiro, _zonas);
             _parceiro2.Pintar(cam != null ? Logica.Parceiro2 : null, cam, Logica.VidaParceiro2, _zonas);

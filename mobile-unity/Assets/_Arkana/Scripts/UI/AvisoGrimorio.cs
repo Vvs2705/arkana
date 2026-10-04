@@ -59,7 +59,7 @@ namespace Arkana.UI
         /// </summary>
         public static Rect Retangulo(Vector2 tela, Margens m, float px)
         {
-            HudLayout l = HudLayout.Calcular(tela, m, px);
+            HudLayout l = HudLayout.DaConfig(tela, m, px);
             float w = Mathf.Min(LarguraDp * px, ColunaDaMira(tela).xMin - 8f * px - l.KillFeed.xMin), h = AlturaDp * px;
             float yc = Mathf.Max((l.Joystick.yMax + l.KillFeed.yMin) * 0.5f, l.Joystick.yMax + 4f * px + h * 0.5f);
             return new Rect(l.KillFeed.xMin, yc - h * 0.5f, w, h);

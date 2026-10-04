@@ -199,30 +199,58 @@ namespace Arkana.UI
         /// <summary>Lado do minimapa em dp: o teto e o piso (tela baixa encolhe o mapa ate' o piso, nunca o empilha). KNOB por foto.</summary>
         public const float MinimapaDp = 124f, MinimapaMinDp = 72f;
 
-        public static HudLayout Calcular(Vector2 tela, Margens m, float px)
+        /// <summary>O layout que o JOGADOR escolheu nas Configuracoes (04/10: "Layout espelhado" e "Escala dos botoes" eram
+        /// salvos e NADA os lia). HUD, marcas de alvo e aviso do grimorio usam este — as zonas proibidas seguem os botoes.</summary>
+        public static HudLayout DaConfig(Vector2 tela, Margens m, float px)
         {
+            Arkana.Menu.ConfigLogica c = Arkana.Menu.ConfigLogica.Atual;
+            return Calcular(tela, m, px, c.Float(Arkana.Menu.ConfigLogica.K_ESCALA_BOTOES), c.Int(Arkana.Menu.ConfigLogica.K_LAYOUT) == 1);
+        }
+
+        /// <summary>`escala` (0,8-1,4) = tamanho dos controles de toque, nunca abaixo de 48 dp; acima de 1 so' cresce ate' a
+        /// fileira do Fogo encostar no PEGAR (o padrao 1 nao muda). `espelhado` = canhoto: os controles trocam de lado,
+        /// calculados com as margens TROCADAS e refletidos — a distancia da borda continua a da area segura daquele lado (o
+        /// entalhe da camera nao engole o Fogo). Barras, relogio, minimapa e pausa nao mudam.</summary>
+        public static HudLayout Calcular(Vector2 tela, Margens m, float px, float escala = 1f, bool espelhado = false)
+        {
+            if (espelhado)
+            {
+                HudLayout b = Calcular(tela, m, px, escala, false);
+                HudLayout c = Calcular(tela, new Margens { Esq = m.Dir, Dir = m.Esq, Topo = m.Topo, Baixo = m.Baixo }, px, escala, false);
+                float w = tela.x;
+                Rect R(Rect r) => new Rect(w - r.xMax, r.y, r.width, r.height);
+                b.Joystick = R(c.Joystick); b.Disparo = R(c.Disparo); b.Esquiva = R(c.Esquiva); b.Tatica = R(c.Tatica);
+                b.Suprema = R(c.Suprema); b.Salto = R(c.Salto); b.Carrossel = R(c.Carrossel);
+                b.AnelSintonia = R(c.AnelSintonia); b.SintoniaPronta = R(c.SintoniaPronta);
+                return b;
+            }
             var l = new HudLayout();
             float mm = 16f * px;    // respiro de leitura
             float g = 24f * px;     // respiro de dedo
+            float alvo = Dp.AlvoMinimoDp * px;
+            float pb = 64f * px;
+            float s = Mathf.Clamp(float.IsNaN(escala) ? 1f : escala, 0.8f, 1.4f);
+            // acima de 1: a fileira (Fogo + 3 botoes) nao pode passar do PEGAR, no meio da tela
+            float cabe = (tela.x * 0.5f - m.Dir - pb * 0.5f - 12f * px - g - 36f * px) / (280f * px);
+            if (s > 1f) s = Mathf.Max(1f, Mathf.Min(s, cabe));
             l.Barras = new Rect(m.Esq + mm, tela.y - m.Topo - mm - 56f * px, 190f * px, 56f * px);
             l.Topo = new Rect(tela.x - m.Dir - mm - 180f * px, tela.y - m.Topo - mm - 52f * px, 180f * px, 52f * px);
             // bussola: faixa fina no topo central, ACIMA da faixa de aviso (que comeca 44dp abaixo do topo)
             l.Bussola = new Rect(tela.x * 0.5f - 120f * px, tela.y - m.Topo - 8f * px - 26f * px, 240f * px, 26f * px);
-            float js = 150f * px;
+            float js = 150f * px * s;
             l.Joystick = new Rect(m.Esq + g, m.Baixo + g, js, js);
-            float fb = 88f * px;
+            float fb = Mathf.Max(88f * px * s, alvo);
             l.Disparo = new Rect(tela.x - m.Dir - g - fb, m.Baixo + 40f * px, fb, fb);
-            float db = 64f * px;
+            float db = Mathf.Max(64f * px * s, alvo);
             float dir = l.Disparo.xMin;
             l.Esquiva = new Rect(dir - 12f * px - db, l.Disparo.yMin, db, db); dir = l.Esquiva.xMin;
             l.Tatica = new Rect(dir - 12f * px - db, l.Disparo.yMin, db, db); dir = l.Tatica.xMin;
             l.Suprema = new Rect(dir - 12f * px - db, l.Disparo.yMin, db, db);
             l.Salto = new Rect(tela.x - m.Dir - g - db, l.Disparo.yMax + 10f * px, db, db);
-            float slot = 52f * px;
+            float slot = Mathf.Max(52f * px * s, alvo);
             float nEl = Elementos.Todos.Length;
             l.Carrossel = new Rect(l.Salto.xMin - 10f * px - slot * nEl, l.Disparo.yMax + 10f * px, slot * nEl, slot);
             l.ArmaRotulo = new Rect(tela.x - m.Dir - 320f * px, l.Carrossel.yMax + 4f * px, 320f * px - g, 16f * px);
-            float pb = 64f * px;
             l.Pegar = new Rect(tela.x / 2f - pb / 2f, m.Baixo + 40f * px, pb, pb);
             l.Altimetro = new Rect(tela.x - m.Dir - mm - 120f * px, tela.y / 2f - 20f * px, 120f * px, 40f * px);
             l.KillFeed = new Rect(m.Esq + mm, l.Barras.yMin - 8f * px - 72f * px, 260f * px, 72f * px);
@@ -887,7 +915,7 @@ namespace Arkana.UI
             Vector2 tela = TamanhoDaTela();
             _telaAtual = tela;
             Margens m = AreaSegura.Atual();
-            HudLayout l = HudLayout.Calcular(tela, m, Dp.Px(1f));
+            HudLayout l = HudLayout.DaConfig(tela, m, Dp.Px(1f));
             AreaSegura.NoRect(_barras, l.Barras);
             AreaSegura.NoRect(_topo, l.Topo);
             AreaSegura.NoRect((RectTransform)Pausa.transform, l.Pausa);
@@ -1036,6 +1064,7 @@ namespace Arkana.UI
         void AplicarConfig(ConfigLogica cfg)
         {
             _mostraFps = cfg.Bool(ConfigLogica.K_CONTADOR_FPS);
+            if (_telaAtual != Vector2.zero) Layout();   // espelhado/escala dos botoes valem na hora (so' muda pelo menu, nunca sozinho)
             _numerosDano = cfg.Bool(ConfigLogica.K_NUMEROS_DANO);
             _fps.enabled = _mostraFps;
         }
