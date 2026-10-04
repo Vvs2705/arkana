@@ -1,7 +1,7 @@
 # mobile-unity — o produto
 
 O jogo de celular, em **Unity 6000.3.23f1** (URP, Input System, uGUI, Test
-Framework). Reescrito a partir de `design/` e do que o `mobile-godot/` provou —
+Framework). Reescrito a partir de `design/` e do que a versão em Godot provou (hoje só no histórico do git) —
 **nenhuma linha de GDScript foi traduzida**: se releu a decisão e se escreveu em C#.
 
 ## Como rodar

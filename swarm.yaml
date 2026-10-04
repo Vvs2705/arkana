@@ -5,7 +5,6 @@ max_subagents_per_wave: 4
 
 rules:
   - "design/ e' a fonte da verdade; muda la' primeiro, implementa depois."
-  - "mobile-godot/ e' referencia de leitura: nao recebe feature, nao se traduz para C#."
   - "Nao commitar binarios 3D/texturas pesadas fora do Git LFS."
   - "Portao: testes do Unity Test Framework em -batchmode antes de qualquer entrega."
   - "Todo teste novo se prova reintroduzindo o defeito; se nao fica vermelho, e' decorativo."
@@ -17,8 +16,8 @@ lanes:
       - "test-writer"
       - "code-reviewer"
     scope:
-      - "mobile-unity/Assets/Scripts/Core"
-      - "mobile-unity/Assets/Tests"
+      - "mobile-unity/Assets/_Arkana/Scripts/Core"
+      - "mobile-unity/Assets/_Arkana/Tests"
 
   unity_gameplay:
     owner: "enterprise-architect"
@@ -26,8 +25,8 @@ lanes:
       - "qa-test-automation"
       - "simplificador"
     scope:
-      - "mobile-unity/Assets/Scripts/Gameplay"
-      - "mobile-unity/Assets/Scenes"
+      - "mobile-unity/Assets/_Arkana/Scripts/Gameplay"
+      - "mobile-unity/Assets/_Arkana/Scenes"
 
   art_direction:
     owner: "product-ux-conversion"

@@ -3,6 +3,18 @@
 Este arquivo registra os marcos das frentes que continuam ativas. O historico
 detalhado do prototipo 2D encerrado permanece disponivel nos commits anteriores.
 
+## Nao publicado - 2026-10-04 - ilha do Documento Mestre, arte do Tripo, repositorio organizado
+
+- **Ilha nova (25/09 em diante):** segue o Documento Mestre (`design/cenario/DOCUMENTO-MESTRE.md`):
+  4,8 x 4,4 km, 12 regioes, zona industrial, base militar e subterraneo, montada por codigo
+  (`Scripts/World/IlhaMestre*.cs`), com terreno em 16 blocos, grama instanciada e colisao nas pecas.
+- **Arte 3D:** kit de arquitetura gerado por script no Blender e pecas organicas do Tripo Studio
+  (arvore gigante, arvore comum, rochedo, estatua, gerador, caminhao, cristal) pelo fluxo validado
+  site -> Blender (`otimizar.py`) -> Unity (`design/cenario/TRIPO-STUDIO.md`).
+- **Desempenho no Poco F4:** carregamento de 57 s para 11 s; APK de 542 MB para ~310 MB.
+- **Organizacao:** `roblox/` e `mobile-godot/` sairam da arvore (seguem no historico do git);
+  o build guarda so o APK atual.
+
 ## Nao publicado - 2026-09-09 - o produto e' Unity; o desvio Steam/Unreal foi desfeito
 
 - **Decisao do Diretor:** o ARKANA volta a ser jogo de celular e passa a ser

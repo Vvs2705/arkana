@@ -108,6 +108,8 @@ public static class Textos { /* rotulos da HUD e do menu, em portugues: ArmaRotu
 
 ## Como o Godot resolveu (leitura obrigatoria da raia)
 
+(Histórico: a pasta `mobile-godot/` saiu da árvore em 01/10/2026; ler com
+`git show <commit-anterior>:mobile-godot/godot/<pasta>/<arquivo>.gd`.)
 `mobile-godot/godot/<pasta>/*.gd` e o `selftest.gd` da pasta: o selftest diz O
 QUE se cobra. O teste EditMode novo cobra os MESMOS invariantes, em C#. Nao se
 traduz linha a linha: se le' a decisao em `design/`, se olha como o Godot fez,

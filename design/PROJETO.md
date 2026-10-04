@@ -286,7 +286,7 @@ rotas S01–S16 físicas, pontos de início por time, linhas claras em cruz no m
 ### 25/09: nova visão da ilha (Documento Mestre, 4,8 km) + Unity ao vivo pelo MCP
 
 **Decisões do Diretor (25/09) — substituem as anteriores sobre a ilha:**
-- A ilha segue o **Documento Mestre** (`C:\Users\VINICIUS\Downloads\ARKANA_Documento_Mestre_Blender.md`, v1.0): **4.800 × 4.400 m**,
+- A ilha segue o **Documento Mestre** (`design/cenario/DOCUMENTO-MESTRE.md`, v1.0): **4.800 × 4.400 m**,
   12 regiões, subterrâneo; **Zona Industrial e Base Militar entram no mundo**. Substitui a ilha de 600 m e o plano de 2,4 km (27/08).
 - Referência de formato: **PUBG Mobile**. **Times de 3**, média de **40–60 personagens** (13–20 times) → início por TIME, 300 m entre times.
 - Tamanho **não** se decide medindo FPS (o mapa inteiro só é visto de cima; em jogo a câmera 3ª pessoa desenha só a tela).

@@ -89,3 +89,6 @@ arte/cenario/documento-mestre/*.blend1
 
 # pacotes CC0 baixados por arte/tools/cc0.py (grandes, reproduziveis)
 arte/cenario/cc0/
+
+# Trava local do Claude Code
+.claude/scheduled_tasks.lock

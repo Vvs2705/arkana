@@ -11,9 +11,7 @@ ARKANA/
 ├── design/        ← A DECISÃO. Não tem engine, não tem código.
 ├── arte/          ← A MATÉRIA-PRIMA. .glb, .png, .wav e as ferramentas que produzem.
 │
-├── mobile-unity/  ← O PRODUTO (Unity 6, Android). Ver mobile-unity/00-LEIA.md.
-├── mobile-godot/  ← REFERÊNCIA. O jogo que funcionou em Godot; a fonte da reescrita. Sai quando o Unity o alcançar.
-└── roblox/        ← O projeto-mãe. Intocado.
+└── mobile-unity/  ← O PRODUTO (Unity 6, Android). Ver mobile-unity/00-LEIA.md.
 ```
 
 **A regra, decidida pelo Diretor em 27/08/2026 e mantida em 09/09:**
@@ -21,9 +19,9 @@ ARKANA/
 > `design/` e `arte/` **alimentam as implementações**.
 > As implementações **nunca cruzam código entre si.**
 
-O GDScript do Godot **não se traduz** para C#: se relê a decisão em `design/`,
-se olha como o Godot resolveu, e se escreve de novo em Unity. O que atravessa
-é a decisão, a arte e o **número medido**.
+As versões anteriores (protótipo em Roblox e o jogo em Godot que serviu de
+referência para a reescrita) saíram da árvore em 01/10/2026 e seguem no
+**histórico do git** (`git log -- roblox mobile-godot`).
 
 ---
 
@@ -45,8 +43,6 @@ sobrou daquele desvio está registrado em `design/PROJETO.md` como lição.
 | **`design/`** | GDD, kits, dano, elenco, moeda, fichas dos 20 magos, estudo da Zona, referências, infra | **Fonte da verdade.** Muda aqui primeiro, implementa depois. Nunca o contrário |
 | **`arte/`** | concepts, `.glb`, áudio, prompts e `tools/` (Meshy, Blender) | Matéria-prima, não produto. Nada aqui é específico de engine |
 | **`mobile-unity/`** | o jogo | Unity 6000.3, URP, Android. Portão: testes do Unity Test Framework em `-batchmode` |
-| **`mobile-godot/`** | o jogo anterior, 12 autotestes verdes, orçamento medido | **Referência de leitura.** Não recebe feature. Apaga-se quando o Unity alcançar a paridade |
-| **`roblox/`** | o projeto-mãe | Intocado |
 
 ---
 
@@ -56,14 +52,17 @@ sobrou daquele desvio está registrado em `design/PROJETO.md` como lição.
 CONTINUAR DAQUI sempre no topo. É o único arquivo que precisa ser lido para saber
 onde as coisas estão.
 
-## Estado (12/09/2026)
+## Estado (04/10/2026)
 
 | | |
 |---|---|
 | **Plataforma alvo** | Android (aparelho de teste: Poco F4) |
-| **Engine** | Unity 6000.3.23f1, instalado com o módulo Android |
-| **mobile-unity** | existe desde 09/09: núcleo, mundo, partida, bots, kits, terreno, HUD, menu, áudio e o visual (shaders próprios, grama, kit de cenário, loot/baú/tempestade/efeitos) reescritos; portão headless verde (420 testes), fotos do jogo rodando (`foto.ps1`) e **APK jogado no Poco F4 a 60 FPS** (12/09) |
-| **mobile-godot** | referência, 12/12 autotestes verdes na última execução (04/09) |
-| **Rede** | **não existe.** É o item mais caro e ainda não começou |
-| **Elenco** | **os 20 magos reais no jogo, todos com kit** (12/09): feitos no site da Meshy com três vistas, rig humanoide na altura da ficha e 11 clipes cada (`Resources/magos/`); falta medir no aparelho |
-| **Cenário** | 15 peças do kit com topologia fechada (remesh do site, 10 K): as 8 de antes, mais arco partido, coluna-braseiro, estátua-vigia e torre arcana, e o **Altar de Sintonia** montado no vale; castelo mantido |
+| **Engine** | Unity 6000.3.23f1 (URP), com o módulo Android |
+| **Ilha** | a do **Documento Mestre** ([`design/cenario/DOCUMENTO-MESTRE.md`](design/cenario/DOCUMENTO-MESTRE.md)): 4,8 × 4,4 km, 12 regiões, zona industrial, base militar e subterrâneo, montada por código em `mobile-unity/Assets/_Arkana/Scripts/World/IlhaMestre*.cs` |
+| **Arte 3D** | kit geométrico por script no Blender (`arte/tools/blender/`) + peças orgânicas geradas no Tripo Studio e otimizadas no Blender ([`design/cenario/TRIPO-STUDIO.md`](design/cenario/TRIPO-STUDIO.md)) |
+| **Elenco** | os 20 magos no jogo, com kit e 11 clipes cada (`Resources/magos/`) |
+| **Testes** | Unity Test Framework em `-batchmode` (`mobile-unity/portao.ps1`): 526 testes EditMode + PlayMode verdes |
+| **Rede** | **ainda não existe** — é o item mais caro do roadmap |
+
+O histórico detalhado de cada fase, com o que falta, está em
+[`design/PROJETO.md`](design/PROJETO.md) (seção CONTINUAR DAQUI).
