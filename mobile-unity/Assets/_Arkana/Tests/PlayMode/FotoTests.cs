@@ -496,6 +496,11 @@ namespace Arkana.Tests
             float alto = Mathf.Max(m.Altura, 0.8f);
             Vector3 olho = p + new Vector3(-0.55f, 0.62f, 1f).normalized * (alto * 2.3f + 1.2f) + Vector3.up * alto * 0.15f;
             Camera cam = CameraTemporaria("CamFotoMecanim", olho, p + Vector3.up * alto * 0.5f, Color.gray);
+            // a CAMERA DO JOGO (atras do ombro direito, um pouco acima — CameraLogica na escala do mago): e' assim que o Diretor ve'
+            float k = alto / 1.8f;
+            Vector3 ombro = p + Vector3.up * (Arkana.Gameplay.CameraLogica.ALTURA_PIVO * k) + Vector3.right * (Arkana.Gameplay.CameraLogica.OMBRO_X * k);
+            Vector3 atras = ombro - Quaternion.Euler(Arkana.Gameplay.CameraLogica.PITCH_PADRAO * Mathf.Rad2Deg, 0f, 0f) * Vector3.forward * (Arkana.Gameplay.CameraLogica.BRACO * 0.75f * k + 0.6f);
+            Camera camJogo = CameraTemporaria("CamFotoMecanimJogo", atras, ombro + Vector3.forward * 6f * k - Vector3.up * 1.2f * k, Color.gray);
 
             float v = Arkana.Core.Balance.Player.Speed;
             var quadros = new (string nome, string pedido, Vector3 vel, string extra)[]
@@ -510,8 +515,10 @@ namespace Arkana.Tests
             const int cw = 400, ch = 560, colunas = 6;
             int linhas = (quadros.Length + colunas - 1) / colunas;
             var folha = new Texture2D(cw * colunas, ch * linhas, TextureFormat.RGB24, false);
+            var folhaJogo = new Texture2D(cw * colunas, ch * linhas, TextureFormat.RGB24, false);
             var rt = new RenderTexture(cw, ch, 24, RenderTextureFormat.ARGB32);
             cam.targetTexture = rt;
+            camJogo.targetTexture = rt;
             var diag = new System.Text.StringBuilder("60-mecanim-" + slug + ":");
             for (int i = 0; i < quadros.Length; i++)
             {
@@ -528,12 +535,19 @@ namespace Arkana.Tests
                 cam.Render();
                 RenderTexture.active = rt;
                 folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (linhas - 1 - i / colunas) * ch);
+                camJogo.Render();
+                folhaJogo.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (linhas - 1 - i / colunas) * ch);
                 RenderTexture.active = null;
                 diag.Append(" " + q.nome + "[" + m.Estado() + "]");
             }
             folha.Apply();
             Directory.CreateDirectory(Pasta);
             File.WriteAllBytes(Path.Combine(Pasta, "60-mecanim-" + slug + ".png"), folha.EncodeToPNG());
+            folhaJogo.Apply();
+            File.WriteAllBytes(Path.Combine(Pasta, "61-mecanim-jogo-" + slug + ".png"), folhaJogo.EncodeToPNG());
+            camJogo.targetTexture = null;
+            Object.Destroy(folhaJogo);
+            Object.Destroy(camJogo.gameObject);
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), diag + "\n");
             cam.targetTexture = null;
             Object.Destroy(folha);
