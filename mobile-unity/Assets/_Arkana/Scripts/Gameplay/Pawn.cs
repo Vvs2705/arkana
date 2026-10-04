@@ -22,6 +22,8 @@ namespace Arkana.Gameplay
         public const float ALTURA_MAO = 1.4f;
         public const float SAIDA_TIRO = 0.9f;
         public const float GESTO_CAST_S = 0.3f;
+        /// <summary>s que o gesto da tatica/suprema segura a pose pedida (o Mecanim segura o tronco por Balance.Anim.KitSeguraS).</summary>
+        public const float GESTO_KIT_S = 0.6f;
         public static readonly Color TINT_MORTO = new Color(0.25f, 0.25f, 0.3f);
         /// <summary>Os estados de corpo que a percepcao do bot le' (IConjurador.AplicarEstado).</summary>
         public const string INVISIVEL = "invisivel", PENUMBRA = "penumbra", SEM_PASSOS = "sem_passos";
@@ -188,11 +190,21 @@ namespace Arkana.Gameplay
         void OnEnable()
         {
             Bus.WeaponEquipped += AoEquipar;
+            Bus.DamageApplied += AoDano;
         }
 
         void OnDisable()
         {
             Bus.WeaponEquipped -= AoEquipar;
+            Bus.DamageApplied -= AoDano;
+        }
+
+        /// <summary>Golpe recebido: o tronco acusa o lado de onde veio (so' no Mecanim; o flash do corpo segue no VisualDoImpacto).</summary>
+        private void AoDano(IEntidade alvo, float dano, Elemento el, IEntidade fonte, bool emEscudo)
+        {
+            if (!ReferenceEquals(alvo, this) || Visual == null || !(dano > 0f)) return;
+            Vector3 de = fonte != null ? fonte.Pos - transform.position : transform.forward;
+            Visual.Golpe(transform.InverseTransformDirection(de));
         }
 
         void OnDestroy()
@@ -340,6 +352,13 @@ namespace Arkana.Gameplay
         private void Pernas(float dt)
         {
             if (Visual == null) return;
+            if (Visual.Mecanim)
+            {
+                // a biblioteca do Mixamo tem strafe e recuo de verdade (blend pela velocidade no corpo): sem girar o visual
+                _pernasYaw = 0f; _recuando = false; Visual.Torcao = 0f;
+                Visual.transform.localRotation = Quaternion.Euler(0f, 0f, -Loc.Bank * Mathf.Rad2Deg);
+                return;
+            }
             float alvo = 0f;
             Vector3 v = Loc.Vel;
             bool andando = Mirando && !Agua.Nadando && !Derrubado.Esta(this) && new Vector2(v.x, v.z).magnitude > Balance.Move.RunAnimExit;
@@ -424,6 +443,7 @@ namespace Arkana.Gameplay
         private void Tocar(string clipe)
         {
             if (Visual == null) return;
+            Visual.VelocidadeLocal = transform.InverseTransformDirection(Loc.Vel);   // a passada do Mecanim: frente, tras e lados
             if (clipe != Clipe) { Clipe = clipe; Visual.Play(clipe); }
             Visual.SetVelocidade(VelocidadeHorizontal);   // fim da patinacao: o Mago cadencia a passada pela velocidade real
         }
@@ -481,8 +501,16 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>TATICA / SUPREMA: quem decide (cooldown, carga, telegrafia) e' o KitRunner; aqui so' o corpo pode agir.</summary>
-        public bool UsarTatica() => PodeAgir && PodeConjurar && Runner != null && Runner.UsarTatica();
-        public bool UsarSuprema() => PodeAgir && PodeConjurar && Runner != null && Runner.UsarSuprema();
+        public bool UsarTatica() => Kit(PodeAgir && PodeConjurar && Runner != null && Runner.UsarTatica(), "tatica");
+        public bool UsarSuprema() => Kit(PodeAgir && PodeConjurar && Runner != null && Runner.UsarSuprema(), "suprema");
+
+        /// <summary>A tatica e a suprema MOVEM O CORPO (antes so' o tiro basico pedia gesto — achado de 24/09): magia de duas
+        /// maos no Mecanim, o cast de sempre no legado. Quem decide e' o KitRunner; o gesto so' mostra.</summary>
+        private bool Kit(bool usou, string gesto)
+        {
+            if (usou) Gesto(gesto, GESTO_KIT_S);
+            return usou;
+        }
 
         /// <summary>Do chao, na altura do FatorDePulo (a mola do Fizz). Conta a decolagem: o kit ve' pela borda de Pulos.</summary>
         public bool Pular()

@@ -254,6 +254,20 @@ namespace Arkana.Core
             /// <summary>MEDIDO no Running do 01-pyra.fbx (quadro 12 de 16): os dois pes fora do chao, joelho da frente erguido,
             /// pe' de tras alto. E' o quadro que o mago SEM o Regular_Jump segura no ar (o pulo de reserva).</summary>
             public const float PuloReservaT = 0.46f;
+
+            // ---- MECANIM / MIXAMO (04/10/2026, design/pipeline/MIXAMO.md) ----
+            /// <summary>KNOB: o Mecanim (biblioteca do Mixamo) vale para os 20 magos; false = so' o Validation Set (Fizz,
+            /// Corvomante, Basalto). Sem o controller ou com o Avatar invalido, o mago cai no legado sozinho.</summary>
+            public const bool MecanimEmTodos = true;
+            /// <summary>KNOB: teto da cadencia da passada acima do clipe mais rapido. A corrida do jogo (7,5 m/s) passa do
+            /// sprint do Mixamo (4,7 m/s num humano de 1,8 m): ate' aqui as pernas aceleram, dai' para cima o pe' escorrega.
+            /// AUMENTAR = pernas frenéticas no mago pequeno; DIMINUIR = mais patinacao.</summary>
+            public const float CadenciaMax = 2.2f;
+            /// <summary>KNOB: a magia de 1 mao (Standing 1H Magic Attack 01, 2,3 s) comeca nesta fracao do clipe (a mao ja'
+            /// indo a frente: o projetil sai no toque, nao no fim de uma preparacao) e toca nesta velocidade.</summary>
+            public const float CastInicioN = 0.22f, CastVel = 1.6f;
+            /// <summary>s que o gesto do tronco segura antes de soltar a camada (magia, tatica, suprema, golpe).</summary>
+            public const float CastSeguraS = 0.55f, KitSeguraS = 0.9f, GolpeSeguraS = 0.35f;
         }
 
         public static class Touch

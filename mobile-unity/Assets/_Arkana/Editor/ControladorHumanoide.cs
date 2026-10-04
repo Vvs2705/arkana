@@ -3,6 +3,7 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using Arkana.Core;
 
 namespace Arkana.EditorTools
 {
@@ -37,6 +38,22 @@ namespace Arkana.EditorTools
             { "GolpeFrente", "standing-react-small-from-front" }, { "GolpeTras", "standing-react-small-from-back" },
             { "GolpeEsq", "standing-react-small-from-left" }, { "GolpeDir", "standing-react-small-from-right" },
         };
+
+        /// <summary>Velocidade de cada estado (o gesto cabe no tempo do jogo; levantar e pegar nao seguram o corpo).</summary>
+        public static float Velocidade(string estado)
+        {
+            switch (estado)
+            {
+                case "Cast": return Balance.Anim.CastVel;
+                case "Tatica": return 1.5f;
+                case "Suprema": return 1.3f;
+                case "Levantar": return 2f;
+                case "Pegar": return 2.5f;
+                case "Derrubado": return 1.3f;
+                case "Pouso": return 1.4f;
+                default: return estado.StartsWith("Golpe") ? 1.6f : 1f;
+            }
+        }
 
         /// <summary>A passada: (clipe, velocidade de reserva no corpo em m/s normalizados, direcao). A posicao no blend e' a
         /// velocidade de raiz MEDIDA no clipe; a reserva so' vale se o clipe vier parado no lugar.</summary>
@@ -104,13 +121,19 @@ namespace Arkana.EditorTools
             {
                 AnimatorState s = sm.AddState(Base[i, 0]);
                 s.motion = Exigir(Base[i, 1], rel);
+                s.speed = Velocidade(Base[i, 0]);
                 if (Base[i, 0] == "Rastejar") { s.speedParameterActive = true; s.speedParameter = "Cadencia"; }
             }
 
             var trc = new AnimatorStateMachine { name = "Tronco", hideFlags = HideFlags.HideInHierarchy };
             AssetDatabase.AddObjectToAsset(trc, ac);
             trc.defaultState = trc.AddState("Vazio");
-            for (int i = 0; i < Tronco.GetLength(0); i++) trc.AddState(Tronco[i, 0]).motion = Exigir(Tronco[i, 1], rel);
+            for (int i = 0; i < Tronco.GetLength(0); i++)
+            {
+                AnimatorState s = trc.AddState(Tronco[i, 0]);
+                s.motion = Exigir(Tronco[i, 1], rel);
+                s.speed = Velocidade(Tronco[i, 0]);
+            }
             // peso 0: o MagoMecanim acende a camada so' enquanto ha' gesto (estado vazio numa camada Override nao e' "nada")
             ac.AddLayer(new AnimatorControllerLayer
             {

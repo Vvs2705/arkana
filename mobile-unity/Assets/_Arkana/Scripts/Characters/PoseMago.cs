@@ -292,7 +292,8 @@ namespace Arkana.Characters
                 "running_forward", "locomotion_run", "sprint", "jog", "fast_run", "walk", "Walking" } },
             { Clipe.Cast, new[] { "cast", "Spellcast", "Spell Cast", "spell_cast", "casting", "magic_cast",
                 "Attack", "attack1", "Standing 1H Magic Attack", "magic_attack", "shoot", "fireball",
-                "Armature|Cast", "Armature|Attack", "mage_soell_cast", "mage_spell_cast", "Mage Spell Cast" } },
+                "Armature|Cast", "Armature|Attack", "mage_soell_cast", "mage_spell_cast", "Mage Spell Cast",
+                "tatica", "suprema" } },   // o gesto do kit: no legado e' o cast; o Mecanim tem magia de duas maos (MagoMecanim.Gesto)
             { Clipe.Cair, new[] { "cair", "fall", "Fall1", "falling", "freefall", "free_fall", "skydive", "Skydiving", "air", "jump_loop" } },
             // o UUID e' o "Planar Arkana" (Texto para Movimento na conta da Meshy, 12/09): o FBX grava a take com o id.
             // NAO usar o "Planar horizontal v2" (01a040ba-...): mergulha de cabeca para baixo — o Diretor reprovou.

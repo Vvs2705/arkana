@@ -18,7 +18,10 @@ namespace Arkana.Tests
         {
             // o Mago instancia materiais (o tint de um bot nao pinta o player); no EditMode isso loga erro
             UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;
-            return Mago.Criar(null, slug);
+            // estes testes sao do caminho de RESERVA (Animation legado); o Mecanim tem os dele (Mecanim_*)
+            MagoMecanim.ForcarLegado = true;
+            try { return Mago.Criar(null, slug); }
+            finally { MagoMecanim.ForcarLegado = false; }
         }
 
         static Vector3 Em(AnimationCurve[] eixo, float t, Vector3 rep) => new Vector3(
@@ -187,9 +190,12 @@ namespace Arkana.Tests
                 GameObject g = Object.Instantiate(prefab);
                 try
                 {
+                    // o braco MEDIDO no bind, antes da T-pose forcada que o Construir aplica
+                    EsqueletoHumano.PoseDeBind(g.GetComponentInChildren<SkinnedMeshRenderer>(true));
+                    float braco = EsqueletoHumano.BracoAbaixoDaHorizontal(g.transform);
                     Avatar av = EsqueletoHumano.Construir(g, out string faltando);
                     bool ok = av != null && av.isValid && av.isHuman;
-                    float braco = EsqueletoHumano.BracoAbaixoDaHorizontal(g.transform);
+                    Assert.Less(Mathf.Abs(EsqueletoHumano.BracoAbaixoDaHorizontal(g.transform)), 1f, slug + ": a T-pose forcada deixa o braco na horizontal");
                     linhas.AppendLine(slug + " | " + (ok ? "OK" : "FALHOU " + faltando) + " | " + braco.ToString("F0"));
                     if (!ok) falhas.Add(slug + (faltando != null ? " (sem " + faltando + ")" : ""));
                     if (av != null) Object.DestroyImmediate(av);
@@ -211,6 +217,129 @@ namespace Arkana.Tests
             Transform baseDaColuna = EsqueletoHumano.Osso(prefab.transform, "Spine02");
             Assert.AreSame(hips, baseDaColuna.parent, "a base da coluna e' o Spine02 (o Spine e' o topo): o mapa automatico erraria");
             Assert.IsNull(EsqueletoHumano.Osso(prefab.transform, "pine02"), "nome exato: nada de 'contem'");
+        }
+
+        // ------------------------------------------------------------------ 04/10: o Mecanim (biblioteca do Mixamo)
+
+        static Mago CriarMecanim(string slug)
+        {
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;   // o Mago instancia materiais no EditMode
+            return Mago.Criar(null, slug);
+        }
+
+        [Test]
+        public void Mecanim_ValidationSet_VesteOAvatarHumano_EOLegadoFicaDeReserva()
+        {
+            Assert.IsNotNull(MagoMecanim.Ctrl(), "o controller mixamo-mago existe em Resources");
+            foreach (string slug in ValidationSet)
+            {
+                Mago m = CriarMecanim(slug);
+                try
+                {
+                    Assert.IsTrue(m.Mecanim, slug + ": o Mecanim assumiu");
+                    Animator a = m.Humanoide.Animador;
+                    Assert.IsTrue(a.avatar != null && a.avatar.isValid && a.avatar.isHuman, slug + ": Avatar humano valido");
+                    Assert.IsFalse(a.applyRootMotion, slug + ": quem anda e' o Pawn, nao o clipe");
+                    Animation legado = m.GetComponentInChildren<Animation>(true);
+                    Assert.IsNotNull(legado, slug + ": o legado continua no modelo (reserva)");
+                    Assert.IsFalse(legado.enabled, slug + ": desligado — dois sistemas nao escrevem no mesmo osso");
+                    Assert.AreEqual("external:magos/" + slug, m.Fonte);
+                }
+                finally { Object.DestroyImmediate(m.gameObject); }
+            }
+        }
+
+        [Test]
+        public void Mecanim_OPedidoDoPawnViraOEstadoCerto_EAMagiaVaiNoTronco()
+        {
+            Mago m = CriarMecanim("05-corvomante");
+            try
+            {
+                MagoMecanim h = m.Humanoide;
+                m.Play("run");
+                Assert.AreEqual("Locomocao", h.Base);
+                m.Play("andar_tras");
+                Assert.AreEqual("Locomocao", h.Base, "recuo e strafe sao o MESMO blend (velocidade no corpo)");
+                m.Play("cast");
+                Assert.AreEqual("Cast", h.GestoAtual);
+                Assert.AreEqual("Locomocao", h.Base, "a magia vai no tronco: as pernas seguem a passada");
+                Assert.IsTrue(m.CastNoTronco);
+                m.Play("tatica");
+                Assert.AreEqual("Tatica", h.GestoAtual, "a tatica tem magia de duas maos");
+                m.Golpe(Vector3.left);
+                Assert.AreEqual("Tatica", h.GestoAtual, "o golpe nao corta a magia em curso");
+                m.Play("pular");
+                Assert.AreEqual("Pulo", h.Base);
+                m.Play("cair");
+                Assert.AreEqual("Ar", h.Base);
+                m.Play("derrubado");
+                Assert.AreEqual("Derrubado", h.Base);
+                m.Play("derrubado");
+                Assert.AreEqual("Derrubado", h.Base, "repetir o pedido nao reinicia a queda");
+                m.Play("idle");
+                Assert.AreEqual("Levantar", h.Base, "reerguido: levanta antes da passada");
+                m.Play("nadar");
+                Assert.AreEqual("Boiar", h.Base);
+                Assert.IsTrue(m.TemClipe("pegar"));
+            }
+            finally { Object.DestroyImmediate(m.gameObject); }
+        }
+
+        [Test]
+        public void Mecanim_GolpeVemDoLadoCerto()
+        {
+            Mago m = CriarMecanim("16-fizz");
+            try
+            {
+                m.Golpe(new Vector3(-3f, 0f, 1f));
+                Assert.AreEqual("GolpeEsq", m.Humanoide.GestoAtual);
+                m.Humanoide.Tick(Arkana.Core.Balance.Anim.GolpeSeguraS + 0.01f);
+                Assert.AreEqual("", m.Humanoide.GestoAtual, "o tranco solta a camada sozinho");
+                m.Golpe(new Vector3(0f, 0f, -2f));
+                Assert.AreEqual("GolpeTras", m.Humanoide.GestoAtual);
+            }
+            finally { Object.DestroyImmediate(m.gameObject); }
+        }
+
+        [Test]
+        public void Mecanim_PassadaAcimaDoSprint_ViraCadencia_ComTeto_ESemNaN()
+        {
+            Assert.AreEqual(4.7f, MagoMecanim.MaxNaDirecao(Vector2.up), 1e-3f);
+            Assert.AreEqual(3.1f, MagoMecanim.MaxNaDirecao(Vector2.down), 1e-3f);
+            Assert.AreEqual(3.5f, MagoMecanim.MaxNaDirecao(Vector2.right), 1e-3f);
+            Mago m = CriarMecanim("18-basalto");
+            try
+            {
+                MagoMecanim h = m.Humanoide;
+                m.Play("run");
+                h.VelocidadeLocal = new Vector3(0f, 0f, Arkana.Core.Balance.Player.Speed);
+                m.Tick(1f / 60f);
+                Assert.That(h.Cadencia, Is.InRange(1f, Arkana.Core.Balance.Anim.CadenciaMax), "a corrida do jogo passa do sprint: a perna acelera, com teto");
+                h.VelocidadeLocal = new Vector3(float.NaN, 0f, 1f);
+                m.Tick(1f / 60f);
+                Assert.IsFalse(float.IsNaN(h.Cadencia), "NaN do corpo nao chega no Animator");
+            }
+            finally { Object.DestroyImmediate(m.gameObject); }
+        }
+
+        [Test]
+        public void Mecanim_Controller_TemOsClipesDoMixamo_LacosCertos_SemClipeVazio()
+        {
+            RuntimeAnimatorController c = MagoMecanim.Ctrl();
+            Assert.IsNotNull(c);
+            var nomes = new System.Collections.Generic.HashSet<string>();
+            foreach (AnimationClip a in c.animationClips)
+            {
+                Assert.Greater(a.length, 0.1f, a.name + ": clipe vazio");
+                Assert.IsTrue(a.isHumanMotion, a.name + ": humanoide");
+                nomes.Add(a.name);
+                bool laco = a.name.Contains("walk") || a.name.Contains("run-") || a.name.Contains("sprint") || a.name == "standing-idle"
+                    || a.name == "queda-no-ar" || a.name == "rastejar" || a.name == "boiar";
+                Assert.AreEqual(laco, a.isLooping, a.name + ": laco");
+            }
+            foreach (string obrigatorio in new[] { "standing-idle", "standing-run-forward", "standing-run-left", "standing-run-right",
+                         "standing-run-back", "standing-walk-left", "standing-1h-magic-attack-01", "standing-jump-running", "queda-no-ar", "derrubado" })
+                Assert.IsTrue(nomes.Contains(obrigatorio), "falta " + obrigatorio);
         }
     }
 }

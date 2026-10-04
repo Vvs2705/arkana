@@ -78,12 +78,35 @@ namespace Arkana.Characters
             };
         }
 
-        /// <summary>Monta o Avatar humano do modelo (pose de bind + mapa). Null = o rig nao fecha (falta osso).</summary>
+        /// <summary>Monta o Avatar humano do modelo (pose de bind + T-pose forcada + mapa). Null = o rig nao fecha (falta osso).</summary>
         public static Avatar Construir(GameObject modelo, out string faltando)
         {
             PoseDeBind(modelo.GetComponentInChildren<SkinnedMeshRenderer>(true));
+            ForcarTPose(modelo.transform);
             HumanDescription? d = Descricao(modelo.transform, out faltando);
             return d.HasValue ? AvatarBuilder.BuildHumanAvatar(modelo, d.Value) : null;
+        }
+
+        /// <summary>
+        /// T-POSE FORCADA (o "Enforce T-Pose" do importador, feito em runtime): braco e antebraco na horizontal, para fora
+        /// (o mago olha +Z: a esquerda e' -X). O Mixamo conta a partir da T-pose; Basalto (34 graus abaixo), Gromm (36),
+        /// Corvus (43) e Vitalis (72) vem de braco baixo no bind e o clipe sairia com o braco ~35 graus mais baixo.
+        /// </summary>
+        public static void ForcarTPose(Transform raiz)
+        {
+            Vector3 fora = raiz.right;
+            Alinhar(Osso(raiz, "LeftArm"), Osso(raiz, "LeftForeArm"), -fora);
+            Alinhar(Osso(raiz, "LeftForeArm"), Osso(raiz, "LeftHand"), -fora);
+            Alinhar(Osso(raiz, "RightArm"), Osso(raiz, "RightForeArm"), fora);
+            Alinhar(Osso(raiz, "RightForeArm"), Osso(raiz, "RightHand"), fora);
+        }
+
+        static void Alinhar(Transform osso, Transform filho, Vector3 alvo)
+        {
+            if (osso == null || filho == null) return;
+            Vector3 d = filho.position - osso.position;
+            if (d.sqrMagnitude < 1e-10f) return;
+            osso.rotation = Quaternion.FromToRotation(d, alvo) * osso.rotation;
         }
 
         /// <summary>Graus do braco (ombro -> cotovelo) abaixo da horizontal na pose atual: ~0 = T-pose (o Mixamo encaixa

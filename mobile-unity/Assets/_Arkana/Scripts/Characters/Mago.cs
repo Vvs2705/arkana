@@ -142,7 +142,13 @@ namespace Arkana.Characters
         /// <summary>(decolagem, pouso) em s dentro do take do pulo, medidos no proprio take; zero sem o take.</summary>
         public Vector2 FasesDoPulo { get; private set; }
         /// <summary>O gesto de conjurar esta' so' no tronco (pernas seguindo a passada)?</summary>
-        public bool CastNoTronco => _castTronco;
+        public bool CastNoTronco => _castTronco || (_mecanim != null && _mecanim.GestoAtual != "");
+        /// <summary>A biblioteca do Mixamo (Mecanim Humanoid) esta' tocando este mago? (MagoMecanim; senao legado/procedural)</summary>
+        public bool Mecanim => _mecanim != null;
+        public MagoMecanim Humanoide => _mecanim;
+        /// <summary>Velocidade do corpo no referencial DELE (x direita, z frente): a passada do Mecanim escolhe frente,
+        /// tras e lados por aqui. O Pawn escreve por quadro; o legado ignora.</summary>
+        public Vector3 VelocidadeLocal { set { if (_mecanim != null) _mecanim.VelocidadeLocal = value; } }
 
         /// <summary>O quadro em que a mao chega a frente. E' aqui que nasce o projetil.</summary>
         public event Action CastFired;
@@ -154,6 +160,8 @@ namespace Arkana.Characters
 
         // externo (Animation legado: o .glb importado como Legacy traz os clipes por nome; sem Controller asset)
         Animation _anim;
+        /// a biblioteca humanoide (Mixamo): quando existe, ela toca e o Animation legado fica desligado (reserva)
+        MagoMecanim _mecanim;
         readonly Dictionary<Clipe, string> _clipesExternos = new Dictionary<Clipe, string>();
         /// o cast numa copia na camada 1, misturada so' da coluna para cima (null = sem coluna: cast de corpo inteiro)
         string _castTroncoNome;
@@ -364,6 +372,12 @@ namespace Arkana.Characters
 
             MaoDireita = Osso(inst.transform, "hand", "r") ?? MaterialMago.Pivo(_rig, "MaoD", new Vector3(0.25f, 0.55f * alturaMalha, 0.2f));
             Cabeca = Osso(inst.transform, "head", null) ?? MaterialMago.Pivo(_rig, "Cabeca", new Vector3(0f, 0.9f * alturaMalha, 0f));
+            // MIXAMO (04/10): com o controller e o Avatar fechando, o Mecanim assume e o legado fica de reserva (desligado)
+            if (MagoMecanim.Ligado(Slug))
+            {
+                _mecanim = MagoMecanim.Montar(inst, Slug);
+                if (_mecanim != null) { anim.Stop(); anim.enabled = false; }
+            }
             return true;
         }
 
@@ -453,12 +467,14 @@ namespace Arkana.Characters
         {
             Clipe? c = PoseMago.Alias(nome);
             if (c == null) return false;
+            if (_mecanim != null) return true;
             return _anim == null || _clipesExternos.ContainsKey(c.Value);
         }
 
         /// <summary>Cast REINICIA sempre (disparo continuo); laco igual ao atual nao faz nada. Desconhecido avisa e ignora.</summary>
         public void Play(string nome)
         {
+            if (_mecanim != null && _mecanim.Gesto(nome)) return;   // tatica/suprema: gesto proprio no Mecanim (o legado toca o cast)
             Clipe? c = PoseMago.Alias(nome);
             if (c == null) { Debug.LogWarning("Mago: clipe desconhecido '" + nome + "'"); return; }
             Play(c.Value);
@@ -471,6 +487,7 @@ namespace Arkana.Characters
         /// </summary>
         public void Play(Clipe c)
         {
+            if (_mecanim != null) { _pedido = _clipe = c; _mecanim.Play(c); return; }
             if (c == Clipe.Cast && PodeCastNoTronco()) { IniciarCastTronco(0f, false); return; }
             if (_castTronco) EncerrarCastTronco();
             Tocar(c);
@@ -550,6 +567,7 @@ namespace Arkana.Characters
         public void SetVelocidade(float ms)
         {
             _ms = float.IsNaN(ms) ? 0f : Mathf.Abs(ms);
+            if (_mecanim != null) { _mecanim.Velocidade(_ms); return; }
             _correndo = PoseMago.Correndo(_correndo, _ms);
             if (_pedido == Clipe.Cast && _clipe == Clipe.Cast && _correndo && _castTroncoNome != null)
             {
@@ -567,6 +585,9 @@ namespace Arkana.Characters
         /// <summary>Parado = Idle; correndo = Run, ou AndarTras se o ultimo pedido foi recuar (o Pawn troca pelo nome).</summary>
         Clipe Locomocao() => !_correndo ? Clipe.Idle : _pedido == Clipe.AndarTras ? Clipe.AndarTras : Clipe.Run;
 
+        /// <summary>GOLPE recebido de `deLocal` (direcao da fonte no referencial do corpo). So' o Mecanim tem os clipes.</summary>
+        public void Golpe(Vector3 deLocal) { if (_mecanim != null) _mecanim.Golpe(deLocal); }
+
         /// <summary>Recolore o manto (bots reusam o modelo). No externo, todos os materiais.</summary>
         public void SetTint(Color cor)
         {
@@ -579,6 +600,7 @@ namespace Arkana.Characters
         public void Tick(float dt)
         {
             if (!(dt > 0f)) return;
+            if (_mecanim != null) { _mecanim.Tick(dt); return; }
             AnimationState st = _anim != null ? _anim[Real(_clipe)] : null;
             float vel = 1f;
             if (_clipe == Clipe.Run) vel = PoseMago.EscalaDeCorrida(_ms);
@@ -615,7 +637,7 @@ namespace Arkana.Characters
         /// </summary>
         void LateUpdate()
         {
-            if (_anim == null || _coluna.Length == 0) return;
+            if (_mecanim != null || _anim == null || _coluna.Length == 0) return;   // no Mecanim o strafe e' do clipe: sem torcao
             Vector3 cima = transform.up;
             float parte = Torcao / _coluna.Length;
             for (int i = 0; i < _coluna.Length; i++)
@@ -632,6 +654,7 @@ namespace Arkana.Characters
         /// <summary>Para o diag das fotos: o que foi pedido, o que toca, tempo/velocidade do estado e a torcao.</summary>
         public string Estado()
         {
+            if (_mecanim != null) return "pedido=" + _pedido + " " + _mecanim.Estado();
             string s = "pedido=" + _pedido + " toca=" + _clipe;
             if (_anim != null)
             {
