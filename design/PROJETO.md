@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 04/10/2026 (missão de recuperação: portão de verdade com PlayMode, movimento, mira, Humanoid validado, HUD configurável, instrumentação; GATE não passou — ver o 1º bloco do CONTINUAR DAQUI). Antes: 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
+> **Atualizado em:** 04/10/2026, tarde (Mixamo nos 20 magos pelo Mecanim, subir em obstáculo — bloco 13). Antes, 04/10 manhã (missão de recuperação: portão de verdade com PlayMode, movimento, mira, Humanoid validado, HUD configurável, instrumentação; GATE não passou — ver o 1º bloco do CONTINUAR DAQUI). Antes: 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,43 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — 04/10/2026, tarde (13): MIXAMO NOS 20 MAGOS + SUBIR EM OBSTÁCULO
+
+O Diretor autorizou o Mixamo pelo Chrome dele ("categoria fantasy… andar, correr, subir em obstáculos, lançar as magias").
+**Feito e no `main`:**
+
+- **77 clipes baixados** (conta Adobe do Diretor, X Bot, sem personagem, FBX for Unity, 30 fps) — Pro Magic Pack (56),
+  11 avulsos (obstáculo, beirada, queda, derrubado/levantar/rastejar, pegar, boiar) e a passada genérica (10: Unarmed +
+  Left/Right Strafe + Standard Sprint). Proveniência arquivo a arquivo em `design/pipeline/MIXAMO.md`.
+- **Mecanim Humanoid nos 20 magos** (`MagoMecanim`, `Balance.Anim.MecanimEmTodos = true`, vetável): Avatar montado em
+  runtime sobre o esqueleto da Meshy (`EsqueletoHumano`: coluna invertida mapeada, pose de bind, **T-pose forçada** —
+  Basalto/Gromm/Corvus/Vitalis vinham de braço baixo). O legado (Animation) fica DESLIGADO como reserva; sem modelo, o procedural.
+- **Strafe e recuo de verdade:** passada = blend 2D pela velocidade NO CORPO dividida pela escala humana (Fizz 0,39,
+  Corvomante 0,99, Basalto 1,29) — a passada casa com o chão em qualquer tamanho; acima do sprint a cadência acelera até
+  2,2×. Fim do giro de pernas + torção do tronco no Mecanim.
+- **Magia no tronco sem parar as pernas:** tiro = magia de 1 mão; **tática e suprema agora movem o corpo** (2 mãos);
+  golpe recebido acusa o lado de onde veio; pulo → ar → pouso; derrubado → rastejar → levantar; boiar; pegar.
+- **SUBIR EM OBSTÁCULO** (`Escalada`): 0,5–1,2 m o mago pula por cima apoiando a mão (correndo de encontro, sozinho, ou
+  com o SALTO); 1,2–2,2 m escala a beirada (com o SALTO, de frente); só se o corpo cabe em cima (sem teto); o caminho
+  sobe na frente da face e só depois avança — nunca cruza a parede. Knobs em `Balance.Move.Escalada*`.
+- **Validação:** folhas `60-mecanim-*` e `61-mecanim-jogo-*` (14 situações × Fizz/Corvomante/Basalto, câmera de 3/4 e
+  a do jogo); `DiagMecanim` provou o retarget por número (mesmas direções de braço no X Bot de origem e no mago).
+  Portão: **569 passaram, 0 falharam** (13 testes novos de Mecanim/escalada).
+
+**Decisões minhas (vetáveis):** passada genérica em vez da do pacote de mago (a do pacote joga o braço direito para trás
+e na câmera do jogo ele aparece erguido ao lado da cabeça — foto 61); Mecanim nos 20 de uma vez (os 20 fecham Avatar;
+o Validation Set passou na foto); vault automático ao correr de encontro; teto de cadência 2,2.
+
+**GATE atualizado:** strafe/recuo **PASSA** (clipes de verdade); 3 avatares no Mecanim **PASSA** (foto + teste); cast em
+movimento **PASSA**; pulo/queda/pouso **PASSA**; fallback **PASSA** (testes do legado forçam a reserva). Segue
+**BLOCKED_HARDWARE** a performance (custo do Animator Humanoid × 18 corpos não medido) e a patinação vista no aparelho.
+
+**CONTINUAR DAQUI (13):** (1) Poco no USB → instalar o APK novo → jogar: strafe, recuo, correr atirando, tática/suprema,
+pular por cima de cerca/rocha baixa, escalar beirada; ler `ARKANA CUSTO` (CPU/GPU) e comparar com 27/09. (2) Se o
+Animator pesar: `cullingMode` já corta transformações fora da tela; próximo corte é Mecanim só no jogador e nos bots
+perto. (3) Nado para a frente (só há boiar), mortes do pacote no lugar do deitar do `VisualDoAbate`, levantar no reviver.
+(4) Remover o legado (Animation + aliases da Meshy) quando os 20 passarem no aparelho. (5) O resto da fila do bloco (12).
 
 ### >>> COMECE POR AQUI — 04/10/2026 (12): missão de RECUPERAÇÃO — portão de verdade, movimento, mira, Humanoid e o GATE
 
