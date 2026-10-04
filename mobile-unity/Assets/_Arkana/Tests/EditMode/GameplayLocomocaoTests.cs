@@ -326,5 +326,48 @@ namespace Arkana.Tests
             for (int i = 0; i < 120; i++) Passo(meio, DIR * 0.5f);
             Assert.AreEqual(Balance.Player.Speed * 0.5f, meio.VelocidadeHorizontal, 1e-3f, "meio stick (ja' moldado) = meia velocidade");
         }
+
+        // ------------------------------------------------------------------ MOVEMENT LAB (04/10): a ficha do corpo
+
+        /// <summary>
+        /// O MOVEMENT LAB numerico (BLOCO B): simula o corpo com os knobs de hoje e grava a ficha em Logs/movimento.txt a cada
+        /// portao — o numero que o game feel discute (arranque, freio, inversao, pulo, esquiva, flutuar) sem abrir o editor.
+        /// Mudou um knob do Balance? A ficha muda junto e o diff conta a historia.
+        /// </summary>
+        [Test]
+        public void Bancada_FichaDoMovimento_EmLogs()
+        {
+            var f = new System.Text.StringBuilder("ARKANA MOVIMENTO (Locomocao a 60 Hz, knobs do Balance)\n");
+            void Linha(string nome, float v, string un) { Assert.IsFalse(float.IsNaN(v) || float.IsInfinity(v), nome); f.AppendLine(nome + " = " + v.ToString("F3") + " " + un); }
+
+            var l = new Locomocao(); float t = 0f;
+            while (l.VelocidadeHorizontal < Balance.Player.Speed - 0.001f && t < 3f) { Passo(l, DIR); t += DT; }
+            Linha("arranque 0 -> cheio", t, "s");
+            float d = 0f; t = 0f;
+            while (l.VelocidadeHorizontal > 0.001f && t < 3f) { d += Passo(l, Vector3.zero).x; t += DT; }
+            Linha("freio cheio -> 0", t, "s"); Linha("freio (distancia)", d, "m");
+            for (int i = 0; i < 120; i++) Passo(l, DIR);
+            t = 0f;
+            while (Vector3.Distance(l.VelH, -DIR * Balance.Player.Speed) > 0.01f && t < 3f) { Passo(l, -DIR); t += DT; }
+            Linha("inversao 180 graus", t, "s");
+            for (int i = 0; i < 120; i++) Passo(l, DIR);
+            t = 0f;
+            while (Vector3.Distance(l.VelH, Vector3.forward * Balance.Player.Speed) > 0.01f && t < 3f) { Passo(l, Vector3.forward); t += DT; }
+            Linha("curva 90 graus", t, "s");
+            Linha("pulo (topo)", TopoDoPulo(DT), "m");
+            Linha("pulo (tempo de voo)", Locomocao.TempoDeVoo(Balance.Player.JumpV), "s");
+            Linha("coyote", Balance.Move.CoyoteS, "s"); Linha("pulo guardado", Balance.Move.PuloGuardadoS, "s");
+            var e = new Locomocao(); e.Dodge(Vector3.forward); float z = 0f;
+            for (int i = 0; i < 60 && e.Esquivando; i++) z += Passo(e, Vector3.zero).z;
+            Linha("esquiva (distancia)", z, "m"); Linha("esquiva (duracao)", Balance.Dodge.Duration, "s");
+            Linha("esquiva (pico)", Locomocao.DashSpeedAt(0f), "m/s"); Linha("esquiva (recarga)", Balance.Dodge.Cooldown, "s");
+            Linha("esquiva (i-frames)", Balance.Dodge.Iframes, "s");
+            Linha("flutuar (teto)", Balance.Flutuar.DurMax, "s"); Linha("flutuar (descida)", Balance.Flutuar.DescV, "m/s");
+            Linha("flutuar (saldo de mana com a regen)", Balance.Player.ManaRegen - Balance.Flutuar.ManaPorS, "mana/s");
+            Linha("recuo mirando a 180 graus", Locomocao.FatorDeRecuo(180f), "x velocidade");
+            Linha("ladeira acompanhada correndo", Balance.Move.InclinacaoMax, "graus");
+            System.IO.Directory.CreateDirectory("Logs");
+            System.IO.File.WriteAllText("Logs/movimento.txt", f.ToString());
+        }
     }
 }
