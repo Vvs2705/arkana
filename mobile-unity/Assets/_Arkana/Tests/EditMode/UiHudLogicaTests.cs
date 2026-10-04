@@ -471,5 +471,23 @@ namespace Arkana.Tests
                 }
             }
         }
+
+        [Test]
+        public void Hitmarker_EscudoVidaEDerrubou_SaoDiferentes_EDerrubouDuraMais()
+        {
+            _h.Acertei(true);
+            Assert.AreEqual(HudLogica.TipoAcerto.Escudo, _h.UltimoAcerto);
+            _h.Acertei(false);
+            Assert.AreEqual(HudLogica.TipoAcerto.Vida, _h.UltimoAcerto);
+            _h.Derrubei();
+            Assert.AreEqual(HudLogica.TipoAcerto.Derrubou, _h.UltimoAcerto);
+            Assert.AreEqual(1f, _h.HitmarkerFrac, 1e-4f);
+            _h.Acertei(false);
+            Assert.AreEqual(HudLogica.TipoAcerto.Derrubou, _h.UltimoAcerto, "o dano do mesmo tiro nao apaga o derrubou");
+            _h.Tick(HudLogica.HitmarkerS + 0.01f);
+            Assert.Greater(_h.HitmarkerFrac, 0f, "derrubou fica na mira mais que o acerto comum");
+            _h.Tick(HudLogica.HitmarkerDerrubouS);
+            Assert.AreEqual(0f, _h.HitmarkerFrac, 1e-4f);
+        }
     }
 }

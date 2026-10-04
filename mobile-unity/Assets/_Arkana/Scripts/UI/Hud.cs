@@ -21,6 +21,10 @@ namespace Arkana.UI
         public const float KillFeedS = 4f;
         public const int KillFeedMax = 4;   // a casca tem uma linha fixa por abate: mudar aqui muda as duas
         public const float HitmarkerS = 0.16f;
+        /// <summary>s do hitmarker de DERRUBOU: mais longo que o acerto comum — e' a noticia da troca (04/10). KNOB.</summary>
+        public const float HitmarkerDerrubouS = 0.45f;
+        /// <summary>O que o ultimo acerto do jogador fez: o hitmarker muda de cor e tamanho (escudo / vida / derrubou).</summary>
+        public enum TipoAcerto { Vida, Escudo, Derrubou }
         /// <summary>Soma que conta como GOLPE GRANDE (cajado de terra, conducao, rajada somada): pula mais e esquenta para o branco.</summary>
         public const float NumeroGrande = 25f;
         /// <summary>O PULO do numero: nasce na escala de pico a cada golpe somado e assenta em 1 em PuloS. KNOB por foto.</summary>
@@ -37,6 +41,9 @@ namespace Arkana.UI
         public bool Armado { get; private set; }
         public bool CarrosselVisivel { get; private set; }
         public float Hitmarker { get; private set; }
+        public TipoAcerto UltimoAcerto { get; private set; }
+        /// <summary>1 = acabou de acertar, 0 = apagado (cada tipo com a sua duracao).</summary>
+        public float HitmarkerFrac => Hitmarker / (UltimoAcerto == TipoAcerto.Derrubou ? HitmarkerDerrubouS : HitmarkerS);
         public readonly List<Abate> KillFeed = new List<Abate>();
         /// <summary>Abates da partida inteira: o feed esquece em KillFeedS, a tela de fim nao.</summary>
         public int Abates { get; private set; }
@@ -125,7 +132,16 @@ namespace Arkana.UI
         /// <summary>Colocacao final: vencer = 1; cair com N bots de pe' = N + 1 (quem ainda esta' vivo ficou na frente).</summary>
         public static int Colocacao(bool vitoria, int botsVivos) => vitoria ? 1 : Mathf.Max(botsVivos, 0) + 1;
 
-        public void Acertei() { Hitmarker = HitmarkerS; }
+        /// <summary>O dano que chega JUNTO do derrubou (mesmo tiro) nao apaga o aviso de derrubou.</summary>
+        public void Acertei(bool emEscudo = false)
+        {
+            if (UltimoAcerto == TipoAcerto.Derrubou && Hitmarker > 0f) return;
+            Hitmarker = HitmarkerS;
+            UltimoAcerto = emEscudo ? TipoAcerto.Escudo : TipoAcerto.Vida;
+        }
+
+        /// <summary>O jogador DERRUBOU alguem: antes nao havia nenhum aviso para quem atirou (so' o eliminado tinha).</summary>
+        public void Derrubei() { Hitmarker = HitmarkerDerrubouS; UltimoAcerto = TipoAcerto.Derrubou; }
 
         /// <summary>Numero de dano por alvo: dentro de num_merge_s SOMA no mesmo numero (a manopla empilhava escada).</summary>
         public Numero RegistrarDano(int alvoId, float dano, Elemento el, bool emEscudo, out bool novo)
@@ -372,6 +388,8 @@ namespace Arkana.UI
         HudAviso _aviso;
         Image _reticulo;
         /// <summary>KNOB de leitura: branco = livre; vermelho-coral = inimigo vivo sob a mira (o tiro sai para ele).</summary>
+        /// <summary>Hitmarker por tipo: escudo no azul do numero de escudo; derrubou no coral do reticulo-no-alvo, maior.</summary>
+        static readonly Color HitEscudo = new Color32(0xCF, 0xE6, 0xFF, 255), HitDerrubou = new Color(1f, 0.32f, 0.26f, 1f);
         static readonly Color ReticuloLivre = new Color(1f, 1f, 1f, 0.8f), ReticuloNoAlvo = new Color(1f, 0.32f, 0.26f, 0.95f);
         Image[] _hitmarker;
         RectTransform _numeros;
@@ -1090,7 +1108,7 @@ namespace Arkana.UI
         {
             if (EhJogador(fonte) && !EhJogador(alvo))
             {
-                Logica.Acertei();
+                Logica.Acertei(emEscudo);
                 Marcas.Logica.Acertou(alvo);
                 if (_numerosDano && alvo != null) NumeroDano(alvo, dano, el, emEscudo);
             }
@@ -1286,7 +1304,11 @@ namespace Arkana.UI
             Carrossel.Visivel(Logica.CarrosselVisivel);
         }
 
-        void OnDerrubada(IEntidade e, IEntidade causador) { if (EhJogador(e)) Aviso.Derrubar(true); }
+        void OnDerrubada(IEntidade e, IEntidade causador)
+        {
+            if (EhJogador(e)) Aviso.Derrubar(true);
+            else if (EhJogador(causador)) Logica.Derrubei();   // quem derrubou ve' na mira
+        }
         void OnReerguida(IEntidade e, IEntidade por) { if (EhJogador(e)) Aviso.Derrubar(false); if (EhJogador(por)) Aviso.Resgatando = false; }
         void OnDerrubadoProgresso(IEntidade e, float esv, float reer) { if (!EhJogador(e)) Aviso.Resgatando = true; Aviso.Progresso(esv, reer); }
 
@@ -1383,8 +1405,16 @@ namespace Arkana.UI
             // o reticulo ACENDE com inimigo vivo sob a mira (a MarcasDeAlvo ja' sabia quem; o anel ficava branco igual)
             _reticulo.color = Marcas.Logica.SobAMira != null ? ReticuloNoAlvo : ReticuloLivre;
             // hitmarker
-            float a = Logica.Hitmarker / HudLogica.HitmarkerS;
-            for (int i = 0; i < 4; i++) { _hitmarker[i].enabled = a > 0f; _hitmarker[i].color = new Color(1, 1, 1, 0.85f * a); }
+            float a = Logica.HitmarkerFrac;
+            HudLogica.TipoAcerto tipo = Logica.UltimoAcerto;
+            Color ch = tipo == HudLogica.TipoAcerto.Derrubou ? HitDerrubou : tipo == HudLogica.TipoAcerto.Escudo ? HitEscudo : Color.white;
+            float eh = tipo == HudLogica.TipoAcerto.Derrubou ? 1.6f : 1f;
+            for (int i = 0; i < 4; i++)
+            {
+                _hitmarker[i].enabled = a > 0f;
+                _hitmarker[i].color = new Color(ch.r, ch.g, ch.b, 0.85f * a);
+                _hitmarker[i].rectTransform.localScale = new Vector3(eh, eh, 1f);
+            }
             // escudo piscando
             if (_escudoQuebrou > 0f) { _escudoQuebrou = Mathf.Max(_escudoQuebrou - dt, 0f); PintarEscudo(); }
             // rastro de dano das barras (parado nao toca em nada)

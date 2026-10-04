@@ -143,5 +143,36 @@ namespace Arkana.Tests
             Assert.AreEqual(55f, v.Hp, "...cheio");
             Assert.AreEqual(Balance.Player.Hp, Pawn.VidaDe("01-pyra").HpMax);
         }
+
+        [Test]
+        public void Atirar_TiroManaECadencia_ExatamenteUmaVez_NoCorpoDeVerdade()
+        {
+            // GATE (04/10): fire/mana/cooldown UMA vez, no Pawn.Atirar real (antes so' o caminho unico garantia, sem teste)
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;   // o Mago instancia materiais no EditMode
+            Pawn p = Pawn.Criar(null, "01-pyra", false);
+            try
+            {
+                p.Aterrar(Vector3.zero);
+                Assert.IsTrue(p.Slot.Equipar(Arma.VARINHA, null, Elemento.Fogo));
+                int disparos = 0;
+                Bus.Disparo += (a, o) => { if (ReferenceEquals(a, p)) disparos++; };
+                ArmaSpec spec = p.Slot.Spec(Elemento.Fogo);
+                float mana0 = p.Mana;
+                Assert.IsTrue(p.Atirar(Vector3.forward), "o 1o toque dispara");
+                Assert.IsFalse(p.Atirar(Vector3.forward), "o 2o toque no MESMO quadro: a cadencia barra");
+                Assert.AreEqual(1, disparos, "um projetil so'");
+                Assert.AreEqual(mana0 - spec.ManaCost, p.Mana, 1e-4f, "a mana foi cobrada uma vez");
+                p.Mana = 0f;
+                p.Tick(spec.FireRate * p.CadenciaMult + 0.01f);
+                p.Mana = spec.ManaCost * 0.5f;
+                Assert.IsFalse(p.Atirar(Vector3.forward), "sem mana para o tiro: nao sai, nem cobra");
+                Assert.AreEqual(spec.ManaCost * 0.5f, p.Mana, 1e-4f, "recusado nao cobra");
+                Assert.AreEqual(1, disparos);
+                p.Mana = Balance.Player.ManaMax;
+                Assert.IsTrue(p.Atirar(Vector3.forward), "passada a cadencia, com mana, sai o 2o");
+                Assert.AreEqual(2, disparos);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(p.gameObject); }
+        }
     }
 }
