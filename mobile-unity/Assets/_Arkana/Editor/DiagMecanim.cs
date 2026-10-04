@@ -1,6 +1,7 @@
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Playables;
 using Arkana.Characters;
 
 namespace Arkana.EditorTools
