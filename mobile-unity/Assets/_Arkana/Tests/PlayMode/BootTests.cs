@@ -76,6 +76,9 @@ namespace Arkana.Tests
             Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDosKits>(), "os kits tem quem desenhe");
             Assert.IsNotNull(Object.FindFirstObjectByType<Gameplay.VisualDoImpacto>(), "o acerto tem quem desenhe");
             Assert.IsNotNull(Object.FindFirstObjectByType<Arkana.Terrain.VisualDoTerreno>(), "o terreno tem quem desenhe");
+            // 04/10: na ilha do Documento Mestre o chao das zonas de combo era 0 (o mar) e a Sintonia sumia debaixo do terreno
+            Vector3 eu = main.Player.Pawn.Pos;
+            Assert.AreEqual(Ilha.AlturaDoChao(eu.x, eu.z), Gameplay.VisualDaSintonia.Chao(eu.x, eu.z), 0.05f, "a zona da Sintonia nasce no chao da ilha");
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -134,7 +137,8 @@ namespace Arkana.Tests
             Assert.AreSame(main.CameraDoMenu, Camera.main, "no menu quem filma e' a camera do menu");
             var mago = Object.FindFirstObjectByType<Arkana.Characters.Mago>();
             Assert.IsNotNull(mago, "o mago da vitrine existe no menu");
-            Vector2 pk = Ilha.Atual.Relevo.Pico;
+            // com a ilha do Documento Mestre o fundo do titulo e' o MIRANTE (27/09: o pico antigo caia dentro do lago)
+            Vector2 pk = Ilha.Atual.Mestre != null ? RelevoMestre.Mirante : Ilha.Atual.Relevo.Pico;
             Vector3 p = mago.transform.position;
             Assert.Less(Vector2.Distance(new Vector2(p.x, p.z), pk), 0.01f, "o mago esta' no pico");
             Assert.Less(Vector3.Distance(main.CameraDoMenu.transform.position, p), 8f, "a camera orbita perto dele");

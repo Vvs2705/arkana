@@ -1131,10 +1131,12 @@ namespace Arkana.Gameplay
         }
 
         /// <summary>O chao DESENHADO em (x, z) (memoria dos nos da malha); sem ilha, plano em y = 0.</summary>
-        static float Chao(float x, float z)
+        public static float Chao(float x, float z)
         {
             Relevo r = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
-            if (r == null) return 0f;
+            // ilha do Documento Mestre: o chao desenhado E' o Terrain (Ilha.AlturaDoChao). Devolvia 0 e as zonas dos combos
+            // nasciam na cota do mar, debaixo do chao (6-470 m): invisiveis desde 25/09 (achado de 04/10)
+            if (r == null) return Ilha.AlturaDoChao(x, z);
             if (_memo == null || _memo.Relevo != r) _memo = new ChaoDesenhadoMemo(r);
             return _memo.Altura(x, z);
         }

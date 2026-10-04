@@ -1,6 +1,10 @@
-# mobile-unity/portao.ps1 — O PORTAO: compila e roda os testes EditMode, headless.
-# Uso: powershell -File mobile-unity\portao.ps1
-# Sucesso e' a linha "ARKANA: N testes, 0 falhas" no fim. Qualquer falha sai com codigo 1.
+# mobile-unity/portao.ps1 — O PORTAO: compila e roda os testes EditMode e PlayMode, headless.
+# Uso: powershell -File mobile-unity\portao.ps1 [-Rapido]
+#   (padrao) COMPLETO: EditMode + PlayMode.   -Rapido: so' EditMode (logica pura, ~1 min).
+# A linha final separa PASSARAM / FALHARAM / IGNORADOS: teste ignorado NAO e' teste passado (04/10/2026: o portao
+# antigo dizia "620 testes, 9 falhas" com 86 ignorados dentro e ZERO PlayMode passando). Sai com 1 se algo falhar ou
+# se nada passar. As FOTOS (FotoTests) se ignoram sem GPU (-nographics): rodam pelo foto.ps1.
+param([switch]$Rapido)
 $ErrorActionPreference = "Stop"
 $Unity = "C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe"
 $Proj = $PSScriptRoot
@@ -41,15 +45,20 @@ function Passada([string]$Plataforma, [string]$Log, [string]$Xml) {
         Write-Host "FALHOU ($Plataforma): $($_.fullname)"
         Write-Host ($_.failure.message.'#cdata-section')
     }
+    # o motivo de cada ignorado, agrupado (classe + mensagem): um ignorado novo aparece aqui em vez de virar "passou"
+    $R.SelectNodes("//test-case[@result='Skipped']") | Group-Object { "$($_.classname.Split('.')[-1]): $($_.reason.message.'#cdata-section')" } |
+        ForEach-Object { Write-Host "  ignorado ($Plataforma) x$($_.Count) — $($_.Name)" }
     # Write-Host de proposito: dentro de function, string solta vira valor de RETORNO e some da tela.
-    Write-Host "  $Plataforma`: $([int]$Run.total) testes, $([int]$Run.failed) falhas (Unity exit $($P.ExitCode))"
-    return @([int]$Run.total, [int]$Run.failed)
+    Write-Host "  $Plataforma`: $([int]$Run.passed) passaram, $([int]$Run.failed) falharam, $([int]$Run.skipped) ignorados de $([int]$Run.total) (Unity exit $($P.ExitCode))"
+    return @([int]$Run.passed, [int]$Run.failed, [int]$Run.skipped)
 }
 
-$Edit = Passada "EditMode" (Join-Path $Logs "portao.log") (Join-Path $Logs "portao-resultados.xml")
-$Play = Passada "PlayMode" (Join-Path $Logs "portao-playmode.log") (Join-Path $Logs "portao-playmode-resultados.xml")
-$Total = $Edit[-2] + $Play[-2]
-$Falhas = $Edit[-1] + $Play[-1]
-"ARKANA: $Total testes, $Falhas falhas"
-if ($Falhas -gt 0 -or $Total -eq 0) { exit 1 }
+$Res = @(Passada "EditMode" (Join-Path $Logs "portao.log") (Join-Path $Logs "portao-resultados.xml"))
+if (-not $Rapido) {
+    $Play = @(Passada "PlayMode" (Join-Path $Logs "portao-playmode.log") (Join-Path $Logs "portao-playmode-resultados.xml"))
+    $Res = @($Res[-3] + $Play[-3], $Res[-2] + $Play[-2], $Res[-1] + $Play[-1])
+}
+$Passaram, $Falhas, $Ignorados = $Res[-3], $Res[-2], $Res[-1]
+"ARKANA$(if ($Rapido) { ' (rapido: so EditMode)' }): $Passaram passaram, $Falhas falharam, $Ignorados ignorados"
+if ($Falhas -gt 0 -or $Passaram -eq 0) { exit 1 }
 exit 0

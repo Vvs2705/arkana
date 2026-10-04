@@ -51,7 +51,8 @@ namespace Arkana.Tests
             // o bot sai do portao AINDA no castelo (a Queda so' aceita posicao ali) e pousa no ato num nascimento da ilha
             Bot bot = main.Bots[0];
             bot.enabled = false;   // parado: o teste e' do visual, nao da IA
-            Vector3 n0 = Arkana.World.Ilha.Atual.Relevo.Nascimentos[0];
+            var ilha = Arkana.World.Ilha.Atual;   // a ilha do Documento Mestre (25/09) deixa o Relevo antigo nulo
+            Vector3 n0 = ilha.Mestre != null ? ilha.Mestre.Nascimentos[0] : ilha.Relevo.Nascimentos[0];
             main.Castelo.Saltar(bot.Pawn.gameObject);
             bot.Pawn.Aterrar(new Vector3(n0.x, -999f, n0.z));
             yield return null;

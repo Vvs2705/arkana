@@ -568,7 +568,7 @@ namespace Arkana.Gameplay
         void Pousar(Voo v, Camera cam)
         {
             Vector3 pe = v.P.Pos;
-            Relevo r = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
+            IRelevo r = Ilha.Atual != null ? Ilha.Atual.Chao : null;   // Chao: a ilha do Documento Mestre deixa o Relevo antigo nulo
             if (r != null) pe.y = Mathf.Max(pe.y, r.SuperficieDaAgua(pe.x, pe.z));
             Pousos++;
             UltimoPouso = pe;

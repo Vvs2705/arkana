@@ -28,6 +28,7 @@ namespace Arkana.Tests
         public IEnumerator TearDown()
         {
             Arkana.Menu.Menu.PedidoDeTreino = false;
+            Time.timeScale = 1f;
             if (_go != null) Object.Destroy(_go);
             yield return null;
         }
@@ -64,6 +65,13 @@ namespace Arkana.Tests
             Assert.IsFalse(v.RastroAceso(eu), "no castelo o jogador (invisivel) nao risca nada");
             Assert.AreEqual(0, v.Vento, "sem queda, sem vento");
 
+            // a rota do castelo COMECA sobre o vazio da ilha flutuante (25/09): saltar ali e' morrer no vazio, sem pouso.
+            // Espera (tempo acelerado so' nesta espera) o castelo passar sobre chao seco — o jogador salta como um humano.
+            Time.timeScale = 10f;
+            for (float w = 0f; w < 15f && !Arkana.World.Ilha.Atual.Chao.PodePousar(main.Castelo.transform.position.x, main.Castelo.transform.position.z); w += Time.unscaledDeltaTime)
+                yield return null;
+            Time.timeScale = 1f;
+            Assert.IsTrue(Arkana.World.Ilha.Atual.Chao.PodePousar(main.Castelo.transform.position.x, main.Castelo.transform.position.z), "o castelo passou sobre a ilha");
             main.Player.Saltar();
             yield return Esperar(1.5f);
             Assert.AreEqual(Queda.CAINDO, eu.Queda.Fase, "ainda em queda livre");

@@ -131,6 +131,9 @@ namespace Arkana.World
             {
                 Mestre = new RelevoMestre(mestre);
                 NevoaInicio = 4000f; NevoaFim = 14000f; FarDaCamera = 15000f;
+                // o pos e' da TELA, nao da ilha procedural: desde 25/09 este retorno o pulava e o jogo saiu sem tonemapping,
+                // bloom e vinheta (a camera pedia o pos e so' achava o perfil padrao, neutro) — achado pelo BootTests em 04/10
+                if (Pos == null) Pos = MontarPos(transform);
                 return;
             }
             Relevo = new Relevo(escala, seed);

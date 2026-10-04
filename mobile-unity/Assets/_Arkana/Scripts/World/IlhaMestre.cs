@@ -460,7 +460,13 @@ namespace Arkana.World
             altura = mesh.bounds.max.y;
             var go = new GameObject("molde_" + recurso) { hideFlags = HideFlags.HideAndDontSave };
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterials = ms.ToArray();
+            var mrMolde = go.AddComponent<MeshRenderer>();
+            mrMolde.sharedMaterials = ms.ToArray();
+            // UM nivel de LOD que nunca corta (0): o Terrain trata a peca como arvore de MALHA e para de exigir o shader
+            // Nature/Soft Occlusion — a arvore do Tripo (2 materiais) avisava a cada boot e o aviso derrubava os 5 testes
+            // de cena (04/10). Sem impostor (treeBillboardDistance 5 km), o desenho e' o mesmo de antes.
+            // ponytail: limiar 0 = sem corte por tamanho na tela; subir (~0,01) corta arvore miuda longe, medir no Poco antes.
+            go.AddComponent<LODGroup>().SetLODs(new[] { new LOD(0f, new Renderer[] { mrMolde }) });
             go.transform.SetParent(raiz, false);
             go.transform.position = new Vector3(0, -10000, 0);
             return go;

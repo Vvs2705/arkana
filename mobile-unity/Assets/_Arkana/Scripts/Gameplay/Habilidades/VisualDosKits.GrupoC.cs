@@ -842,9 +842,8 @@ namespace Arkana.Gameplay
         static float LaminaC(Vector3 p)
         {
             float y = NoChao(p).y;
-            Relevo r = Ilha.Atual != null ? Ilha.Atual.Relevo : null;
-            if (r == null) return Mathf.Max(y, p.y);
-            float s = r.SuperficieDaAgua(p.x, p.z);
+            if (Ilha.Atual == null) return Mathf.Max(y, p.y);
+            float s = Ilha.SuperficieDaAgua(p.x, p.z);   // a agua de qualquer ilha (a do Documento Mestre deixa o Relevo nulo)
             return s > y ? s : y;
         }
 
