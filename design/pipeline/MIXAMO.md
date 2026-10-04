@@ -1,8 +1,8 @@
-# MIXAMO — biblioteca humanoide do ARKANA (checklist de download + proveniência)
+# MIXAMO — biblioteca humanoide do ARKANA (download, proveniência, integração)
 
-> Criado em 04/10/2026 (BLOCO C da missão de recuperação). Estado: **BLOCKED_MIXAMO_DOWNLOAD** — o download exige
-> login Adobe e aceite dos termos no site, que é ato do Diretor (ou autorização explícita para eu fazer pelo navegador).
-> Tudo que não depende dos arquivos já está pronto e testado (ver "O que já existe").
+> Criado em 04/10/2026 (BLOCO C da missão de recuperação). **Estado (04/10, tarde): BAIXADO E INTEGRADO.** O Diretor
+> autorizou no chat usar o Mixamo pelo Chrome dele; 77 clipes baixados pela conta Adobe dele, tocando nos 20 magos pelo
+> Mecanim Humanoid (`Scripts/Characters/MagoMecanim.cs`), com o legado (Animation) e o procedural de reserva.
 
 ## Por que Mixamo + Mecanim (e o que NÃO muda agora)
 
@@ -60,30 +60,112 @@ O cast tem de ler como **disparo à frente**, nunca ritual no chão.
 
 ## Onde os arquivos ficam (sem pasta nova)
 
-- Fonte (como baixou): `arte/personagens/mixamo-<funcao>.fbx` (LFS pega `*.fbx`).
-- No Unity: `mobile-unity/Assets/_Arkana/Resources/magos/mixamo-<funcao>.fbx`, importado como **Humanoid**,
-  Avatar "Create From This Model", Loop Time na locomoção, Root Transform Rotation/Position Y/XZ **Bake Into Pose**.
+- No Unity: `mobile-unity/Assets/_Arkana/Resources/mixamo-<nome>.fbx` (o prefixo segue a convenção de `arq-`, `cc0-`,
+  `tripo-` em Resources), Git LFS. Controller: `Resources/mixamo-mago.controller`; máscara do tronco: `mixamo-tronco.mask`.
+- Os zips originais: `Downloads` do Diretor (não versionados; o FBX no projeto é o arquivo baixado, só renomeado).
 
-## Proveniência (preencher a cada download — uma linha por clipe)
+## Proveniência (77 clipes, todos baixados em 04/10/2026)
 
-| Clipe final | Nome no Mixamo | Fonte | Data | Arquivo original | Import (rig/loop/root) | Uso no controller |
-|---|---|---|---|---|---|---|
-| | | Mixamo (Adobe), conta do Diretor | | | | |
+Fonte: Mixamo (Adobe), conta do Diretor, autorizado no chat. Personagem X Bot, **sem personagem** no arquivo (pacote:
+"No Character"), **FBX for Unity**, **30 fps**, **sem redução de quadros**, sem In Place (o andar vai para o root motion,
+que o Animator descarta: a medida da passada sai daí). Import: `ImportacaoArkana` (Humanoid, Avatar do próprio arquivo,
+clipe com o nome do arquivo, laço nas passadas, giro e altura assados pelos pés). Uso: `ControladorHumanoide` (controller).
+Os zips originais ficaram em `Downloads` do Diretor ("Pro Magic Pack.zip", "Arkana Extras.zip", "Arkana Locomocao.zip");
+nada de conta, sessão ou credencial no repositório. Licença: conferir os termos da Adobe; não redistribuir o arquivo cru.
 
-Não misturar proveniência: o que vier da Meshy, Blender ou Tripo tem linha própria com a fonte certa.
-Licença: conferir os termos da Adobe no momento do download; não redistribuir o arquivo cru fora do projeto.
-Nada de conta, sessão ou credencial no repositório (ele é público).
+| Arquivo no projeto | Nome no Mixamo | Origem | Data |
+|---|---|---|---|
+| `mixamo-boiar.fbx` | Floating | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-crouch-idle.fbx` | Crouch Idle | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-to-standing-idle.fbx` | Crouch To Standing Idle | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-turn-left-90.fbx` | Crouch Turn Left 90 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-turn-right-90.fbx` | Crouch Turn Right 90 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-walk-back.fbx` | Crouch Walk Back | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-walk-forward.fbx` | Crouch Walk Forward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-walk-left.fbx` | Crouch Walk Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-crouch-walk-right.fbx` | Crouch Walk Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-derrubado.fbx` | Knocked Down To Stomach | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-escalar-beirada-agachar.fbx` | Climb Wall From Braced Hang To Crouch | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-levantar.fbx` | Getting Up From Being Knocked Down On The Ground | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-pegar.fbx` | Picking Up An Object With One Hand | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-pouso-da-queda.fbx` | Landing From Falling Idle | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-pular-obstaculo-1-mao.fbx` | Male Jumping Over An Obstacle With 1 Hand Planted | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-queda-no-ar.fbx` | Mid-Air Falling Idle | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-rastejar.fbx` | Crawling Forward On Hands And Knees | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-standing-1h-cast-spell-01.fbx` | standing 1H cast spell 01 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-1h-magic-attack-01.fbx` | Standing 1H Magic Attack 01 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-1h-magic-attack-02.fbx` | Standing 1H Magic Attack 02 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-1h-magic-attack-03.fbx` | Standing 1H Magic Attack 03 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-cast-spell-01.fbx` | Standing 2H Cast Spell 01 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-area-attack-01.fbx` | Standing 2H Magic Area Attack 01 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-area-attack-02.fbx` | Standing 2H Magic Area Attack 02 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-attack-01.fbx` | Standing 2H Magic Attack 01 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-attack-02.fbx` | Standing 2H Magic Attack 02 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-attack-03.fbx` | Standing 2H Magic Attack 03 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-attack-04.fbx` | Standing 2H Magic Attack 04 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-2h-magic-attack-05.fbx` | Standing 2H Magic Attack 05 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-block-end.fbx` | Standing Block End | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-block-idle.fbx` | Standing Block Idle | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-block-react-large.fbx` | Standing Block React Large | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-block-start.fbx` | Standing Block Start | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-idle.fbx` | standing idle | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-idle-02.fbx` | standing idle 02 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-idle-03.fbx` | Standing Idle 03 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-idle-04.fbx` | Standing Idle 04 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-idle-to-crouch.fbx` | Standing Idle To Crouch | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-jump.fbx` | Standing Jump | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-jump-running.fbx` | Standing Jump Running | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-jump-running-landing.fbx` | Standing Jump Running Landing | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-land-to-standing-idle.fbx` | Standing Land To Standing Idle | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-death-backward.fbx` | Standing React Death Backward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-death-forward.fbx` | Standing React Death Forward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-death-left.fbx` | Standing React Death Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-death-right.fbx` | Standing React Death Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-large-from-back.fbx` | Standing React Large From Back | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-large-from-front.fbx` | Standing React Large From Front | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-large-from-left.fbx` | Standing React Large From Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-large-from-right.fbx` | Standing React Large From Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-small-from-back.fbx` | Standing React Small From Back | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-small-from-front.fbx` | Standing React Small From Front | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-small-from-left.fbx` | Standing React Small From Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-react-small-from-right.fbx` | Standing React Small From Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-run-back.fbx` | Standing Run Back | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-run-forward.fbx` | Standing Run Forward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-run-left.fbx` | Standing Run Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-run-right.fbx` | Standing Run Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-sprint-forward.fbx` | Standing Sprint Forward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-turn-left-90.fbx` | Standing Turn Left 90 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-turn-right-90.fbx` | Standing Turn Right 90 | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-walk-back.fbx` | Standing Walk Back | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-walk-forward.fbx` | Standing Walk Forward | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-walk-left.fbx` | Standing Walk Left | Pro Magic Pack | 04/10/2026 |
+| `mixamo-standing-walk-right.fbx` | Standing Walk Right | Pro Magic Pack | 04/10/2026 |
+| `mixamo-subir-beirada.fbx` | Pulling Up To A Ledge | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-subir-e-pular-obstaculo.fbx` | Step Up To Jump Over Object | avulso (zip "Arkana Extras") | 04/10/2026 |
+| `mixamo-loc-parado.fbx` | Unarmed Idle — Standing Idle- Loop | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-andar-frente.fbx` | Unarmed Walk Forward — Walking Forward | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-andar-tras.fbx` | Unarmed Walk Back — Walking Backwards | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-correr-frente.fbx` | Unarmed Run Forward — Running Forward | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-correr-tras.fbx` | Unarmed Run Back — Running Backwards | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-correr-esq.fbx` | Left Strafe — Running Strafe To The Left | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-correr-dir.fbx` | Right Strafe — Running Strafe To The Right | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-andar-esq.fbx` | Left Strafe Walking — Strafe Walking To The Left | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-andar-dir.fbx` | Right Strafe Walking — Strafe Walking To The Right | avulso (zip "Arkana Locomocao") | 04/10/2026 |
+| `mixamo-loc-sprint.fbx` | Sprint — Standard Sprint | avulso (zip "Arkana Locomocao") | 04/10/2026 |
 
-## O pilot (quando os FBX chegarem)
+## O pilot — FEITO (04/10, tarde)
 
-1. Importar os P0 como Humanoid (acima). Conferir no Inspector: Avatar válido, sem ossos vermelhos.
-2. `Mago.cs`: caminho novo **preferencial** só para o Validation Set — `Animator` no visual com o Avatar de
-   `EsqueletoHumano.Construir` (runtime; não muda a importação dos FBX da Meshy) e um `AnimatorController` enxuto:
-   - Base: Locomoção = Blend Tree 2D (MoveX, MoveZ relativos ao corpo) com idle/run/strafe/trás; Pulo→Ar→Pouso;
-     Derrubado; Nado. Velocidade separada da direção; histerese idle/run (a da `Locomocao`).
-   - Camada do tronco (AvatarMask) para Cast e Hit leve — as pernas seguem a locomoção.
-   - **O gameplay manda no tempo**: o tiro sai no relógio do `Pawn.Atirar`; nenhum `AnimationEvent` decide dano,
-     mana, cooldown, revive ou Sintonia.
-3. Medir foot sliding por clipe (passo por ciclo a `speed = 1`) — fim da constante única `Balance.Anim.RunStrideM`
-   medida na Pyra antiga.
-4. Fotos dos 3 (frente, lado, trás, diagonal, subida, descida, cast parado/correndo) → Poco F4 → só então os 20.
+- **Validation Set validado** (Fizz, Corvomante, Basalto): Avatar humano válido, folhas `60-mecanim-*` (3/4 frente) e
+  `61-mecanim-jogo-*` (câmera do jogo, atrás do ombro) com 14 situações cada. Os 20 fecham Avatar → `Balance.Anim.MecanimEmTodos = true`.
+- **Retarget conferido por número** (`DiagMecanim`): o mesmo clipe no X Bot de origem e no mago dá as mesmas direções de braço.
+- **Decisão (vetável): a PASSADA é a genérica** (`loc-*`). A do pacote de mago anda com o braço direito jogado para trás
+  e, na câmera do jogo, ele aparece erguido ao lado da cabeça (folha 61 de 04/10). O pacote de mago segue nas magias
+  (1 mão no tiro, 2 mãos na tática e na suprema), golpes, pulo, queda, derrubado/rastejar/levantar, boiar e pegar.
+- **Passada sem patinar em qualquer tamanho:** blend 2D pela velocidade no corpo dividida pela escala humana (Fizz 0,39,
+  Corvomante 0,99, Basalto 1,29); acima do clipe mais rápido a cadência acelera até `Balance.Anim.CadenciaMax` (2,2).
+  O Fizz bate o teto correndo a 7,5 m/s (o pé dele escorrega um pouco: é um gnomo na velocidade de todo mundo).
+- **Subir em obstáculo** (`Escalada`): `pular-obstaculo-1-mao` e `escalar-beirada-agachar` no relógio do jogo.
+- **A animação não decide nada:** tiro, dano, mana, recarga, reviver e Sintonia seguem no relógio do Pawn.
+
+**Falta:** medir o custo do Animator Humanoid no Poco (linha `ARKANA CUSTO`); nado para a frente (só há o boiar);
+mortes do pacote ainda sem uso (o `VisualDoAbate` deita o corpo); remover o legado depois que os 20 passarem no aparelho.
