@@ -29,7 +29,10 @@ namespace Arkana.Tests
             try
             {
                 Assert.AreEqual("external:magos/" + slug, m.Fonte, "o FBX nao vestiu (sem idle/run/cast?)");
-                Assert.IsTrue(m.GetComponentInChildren<Animation>().isPlaying, "nasce na pose congelada do FBX, sem idle");
+                // nasce ANIMADO: no Mecanim (Mixamo, 04/10) o Animator com o controller e a passada como estado padrao; no legado,
+                // o Animation tocando o idle (12/09: o elenco nascia de braco erguido, na pose congelada do FBX)
+                if (m.Mecanim) Assert.IsNotNull(m.Humanoide.Animador.runtimeAnimatorController, "Mecanim sem controller: nasce na pose congelada");
+                else Assert.IsTrue(m.GetComponentInChildren<Animation>().isPlaying, "nasce na pose congelada do FBX, sem idle");
                 Bounds b = MalhaDeformada(m.gameObject, out string diag);
                 File.WriteAllText(Path.Combine(Application.dataPath, "..", "Logs", "diag-mago-" + slug + ".txt"), diag);
                 float ficha = IdentidadeMago.De(slug).AlturaM;
