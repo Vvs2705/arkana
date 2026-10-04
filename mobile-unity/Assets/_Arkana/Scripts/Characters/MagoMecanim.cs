@@ -18,9 +18,10 @@ namespace Arkana.Characters
         /// <summary>O ANIMATION VALIDATION SET (dado, 04/10): o mais compacto que pisa, a mediana, o maior/mais largo.</summary>
         public static readonly string[] ValidationSet = { "16-fizz", "05-corvomante", "18-basalto" };
 
-        /// <summary>Velocidade de raiz (normalizada pelo humano) do clipe mais rapido em cada direcao — os do
-        /// Logs/mixamo-clipes.txt (sprint 4,7; corrida para tras 3,1; para os lados ~3,5). Acima disto a Cadencia acelera.</summary>
-        const float MaxFrente = 4.7f, MaxTras = 3.1f, MaxLado = 3.5f;
+        /// <summary>Velocidade de raiz (normalizada pelo humano) do clipe mais rapido em cada direcao — as MEDIDAS no
+        /// Logs/mixamo-clipes.txt (passada generica loc-*: sprint 5,46; corrida para tras 2,08; strafe correndo 4,37).
+        /// Acima disto a Cadencia acelera.</summary>
+        public const float MaxFrente = 5.46f, MaxTras = 2.08f, MaxLado = 4.37f;
         /// <summary>Velocidade de raiz do rastejar (m/s normalizados): a cadencia do derrubado sai dela.</summary>
         const float Rastejo = 0.2f;
 

@@ -304,9 +304,10 @@ namespace Arkana.Tests
         [Test]
         public void Mecanim_PassadaAcimaDoSprint_ViraCadencia_ComTeto_ESemNaN()
         {
-            Assert.AreEqual(4.7f, MagoMecanim.MaxNaDirecao(Vector2.up), 1e-3f);
-            Assert.AreEqual(3.1f, MagoMecanim.MaxNaDirecao(Vector2.down), 1e-3f);
-            Assert.AreEqual(3.5f, MagoMecanim.MaxNaDirecao(Vector2.right), 1e-3f);
+            Assert.AreEqual(MagoMecanim.MaxFrente, MagoMecanim.MaxNaDirecao(Vector2.up), 1e-3f);
+            Assert.AreEqual(MagoMecanim.MaxTras, MagoMecanim.MaxNaDirecao(Vector2.down), 1e-3f);
+            Assert.AreEqual(MagoMecanim.MaxLado, MagoMecanim.MaxNaDirecao(Vector2.right), 1e-3f);
+            Assert.AreEqual(Mathf.Lerp(MagoMecanim.MaxLado, MagoMecanim.MaxFrente, 0.7071f), MagoMecanim.MaxNaDirecao(new Vector2(1f, 1f)), 1e-2f, "diagonal entre os dois");
             Mago m = CriarMecanim("18-basalto");
             try
             {

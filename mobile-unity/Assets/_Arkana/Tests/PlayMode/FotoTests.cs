@@ -499,8 +499,8 @@ namespace Arkana.Tests
             // a CAMERA DO JOGO (atras do ombro direito, um pouco acima — CameraLogica na escala do mago): e' assim que o Diretor ve'
             float k = alto / 1.8f;
             Vector3 ombro = p + Vector3.up * (Arkana.Gameplay.CameraLogica.ALTURA_PIVO * k) + Vector3.right * (Arkana.Gameplay.CameraLogica.OMBRO_X * k);
-            Vector3 atras = ombro - Quaternion.Euler(Arkana.Gameplay.CameraLogica.PITCH_PADRAO * Mathf.Rad2Deg, 0f, 0f) * Vector3.forward * (Arkana.Gameplay.CameraLogica.BRACO * 0.75f * k + 0.6f);
-            Camera camJogo = CameraTemporaria("CamFotoMecanimJogo", atras, ombro + Vector3.forward * 6f * k - Vector3.up * 1.2f * k, Color.gray);
+            Vector3 atras = ombro - Quaternion.Euler(Arkana.Gameplay.CameraLogica.PITCH_PADRAO * Mathf.Rad2Deg, 0f, 0f) * Vector3.forward * (Arkana.Gameplay.CameraLogica.BRACO * k + 1f);
+            Camera camJogo = CameraTemporaria("CamFotoMecanimJogo", atras, p + Vector3.up * alto * 0.55f, Color.gray);
 
             float v = Arkana.Core.Balance.Player.Speed;
             var quadros = new (string nome, string pedido, Vector3 vel, string extra)[]
