@@ -510,7 +510,7 @@ namespace Arkana.Tests
                 ("recuo", "andar_tras", new Vector3(0f, 0f, -v * 0.7f), null), ("correr-atirando", "run", new Vector3(0f, 0f, v), "cast"),
                 ("tatica", "idle", Vector3.zero, "tatica"), ("pulo", "pular", new Vector3(0f, 0f, v), null),
                 ("ar", "cair", Vector3.zero, null), ("golpe", "idle", Vector3.zero, "golpe"),
-                ("derrubado", "derrubado", Vector3.zero, null), ("boiar", "nadar", Vector3.zero, null),
+                ("derrubado", "derrubado", Vector3.zero, null), ("boiar", "nadar", Vector3.zero, null), ("pular-obstaculo", "vaultar", Vector3.zero, null), ("escalar", "escalar", Vector3.zero, null),
             };
             const int cw = 400, ch = 560, colunas = 6;
             int linhas = (quadros.Length + colunas - 1) / colunas;
@@ -530,7 +530,7 @@ namespace Arkana.Tests
                 m.Play(q.pedido);
                 if (q.extra == "golpe") m.Golpe(Vector3.left);
                 else if (q.extra != null) m.Play(q.extra);
-                yield return Esperar(q.extra != null || q.pedido == "pular" ? 0.3f : 0.9f);
+                yield return Esperar(q.extra != null || q.pedido == "pular" || q.pedido == "vaultar" || q.pedido == "escalar" ? 0.3f : 0.9f);
                 if (q.pedido == "derrubado") yield return Esperar(1.6f);   // deitado
                 cam.Render();
                 RenderTexture.active = rt;
