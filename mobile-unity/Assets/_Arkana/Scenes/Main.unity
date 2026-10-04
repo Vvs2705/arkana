@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &779148642
+--- !u!1 &572571680
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,9 +127,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 779148645}
-  - component: {fileID: 779148644}
-  - component: {fileID: 779148643}
+  - component: {fileID: 572571683}
+  - component: {fileID: 572571682}
+  - component: {fileID: 572571681}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -137,25 +137,25 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &779148643
+--- !u!114 &572571681
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 779148642}
+  m_GameObject: {fileID: 572571680}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 992644b017686264b9c73c7fbe9d6d31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Arkana::Arkana.World.Sol
---- !u!108 &779148644
+--- !u!108 &572571682
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 779148642}
+  m_GameObject: {fileID: 572571680}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -214,13 +214,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &779148645
+--- !u!4 &572571683
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 779148642}
+  m_GameObject: {fileID: 572571680}
   serializedVersion: 2
   m_LocalRotation: {x: 0.251131, y: -0.23367861, z: 0.062613994, w: 0.9372337}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -229,7 +229,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &857181447
+--- !u!1 &1138004042
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -237,9 +237,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 857181450}
-  - component: {fileID: 857181449}
-  - component: {fileID: 857181448}
+  - component: {fileID: 1138004045}
+  - component: {fileID: 1138004044}
+  - component: {fileID: 1138004043}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -247,13 +247,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &857181448
+--- !u!114 &1138004043
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 857181447}
+  m_GameObject: {fileID: 1138004042}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
@@ -291,13 +291,13 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!20 &857181449
+--- !u!20 &1138004044
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 857181447}
+  m_GameObject: {fileID: 1138004042}
   m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 2
@@ -342,13 +342,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &857181450
+--- !u!4 &1138004045
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 857181447}
+  m_GameObject: {fileID: 1138004042}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 3, z: -5}
@@ -357,7 +357,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2121505859
+--- !u!1 &1304620275
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -365,8 +365,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2121505861}
-  - component: {fileID: 2121505860}
+  - component: {fileID: 1304620277}
+  - component: {fileID: 1304620276}
   m_Layer: 0
   m_Name: Main
   m_TagString: Untagged
@@ -374,25 +374,25 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2121505860
+--- !u!114 &1304620276
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2121505859}
+  m_GameObject: {fileID: 1304620275}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f5beeaa90b3b8e849911b87774996e34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Arkana::Arkana.Main
---- !u!4 &2121505861
+--- !u!4 &1304620277
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2121505859}
+  m_GameObject: {fileID: 1304620275}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -405,6 +405,6 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 2121505861}
-  - {fileID: 779148645}
-  - {fileID: 857181450}
+  - {fileID: 1304620277}
+  - {fileID: 572571683}
+  - {fileID: 1138004045}
