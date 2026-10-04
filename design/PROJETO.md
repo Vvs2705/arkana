@@ -61,9 +61,9 @@ build/perf/bots/rede) e as correções em série, cada lote com portão. **HEAD 
 
 | Frente | Estado | Evidência |
 |---|---|---|
-| Testes | **557 passaram, 0 falharam, 86 ignorados** (85 fotos sem GPU + 1 auto-ignorado) | `portao.ps1` (EditMode 548 + PlayMode 9) |
+| Testes | **559 passaram; 1 vermelho INTERMITENTE** (voo: 1 falha em ~15 rodadas; 10 isoladas seguidas passaram — ver dívida); 86 ignorados (85 fotos sem GPU + 1 auto-ignorado) | `portao.ps1` (EditMode 551 + PlayMode 9) |
 | Movimento | pulo, coyote, jump buffer, ladeira, parede, esquiva e pulo iguais em qualquer FPS — corrigidos e testados | `GameplayLocomocaoTests` (+12), `Logs/movimento.txt` |
-| Mira/combate | tiro converge no retículo (toque e arrasto), olhar em dp, tiro não atravessa alvo nem rocha, manopla cobra certo, retículo acende | `GameplayEfeitosTests`, `CameraColisaoTests`, `GameplayArmaLootTests`, `UiGestoTests` |
+| Mira/combate | tiro converge no retículo (toque e arrasto), olhar em dp, tiro não atravessa alvo nem rocha, manopla cobra certo, retículo acende, hitmarker por tipo (escudo azul, vida branco, DERRUBOU coral e maior), tiro/mana/cadência uma vez no Pawn real | `GameplayEfeitosTests`, `CameraColisaoTests`, `GameplayArmaLootTests`, `UiGestoTests` |
 | Animação | ainda `Animation` legado + `PoseMago`; **os 20 fecham Avatar Humanoid válido** (mapa pronto) | `CharactersCorpoMagoTests.Humanoide_*`, `Logs/humanoide.txt` |
 | Clips Mixamo | **nenhum baixado** — BLOCKED_MIXAMO_DOWNLOAD (login Adobe/termos = ato do Diretor) | `design/pipeline/MIXAMO.md` |
 | Performance | **não medida desde 27/09** (42–54 FPS no chão, treino 31) — BLOCKED_HARDWARE (Poco fora do USB em 04/10) | instrumentação nova pronta (`ARKANA CUSTO`) |
@@ -90,7 +90,10 @@ Terrain (LODGroup no molde) + testes da ilha antiga adaptados; `fix(movement)`; 
 faltar, Sol não escreve no asset no editor, `build_apk.ps1` sai 6 se sujar arquivo versionado); `feat(animation)`
 (`EsqueletoHumano`: mapa Meshy→Mecanim com a coluna invertida, pose de bind, Avatar nos 20); `docs(pipeline)` MIXAMO.md;
 `perf(android)` (4 pontos de lixo por quadro + linha `ARKANA CUSTO` com CPU/GPU/GC/memória/batches no logcat);
-`feat(hud)` espelhado/escala; `test(movement)` Movement Lab numérico.
+`feat(hud)` espelhado/escala; `test(movement)` Movement Lab numérico; `feat(combat)` hitmarker por tipo + tiro uma vez.
+**APK:** `mobile-unity/Builds/testes/arkana-2026-10-04_0457.apk` (296 MB, 5,5 min, o check de sujeira do build passou limpo)
+— NÃO tem o hitmarker por tipo (entrou depois); o próximo build leva. **Fotos do editor (com GPU):** `Foto_Sintonia_OsDezCombos`
+mostra os 10 combos de volta, deitados na encosta; `Foto_Treino` com o pós de volta.
 
 **DECISÕES QUE EU TOMEI (VETÁVEIS):** coyote 0,10 s e pulo guardado 0,12 s; flutuar só na descida; rocha/prédio/ponte param o
 tiro (cobertura, coerente com a mira); olhar em dp (se ficar lento, subir o slider — o padrão foi pensado para 160 dpi);
@@ -107,8 +110,8 @@ retículo coral sobre inimigo; escala dos botões acima de 1 limitada para não 
 | Animação: 3 avatares no Mecanim | **BLOQUEADO** | Avatar válido nos 20, mas o pilot precisa dos clips (BLOCKED_MIXAMO_DOWNLOAD) |
 | Câmera sem clipping/sem tremor | parcial | colisão testada; "canto" troca binária sem histerese (dívida) |
 | Mira consistente | PASSA | tiro da mão ao ponto do raio (teste) |
-| Fire/mana/cooldown uma vez | parcial | caminho único no `Pawn.Atirar`, mas sem teste no Pawn (só no ArmaSlot) |
-| Hit feedback | PASSA (básico) | hitmarker igual para escudo/vida; derrubar não avisa quem atirou (dívida) |
+| Fire/mana/cooldown uma vez | PASSA | `GameplayMotorTests.Atirar_*` no Pawn de verdade (2 toques no mesmo quadro = 1 tiro, 1 cobrança; sem mana não sai nem cobra) |
+| Hit feedback | PASSA | hitmarker por tipo e aviso de DERRUBOU para quem atirou (`UiHudLogicaTests.Hitmarker_*`); som por tipo e vibração ainda não |
 | Sintonia, down/revive | PASSA | `CoreSintoniaTests`, `GameplayBauDerrubadoTests`; reviver de eliminado sem teste |
 | HUD sem sobreposição, layout essencial | PASSA | testes; editor de arrastar botões ainda não existe |
 | Performance no Poco F4 | **BLOCKED_HARDWARE** | última medição 27/09: chão 42–54, treino 31 — abaixo da meta intermediária (45 estável) em parte |
@@ -131,6 +134,11 @@ virou injeção (`Partida.Obstaculo`) — o mesmo padrão serve para o servidor.
   vivo: decisão dele tirar do build. 5 GLBs velhos fora do LFS em `arte/cenario/_glb/` (~46 MB).
 - Partes da ilha antiga ainda leem `Ilha.Atual.Relevo` (nulo na ilha nova): passiva da Sylva (bioma Campina), inclinação de
   VFX — degradam sem erro.
+- **Vermelho intermitente** `VooVisualTests` (1 em ~15): o corpo apareceu 2,2 m ao lado do ponto do pouso um quadro depois
+  (suspeita: pouso encostado numa peça com colisor e o CharacterController empurrando). O teste agora imprime pouso, estalo,
+  corpo, chão e os colisores encostados — a próxima falha diz a causa.
+- As FOTOS (`FotoTests`) ainda compõem cenas da ilha antiga: na nova o treino nasce numa encosta íngreme e a foto do alvo
+  não mostra o alvo. E a textura do chão estica nas encostas íngremes (listras no sentido da queda) — arte do Terrain.
 - Testes novos foram provados vermelhos por CONTA (a entrada antiga dá o resultado errado descrito no teste), não por mutação
   rodada no Unity.
 
@@ -143,7 +151,7 @@ virou injeção (`Partida.Obstaculo`) — o mesmo padrão serve para o servidor.
 4. Pilot Mecanim nos 3 (Fizz, Corvomante, Basalto): Animator no visual com Avatar de `EsqueletoHumano`, T-pose forçada nos de
    braço baixo, Blend Tree 2D + camada do tronco; legado como reserva.
 5. Passada por mago (medir o passo do clipe em runtime, como `MedirPulo`) — fim da constante da Pyra.
-6. Teste de fire/mana/cooldown exatamente uma vez no `Pawn.Atirar` (cena mínima) e feedback de "derrubou" para quem atirou.
+6. Som por tipo de acerto (escudo/vida/derrubou) e vibração opcional na Config; reviver de eliminado com teste.
 7. Boot fatiado: `yield` entre as etapas/regiões da `IlhaMestre` atrás da tela de carregamento; cobrar pior quadro < 100 ms.
 8. Editor de HUD (arrastar/resetar/opacidade, salvo local) sobre o `HudLayout.DaConfig`.
 9. Câmera: histerese no "canto" e ignorar corpos na colisão; tremor medido em quina.
