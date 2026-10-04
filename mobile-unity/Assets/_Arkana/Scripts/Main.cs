@@ -637,6 +637,14 @@ namespace Arkana
             Time.timeScale = 1f;   // a pausa da HUD nao pode atravessar partida
         }
 
+        static readonly List<string> _chavesReviver = new List<string>();
+        /// <summary>"reviver" + i montada UMA vez (era uma string nova por bot por quadro).</summary>
+        static string ChaveReviver(int i)
+        {
+            while (_chavesReviver.Count <= i) _chavesReviver.Add("reviver" + _chavesReviver.Count);
+            return _chavesReviver[i];
+        }
+
         /// <summary>O topo da HUD: BOTS n no solo, DUPLAS n (times vivos) na dupla.</summary>
         void AtualizarHud()
         {
@@ -650,7 +658,7 @@ namespace Arkana
             {
                 // bussola verde no corpo de cada aliado ELIMINADO: e' para la' que o time vai revive-lo
                 bool aliadoMorto = Bots[i] != null && !Bots[i].Pawn.Viva && Combat.MesmoTime(Bots[i].Pawn, Player.Pawn);
-                Hud.Aviso.SetBussola("reviver" + i, aliadoMorto ? Bots[i].Pawn.Pos : Vector3.zero, new Color(0.45f, 1f, 0.6f), aliadoMorto);
+                Hud.Aviso.SetBussola(ChaveReviver(i), aliadoMorto ? Bots[i].Pawn.Pos : Vector3.zero, new Color(0.45f, 1f, 0.6f), aliadoMorto);
                 if (Bots[i] == null || Bots[i].Pawn.Viva || !Combat.MesmoTime(Bots[i].Pawn, Player.Pawn)) continue;
                 float p = Partida.ProgressoReviver(Bots[i].Pawn);
                 if (p > melhor && (Bots[i].Pawn.Pos - Player.Pawn.Pos).sqrMagnitude <= Partida.RAIO_REVIVER * Partida.RAIO_REVIVER * 4f) { melhor = p; alvo = Bots[i].Pawn; }

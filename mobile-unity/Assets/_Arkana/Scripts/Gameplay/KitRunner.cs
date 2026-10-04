@@ -84,6 +84,8 @@ namespace Arkana.Gameplay
 
         private readonly Dictionary<string, float> _estados = new Dictionary<string, float>();
         private readonly List<string> _expirados = new List<string>();
+        /// <summary>Copia das chaves reaproveitada (era `new List` por corpo por quadro: lixo constante para o GC do celular).</summary>
+        private readonly List<string> _chaves = new List<string>();
         private readonly List<EfeitoVisual> _visuais = new List<EfeitoVisual>();
         private float _vidaAntes;
         private bool _ligado;
@@ -147,7 +149,9 @@ namespace Arkana.Gameplay
             _vidaAntes = vida;
 
             _expirados.Clear();
-            foreach (string nome in new List<string>(_estados.Keys))
+            _chaves.Clear();
+            _chaves.AddRange(_estados.Keys);
+            foreach (string nome in _chaves)
             {
                 float t = _estados[nome] - dt;
                 if (t <= 0f) _expirados.Add(nome);

@@ -204,9 +204,10 @@ namespace Arkana.Gameplay
             float dOmbro = ao.magnitude;
             if (dOmbro > 0.001f)
             {
-                RaycastHit[] hs = Physics.SphereCastAll(centro, r, ao / dOmbro, dOmbro, ~0, QueryTriggerInteraction.Ignore);
+                RaycastHit[] hs = _varrida;   // NonAlloc: o SphereCastAll alocava um array a cada chamada (ate' 4x por quadro)
+                int nh = Physics.SphereCastNonAlloc(centro, r, ao / dOmbro, hs, dOmbro, ~0, QueryTriggerInteraction.Ignore);
                 float livre = dOmbro;
-                for (int i = 0; i < hs.Length; i++)
+                for (int i = 0; i < nh; i++)
                     if (Conta(hs[i].collider, ignorar) && hs[i].distance < livre) livre = Mathf.Max(hs[i].distance - 0.05f, 0f);
                 if (livre < dOmbro) olho = centro + ao / dOmbro * livre;
             }
@@ -217,8 +218,9 @@ namespace Arkana.Gameplay
             if (dist < 0.001f) return olho;
             Vector3 dir = d / dist;
             float melhor = dist;
-            RaycastHit[] hits = Physics.SphereCastAll(olho, r, dir, dist, ~0, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < hits.Length; i++)
+            RaycastHit[] hits = _varrida;
+            int n = Physics.SphereCastNonAlloc(olho, r, dir, hits, dist, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
                 if (Conta(hits[i].collider, ignorar) && hits[i].distance < melhor) melhor = Mathf.Max(hits[i].distance, 0.2f);
             Vector3 pos = olho + dir * melhor;
             // 3) a guarda: dentro de algo? recua ate' sair
@@ -233,6 +235,7 @@ namespace Arkana.Gameplay
         static bool Conta(Collider c, Transform ignorar) => c != null && (ignorar == null || !c.transform.IsChildOf(ignorar));
 
         static readonly Collider[] _perto = new Collider[8];
+        static readonly RaycastHit[] _varrida = new RaycastHit[16];
         static bool Dentro(Vector3 p, float r, Transform ignorar)
         {
             int n = Physics.OverlapSphereNonAlloc(p, r, _perto, ~0, QueryTriggerInteraction.Ignore);

@@ -214,8 +214,10 @@ namespace Arkana.Gameplay
             // apanha pelo caminho que ja' existe: Impacto -> TerrainHit na posicao do tiro -> TerrenoReativo.Reagir (hp x Estrutura).
             // O acerto roda em sub-passos (Projetil.SUBPASSO_M) e para no primeiro SOLIDO do mundo (Obstaculo): rocha, predio
             // e ponte tambem sao cobertura — a mira (Player.PontoDoRaio) ja' parava neles e o tiro passava (achado de 04/10).
-            Func<Vector3, IEntidade> acerto = Acerto;
-            if (terreno != null) acerto = pos => NoMuro(terreno, pos) ? null : Acerto(pos);
+            // delegates guardados: `Acerto` e a lambda com o terreno criavam 2 objetos por quadro (lixo para o GC do celular)
+            if (_acerto == null) { _acerto = Acerto; _acertoForaDoMuro = AcertoForaDoMuro; }
+            _terrenoDoTick = terreno;
+            Func<Vector3, IEntidade> acerto = terreno != null ? _acertoForaDoMuro : _acerto;
             for (int i = Projeteis.Count - 1; i >= 0; i--)
             {
                 Projetil p = Projeteis[i];
@@ -255,6 +257,10 @@ namespace Arkana.Gameplay
             }
             return null;
         }
+
+        private Func<Vector3, IEntidade> _acerto, _acertoForaDoMuro;
+        private TerrenoReativo _terrenoDoTick;
+        private IEntidade AcertoForaDoMuro(Vector3 pos) => NoMuro(_terrenoDoTick, pos) ? null : Acerto(pos);
 
         /// <summary>Celula de muro E abaixo do topo dele: cobertura tem ALTURA (tiro por cima do muro segue voando).</summary>
         private static bool NoMuro(TerrenoReativo t, Vector3 pos) =>

@@ -93,5 +93,15 @@ namespace Arkana.Tests
             Bus.EmitGameStartRequested();
             Assert.AreEqual(2, _montou, "religar duas vezes assina uma vez so'");
         }
+
+        [Test]
+        public void MedidorDeFps_LinhaDeCusto_LegivelNoLogcat_ContadorAusenteViraND()
+        {
+            // BLOCO H (04/10): a linha que o aparelho escreve por janela - onde o quadro gasta, nao so' quantos quadros
+            string l = MedidorDeFps.Custo(12.34, 8.5, 21.0, 2, 512L * 1024 * 1024, 410, 95, 1250000);
+            Assert.AreEqual("ARKANA CUSTO cpu_main=12.3ms cpu_render=8.5ms gpu=21.0ms gc=2 mem=512MB batches=410 setpass=95 tris=1250K", l);
+            StringAssert.Contains("gpu=n/d", MedidorDeFps.Custo(5, 5, -1, 0, -1, -1, -1, -1), "driver sem tempo de GPU: n/d, nunca um numero falso");
+            StringAssert.Contains("mem=n/d", MedidorDeFps.Custo(5, 5, 5, 0, -1, 1, 1, 1));
+        }
     }
 }

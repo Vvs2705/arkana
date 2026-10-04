@@ -50,6 +50,7 @@ namespace Arkana.EditorTools
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
+            PlayerSettings.enableFrameTimingStats = true;   // o MedidorDeFps le CPU/GPU por quadro (FrameTimingManager) no aparelho
             IncluirShadersDoCodigo();
             AssetDatabase.SaveAssets();
             Debug.Log("Arkana.Build: settings aplicados (URP, Android IL2CPP/ARM64, minSdk 26, landscape).");
