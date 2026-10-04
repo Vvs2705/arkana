@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
+> **Atualizado em:** 04/10/2026 (missão de recuperação: portão de verdade com PlayMode, movimento, mira, Humanoid validado, HUD configurável, instrumentação; GATE não passou — ver o 1º bloco do CONTINUAR DAQUI). Antes: 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,107 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — 04/10/2026 (12): missão de RECUPERAÇÃO — portão de verdade, movimento, mira, Humanoid e o GATE
+
+Missão do prompt mestre `ARKANA_PROMPT_MESTRE_CLAUDE_CODE_RECOVERY_AND_UPGRADE_v1_0` (Downloads do Diretor), executada pelo
+orquestrador com 4 raias de auditoria só-leitura em paralelo (movimento/física; animação/personagens; câmera/mira/combate;
+build/perf/bots/rede) e as correções em série, cada lote com portão. **HEAD ao fechar: ver `git log` (`main` = branch da sessão).**
+
+**ESTADO NUM OLHAR (04/10):**
+
+| Frente | Estado | Evidência |
+|---|---|---|
+| Testes | **557 passaram, 0 falharam, 86 ignorados** (85 fotos sem GPU + 1 auto-ignorado) | `portao.ps1` (EditMode 548 + PlayMode 9) |
+| Movimento | pulo, coyote, jump buffer, ladeira, parede, esquiva e pulo iguais em qualquer FPS — corrigidos e testados | `GameplayLocomocaoTests` (+12), `Logs/movimento.txt` |
+| Mira/combate | tiro converge no retículo (toque e arrasto), olhar em dp, tiro não atravessa alvo nem rocha, manopla cobra certo, retículo acende | `GameplayEfeitosTests`, `CameraColisaoTests`, `GameplayArmaLootTests`, `UiGestoTests` |
+| Animação | ainda `Animation` legado + `PoseMago`; **os 20 fecham Avatar Humanoid válido** (mapa pronto) | `CharactersCorpoMagoTests.Humanoide_*`, `Logs/humanoide.txt` |
+| Clips Mixamo | **nenhum baixado** — BLOCKED_MIXAMO_DOWNLOAD (login Adobe/termos = ato do Diretor) | `design/pipeline/MIXAMO.md` |
+| Performance | **não medida desde 27/09** (42–54 FPS no chão, treino 31) — BLOCKED_HARDWARE (Poco fora do USB em 04/10) | instrumentação nova pronta (`ARKANA CUSTO`) |
+| HUD | "Layout espelhado" e "Escala dos botões" agora funcionam (eram opções mortas) | `UiHudLogicaTests` |
+| Rede | não começou (o gate não passou) | — |
+| Arte | sem mudança nesta missão (prazo do Tripo segue 26/10) | — |
+
+**ACHADOS QUE ESTAVAM ESCONDIDOS (todos corrigidos em `main`):**
+- **O portão mentia por omissão:** dizia "620 testes" com 86 ignorados dentro e **PlayMode 0 de 9 passando** desde a ilha do
+  Documento Mestre (25/09). Agora a linha final separa passaram/falharam/ignorados, com o motivo de cada ignorado, e há
+  `-Rapido` (só EditMode).
+- **Desde 25/09 o jogo saiu sem pós-processamento** (tonemapping, bloom, vinheta): com a IlhaMestre o `Ilha.Montar` retornava
+  antes do `MontarPos`. Religado — **o visual do aparelho muda (volta o pós de 12/09); conferir na foto**.
+- **As zonas da Sintonia nasciam debaixo do chão** na ilha nova (`VisualDaSintonia.Chao` devolvia 0 = o mar): combo invisível.
+- **Um toque normal no SALTO matava o pulo** (o corpo subia 8–16 cm e já planava gastando mana).
+- O arrasto do botão de tiro caía ~1,9 m curto e 0,78 m à esquerda do retículo; o Poco girava a câmera 2,5× (px em vez de dp).
+- O tiro atravessava rocha/prédio (a mira parava neles) e, a 30 FPS, atravessava o próprio alvo (1 teste por quadro).
+- A manopla cobrava a mana do elemento do carrossel e atirava o do par. Atordoado esquivava e pulava.
+- Eliminado com o dedo no controle: joystick/Fogo/Salto ficavam presos depois de revivido.
+- O build regravava a `Main.unity` (fileIDs novos) e o URP asset (sombra 50→60) — 22 commits de ruído.
+
+**O QUE ENTROU (commits desta missão, em ordem):** `fix(baseline)` PlayMode de volta + pós + Sintonia no chão + aviso do
+Terrain (LODGroup no molde) + testes da ilha antiga adaptados; `fix(movement)`; `fix(combat)`; `fix(build)` (cena só se
+faltar, Sol não escreve no asset no editor, `build_apk.ps1` sai 6 se sujar arquivo versionado); `feat(animation)`
+(`EsqueletoHumano`: mapa Meshy→Mecanim com a coluna invertida, pose de bind, Avatar nos 20); `docs(pipeline)` MIXAMO.md;
+`perf(android)` (4 pontos de lixo por quadro + linha `ARKANA CUSTO` com CPU/GPU/GC/memória/batches no logcat);
+`feat(hud)` espelhado/escala; `test(movement)` Movement Lab numérico.
+
+**DECISÕES QUE EU TOMEI (VETÁVEIS):** coyote 0,10 s e pulo guardado 0,12 s; flutuar só na descida; rocha/prédio/ponte param o
+tiro (cobertura, coerente com a mira); olhar em dp (se ficar lento, subir o slider — o padrão foi pensado para 160 dpi);
+retículo coral sobre inimigo; escala dos botões acima de 1 limitada para não encostar no PEGAR; pós-processamento religado.
+
+**COMBAT & MOVEMENT GATE (04/10): NÃO PASSOU → a rede NÃO começa.**
+
+| Item | Veredito | Por quê |
+|---|---|---|
+| Movimento sem patinação visual | **não medido** | sem foto/aparelho; `Balance.Anim.RunStrideM` ainda é a medida da Pyra antiga (21/08) |
+| Analógico, aceleração/freio | PASSA | testes + ficha `Logs/movimento.txt` |
+| Strafe/backpedal | **FALHA** | nenhum dos 20 tem take de strafe (pernas giradas no Running) |
+| Pulo/esquiva/flutuar sem exploit | PASSA | testes (coyote sem pulo duplo, stun, quadro travado, flutuar só descendo) |
+| Animação: 3 avatares no Mecanim | **BLOQUEADO** | Avatar válido nos 20, mas o pilot precisa dos clips (BLOCKED_MIXAMO_DOWNLOAD) |
+| Câmera sem clipping/sem tremor | parcial | colisão testada; "canto" troca binária sem histerese (dívida) |
+| Mira consistente | PASSA | tiro da mão ao ponto do raio (teste) |
+| Fire/mana/cooldown uma vez | parcial | caminho único no `Pawn.Atirar`, mas sem teste no Pawn (só no ArmaSlot) |
+| Hit feedback | PASSA (básico) | hitmarker igual para escudo/vida; derrubar não avisa quem atirou (dívida) |
+| Sintonia, down/revive | PASSA | `CoreSintoniaTests`, `GameplayBauDerrubadoTests`; reviver de eliminado sem teste |
+| HUD sem sobreposição, layout essencial | PASSA | testes; editor de arrastar botões ainda não existe |
+| Performance no Poco F4 | **BLOCKED_HARDWARE** | última medição 27/09: chão 42–54, treino 31 — abaixo da meta intermediária (45 estável) em parte |
+
+**PRONTIDÃO PARA REDE (só leitura, sem pacote):** já são simulação pura (sem MonoBehaviour/Camera): Combat, Vitalidade, Efeitos,
+Locomocao, Queda, Zona, Loot, Derrubado, ArmaSlot, KitRunner, Sintonia, TerrenoReativo, Projetil, Partida e a IA (semeada).
+A entrada de comandos já é única (Player e Bot escrevem os mesmos campos no Pawn). Acoplados: o Pawn é a entidade
+(MonoBehaviour) e o movimento passa pelo PhysX; passo de tempo variável; estado estático chaveado por referência (uma partida
+por processo, entidade sem ID); o mundo é lido por estáticos (`Ilha.AlturaDoChao`). A pergunta "o tiro bateu no mundo?"
+virou injeção (`Partida.Obstaculo`) — o mesmo padrão serve para o servidor.
+
+**DÍVIDA QUE CONTINUA (com onde está):**
+- Animação: calibração de passada única (Pyra antiga) — `Balance.Anim.RunStrideM/BackStrideM`; o recuo do Fizz escorrega ~2×.
+  A origem do tiro é fixa a 1,4 m para todos (Fizz 0,95 m, Pip) — `Pawn.ALTURA_MAO`.
+- Boot: a ilha monta num único quadro de vários segundos (`IlhaMestre.Construir` síncrono; 1º quadro ~11 s no Poco em 27/09).
+- Bots: `Escolta`/`AliadoCaido` O(n²) por quadro (`Bot.cs:634`) — barato com 18, medir antes de 40–60. Animação legada sem
+  `cullingType` (anima fora da tela).
+- Câmera: canto sem histerese; colisores de outros magos encolhem o braço (`CameraTerceiraPessoa.Conta`).
+- `com.coplaydev.unity-mcp` entra no APK (assembly de runtime sem restrição) — é a ferramenta do Diretor de ver o Unity ao
+  vivo: decisão dele tirar do build. 5 GLBs velhos fora do LFS em `arte/cenario/_glb/` (~46 MB).
+- Partes da ilha antiga ainda leem `Ilha.Atual.Relevo` (nulo na ilha nova): passiva da Sylva (bioma Campina), inclinação de
+  VFX — degradam sem erro.
+- Testes novos foram provados vermelhos por CONTA (a entrada antiga dá o resultado errado descrito no teste), não por mutação
+  rodada no Unity.
+
+**CONTINUAR DAQUI (próximos 10 passos, nesta ordem):**
+1. **Diretor:** ligar o Poco no USB (receita na memória `poco-f4-no-adb`), instalar o APK novo e jogar: pulo com toque,
+   mira arrastada, tiro contra rocha, Configurações → Layout espelhado / Escala. Foto do aparelho (o pós voltou).
+2. Bancada no Poco frio com o APK novo: `--ei arkana_bancada 1` + ler as linhas `ARKANA CUSTO` (CPU × GPU de verdade).
+3. **Diretor:** baixar no Mixamo os clips P0 de `design/pipeline/MIXAMO.md` (strafe E/D, correr para trás, cast à frente)
+   — ou autorizar que eu baixe pelo navegador com a conta dele.
+4. Pilot Mecanim nos 3 (Fizz, Corvomante, Basalto): Animator no visual com Avatar de `EsqueletoHumano`, T-pose forçada nos de
+   braço baixo, Blend Tree 2D + camada do tronco; legado como reserva.
+5. Passada por mago (medir o passo do clipe em runtime, como `MedirPulo`) — fim da constante da Pyra.
+6. Teste de fire/mana/cooldown exatamente uma vez no `Pawn.Atirar` (cena mínima) e feedback de "derrubou" para quem atirou.
+7. Boot fatiado: `yield` entre as etapas/regiões da `IlhaMestre` atrás da tela de carregamento; cobrar pior quadro < 100 ms.
+8. Editor de HUD (arrastar/resetar/opacidade, salvo local) sobre o `HudLayout.DaConfig`.
+9. Câmera: histerese no "canto" e ignorar corpos na colisão; tremor medido em quina.
+10. Repetir o GATE; só com PASS: ADR da versão do Netcode for GameObjects + fatia de rede (2 clients → tiro → dano →
+    derrubado/revive → 1 Sintonia).
+
+#### Histórico das levas anteriores (o mais novo primeiro) — o estado VIGENTE é o bloco acima
 
 ### >>> 30/09, manhã (11): lote de validação do Tripo no jogo — as 6 famílias + regra da Malha Smart
 
