@@ -216,5 +216,8 @@ namespace Arkana.UI
         }
 
         public void OnPointerUp(PointerEventData e) { Segurando = false; }
+
+        /// <summary>Desligado com o dedo em cima, o soltar nao vem: o SALTO ficava "segurando" e o corpo flutuava sozinho.</summary>
+        void OnDisable() { Segurando = false; }
     }
 }

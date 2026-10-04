@@ -343,6 +343,8 @@ namespace Arkana.UI
         AbateLinha[] _abates;
         HudAviso _aviso;
         Image _reticulo;
+        /// <summary>KNOB de leitura: branco = livre; vermelho-coral = inimigo vivo sob a mira (o tiro sai para ele).</summary>
+        static readonly Color ReticuloLivre = new Color(1f, 1f, 1f, 0.8f), ReticuloNoAlvo = new Color(1f, 0.32f, 0.26f, 0.95f);
         Image[] _hitmarker;
         RectTransform _numeros;
         readonly Dictionary<HudLogica.Numero, Text> _labels = new Dictionary<HudLogica.Numero, Text>();
@@ -432,7 +434,7 @@ namespace Arkana.UI
             MontarTopo();
 
             // reticulo + hitmarker (SEM area segura: marca o centro da camera)
-            _reticulo = Formas.Imagem(_raiz, "Reticulo", Formas.Anel(), new Color(1, 1, 1, 0.8f));
+            _reticulo = Formas.Imagem(_raiz, "Reticulo", Formas.Anel(), ReticuloLivre);
             _reticulo.rectTransform.anchorMin = new Vector2(0.5f, 0.5f); _reticulo.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             _reticulo.rectTransform.sizeDelta = new Vector2(Dp.Px(12f), Dp.Px(12f));
             var ponto = Formas.Imagem(_reticulo.transform, "Ponto", Formas.Disco(), new Color(1, 1, 1, 0.9f));
@@ -1349,6 +1351,8 @@ namespace Arkana.UI
             // rotulo da arma: pulso -> espera -> apaga
             _armaRotulo.enabled = Logica.ArmaRotuloVisivel;
             _armaRotulo.color = Formas.ComAlfa(_armaRotulo.color, Logica.ArmaRotuloAlfa);
+            // o reticulo ACENDE com inimigo vivo sob a mira (a MarcasDeAlvo ja' sabia quem; o anel ficava branco igual)
+            _reticulo.color = Marcas.Logica.SobAMira != null ? ReticuloNoAlvo : ReticuloLivre;
             // hitmarker
             float a = Logica.Hitmarker / HudLogica.HitmarkerS;
             for (int i = 0; i < 4; i++) { _hitmarker[i].enabled = a > 0f; _hitmarker[i].color = new Color(1, 1, 1, 0.85f * a); }

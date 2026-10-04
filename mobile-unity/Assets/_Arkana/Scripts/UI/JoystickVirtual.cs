@@ -101,6 +101,15 @@ namespace Arkana.UI
         public void OnPointerUp(PointerEventData e)
         {
             if (e.pointerId != _ponteiro) return;
+            Soltar();
+        }
+
+        /// <summary>Desligado com o dedo em cima (eliminado, espectador), o "soltar" nunca chega: sem isto o analogico voltava
+        /// travado na ultima direcao depois de revivido.</summary>
+        void OnDisable() { if (_ponteiro != int.MinValue) Soltar(); }
+
+        void Soltar()
+        {
             _ponteiro = int.MinValue;
             Direcao = Vector2.zero;
             _aro.color = AroSolto;

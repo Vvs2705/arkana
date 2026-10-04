@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 using Arkana.Gameplay;
+using Arkana.UI;
 
 namespace Arkana.Tests
 {
@@ -90,6 +91,41 @@ namespace Arkana.Tests
             Vector3 olho = centro + new Vector3(CameraLogica.OMBRO_X, CameraLogica.OMBRO_Y, 0f);
             Vector3 desejada = olho - Vector3.forward * CameraLogica.BRACO;
             Assert.AreEqual(desejada, CameraTerceiraPessoa.Colidir(centro, olho, desejada, null));
+        }
+
+        // ------------------------------------------------------------------ 04/10: a mira converge (BLOCO E)
+
+        [Test]
+        public void Mira_TiroDaMaoVaiAoPontoDoRaio_EIgnoraOQueEstaEntreCameraEMao()
+        {
+            // camera no ombro direito, atras; mao no eixo do corpo. O raio acha o alvo; o tiro da MAO aponta para o mesmo
+            // ponto (o arrasto saia paralelo a camera: ~1,9 m curto e 0,78 m a esquerda). Pilar colado na lente nao conta.
+            Vector3 mao = new Vector3(0f, 1.4f, 0f);
+            Vector3 olho = new Vector3(CameraLogica.OMBRO_X, CameraLogica.ALTURA_PIVO + CameraLogica.OMBRO_Y, -CameraLogica.BRACO);
+            GameObject alvo = Parede(new Vector3(0.5f, 1.5f, 20f), Vector3.one);
+            GameObject pilar = Parede(new Vector3(0.78f, 2f, -2.5f), new Vector3(0.3f, 4f, 0.3f));
+            try
+            {
+                Vector3 dir = (alvo.transform.position - olho).normalized;
+                Vector3 p = Player.PontoDoRaio(olho, dir, 40f, mao, null);
+                Assert.Greater(p.z, 19f, "o pilar entre a camera e a mao nao rouba a mira");
+                Assert.Less(Vector3.Distance(p, alvo.transform.position), 0.9f, "o raio acha o alvo");
+                Assert.Less(Vector3.Angle(p - mao, alvo.transform.position - mao), 2f, "o tiro da mao vai para onde o reticulo olha");
+            }
+            finally { Object.DestroyImmediate(alvo); Object.DestroyImmediate(pilar); }
+        }
+
+        [Test]
+        public void Olhar_EmDp_OMesmoCmGiraIgualEmQualquerTela()
+        {
+            float antes = Dp.DpiForcado;
+            try
+            {
+                Dp.DpiForcado = 160f; Vector2 a = Player.EmDp(new Vector2(160f / 2.54f, 0f));   // 1 cm a 160 dpi
+                Dp.DpiForcado = 395f; Vector2 b = Player.EmDp(new Vector2(395f / 2.54f, 0f));   // 1 cm no Poco F4 (~395 ppi)
+                Assert.AreEqual(a.x, b.x, 1e-3f, "1 cm de dedo = o mesmo giro (em px o Poco girava 2,5x)");
+            }
+            finally { Dp.DpiForcado = antes; }
         }
     }
 }

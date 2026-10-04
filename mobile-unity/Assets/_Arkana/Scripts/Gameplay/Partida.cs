@@ -27,6 +27,15 @@ namespace Arkana.Gameplay
         /// <summary>A partida em curso (o Pawn registra projeteis e pega loot por aqui). Null fora de partida.</summary>
         public static Partida Atual { get; private set; }
 
+        /// <summary>
+        /// A pergunta ao MUNDO SOLIDO (rocha, predio, ponte, chao): metros livres de `de` na direcao `dir` ate' `max`
+        /// (infinito se nada). A casca liga no PhysX (Main) ignorando os corpos; o teste e o futuro servidor injetam o deles.
+        /// Sem ninguem ligado, o mundo e' vazio (o comportamento antigo).
+        /// </summary>
+        public static Func<Vector3, Vector3, float, float> Obstaculo;
+
+        public static float Livre(Vector3 de, Vector3 dir, float max) => Obstaculo != null ? Obstaculo(de, dir, max) : float.PositiveInfinity;
+
         public readonly List<IEntidade> Arena = new List<IEntidade>();
         public readonly List<IEntidade> Bonecos = new List<IEntidade>();
         public readonly List<Projetil> Projeteis = new List<Projetil>();
@@ -203,13 +212,14 @@ namespace Arkana.Gameplay
             }
             // MURO E' COBERTURA (GDD §14): o tiro que entra no muro PARA ali — o corpo atras nem e' consultado. O muro
             // apanha pelo caminho que ja' existe: Impacto -> TerrainHit na posicao do tiro -> TerrenoReativo.Reagir (hp x Estrutura).
-            // ponytail: testa o ponto de cada passo; passo > CellSize (Raio abaixo de ~12 fps) atravessa — sub-passo se medir isso.
+            // O acerto roda em sub-passos (Projetil.SUBPASSO_M) e para no primeiro SOLIDO do mundo (Obstaculo): rocha, predio
+            // e ponte tambem sao cobertura — a mira (Player.PontoDoRaio) ja' parava neles e o tiro passava (achado de 04/10).
             Func<Vector3, IEntidade> acerto = Acerto;
             if (terreno != null) acerto = pos => NoMuro(terreno, pos) ? null : Acerto(pos);
             for (int i = Projeteis.Count - 1; i >= 0; i--)
             {
                 Projetil p = Projeteis[i];
-                bool voa = p.Tick(dt, acerto, Arena);
+                bool voa = p.Tick(dt, acerto, Arena, Livre(p.Pos, p.Dir, p.Velocidade * dt));
                 if (voa && terreno != null && NoMuro(terreno, p.Pos)) { p.Impacto(null); voa = false; }
                 // O GELO PARA O TIRO como o chao (onda 18E): quem mira no gelo acerta o gelo — o fogo derrete ONDE bateu, nao no fundo adiante
                 if (voa && terreno != null && LeituraDoTerreno.TiroNoGelo(terreno, p.Pos, Arkana.World.Ilha.SuperficieDaAgua(p.Pos.x, p.Pos.z))) { p.Impacto(null); voa = false; }

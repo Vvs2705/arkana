@@ -269,5 +269,20 @@ namespace Arkana.Tests
             Assert.AreEqual(Arma.CAJADO, slot.ArmaId, "tier melhor: pega");
             Assert.AreEqual(Loot.EMISSAO_CORPO, 0.35f, "constante de apresentacao registrada");
         }
+
+        [Test]
+        public void Manopla_CobraOElementoQueSai_EspiarNaoGira()
+        {
+            // 04/10: a manopla cobrava a mana do elemento do carrossel e atirava o do par
+            var slot = new ArmaSlot(new FakeEntidade("p", Vector3.zero, true));
+            slot.Equipar(Arma.MANOPLA, new[] { Elemento.Fogo, Elemento.Vento });
+            Elemento previsto = slot.ProximoDisparo(Elemento.Agua);
+            Assert.AreEqual(previsto, slot.ProximoDisparo(Elemento.Agua), "espiar nao gira a manopla");
+            Assert.AreEqual(previsto, slot.ElementoDoDisparo(Elemento.Agua), "o tiro que sai e' o que foi cobrado");
+            Assert.AreNotEqual(previsto, slot.ProximoDisparo(Elemento.Agua), "depois do tiro, o proximo e' o outro do par");
+            var luva = new ArmaSlot(new FakeEntidade("q", Vector3.zero, true));
+            luva.Equipar(Arma.CAJADO, null, Elemento.Terra);
+            Assert.AreEqual(Elemento.Terra, luva.ProximoDisparo(Elemento.Agua), "luva comum: o elemento dela, nao o do carrossel");
+        }
     }
 }

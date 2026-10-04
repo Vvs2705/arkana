@@ -451,14 +451,18 @@ namespace Arkana.Gameplay
             dir.y = Mathf.Clamp(dir.y, -1f, 1f);
             if (dir.sqrMagnitude < 0.0001f) dir = transform.forward;
             dir.Normalize();
-            // o spec sai do elemento QUE VAI SAIR (senao a mana cobrada e' de um elemento e o tiro de outro)
-            ArmaSpec spec = Slot.Spec(Slot.ElementoDaLuva ?? Elemento);
+            // o spec sai do elemento QUE VAI SAIR (senao a mana cobrada e' de um elemento e o tiro de outro): a manopla so'
+            // gira depois de pagar
+            Elemento el = Slot.ProximoDisparo(Elemento);
+            ArmaSpec spec = Slot.Spec(el);
             if (Mana < spec.ManaCost) return false;
-            Elemento el = Slot.ElementoDoDisparo(Elemento);
+            Slot.ElementoDoDisparo(Elemento);
             EscreverMana(Mana - spec.ManaCost);
             _fireCd = spec.FireRate * CadenciaMult;
-            Vector3 origem = transform.position + Vector3.up * ALTURA_MAO + dir * SAIDA_TIRO;
+            Vector3 mao = transform.position + Vector3.up * ALTURA_MAO;
+            Vector3 origem = Projetil.Saida(mao, dir, SAIDA_TIRO, Partida.Livre(mao, dir, SAIDA_TIRO), out bool colado);
             Projetil p = Projetil.Lancar(this, origem, dir, el, Slot);
+            if (colado) p.Impacto(null);   // encostado na parede o tiro bate NELA (e a Partida descarta o morto), nao nasce do outro lado
             RegistrarProjetil(p);   // o mesmo caminho do tiro de kit (KitRunner.AoLancar)
             if (Runner != null) Runner.NotificarAtaque();   // atacar quebra a Entrelinha da Veu
             Gesto("cast", GESTO_CAST_S);

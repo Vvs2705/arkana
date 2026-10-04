@@ -48,6 +48,14 @@ namespace Arkana.Gameplay
             return new[] { ElementoDaLuva ?? escolhido };
         }
 
+        /// <summary>O elemento que o PROXIMO disparo vai usar, SEM girar a manopla: o tiro cobra mana e cadencia dele e so' gira
+        /// depois de pagar (antes a manopla cobrava o elemento do carrossel e atirava o do par — achado de 04/10).</summary>
+        public Elemento ProximoDisparo(Elemento escolhido)
+        {
+            Elemento[] els = Elementos(escolhido);
+            return els.Length >= 2 ? els[(_alt + 1) % els.Length] : ElementoDaLuva ?? escolhido;
+        }
+
         /// <summary>Elemento DESTE disparo. Manopla alterna os 2 fixos tiro a tiro; a luva manda o dela.</summary>
         public Elemento ElementoDoDisparo(Elemento escolhido)
         {

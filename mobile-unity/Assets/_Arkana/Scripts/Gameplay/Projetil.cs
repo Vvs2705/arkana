@@ -75,29 +75,56 @@ namespace Arkana.Gameplay
             return p;
         }
 
+        /// <summary>m: o maior pedaco de voo entre dois testes de acerto. A hitbox do corpo tem ~1,2 m de largura: pedacos de
+        /// ate' 0,5 m nao pulam por cima dela. Antes era 1 teste por quadro — Raio + Cajado a 30 FPS andava 1,46 m e errava
+        /// ate' no centro do alvo (achado de 04/10).</summary>
+        public const float SUBPASSO_M = 0.5f;
+
         /// <summary>
-        /// Um passo de voo. `acerto(pos)` devolve quem esta' na hitbox (ou null); `vizinhos` alimenta o arco de
-        /// conducao. Devolve true se o projetil ainda voa.
+        /// Um passo de voo, em pedacos de SUBPASSO_M. `acerto(pos)` devolve quem esta' na hitbox (ou null); `vizinhos` alimenta
+        /// o arco de conducao; `livreM` = metros ate' o primeiro SOLIDO do mundo neste quadro (a casca mede: Partida.Obstaculo) —
+        /// quem estiver antes dele leva o tiro, depois dele nao: a rocha e' cobertura, como a mira ja' tratava. Devolve true se
+        /// o projetil ainda voa.
         /// </summary>
-        public bool Tick(float dt, Func<Vector3, IEntidade> acerto = null, IList<IEntidade> vizinhos = null)
+        public bool Tick(float dt, Func<Vector3, IEntidade> acerto = null, IList<IEntidade> vizinhos = null, float livreM = float.PositiveInfinity)
         {
             if (!Vivo || dt <= 0f) return false;
             float passo = Velocidade * dt;
-            Pos += Dir * passo;
-            if (ElementoDoTiro == Elemento.Agua)
+            int n = Mathf.Max(1, Mathf.CeilToInt(passo / SUBPASSO_M));
+            float sdt = dt / n, sub = passo / n, andou = 0f;
+            for (int k = 0; k < n; k++)
             {
-                _queda += WATER_ARC * dt;
-                Pos += new Vector3(0f, -_queda * dt, 0f);
-            }
-            AlcanceRestante -= passo;
-            if (acerto != null)
-            {
-                IEntidade alvo = acerto(Pos);
-                // PONTE A4: o tiro direto ATRAVESSA o aliado (fogo amigo desligado); o terreno segue pegando todo mundo
-                if (alvo != null && !Combat.MesmoTime(alvo, Atirador)) { Impacto(alvo, vizinhos); return false; }
+                if (andou + sub > livreM)
+                {
+                    Pos += Dir * Mathf.Max(livreM - andou, 0f);   // o tiro para NO solido (a cor do impacto, o fogo na parede)
+                    Impacto(null, vizinhos);
+                    return false;
+                }
+                Pos += Dir * sub;
+                andou += sub;
+                AlcanceRestante -= sub;
+                if (ElementoDoTiro == Elemento.Agua)
+                {
+                    _queda += WATER_ARC * sdt;
+                    Pos += new Vector3(0f, -_queda * sdt, 0f);
+                }
+                if (acerto != null)
+                {
+                    IEntidade alvo = acerto(Pos);
+                    // PONTE A4: o tiro direto ATRAVESSA o aliado (fogo amigo desligado); o terreno segue pegando todo mundo
+                    if (alvo != null && !Combat.MesmoTime(alvo, Atirador)) { Impacto(alvo, vizinhos); return false; }
+                }
             }
             if (AlcanceRestante <= 0f) Vivo = false;
             return Vivo;
+        }
+
+        /// <summary>De onde o tiro NASCE: `saida` m a frente da mao, ou no solido colado nela (`livreM` = metros livres da mao
+        /// na direcao do tiro). Sem isto, encostado na parede, o tiro nascia do outro lado dela.</summary>
+        public static Vector3 Saida(Vector3 mao, Vector3 dir, float saida, float livreM, out bool colado)
+        {
+            colado = livreM < saida;
+            return mao + dir * (colado ? Mathf.Max(livreM, 0f) : saida);
         }
 
         /// <summary>

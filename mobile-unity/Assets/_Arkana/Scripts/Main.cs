@@ -238,8 +238,23 @@ namespace Arkana
         static readonly Dictionary<Projetil.Forma, Mesh> _malhas = new Dictionary<Projetil.Forma, Mesh>();
         static readonly Dictionary<Elemento, Material> _materiais = new Dictionary<Elemento, Material>();
 
+        static readonly RaycastHit[] _solidos = new RaycastHit[16];
+
+        /// <summary>Metros livres ate' o primeiro SOLIDO do mundo (rocha, predio, ponte, chao, muro, gelo) — os corpos
+        /// (CharacterController) ficam de fora: acerto em corpo e' a hitbox da Partida. Sem lixo por tiro (NonAlloc).</summary>
+        static float DistanciaLivre(Vector3 de, Vector3 dir, float max)
+        {
+            if (!(max > 0f)) return float.PositiveInfinity;
+            int n = Physics.RaycastNonAlloc(de, dir, _solidos, max, ~0, QueryTriggerInteraction.Ignore);
+            float livre = float.PositiveInfinity;
+            for (int i = 0; i < n; i++)
+                if (!(_solidos[i].collider is CharacterController) && _solidos[i].distance < livre) livre = _solidos[i].distance;
+            return livre;
+        }
+
         void Awake()
         {
+            Partida.Obstaculo = DistanciaLivre;   // o tiro para no mundo solido (a simulacao pergunta; o PhysX responde)
             GarantirEventSystem();
             if (GetComponent<AudioListener>() == null) gameObject.AddComponent<AudioListener>();   // o unico ouvinte da cena (menu e partida)
             Sfx = Sfx.Criar();

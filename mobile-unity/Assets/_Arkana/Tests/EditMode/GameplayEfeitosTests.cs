@@ -174,5 +174,52 @@ namespace Arkana.Tests
             Assert.AreEqual(Balance.Combate.Knockback * Balance.Vento.Empurrao, Projetil.Lancar(bot, Vector3.zero, Vector3.forward, Elemento.Vento, null).Empurrao(true), 0.001f, "vento empurra 2x no chao");
             Assert.AreEqual(Balance.Combate.Knockback, Projetil.Lancar(bot, Vector3.zero, Vector3.forward, Elemento.Vento, null).Empurrao(false), 0.001f, "nada de juggle no ar");
         }
+
+        // ------------------------------------------------------------- 04/10: o tiro nao atravessa (BLOCO E)
+
+        [Test]
+        public void Projetil_QuadroLento_NaoAtravessaOAlvo_SubPassos()
+        {
+            // 1 teste de acerto por quadro: com passo de 1,5 m a hitbox de ~1,2 m ficava ENTRE dois pontos e o tiro passava
+            var eu = new FakeEntidade("eu", Vector3.zero, true);
+            var alvo = new FakeEntidade("alvo", new Vector3(0f, 0f, 0.75f));
+            Projetil p = Projetil.Lancar(eu, Vector3.zero, Vector3.forward, Elemento.Raio);
+            float dt = 1.5f / p.Velocidade;   // 1,5 m num quadro so' (Raio + Cajado a 30 FPS anda 1,46 m)
+            IEntidade Hit(Vector3 pos) => Mathf.Abs(pos.z - alvo.Pos.z) <= 0.6f ? alvo : null;
+            Assert.IsFalse(p.Tick(dt, Hit), "o tiro acertou no meio do passo");
+            Assert.AreEqual(1, _danos.Count, "e o dano entrou uma vez");
+        }
+
+        [Test]
+        public void Projetil_ParaNoSolido_QuemEstaAntesLeva_QuemEstaDepoisNao()
+        {
+            var eu = new FakeEntidade("eu", Vector3.zero, true);
+            var atras = new FakeEntidade("atras", new Vector3(0f, 0f, 3f));
+            Projetil p = Projetil.Lancar(eu, Vector3.zero, Vector3.forward, Elemento.Fogo);
+            IEntidade Hit(Vector3 pos) => Mathf.Abs(pos.z - 3f) <= 0.6f ? atras : null;
+            float dt = 4f / p.Velocidade;
+            Assert.IsFalse(p.Tick(dt, Hit, null, 2f), "uma rocha a 2 m para o tiro");
+            Assert.AreEqual(2f, p.Pos.z, 1e-3f, "o impacto e' NA rocha");
+            Assert.AreEqual(0, _danos.Count, "quem esta' atras da rocha nao leva");
+            Assert.AreEqual(1, _terrain.Count, "o impacto no solido acende o terreno (fogo na parede)");
+
+            var frente = new FakeEntidade("frente", new Vector3(0f, 0f, 1f));
+            Projetil q = Projetil.Lancar(eu, Vector3.zero, Vector3.forward, Elemento.Fogo);
+            IEntidade Hit2(Vector3 pos) => Mathf.Abs(pos.z - 1f) <= 0.6f ? frente : null;
+            Assert.IsFalse(q.Tick(dt, Hit2, null, 2f));
+            Assert.AreEqual(1, _danos.Count, "quem esta' ANTES da rocha leva o tiro");
+        }
+
+        [Test]
+        public void Projetil_EncostadoNaParede_NasceNela_NaoDoOutroLado()
+        {
+            Vector3 mao = new Vector3(0f, 1.4f, 0f);
+            Vector3 o = Projetil.Saida(mao, Vector3.forward, Pawn.SAIDA_TIRO, 0.3f, out bool colado);
+            Assert.IsTrue(colado);
+            Assert.AreEqual(0.3f, o.z, 1e-4f, "nasce na face da parede a 0,3 m da mao");
+            o = Projetil.Saida(mao, Vector3.forward, Pawn.SAIDA_TIRO, float.PositiveInfinity, out colado);
+            Assert.IsFalse(colado);
+            Assert.AreEqual(Pawn.SAIDA_TIRO, o.z, 1e-4f, "livre: a saida de sempre, a frente da mao");
+        }
     }
 }

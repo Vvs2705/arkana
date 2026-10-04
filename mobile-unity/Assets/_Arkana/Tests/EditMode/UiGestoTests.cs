@@ -114,5 +114,20 @@ namespace Arkana.Tests
         {
             Assert.AreEqual(14f, Dp.PxCom(14f, 0f), 1e-4f, "dpi 0 (editor) cai em 160");
         }
+
+        [Test]
+        public void Largar_DesligadoComODedoEmCima_CancelaSemAtirar()
+        {
+            // eliminado com o dedo no botao: o SetActive(false) engolia o soltar e o botao ficava preso depois de revivido
+            _g.Pressionar(new Vector2(100, 100), 0);
+            _g.Arrastar(new Vector2(160, 100));
+            _g.Largar();
+            Assert.AreEqual(0, _disparos, "o botao sumiu: nao e' tiro");
+            Assert.AreEqual(1, _cancelamentos, "avisa a mira para largar");
+            Assert.IsFalse(_g.Pressionado, "e o proximo toque funciona");
+            _g.Pressionar(new Vector2(100, 100), 1000);
+            _g.Soltar(1100);
+            Assert.AreEqual(1, _disparos, "toque curto depois de revivido dispara");
+        }
     }
 }

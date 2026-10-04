@@ -77,6 +77,16 @@ namespace Arkana.UI
             Cancelou?.Invoke();   // segurou parado alem do tap: nao e' tiro, e' desistencia
         }
 
+        /// <summary>O dedo SUMIU sem soltar (o botao foi desligado: eliminado, espectador). Larga o gesto sem atirar e avisa
+        /// Cancelou — sem isto o botao ficava "pressionado" para sempre e nao respondia mais.</summary>
+        public void Largar()
+        {
+            if (!_pressionado) return;
+            _pressionado = false;
+            Estado = EstadoGesto.Ocioso;
+            Cancelou?.Invoke();
+        }
+
         /// <summary>Anel aceso = mira valida; X = cancelando. O visual diz se soltar dispara.</summary>
         public bool MostraAnel => Estado == EstadoGesto.Mirando && _mirou;
         public bool MostraXis => Estado == EstadoGesto.Cancelando;
@@ -185,6 +195,14 @@ namespace Arkana.UI
             if (e.pointerId != _ponteiro) return;
             _ponteiro = int.MinValue;
             Gesto.Soltar(AgoraMs);
+            Pintar();
+        }
+
+        void OnDisable()
+        {
+            if (_ponteiro == int.MinValue) return;
+            _ponteiro = int.MinValue;
+            Gesto.Largar();   // desligado com o dedo em cima: o soltar nao vem
             Pintar();
         }
     }

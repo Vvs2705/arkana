@@ -74,14 +74,21 @@ namespace Arkana.Gameplay
 
         // ---------------------------------------------------------------- verbos
 
-        public void OlharDelta(Vector2 deltaPx) { if (Pawn.Viva) Camera.Logica.Olhar(deltaPx, _mirando); }
+        public void OlharDelta(Vector2 deltaPx) { if (Pawn.Viva) Camera.Logica.Olhar(EmDp(deltaPx), _mirando); }
 
-        /// <summary>Tap (gesto zero) = mira da camera no reticulo; arrasto = direcao do gesto.</summary>
+        /// <summary>O arrasto do olhar em DP (regra do projeto: o que o dedo sente vive em dp). Em px, o Poco (395 ppi) girava
+        /// ~71 graus por cm, 2,5x o calibrado (diagnostico de 24/09); a SENS_BASE foi pensada para 160 dpi.</summary>
+        public static Vector2 EmDp(Vector2 px) => px / Dp.Px(1f);
+
+        /// <summary>Tap (gesto zero) = o reticulo; arrasto = o raio da camera girado pelo gesto. Nos dois, o tiro sai da MAO para
+        /// o ponto que o raio acha — antes o arrasto saia paralelo a camera e caia ~1,9 m curto e 0,78 m a esquerda.</summary>
         public void DisparoMirado(Vector2 gesto)
         {
             _mirando = false;
             Vector3 origem = Pawn.Pos + Vector3.up * Pawn.ALTURA_MAO;
-            Vector3 dir = gesto.sqrMagnitude < 0.0001f ? (PontoDeMira() - origem).normalized : Camera.Logica.MiraDoGesto(gesto);
+            Vector3 raio = gesto.sqrMagnitude < 0.0001f ? Camera.Logica.Direcao3D : Camera.Logica.MiraDoGesto(gesto);
+            float alcance = Pawn.Slot.Spec(Pawn.Slot.ProximoDisparo(Pawn.Elemento)).Range + CameraLogica.BRACO;
+            Vector3 dir = (PontoDoRaio(Camera.transform.position, raio, alcance, origem, Pawn.transform) - origem).normalized;
             if (Pawn.Atirar(dir)) { Pawn.YawAlvo = Camera.Logica.Yaw; _miraAteS = Time.time + MIRA_APOS_TIRO_S; }   // o corpo gira para a mira ao disparar e segura o gesto inteiro
         }
 
@@ -125,19 +132,24 @@ namespace Arkana.Gameplay
             Bus.EmitElementChanged(e);
         }
 
-        /// <summary>O ponto que o reticulo olha: raio do olho da camera ate' o alcance da arma, ignorando o proprio corpo.</summary>
-        private Vector3 PontoDeMira()
+        static readonly RaycastHit[] _hits = new RaycastHit[32];
+
+        /// <summary>
+        /// O ponto que um raio da CAMERA olha (`de` -> `dir`) ate' `alcance`: o primeiro colisor que nao seja o proprio corpo
+        /// (`ignorar`) nem esteja ENTRE a camera e a mao — um pilar colado no ombro da camera parava o raio antes da mao e o
+        /// tiro saia de lado. Sem nada no caminho, o fim do alcance. Sem lixo por tiro (NonAlloc).
+        /// </summary>
+        public static Vector3 PontoDoRaio(Vector3 de, Vector3 dir, float alcance, Vector3 mao, Transform ignorar)
         {
-            Vector3 de = Camera.transform.position;
-            Vector3 dir = Camera.Logica.Direcao3D;
-            float alcance = Pawn.Slot.Spec(Pawn.Slot.ElementoDaLuva ?? Pawn.Elemento).Range + CameraLogica.BRACO;
+            float antesDaMao = Mathf.Max(Vector3.Dot(mao - de, dir), 0f);
             Vector3 ate = de + dir * alcance;
-            RaycastHit[] hits = Physics.RaycastAll(de, dir, alcance, ~0, QueryTriggerInteraction.Ignore);
+            int n = Physics.RaycastNonAlloc(de, dir, _hits, alcance, ~0, QueryTriggerInteraction.Ignore);
             float melhor = float.PositiveInfinity;
-            for (int i = 0; i < hits.Length; i++)
+            for (int i = 0; i < n; i++)
             {
-                if (hits[i].collider == null || hits[i].collider.transform.IsChildOf(Pawn.transform)) continue;
-                if (hits[i].distance < melhor) { melhor = hits[i].distance; ate = hits[i].point; }
+                Collider c = _hits[i].collider;
+                if (c == null || (ignorar != null && c.transform.IsChildOf(ignorar)) || _hits[i].distance < antesDaMao) continue;
+                if (_hits[i].distance < melhor) { melhor = _hits[i].distance; ate = _hits[i].point; }
             }
             return ate;
         }

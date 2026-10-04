@@ -14,7 +14,8 @@ namespace Arkana.Gameplay
     {
         public enum Modo { Normal, Castelo, Queda }
 
-        /// <summary>rad por px com o slider no PADRAO (3.0). KNOB: mexer aqui move a faixa inteira do menu.</summary>
+        /// <summary>rad por DP com o slider no PADRAO (3.0) — o Player converte o arrasto (Player.EmDp, 04/10; antes era px e
+        /// o Poco girava 2,5x). VETAVEL no aparelho: subir o slider. KNOB: mexer aqui move a faixa inteira do menu.</summary>
         public const float SENS_BASE = 0.008f / 3f;
         // CASTELO e QUEDA recalibrados pela FOTO de 11/09: com braco de 26 m a camera ficava colada na torre (o castelo
         // tem 35,8 m de envergadura) e a ilha — o que se precisa ver para escolher onde saltar — mal aparecia; na queda,
@@ -43,7 +44,7 @@ namespace Arkana.Gameplay
             InverterY = inverterY ? -1f : 1f;
         }
 
-        /// <summary>Arrasto em px (y para cima). "Sensibilidade ao mirar" so' enquanto o dedo mira a partir do Fogo.</summary>
+        /// <summary>Arrasto em DP (y para cima). "Sensibilidade ao mirar" so' enquanto o dedo mira a partir do Fogo.</summary>
         public void Olhar(Vector2 deltaPx, bool mirando)
         {
             float s = Sens * (mirando ? SensMira : 1f);
