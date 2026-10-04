@@ -47,6 +47,35 @@ namespace Arkana.EditorTools
                     + " Spine=" + N(sp) + " Chest=" + N(ch) + " UpperChest=" + N(uc));
                 Object.DestroyImmediate(g);
             }
+            // o MESMO clipe no esqueleto de origem (X Bot do proprio FBX do Mixamo): separa "o clipe e' assim" de "o retarget torceu"
+            foreach (string clipe in new[] { "standing-idle", "standing-run-forward", "standing-1h-magic-attack-01" })
+            {
+                string caminho = ControladorHumanoide.Pasta + "mixamo-" + clipe + ".fbx";
+                var fonte = AssetDatabase.LoadAssetAtPath<GameObject>(caminho);
+                Avatar avf = null; AnimationClip ac = null;
+                foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(caminho))
+                {
+                    if (o is Avatar av2) avf = av2;
+                    if (o is AnimationClip c2 && !c2.name.StartsWith("__preview__")) ac = c2;
+                }
+                GameObject x = Object.Instantiate(fonte);
+                var ax = x.GetComponent<Animator>() ?? x.AddComponent<Animator>();
+                ax.avatar = avf;
+                var graph = UnityEngine.Playables.PlayableGraph.Create("diag");
+                var saida = UnityEngine.Animations.AnimationPlayableOutput.Create(graph, "o", ax);
+                var cp = UnityEngine.Animations.AnimationClipPlayable.Create(graph, ac);
+                saida.SetSourcePlayable(cp);
+                cp.SetTime(Mathf.Repeat(1f, ac.length));   // o mesmo instante do idle do mago (30 quadros de 1/30 s)
+                graph.Evaluate(0f);
+                Transform xr = x.transform;
+                Transform l1 = ax.GetBoneTransform(HumanBodyBones.LeftUpperArm), l2 = ax.GetBoneTransform(HumanBodyBones.LeftLowerArm);
+                Transform r1 = ax.GetBoneTransform(HumanBodyBones.RightUpperArm), r2 = ax.GetBoneTransform(HumanBodyBones.RightLowerArm);
+                sb.AppendLine("== ORIGEM X Bot '" + clipe + "' avatar=" + (avf != null && avf.isHuman) + ": E "
+                    + xr.InverseTransformDirection(l2.position - l1.position).normalized.ToString("F2") + " D "
+                    + xr.InverseTransformDirection(r2.position - r1.position).normalized.ToString("F2"));
+                graph.Destroy();
+                Object.DestroyImmediate(x);
+            }
             System.IO.Directory.CreateDirectory("Logs");
             System.IO.File.WriteAllText("Logs/mecanim-diag.txt", sb.ToString());
             Debug.Log("ARKANA MIXAMO diag gravado");
