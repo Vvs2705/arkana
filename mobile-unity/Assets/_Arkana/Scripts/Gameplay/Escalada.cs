@@ -95,6 +95,9 @@ namespace Arkana.Gameplay
             alem.y = pe.y + teto;
             if (!Solido(alem, Vector3.down, teto, out RaycastHit cima)) return false;
             altura = cima.point.y - pe.y;
+            // o 1o solido de cima para baixo acima do limite e' parede alta ou TETO sobre o obstaculo (o raio nem chega no topo
+            // dele): nao se sobe
+            if (altura > Balance.Move.EscaladaMax) return false;
             topo = cima.point;
             fim = cima.point + frente * (raio + 0.15f);
             float r = raio * 0.9f;
