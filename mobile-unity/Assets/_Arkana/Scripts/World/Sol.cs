@@ -90,7 +90,9 @@ namespace Arkana.World
             // resolucao, cascatas, macia e bias moram no URP_Base. ponytail: bias 1/1 do URP (o 7x7 escala para 3,5 texels:
             // sem acne ate' ~70 graus de rasante; na 1a cascata o calcanhar fica ~3 cm acima da sombra e o SSAO fecha o
             // contato). Pe' flutuando na foto: depth bias 0,6 no asset e conferir a acne na encosta.
-            if (urp != null) urp.shadowDistance = alcance;
+            // no editor o asset URP e' o ARQUIVO do projeto: mudar em Play gravava 50 -> 60 no disco e o build seguinte
+            // salvava (a mesma guarda da Config). O aparelho segue com o alcance por altura.
+            if (urp != null && !Application.isEditor) urp.shadowDistance = alcance;
             QualitySettings.shadowDistance = alcance;
         }
 

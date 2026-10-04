@@ -17,6 +17,9 @@ if (-not (Get-Process "Unity Hub" -ErrorAction SilentlyContinue)) {
     Start-Sleep -Seconds 25
 }
 
+# O BUILD NAO PODE SUJAR O REPO (04/10/2026: 22 commits de "Main.unity regravada pelo build"): fotografa o git antes e
+# compara depois; o que o build mudou em arquivo VERSIONADO falha com 6 (os artefatos esperados ja' estao no .gitignore).
+$Antes = @(git -C $Proj status --porcelain -- .)
 $UnityArgs = @("-batchmode", "-nographics", "-projectPath", "`"$Proj`"", "-buildTarget", "Android",
                "-executeMethod", "Arkana.EditorTools.Build.Android", "-logFile", "`"$Log`"", "-quit")
 $P = Start-Process -FilePath $Unity -ArgumentList $UnityArgs -PassThru -NoNewWindow
@@ -36,5 +39,11 @@ if (Test-Path $Apk) {
     "APK: $Stamped ($([math]::Round((Get-Item $Stamped).Length / 1MB, 1)) MB)"
 } else {
     "APK NAO GERADO (Unity exit code $($P.ExitCode)). Leia $Log."
+}
+$Sujou = @(git -C $Proj status --porcelain -- . | Where-Object { $Antes -notcontains $_ })
+if ($Sujou.Count -gt 0) {
+    "BUILD SUJOU O REPO (arquivo versionado regravado pelo build):"
+    $Sujou
+    if ($P.ExitCode -eq 0) { exit 6 }
 }
 exit $P.ExitCode

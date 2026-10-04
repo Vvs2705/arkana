@@ -163,7 +163,9 @@ namespace Arkana.EditorTools
 
             ApplySettings();
             if (ajustes != null) ajustes();
-            MainSceneBuilder.Build();
+            // a cena por codigo so' quando falta: remontada a cada build ela ganhava fileIDs novos com o MESMO conteudo e
+            // sujava o git (22 commits "Main.unity regravada pelo build"). Mudou o MainSceneBuilder? Menu Arkana/Montar cena Main.
+            if (!File.Exists(ScenePath)) MainSceneBuilder.Build();
 
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
