@@ -21,6 +21,19 @@ namespace Arkana.EditorTools
         void OnPreprocessModel()
         {
             string p = assetPath.Replace('\\', '/');
+            if (EhMixamo(p))
+            {
+                var mx = (ModelImporter)assetImporter;
+                mx.animationType = ModelImporterAnimationType.Human;
+                mx.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                mx.importAnimation = true;
+                mx.importBlendShapes = false;
+                mx.importCameras = false;
+                mx.importLights = false;
+                mx.isReadable = false;
+                mx.materialImportMode = ModelImporterMaterialImportMode.None;
+                return;
+            }
             if (!p.Contains("/Resources/magos/")) return;
             var mi = (ModelImporter)assetImporter;
             mi.animationType = ModelImporterAnimationType.Legacy;
@@ -28,6 +41,43 @@ namespace Arkana.EditorTools
             mi.importBlendShapes = false;
             mi.isReadable = false;
             mi.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+        }
+
+        /// <summary>
+        /// Resources/mixamo-*.fbx: a biblioteca HUMANOIDE do Mixamo (04/10/2026, design/pipeline/MIXAMO.md), baixada SEM
+        /// personagem no X Bot. Humanoid com o Avatar do proprio arquivo (esqueleto mixamorig); sem malha nem material.
+        /// </summary>
+        public static bool EhMixamo(string p) =>
+            p.Contains("/Resources/") && System.IO.Path.GetFileName(p).StartsWith("mixamo-", System.StringComparison.Ordinal);
+
+        /// <summary>Clipes que repetem: parados, passadas, a queda no ar, rastejar e boiar. Transicao ("-to-"), pulo, golpe,
+        /// magia e morte tocam uma vez.</summary>
+        public static bool EmLaco(string nome) =>
+            (nome.Contains("idle") && !nome.Contains("-to-")) || nome.Contains("walk") || nome.Contains("sprint")
+            || (nome.Contains("run") && !nome.Contains("jump")) || nome == "queda-no-ar" || nome == "rastejar" || nome == "boiar";
+
+        /// <summary>
+        /// O clipe do Mixamo: nome = o do arquivo (o FBX grava "mixamo.com" em todos) e o CORPO NO LUGAR — quem move e' a
+        /// fisica do Pawn. Giro assado na pose (sem deriva), altura assada pelos PES (no pouso e no derrubado o pe' fica no
+        /// chao; no pulo as pernas dobram sem a malha subir por cima do salto do jogo), o andar no plano vai para o root
+        /// motion que o Animator descarta (applyRootMotion desligado): passada sem deslizar o corpo.
+        /// </summary>
+        void OnPreprocessAnimation()
+        {
+            string p = assetPath.Replace('\\', '/');
+            if (!EhMixamo(p)) return;
+            var mi = (ModelImporter)assetImporter;
+            string nome = System.IO.Path.GetFileNameWithoutExtension(p).Substring("mixamo-".Length);
+            ModelImporterClipAnimation[] cs = mi.defaultClipAnimations;
+            foreach (ModelImporterClipAnimation c in cs)
+            {
+                c.name = nome;
+                c.loopTime = c.loopPose = EmLaco(nome);
+                c.lockRootRotation = true; c.keepOriginalOrientation = true;
+                c.lockRootHeightY = true; c.keepOriginalPositionY = false; c.heightFromFeet = true;
+                c.lockRootPositionXZ = false;
+            }
+            mi.clipAnimations = cs;
         }
 
         // depois do preprocessador do URP (que faz o Lit): quem fala por ultimo sobre o material do mago somos nos
