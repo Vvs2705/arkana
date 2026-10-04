@@ -472,6 +472,77 @@ namespace Arkana.Tests
             Object.Destroy(m.gameObject);
         }
 
+        /// <summary>
+        /// O MECANIM no Validation Set (04/10/2026, biblioteca do Mixamo): a folha 60-mecanim-&lt;slug&gt;.png com 12 quadros —
+        /// parado, correr, strafe esq/dir, recuo, correr ATIRANDO (magia no tronco, pernas correndo), tatica (2 maos),
+        /// pulo, ar, golpe, derrubado, boiar. Camera de 3/4 pela frente-esquerda (o cruzar de pernas do strafe aparece).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Mecanim_ValidationSet([Values("16-fizz", "05-corvomante", "18-basalto")] string slug)
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(1.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+
+            Vector3 p = main.Player.Pawn.Pos + new Vector3(12f, 0f, 0f);
+            p.y = Arkana.World.Ilha.AlturaDoChao(p.x, p.z) + 1.2f;
+            var m = Arkana.Characters.Mago.Criar(null, slug);
+            m.transform.position = p;
+            Assert.IsTrue(m.Mecanim, slug + ": o Mecanim nao assumiu (controller? Avatar?)");
+            float alto = Mathf.Max(m.Altura, 0.8f);
+            Vector3 olho = p + new Vector3(-0.55f, 0.62f, 1f).normalized * (alto * 2.3f + 1.2f) + Vector3.up * alto * 0.15f;
+            Camera cam = CameraTemporaria("CamFotoMecanim", olho, p + Vector3.up * alto * 0.5f, Color.gray);
+
+            float v = Arkana.Core.Balance.Player.Speed;
+            var quadros = new (string nome, string pedido, Vector3 vel, string extra)[]
+            {
+                ("parado", "idle", Vector3.zero, null), ("correr", "run", new Vector3(0f, 0f, v), null),
+                ("strafe-esq", "run", new Vector3(-v, 0f, 0f), null), ("strafe-dir", "run", new Vector3(v, 0f, 0f), null),
+                ("recuo", "andar_tras", new Vector3(0f, 0f, -v * 0.7f), null), ("correr-atirando", "run", new Vector3(0f, 0f, v), "cast"),
+                ("tatica", "idle", Vector3.zero, "tatica"), ("pulo", "pular", new Vector3(0f, 0f, v), null),
+                ("ar", "cair", Vector3.zero, null), ("golpe", "idle", Vector3.zero, "golpe"),
+                ("derrubado", "derrubado", Vector3.zero, null), ("boiar", "nadar", Vector3.zero, null),
+            };
+            const int cw = 400, ch = 560, colunas = 6;
+            int linhas = (quadros.Length + colunas - 1) / colunas;
+            var folha = new Texture2D(cw * colunas, ch * linhas, TextureFormat.RGB24, false);
+            var rt = new RenderTexture(cw, ch, 24, RenderTextureFormat.ARGB32);
+            cam.targetTexture = rt;
+            var diag = new System.Text.StringBuilder("60-mecanim-" + slug + ":");
+            for (int i = 0; i < quadros.Length; i++)
+            {
+                var q = quadros[i];
+                m.Play("idle");
+                yield return null;
+                m.VelocidadeLocal = q.vel;
+                m.SetVelocidade(new Vector2(q.vel.x, q.vel.z).magnitude);
+                m.Play(q.pedido);
+                if (q.extra == "golpe") m.Golpe(Vector3.left);
+                else if (q.extra != null) m.Play(q.extra);
+                yield return Esperar(q.extra != null || q.pedido == "pular" ? 0.3f : 0.9f);
+                if (q.pedido == "derrubado") yield return Esperar(1.6f);   // deitado
+                cam.Render();
+                RenderTexture.active = rt;
+                folha.ReadPixels(new Rect(0, 0, cw, ch), (i % colunas) * cw, (linhas - 1 - i / colunas) * ch);
+                RenderTexture.active = null;
+                diag.Append(" " + q.nome + "[" + m.Estado() + "]");
+            }
+            folha.Apply();
+            Directory.CreateDirectory(Pasta);
+            File.WriteAllBytes(Path.Combine(Pasta, "60-mecanim-" + slug + ".png"), folha.EncodeToPNG());
+            File.AppendAllText(Path.Combine(Pasta, "diag.txt"), diag + "\n");
+            cam.targetTexture = null;
+            Object.Destroy(folha);
+            rt.Release();
+            Object.Destroy(rt);
+            Object.Destroy(cam.gameObject);
+            Object.Destroy(m.gameObject);
+        }
+
         [UnityTest]
         public IEnumerator Foto_Partida_CasteloQuedaPouso()
         {
