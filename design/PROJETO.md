@@ -82,6 +82,12 @@ o Validation Set passou na foto); vault automático ao correr de encontro; teto 
 movimento **PASSA**; pulo/queda/pouso **PASSA**; fallback **PASSA** (testes do legado forçam a reserva). Segue
 **BLOCKED_HARDWARE** a performance (custo do Animator Humanoid × 18 corpos não medido) e a patinação vista no aparelho.
 
+**Emulador (04/10, 11h20, APK de emulador do mesmo `main`):** PASSA — 150 s vivo, 0 crash, 0 erro/exceção no log da
+Unity, mago no idle do Mixamo com o HUD (`Logs/emulador/2026-10-04_1120/tela.png`). A linha `ARKANA CUSTO` sai no
+logcat. Achado de custo (vale para o Poco): no chão a cena desenha **~9,8 M triângulos e ~4.400 batches** por quadro —
+o cenário domina (os 18 magos somam ~0,6 M). O FPS do emulador não vale como medida; o corte de triângulos/batches
+(LOD/impostor das árvores, peças da ilha) sobe na fila logo depois da medida no aparelho.
+
 **CONTINUAR DAQUI (13):** (1) Poco no USB → instalar o APK novo → jogar: strafe, recuo, correr atirando, tática/suprema,
 pular por cima de cerca/rocha baixa, escalar beirada; ler `ARKANA CUSTO` (CPU/GPU) e comparar com 27/09. (2) Se o
 Animator pesar: `cullingMode` já corta transformações fora da tela; próximo corte é Mecanim só no jogador e nos bots
