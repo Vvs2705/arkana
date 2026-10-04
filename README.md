@@ -46,6 +46,17 @@ sobrou daquele desvio está registrado em `design/PROJETO.md` como lição.
 
 ---
 
+## Para quem vai analisar o repositório
+
+Modelos, texturas e áudio (~1,4 GB) ficam no **Git LFS**. Para ler só código e documentos, clone sem baixá-los:
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Vvs2705/arkana.git
+```
+
+Para abrir o projeto no Unity é preciso o clone completo (`git lfs install` e depois `git clone`).
+Unity **6000.3.23f1** com o módulo Android; o projeto fica em `mobile-unity/`.
+
 ## Comece por aqui
 
 **[`design/PROJETO.md`](design/PROJETO.md)** — a memória do projeto, com a seção
