@@ -82,10 +82,16 @@ namespace Arkana.Tests
             float t = 0f;
             while (eu.Queda.NoAr && t < 25f) { yield return null; t += Time.deltaTime; }
             Assert.IsFalse(eu.Queda.NoAr, "pousou");
+            Vector3 pouso = eu.Pos;
             yield return null;   // o LateUpdate do quadro do pouso le' a borda
             Vector3 d = v.UltimoPouso - eu.Pos;
             d.y = 0f;   // no mar o estalo sobe para a lamina
-            Assert.Less(d.magnitude, 1f, "o estalo foi nos pes do jogador");
+            // diagnostico (04/10: 2,2 m numa rodada): onde pousou, onde o corpo foi parar, e quem estava encostado nele
+            var perto = new System.Text.StringBuilder();
+            foreach (Collider c in Physics.OverlapCapsule(pouso + Vector3.up * 0.35f, pouso + Vector3.up * 1.45f, 0.35f, ~0, QueryTriggerInteraction.Ignore))
+                if (!(c is CharacterController)) perto.Append(c.name).Append(' ');
+            Assert.Less(d.magnitude, 1f, "o estalo foi nos pes do jogador: pouso " + pouso + " estalo " + v.UltimoPouso + " corpo " + eu.Pos
+                + " chao " + Arkana.World.Ilha.AlturaDoChao(pouso.x, pouso.z).ToString("F2") + " encostado [" + perto + "]");
             Assert.IsFalse(v.RastroAceso(eu), "no chao o rastro apaga");
             yield return Esperar(0.6f);
             Assert.AreEqual(0, v.Vento, "no chao o vento para");
