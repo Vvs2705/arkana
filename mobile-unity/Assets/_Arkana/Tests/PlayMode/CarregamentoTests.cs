@@ -38,6 +38,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator Jogar_MontaEmFatiasAtrasDaTela_EATelaSomeQuandoAPartidaComeca([Values(false, true)] bool treino)
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Arkana.Menu.Menu.PedidoDeTreino = treino;

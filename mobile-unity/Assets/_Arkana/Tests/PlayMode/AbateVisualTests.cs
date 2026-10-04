@@ -41,6 +41,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator Caido_AcendeAnel_MorteEstouraEAfunda_SoOVisualSome()
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Bus.EmitGameStartRequested();

@@ -161,7 +161,7 @@ namespace Arkana.Gameplay
             var cc = go.AddComponent<CharacterController>();
             cc.height = Partida.ALTURA_CORPO; cc.radius = Partida.RAIO_CORPO;
             cc.center = new Vector3(0f, Partida.ALTURA_CORPO * 0.5f, 0f);
-            cc.slopeLimit = 50f; cc.stepOffset = 0.4f;
+            cc.slopeLimit = Balance.Move.InclinacaoMax; cc.stepOffset = 0.4f;   // a mesma rampa que a cola da Locomocao acompanha
             var p = go.AddComponent<Pawn>();
             p.Montar(slug, ehPlayer);
             return p;
@@ -295,13 +295,23 @@ namespace Arkana.Gameplay
             est.IframesLeft = Mathf.Max(Loc.IframesLeft, _intangivelS);
             if (Agua.Nadando) desloc.y = Agua.Flutuar(transform.position, dt).y - transform.position.y;
 
-            if (_cc != null && _cc.enabled) { _cc.Move(desloc); NoChao = _cc.isGrounded; }
+            if (_cc != null && _cc.enabled)
+            {
+                Vector3 antes = transform.position;
+                _cc.Move(desloc);
+                NoChao = _cc.isGrounded;
+                Loc.Real(transform.position - antes, dt);   // contra a parede a passada para: nada de correr parado
+            }
             else { transform.position += desloc; NoChao = false; }
             // rede de seguranca: a verdade do chao e' a ilha (sem colisor, ou atravessou a malha)
             Vector3 pos = transform.position;
             float chao = Ilha.AlturaDoChao(pos.x, pos.z);
             // (dentro de caverna/tunel da IlhaMestre o chao verdadeiro e' a casca, abaixo da superficie: a rede nao puxa)
-            if (pos.y < chao && !Ilha.Subterraneo(pos)) { transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true; }
+            if (pos.y < chao && !Ilha.Subterraneo(pos))
+            {
+                transform.position = new Vector3(pos.x, chao, pos.z); NoChao = true;
+                Physics.SyncTransforms();   // sem isto o proximo Move do CharacterController parte da pose antiga
+            }
             if (NoChao && !Ilha.NoVazio(pos)) UltimoChaoSeguro = pos;
             if (Viva && Ilha.NoVazio(transform.position))   // caiu da borda da ilha flutuante: morre, e o corpo volta a beira
             {
@@ -311,6 +321,7 @@ namespace Arkana.Gameplay
                 Physics.SyncTransforms();
             }
             Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
+            if (NoChao && Loc.PuloGuardadoS > 0f) Pular();   // o SALTO tocado pouco antes de pousar sai agora (jump buffer)
 
             Virar(dt);
             Loc.AtualizarBank(transform.eulerAngles.y * Mathf.Deg2Rad, dt);

@@ -220,6 +220,14 @@ namespace Arkana.Core
             /// <summary>Graus entre a MIRA e o MOVIMENTO a partir dos quais o corpo RECUA (pernas para tras). O BackpedalMult
             /// entra em rampa de RecuoGraus-RecuoRampa (1) a RecuoGraus+RecuoRampa (cheio): sem degrau no strafe diagonal.</summary>
             public const float RecuoGraus = 105f, RecuoRampa = 15f;
+            /// <summary>KNOB (04/10, toque de celular): s depois de sair da BORDA em que o salto ainda vale (coyote). So' saindo
+            /// andando — nunca depois de um pulo (sem pulo duplo). AUMENTAR = pulo no ar; DIMINUIR = toque atrasado perdido.</summary>
+            public const float CoyoteS = 0.10f;
+            /// <summary>KNOB (04/10): s que um toque de SALTO no ar fica guardado e sai no quadro em que o pe' toca o chao (jump
+            /// buffer). Uma vaga so', sem fila. AUMENTAR = pula sozinho ao pousar; DIMINUIR = toque cedo perdido.</summary>
+            public const float PuloGuardadoS = 0.12f;
+            /// <summary>Graus de rampa que o corpo sobe (CharacterController.slopeLimit) e acompanha DESCENDO sem descolar.</summary>
+            public const float InclinacaoMax = 50f;
         }
 
         /// <summary>ANIMACAO x VELOCIDADE (R20): speed_scale sai da velocidade real — fim da patinacao.</summary>

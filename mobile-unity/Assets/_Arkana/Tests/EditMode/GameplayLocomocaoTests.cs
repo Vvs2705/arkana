@@ -176,5 +176,155 @@ namespace Arkana.Tests
             for (int i = 0; i < 60; i++) l.Tick(DT, DIR, true, false, Balance.Player.Speed, true, false, ref mana);
             Assert.AreEqual(0f, l.VelocidadeHorizontal, 1e-4f);
         }
+
+        // ------------------------------------------------------------------ 04/10: o toque do celular (Movement Lab, BLOCO B/D)
+
+        [Test]
+        public void Pulo_SegurandoSalto_SobeInteiro_FlutuaSoNaDescida()
+        {
+            // o botao fica "segurando" enquanto o dedo esta' na tela: o 2o quadro do pulo ja' flutuava e o corpo subia 8-16 cm
+            var l = new Locomocao();
+            Assert.IsTrue(l.Pular(true, false));
+            float y = 0f, topo = 0f, mana = 100f;
+            for (int i = 0; i < 90; i++)
+            {
+                y += l.Tick(DT, Vector3.zero, false, false, Balance.Player.Speed, false, true, ref mana).y;
+                topo = Mathf.Max(topo, y);
+                if (l.Vy > 0f) Assert.IsFalse(l.Flutuando, "subindo nao flutua");
+            }
+            Assert.Greater(topo, 1.25f, "o pulo sobe inteiro mesmo com o dedo no botao");
+            Assert.IsTrue(l.Flutuando, "passado o topo, segurar flutua");
+        }
+
+        [Test]
+        public void Pulo_Coyote_PerdoaOToqueAtrasado_SemPuloDuplo()
+        {
+            var l = new Locomocao();
+            l.AtualizarAr(DT, true, false);   // pisou
+            for (int i = 0; i < 4; i++) { Passo(l, Vector3.zero, DT, false); l.AtualizarAr(DT, false, false); }   // ~67 ms alem da borda
+            Assert.IsTrue(l.Pular(false, false), "saiu andando da borda ha' pouco: o salto ainda vale");
+            Passo(l, Vector3.zero, DT, false); l.AtualizarAr(DT, false, false);
+            Assert.IsFalse(l.Pular(false, false), "depois de um pulo o coyote nao da' pulo duplo");
+
+            var tarde = new Locomocao();
+            tarde.AtualizarAr(DT, true, false);
+            for (float t = 0f; t <= Balance.Move.CoyoteS + DT; t += DT) { Passo(tarde, Vector3.zero, DT, false); tarde.AtualizarAr(DT, false, false); }
+            Assert.IsFalse(tarde.Pular(false, false), "passada a janela, no ar o pulo e' negado");
+        }
+
+        [Test]
+        public void Pulo_GuardadoNoAr_SaiAoPousar_EExpira()
+        {
+            var l = new Locomocao();
+            Assert.IsFalse(l.Pular(false, false), "no ar nao pula...");
+            Assert.Greater(l.PuloGuardadoS, 0f, "...mas o toque fica guardado");
+            Passo(l, Vector3.zero, Balance.Move.PuloGuardadoS * 0.5f, false);
+            Assert.Greater(l.PuloGuardadoS, 0f, "ainda dentro da janela");
+            Assert.IsTrue(l.Pular(true, false), "pousou: a casca pula com o toque guardado");
+            Assert.AreEqual(0f, l.PuloGuardadoS, "o guardado foi usado (uma vaga so', sem fila)");
+
+            var cedo = new Locomocao();
+            cedo.Pular(false, false);
+            Passo(cedo, Vector3.zero, Balance.Move.PuloGuardadoS + 0.01f, false);
+            Assert.AreEqual(0f, cedo.PuloGuardadoS, "toque cedo demais expira: nada de pular sozinho muito depois");
+        }
+
+        [Test]
+        public void Atordoado_NaoEsquivaNemPula()
+        {
+            var l = new Locomocao();
+            float mana = 100f;
+            l.Tick(DT, DIR, true, false, Balance.Player.Speed, true, false, ref mana);
+            Assert.IsFalse(l.Dodge(DIR), "atordoado nao foge 5 m");
+            Assert.IsFalse(l.Pular(true, false), "atordoado nao pula");
+            Assert.AreEqual(0f, l.PuloGuardadoS, "nem guarda o pulo");
+            l.Tick(DT, DIR, true, false, Balance.Player.Speed, false, false, ref mana);
+            Assert.IsTrue(l.Dodge(DIR), "passou o atordoamento, o corpo volta a obedecer");
+        }
+
+        [Test]
+        public void Cola_AcompanhaLadeiraDe20Graus_SemGuardarVelocidadeDeQueda()
+        {
+            var l = new Locomocao();
+            for (int i = 0; i < 60; i++) Passo(l, DIR);
+            Assert.GreaterOrEqual(-l.Vel.y, l.VelocidadeHorizontal * Mathf.Tan(20f * Mathf.Deg2Rad),
+                "correndo ladeira abaixo de 20 graus o passo desce junto (a -1 m/s fixa descolava acima de ~7,6 graus)");
+            Assert.AreEqual(Locomocao.COLA_CHAO, l.Vy, 1e-4f, "a velocidade GUARDADA segue -1: saindo da borda a queda comeca normal");
+        }
+
+        [Test]
+        public void ContraParede_VelocidadeRealZera_EAPassadaVoltaAoIdle()
+        {
+            var l = new Locomocao();
+            for (int i = 0; i < 60; i++) Passo(l, DIR);
+            Assert.AreEqual("run", l.AnimNoChao());
+            for (int i = 0; i < 5; i++) { Passo(l, DIR); l.Real(Vector3.zero, DT); }   // o CharacterController nao andou: parede
+            Assert.AreEqual(0f, l.VelocidadeHorizontal, 1e-4f, "a passada le' o que o corpo andou");
+            Assert.AreEqual("idle", l.AnimNoChao(), "sem correr parado contra a parede");
+            Assert.Greater(new Vector2(l.VelH.x, l.VelH.z).magnitude, Balance.Player.Speed * 0.9f, "a intencao segue cheia: saiu da parede, sai correndo");
+            l.Real(new Vector3(float.NaN, 0f, 0f), DT);
+            Assert.IsFalse(float.IsNaN(l.Vel.x), "NaN do motor nao entra");
+        }
+
+        [Test]
+        public void Dodge_QuadroTravado_AindaPercorreADistancia()
+        {
+            var l = new Locomocao();
+            Assert.IsTrue(l.Dodge(Vector3.forward));
+            float z = Passo(l, Vector3.zero, 0.33f).z;   // um engasgo de 0,33 s logo no 1o quadro da esquiva
+            Assert.AreEqual(Balance.Dodge.Distance, z, Balance.Dodge.Distance * 0.02f, "o quadro longo anda a esquiva inteira (antes: 2,7 m)");
+        }
+
+        [Test]
+        public void Pulo_AlturaIndependeDoFps()
+        {
+            float esperado = Balance.Player.JumpV * Balance.Player.JumpV / (2f * Locomocao.GRAVIDADE);
+            Assert.AreEqual(esperado, TopoDoPulo(1f / 60f), 0.01f);
+            Assert.AreEqual(esperado, TopoDoPulo(1f / 30f), 0.01f, "a 30 FPS o salto tem a mesma altura (Euler puro dava 4-9 cm a menos)");
+        }
+
+        static float TopoDoPulo(float dt)
+        {
+            var l = new Locomocao();
+            l.Pular(true, false);
+            float y = 0f, topo = 0f;
+            for (int i = 0; i < 2000 && l.Vy > -6f; i++) { y += Passo(l, Vector3.zero, dt, false).y; topo = Mathf.Max(topo, y); }
+            return topo;
+        }
+
+        [Test]
+        public void Stick_NaN_NaoEnvenenaAVelocidade()
+        {
+            Assert.AreEqual(Vector3.zero, Locomocao.DirDoStick(new Vector2(float.NaN, 0.5f), 0f));
+            var l = new Locomocao();
+            for (int i = 0; i < 10; i++) Passo(l, Locomocao.DirDoStick(new Vector2(float.NaN, float.NaN), 0f));
+            Passo(l, DIR);
+            Assert.IsFalse(float.IsNaN(l.VelH.x) || float.IsNaN(l.Vel.x), "um quadro de toque NaN nao trava o corpo para sempre");
+        }
+
+        [Test]
+        public void Inversao_FreiaPelaTurnAccel_EAceleraPelaAccel()
+        {
+            // 180 graus: o freio da inversao e' a TurnAccel (nao a Accel do ajuste fino) ate' o zero; do outro lado, Accel
+            var l = new Locomocao();
+            for (int i = 0; i < 120; i++) Passo(l, DIR);
+            float t = 0f;
+            while (Vector3.Distance(l.VelH, -DIR * Balance.Player.Speed) > 0.01f && t < 3f) { Passo(l, -DIR); t += DT; }
+            Assert.AreEqual(Balance.Player.Speed / Balance.Move.TurnAccel + Balance.Player.Speed / Balance.Move.Accel, t, DT * 2f);
+        }
+
+        [Test]
+        public void ZeroInput_ZeroMovimento_EAnalogicoProporcional()
+        {
+            var parado = new Locomocao();
+            for (int i = 0; i < 60; i++)
+            {
+                Vector3 d = Passo(parado, Vector3.zero);
+                Assert.AreEqual(0f, new Vector2(d.x, d.z).magnitude, 1e-6f, "sem stick, sem passo");
+            }
+            var meio = new Locomocao();
+            for (int i = 0; i < 120; i++) Passo(meio, DIR * 0.5f);
+            Assert.AreEqual(Balance.Player.Speed * 0.5f, meio.VelocidadeHorizontal, 1e-3f, "meio stick (ja' moldado) = meia velocidade");
+        }
     }
 }

@@ -50,8 +50,17 @@ namespace Arkana.Gameplay
         public bool Pulando;
         /// <summary>s sem chao; s descendo rapido; s de voo previstos na decolagem (2*Vy/g); s que faltam da aterrissagem.</summary>
         public float NoArS, DescendoS, VooS, PousoS;
+        /// <summary>s que um SALTO tocado no ar ainda espera o chao (jump buffer, Balance.Move.PuloGuardadoS). A casca pula ao pousar.</summary>
+        public float PuloGuardadoS;
+        /// <summary>O atordoamento do ultimo Tick: o corpo nao obedece — nem anda, nem esquiva, nem pula (o tiro ja' barrava).</summary>
+        public bool Atordoado { get; private set; }
+
+        /// <summary>A cola no chao acompanha descida de ate' InclinacaoMax (a -1 m/s fixa so' segurava ~7,6 graus correndo).</summary>
+        static readonly float TanInclinacao = Mathf.Tan(Balance.Move.InclinacaoMax * Mathf.Deg2Rad);
 
         private Vector3 _dodgeDir, _impDir;
+        /// <summary>s desde o ultimo quadro com chao (coyote). Nasce "nunca pisou": corpo novo no ar nao ganha pulo.</summary>
+        private float _semChaoS = float.PositiveInfinity;
         private float _impM, _impDur;
         private float _prevYaw;
         private bool _yawInit;
@@ -75,6 +84,8 @@ namespace Arkana.Gameplay
         /// <summary>Stick (x direita, y frente; magnitude 0..1 ja' moldada) -> direcao no mundo pelo yaw da camera (rad).</summary>
         public static Vector3 DirDoStick(Vector2 stick, float yawCam)
         {
+            // um NaN do toque envenenava a VelH para sempre (AccelStep persegue o alvo NaN)
+            if (float.IsNaN(stick.x) || float.IsNaN(stick.y) || float.IsNaN(yawCam)) return Vector3.zero;
             var frente = new Vector3(Mathf.Sin(yawCam), 0f, Mathf.Cos(yawCam));
             var direita = new Vector3(Mathf.Cos(yawCam), 0f, -Mathf.Sin(yawCam));
             Vector3 d = direita * stick.x + frente * stick.y;
@@ -115,7 +126,7 @@ namespace Arkana.Gameplay
         /// esquivar sai do dash de kit.</summary>
         public bool Dodge(Vector3 dir)
         {
-            if (!DodgePronto) return false;
+            if (!DodgePronto || Atordoado) return false;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) return false;
             _dodgeDir = dir.normalized;
@@ -153,15 +164,18 @@ namespace Arkana.Gameplay
             Pulando = false; NoArS = 0f; DescendoS = 0f;
         }
 
-        /// <summary>SALTO ARCANO: so' do chao (sem pulo duplo) e nunca nadando. `fatorAltura` = quantas vezes mais ALTO
-        /// (h = v^2/2g, logo a velocidade sobe pela raiz): a mola do Fizz e' 1,5.</summary>
+        /// <summary>SALTO ARCANO: do chao, ou ate' CoyoteS depois de sair da borda ANDANDO (nunca depois de um pulo: sem pulo
+        /// duplo); nunca nadando nem atordoado. No ar, o toque fica GUARDADO PuloGuardadoS e a casca pula ao pousar.
+        /// `fatorAltura` = quantas vezes mais ALTO (h = v^2/2g, logo a velocidade sobe pela raiz): a mola do Fizz e' 1,5.</summary>
         public bool Pular(bool noChao, bool nadando, float fatorAltura = 1f)
         {
-            if (!noChao || nadando) return false;
+            if (nadando || Atordoado) return false;
+            bool coyote = !noChao && !Pulando && Vy <= 0f && _semChaoS <= Balance.Move.CoyoteS;
+            if (!noChao && !coyote) { PuloGuardadoS = Balance.Move.PuloGuardadoS; return false; }
             Vy = Balance.Player.JumpV * Mathf.Sqrt(Mathf.Max(fatorAltura, 0f));
             Pulando = true;
             VooS = TempoDeVoo(Vy);
-            NoArS = 0f; DescendoS = 0f; PousoS = 0f;
+            NoArS = 0f; DescendoS = 0f; PousoS = 0f; PuloGuardadoS = 0f;
             return true;
         }
 
@@ -176,6 +190,7 @@ namespace Arkana.Gameplay
         {
             if (dt <= 0f) return;
             PousoS = Mathf.Max(PousoS - dt, 0f);
+            _semChaoS = noChao || nadando ? 0f : _semChaoS + dt;
             if (!noChao && !nadando)
             {
                 NoArS += dt;
@@ -223,7 +238,9 @@ namespace Arkana.Gameplay
             VelMax = velMax;
             DodgeCd = Mathf.Max(DodgeCd - dt, 0f);
             IframesLeft = Mathf.Max(IframesLeft - dt, 0f);
+            PuloGuardadoS = Mathf.Max(PuloGuardadoS - dt, 0f);
             Knockback = Vector3.MoveTowards(Knockback, Vector3.zero, KNOCK_DECAY * dt);
+            Atordoado = atordoado;
             if (atordoado) dir = Vector3.zero;   // o corpo nao obedece (teto Status.StunCap)
             dir.y = 0f;
 
@@ -231,10 +248,12 @@ namespace Arkana.Gameplay
             if (DodgeLeft > 0f)
             {
                 float dur = Balance.Dodge.Duration;
-                // amostra no MEIO do passo: rampa linear -> a soma dos passos da' a distancia exata (sem isso fica ~5% curto)
-                float p = Mathf.Clamp01((dur - DodgeLeft + dt * 0.5f) / dur);
-                DodgeLeft -= dt;
-                h = _dodgeDir * DashSpeedAt(p);
+                // amostra no MEIO do passo: rampa linear -> a soma dos passos da' a distancia exata (sem isso fica ~5% curto).
+                // O ultimo passo so' anda o que falta (como o Impulso): um quadro travado de 0,33 s nao corta a esquiva pela metade.
+                float passo = Mathf.Min(dt, DodgeLeft);
+                float p = Mathf.Clamp01((dur - DodgeLeft + passo * 0.5f) / dur);
+                DodgeLeft -= passo;
+                h = _dodgeDir * (DashSpeedAt(p) * passo / dt);
                 // momentum: ao acabar o dash o corpo JA' esta' correndo pra la'
                 VelH = _dodgeDir * velMax * Balance.Dodge.ExitMomentum;
             }
@@ -253,19 +272,28 @@ namespace Arkana.Gameplay
                 h = VelH + Knockback;
             }
 
+            float vyPasso;   // a velocidade vertical MEDIA do passo: com a gravidade, a media e' exata (o pulo nao depende do FPS)
             if (nadando)
             {
                 // a lamina segura o corpo: gravidade zero (quem persegue a superficie e' Agua.Flutuar)
                 Vy = 0f; FlutuaS = 0f; Flutuando = false;
+                vyPasso = 0f;
             }
             else if (noChao && Vy <= 0f)
             {
                 FlutuaS = 0f; Flutuando = false;   // o chao devolve a flutuacao inteira
+                // a cola acompanha a ladeira na velocidade de agora: a -1 m/s fixa descolava em descida acima de ~7,6 graus
+                // correndo (pulo negado, freio x0,35, flutuar ligando). Saindo de uma borda, cai seco — o coyote perdoa o pulo.
+                // So' o PASSO desce mais (Vy guardada segue -1): saindo da borda a queda comeca normal, e a esquiva (51 m/s)
+                // nao vira mergulho — o teto e' a corrida.
                 Vy = COLA_CHAO;
+                vyPasso = Mathf.Min(COLA_CHAO, -Mathf.Min(new Vector2(h.x, h.z).magnitude, velMax) * TanInclinacao);
             }
             else
             {
-                bool quer = querFlutuar && !noChao && FlutuaRestante > 0f && mana > 0f;
+                // so' na DESCIDA: segurando o SALTO desde o toque, o 2o quadro do pulo ja' flutuava e o corpo subia 8-16 cm
+                // em vez de ~1,4 m (o botao fica "segurando" enquanto o dedo esta' na tela)
+                bool quer = querFlutuar && !noChao && Vy <= 0f && FlutuaRestante > 0f && mana > 0f;
                 if (quer)
                 {
                     // FLUTUAR: descida lenta e constante, nunca sobe (voo livre desequilibra). Paga a mesma mana do tiro.
@@ -273,15 +301,29 @@ namespace Arkana.Gameplay
                     mana = Mathf.Max(mana - Balance.Flutuar.ManaPorS * dt, 0f);
                     Vy = -Balance.Flutuar.DescV;
                     Flutuando = mana > 0f;   // mana no fim = a magia larga o corpo, na hora
+                    vyPasso = Vy;
                 }
                 else
                 {
                     Flutuando = false;
+                    float vy0 = Vy;
                     Vy -= GRAVIDADE * dt;
+                    vyPasso = (vy0 + Vy) * 0.5f;   // Euler puro dava topo 1,335 m a 60 FPS e 1,29 m a 30 FPS
                 }
             }
-            Vel = new Vector3(h.x, Vy, h.z);
+            Vel = new Vector3(h.x, vyPasso, h.z);
             return Vel * dt;
+        }
+
+        /// <summary>
+        /// O que o corpo ANDOU de verdade (a casca chama depois do CharacterController.Move): contra a parede a intencao segue
+        /// cheia, mas a passada (AnimNoChao, cadencia, pernas, mira dos bots) le' a velocidade REAL — sem correr parado.
+        /// So' o plano: a vertical segue a do Tick (a rede de seguranca do chao teleporta e nao e' velocidade).
+        /// </summary>
+        public void Real(Vector3 deslocamento, float dt)
+        {
+            if (!(dt > 0f) || float.IsNaN(deslocamento.x) || float.IsNaN(deslocamento.z)) return;
+            Vel = new Vector3(deslocamento.x / dt, Vel.y, deslocamento.z / dt);
         }
 
         /// <summary>Banking: inclina pra dentro da curva, proporcional ao giro deste frame e a quanto esta' rapido.</summary>

@@ -49,6 +49,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator Voo_CasteloVivo_RastroEVentoNaQueda_EstaloNoPouso_SomeComOCastelo()
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Bus.EmitGameStartRequested();

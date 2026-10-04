@@ -11,6 +11,13 @@ namespace Arkana.Tests
     /// O BOOT de verdade, com cena: Main sozinho no mundo monta o menu, e o pedido de partida monta a arena inteira
     /// (ilha, castelo, jogador, 12 bots) e roda 3 s de frames sem erro de log. O treino nasce no chao, sem bots.
     /// </summary>
+    /// <summary>O unico log do boot: a medicao "ARKANA MONTAGEM" da IlhaMestre (tempo por etapa e regiao, lida no logcat).
+    /// O NoUnexpectedReceived reprova QUALQUER log; quem monta a ilha declara que espera esse.</summary>
+    static class LogsDoBoot
+    {
+        public static void Montagem() => LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^ARKANA MONTAGEM"));
+    }
+
     public class BootTests
     {
         const float SEGUNDOS = 3f;
@@ -46,6 +53,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator PartidaNormal_MontaArenaInteira_ERoda3sSemErro()
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Assert.AreEqual(FluxoDeJogo.Estado.Menu, main.Fluxo.Atual, "boot cai no menu");
@@ -85,6 +93,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator Treino_JogadorNoChao_SemBots_ComBonecos()
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Arkana.Menu.Menu.PedidoDeTreino = true;
@@ -107,6 +116,7 @@ namespace Arkana.Tests
         {
             // defeito (foto 17 de 12/09): o botao de tatica usava a frente do CORPO; parado, com a camera girada, a muralha
             // da Pyra nascia atras dela — fora da tela. Vermelho sem o YawAlvo do Player.Tatica.
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Arkana.Menu.Menu.PedidoDeTreino = true;
@@ -130,6 +140,7 @@ namespace Arkana.Tests
         public IEnumerator Menu_VitrineMostraOMagoNoPico_ESomeNaPartida()
         {
             // o fundo do menu e' o mago escolhido no pico; o treino nasce LA' — o mago da vitrine nao pode sobrar na partida
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             yield return null;
@@ -153,6 +164,7 @@ namespace Arkana.Tests
         [UnityTest]
         public IEnumerator MatchOver_VaiParaFim_EMenuDesmontaAArena()
         {
+            LogsDoBoot.Montagem();
             Main main = _go.AddComponent<Main>();
             yield return null;
             Bus.EmitGameStartRequested();

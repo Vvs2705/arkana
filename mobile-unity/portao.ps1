@@ -56,7 +56,7 @@ function Passada([string]$Plataforma, [string]$Log, [string]$Xml) {
 $Res = @(Passada "EditMode" (Join-Path $Logs "portao.log") (Join-Path $Logs "portao-resultados.xml"))
 if (-not $Rapido) {
     $Play = @(Passada "PlayMode" (Join-Path $Logs "portao-playmode.log") (Join-Path $Logs "portao-playmode-resultados.xml"))
-    $Res = @($Res[-3] + $Play[-3], $Res[-2] + $Play[-2], $Res[-1] + $Play[-1])
+    $Res = @(($Res[-3] + $Play[-3]), ($Res[-2] + $Play[-2]), ($Res[-1] + $Play[-1]))   # parenteses: no PowerShell a virgula pega antes do +
 }
 $Passaram, $Falhas, $Ignorados = $Res[-3], $Res[-2], $Res[-1]
 "ARKANA$(if ($Rapido) { ' (rapido: so EditMode)' }): $Passaram passaram, $Falhas falharam, $Ignorados ignorados"
