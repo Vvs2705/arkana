@@ -308,7 +308,8 @@ namespace Arkana.Characters
             { Clipe.AndeAgachado, new[] { "ande_agachado", "crouch_walk", "crouch", "crouching", "sneak", "sneaking", "Crouched Walking",
                 "Cautious_Crouch_Walk_Forward" } },
             // "Salto Regular" da biblioteca da Meshy (take Regular_Jump). NAO confundir com "jump_loop", que e' queda.
-            { Clipe.Pular, new[] { "pular", "Regular_Jump", "jump", "jumping", "jump_up", "standing_jump" } },
+            { Clipe.Pular, new[] { "pular", "Regular_Jump", "jump", "jumping", "jump_up", "standing_jump",
+                "vaultar", "escalar" } },   // subir em obstaculo: no legado e' o pulo; o Mecanim tem os clipes (MagoMecanim.Gesto)
             // a aterrissagem e' o PROPRIO take do pulo a partir do pouso (Mago.MontarExterno); o nome so' serve ao contrato
             { Clipe.Pousar, new[] { "pousar" } },
             // "Andar para tras" da biblioteca da Meshy (take Walk_Backward)

@@ -28,6 +28,7 @@ namespace Arkana.EditorTools
             { "Pulo", "standing-jump-running" }, { "Ar", "queda-no-ar" }, { "Pouso", "standing-land-to-standing-idle" },
             { "Derrubado", "derrubado" }, { "Rastejar", "rastejar" }, { "Levantar", "levantar" },
             { "Boiar", "boiar" }, { "Pegar", "pegar" },
+            { "Vaultar", "pular-obstaculo-1-mao" }, { "Escalar", "escalar-beirada-agachar" },
         };
 
         /// <summary>Estado da camada TRONCO -> clipe.</summary>
@@ -51,6 +52,9 @@ namespace Arkana.EditorTools
                 case "Pegar": return 2.5f;
                 case "Derrubado": return 1.3f;
                 case "Pouso": return 1.4f;
+                // o clipe cabe no relogio do jogo (Balance.Move.EscaladaVaultS / EscaladaSubirS)
+                case "Vaultar": return Clipe("pular-obstaculo-1-mao").length / Balance.Move.EscaladaVaultS;
+                case "Escalar": return Clipe("escalar-beirada-agachar").length / Balance.Move.EscaladaSubirS;
                 default: return estado.StartsWith("Golpe") ? 1.6f : 1f;
             }
         }

@@ -174,5 +174,100 @@ namespace Arkana.Tests
             }
             finally { UnityEngine.Object.DestroyImmediate(p.gameObject); }
         }
+
+        // ------------------------------------------------------------------ 04/10: subir em obstaculo (Escalada)
+
+        static GameObject Bloco(Vector3 centro, Vector3 tamanho)
+        {
+            var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            g.transform.position = centro;
+            g.transform.localScale = tamanho;
+            Physics.SyncTransforms();
+            return g;
+        }
+
+        [Test]
+        public void Escalada_Decide_DegrauNada_BaixoPulaPorCima_BeiradaSoComSalto_ParedeNada()
+        {
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(0.3f, true, true, true), "degrau: o CharacterController sobe sozinho");
+            Assert.AreEqual(Escalada.Tipo.Vault, Escalada.Decidir(1.0f, true, false, true), "baixo, correndo de encontro: pula por cima");
+            Assert.AreEqual(Escalada.Tipo.Vault, Escalada.Decidir(1.0f, true, true, false), "baixo, tocando o SALTO: pula por cima");
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(1.0f, true, false, false), "parado sem tocar nada: nada");
+            Assert.AreEqual(Escalada.Tipo.Subir, Escalada.Decidir(1.8f, true, true, false), "beirada com o SALTO: escala");
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(1.8f, true, false, true), "beirada so' correndo: nao escala sozinho");
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(3f, true, true, true), "parede");
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(1.0f, false, true, true), "sem espaco em cima: nada");
+            Assert.AreEqual(Escalada.Tipo.Nada, Escalada.Decidir(float.NaN, true, true, true));
+        }
+
+        [Test]
+        public void Escalada_OCaminhoSobeNaFrenteDaFace_ESoDepoisAvancaPorCima()
+        {
+            var e = new Escalada();
+            Vector3 de = Vector3.zero, topo = new Vector3(0f, 1f, 0.6f), fim = new Vector3(0f, 1f, 1.1f);
+            e.Iniciar(Escalada.Tipo.Vault, de, topo, fim);
+            Assert.IsTrue(e.Ativa);
+            for (float u = 0f; u <= Escalada.SubidaFrac; u += 0.05f)
+                Assert.AreEqual(0f, e.Ponto(u).z, 1e-4f, "subindo, o corpo nao avanca para dentro da face");
+            Assert.AreEqual(1.02f, e.Ponto(Escalada.SubidaFrac).y, 1e-3f, "no fim da subida o pe' esta' acima do topo");
+            Assert.AreEqual(1.1f, e.Ponto(1f).z, 1e-4f);
+            Assert.AreEqual(1.02f, e.Ponto(0.8f).y, 1e-3f, "avancando, segue por cima do topo");
+            Vector3 p = Vector3.zero;
+            for (int i = 0; i < 200 && e.Ativa; i++) p = e.Tick(1f / 60f);
+            Assert.IsFalse(e.Ativa, "acaba sozinha");
+            Assert.AreEqual(1.1f, p.z, 1e-3f);
+        }
+
+        [Test]
+        public void Escalada_Sonda_AchaOTopoDoMuro_RecusaParedeAlta_ETeto()
+        {
+            var chao = Bloco(new Vector3(0f, -0.5f, 0f), new Vector3(20f, 1f, 20f));
+            var muro = Bloco(new Vector3(0f, 0.5f, 1.2f), new Vector3(3f, 1f, 1f));   // face em z = 0,7; topo a 1 m
+            try
+            {
+                Assert.IsTrue(Escalada.Sondar(Vector3.zero, Vector3.forward, Partida.RAIO_CORPO, Partida.ALTURA_CORPO, out float h, out Vector3 topo, out Vector3 fim));
+                Assert.AreEqual(1f, h, 0.02f, "o topo do muro");
+                Assert.Greater(fim.z, 0.7f, "o fim fica alem da face, em cima");
+                Assert.AreEqual(1f, fim.y, 0.02f);
+                Assert.IsFalse(Escalada.Sondar(Vector3.zero, Vector3.back, Partida.RAIO_CORPO, Partida.ALTURA_CORPO, out _, out _, out _), "de costas: nada a frente");
+
+                var teto = Bloco(new Vector3(0f, 2.2f, 1.2f), new Vector3(3f, 0.4f, 1f));   // laje 1 m acima do topo: o corpo nao cabe
+                Assert.IsFalse(Escalada.Sondar(Vector3.zero, Vector3.forward, Partida.RAIO_CORPO, Partida.ALTURA_CORPO, out _, out _, out _), "sem espaco em cima: nao sobe");
+                UnityEngine.Object.DestroyImmediate(teto);
+
+                muro.transform.localScale = new Vector3(3f, 4f, 1f);
+                muro.transform.position = new Vector3(0f, 2f, 1.2f);
+                Physics.SyncTransforms();
+                bool achou = Escalada.Sondar(Vector3.zero, Vector3.forward, Partida.RAIO_CORPO, Partida.ALTURA_CORPO, out float alta, out _, out _);
+                Assert.IsTrue(!achou || Escalada.Decidir(alta, true, true, true) == Escalada.Tipo.Nada, "parede de 4 m nao se escala");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(muro); UnityEngine.Object.DestroyImmediate(chao); }
+        }
+
+        [Test]
+        public void Escalada_OCorpoSobeNoMuroDe1m_ETerminaEmCima_NuncaDentro()
+        {
+            UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;   // o Mago instancia materiais no EditMode
+            var chao = Bloco(new Vector3(0f, -0.5f, 0f), new Vector3(20f, 1f, 20f));
+            var muro = Bloco(new Vector3(0f, 0.5f, 1.4f), new Vector3(3f, 1f, 1.2f));   // face em z = 0,8
+            Pawn p = Pawn.Criar(null, "01-pyra", false);
+            try
+            {
+                p.Aterrar(Vector3.zero);
+                p.transform.rotation = Quaternion.identity;
+                Physics.SyncTransforms();
+                for (int i = 0; i < 5; i++) p.Tick(1f / 60f);   // assenta no chao
+                Assert.IsTrue(p.NoChao, "o corpo pousou no chao de teste");
+                Assert.IsTrue(p.Pular(), "o SALTO de frente para o muro baixo sobe nele");
+                Assert.IsTrue(p.Escala.Ativa);
+                for (int i = 0; i < 120 && p.Escala.Ativa; i++) p.Tick(1f / 60f);
+                Assert.IsFalse(p.Escala.Ativa);
+                Vector3 pe = p.transform.position;
+                Assert.AreEqual(1f, pe.y, 0.1f, "terminou EM CIMA do muro");
+                Assert.Greater(pe.z, 0.8f, "alem da face");
+                Assert.IsFalse(Physics.CheckSphere(pe + Vector3.up * 0.5f, 0.2f, ~0, QueryTriggerInteraction.Ignore) && pe.y < 0.9f, "nunca dentro do muro");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(p.gameObject); UnityEngine.Object.DestroyImmediate(muro); UnityEngine.Object.DestroyImmediate(chao); }
+        }
     }
 }

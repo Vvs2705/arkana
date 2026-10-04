@@ -100,13 +100,16 @@ namespace Arkana.Characters
             }
         }
 
-        /// <summary>Gestos so' do Mecanim (o legado toca o cast): "tatica", "suprema". False = nao e' gesto daqui.</summary>
+        /// <summary>Pedidos so' do Mecanim (o legado toca cast/pulo): "tatica", "suprema" (tronco), "vaultar", "escalar" (corpo
+        /// inteiro, Escalada). False = nao e' daqui.</summary>
         public bool Gesto(string nome)
         {
             switch (nome)
             {
                 case "tatica": Gesto("Tatica", 0.15f, Balance.Anim.KitSeguraS); return true;
                 case "suprema": Gesto("Suprema", 0.1f, Balance.Anim.KitSeguraS); return true;
+                case "vaultar": Ir("Vaultar", 0.06f); return true;   // corpo inteiro: pula por cima apoiando a mao
+                case "escalar": Ir("Escalar", 0.08f); return true;
                 default: return false;
             }
         }
@@ -190,7 +193,8 @@ namespace Arkana.Characters
             {
                 if (Base == "Pulo" && st.IsName("Pulo") && st.normalizedTime >= 0.95f) Ir("Ar", 0.25f);
                 else if (Base == "Derrubado" && st.IsName("Derrubado") && st.normalizedTime >= 0.98f) Ir("Rastejar", 0.2f);
-                else if ((Base == "Levantar" || Base == "Pouso" || Base == "Pegar") && st.IsName(Base) && st.normalizedTime >= 0.97f) Ir("Locomocao", 0.2f);
+                else if ((Base == "Levantar" || Base == "Pouso" || Base == "Pegar" || Base == "Vaultar" || Base == "Escalar")
+                         && st.IsName(Base) && st.normalizedTime >= 0.97f) Ir("Locomocao", 0.2f);
             }
 
             // a camada do tronco: sobe no gesto, desce quando ele acaba

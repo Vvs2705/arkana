@@ -24,6 +24,10 @@ namespace Arkana.Gameplay
         public const float GESTO_CAST_S = 0.3f;
         /// <summary>s que o gesto da tatica/suprema segura a pose pedida (o Mecanim segura o tronco por Balance.Anim.KitSeguraS).</summary>
         public const float GESTO_KIT_S = 0.6f;
+
+        /// <summary>SUBIR EM OBSTACULO (Escalada): ativa, o corpo segue o caminho dela e o resto do movimento espera.</summary>
+        public Escalada Escala { get; } = new Escalada();
+        private string _escaladaAnim = "vaultar";
         public static readonly Color TINT_MORTO = new Color(0.25f, 0.25f, 0.3f);
         /// <summary>Os estados de corpo que a percepcao do bot le' (IConjurador.AplicarEstado).</summary>
         public const string INVISIVEL = "invisivel", PENUMBRA = "penumbra", SEM_PASSOS = "sem_passos";
@@ -290,6 +294,7 @@ namespace Arkana.Gameplay
 
             if (Mana < Balance.Player.ManaMax) EscreverMana(Mathf.Min(Mana + Balance.Player.ManaRegen * dt, Balance.Player.ManaMax));
             _fireCd = Mathf.Max(_fireCd - dt, 0f);
+            if (Escala.Ativa) { TickEscalada(dt); return; }
             _gestoS = Mathf.Max(_gestoS - dt, 0f);
 
             Agua.Tick(dt, transform.position);
@@ -334,6 +339,9 @@ namespace Arkana.Gameplay
             }
             Loc.AtualizarAr(dt, NoChao, Agua.Nadando);
             if (NoChao && Loc.PuloGuardadoS > 0f) Pular();   // o SALTO tocado pouco antes de pousar sai agora (jump buffer)
+            // correndo de encontro a um obstaculo BAIXO (a passada real parou, a intencao nao): pula por cima sozinho
+            else if (NoChao && !Agua.Nadando && Loc.VelH.magnitude > velMax * 0.6f && Loc.VelocidadeHorizontal < Loc.VelH.magnitude * 0.35f)
+                TentarEscalar(false);
 
             Virar(dt);
             Loc.AtualizarBank(transform.eulerAngles.y * Mathf.Deg2Rad, dt);
@@ -515,10 +523,42 @@ namespace Arkana.Gameplay
         /// <summary>Do chao, na altura do FatorDePulo (a mola do Fizz). Conta a decolagem: o kit ve' pela borda de Pulos.</summary>
         public bool Pular()
         {
+            if (PodeAgir && TentarEscalar(true)) return true;   // de frente para obstaculo/beirada, o SALTO sobe nele
             if (!PodeAgir || !Loc.Pular(NoChao, Agua.Nadando, FatorDePulo)) return false;
             Pulos++;
             if (Visual != null) Visual.VooS = Loc.VooS;   // o ar do take cabe no voo desta decolagem (a mola do Fizz voa mais)
             return true;
+        }
+
+        /// <summary>
+        /// O obstaculo a frente (para onde o stick quer ir; parado, para onde olha) e' escalavel? Entao comeca a Escalada: o
+        /// corpo segue o caminho dela (sobe NA FRENTE da face e so' depois avanca por cima) e volta ao CharacterController no topo.
+        /// </summary>
+        private bool TentarEscalar(bool pediuPulo)
+        {
+            if (Escala.Ativa || !NoChao || Agua.Nadando || Queda.NoAr || !Viva) return false;
+            Vector3 dir = _dir.sqrMagnitude > 0.01f ? _dir : transform.forward;
+            if (!Escalada.Sondar(transform.position, dir, Partida.RAIO_CORPO, Partida.ALTURA_CORPO, out float altura, out Vector3 topo, out Vector3 fim))
+                return false;
+            Escalada.Tipo tipo = Escalada.Decidir(altura, true, pediuPulo, !pediuPulo);
+            if (tipo == Escalada.Tipo.Nada) return false;
+            Escala.Iniciar(tipo, transform.position, topo, fim);
+            _escaladaAnim = tipo == Escalada.Tipo.Vault ? "vaultar" : "escalar";
+            Loc.Parar();
+            return true;
+        }
+
+        private void TickEscalada(float dt)
+        {
+            transform.position = Escala.Tick(dt);
+            Physics.SyncTransforms();   // o CharacterController le' a pose nova no proximo Move
+            if (!Escala.Ativa)
+            {
+                NoChao = true;
+                Loc.VelH = Escala.Frente * Mathf.Min(Loc.VelH.magnitude, Balance.Player.Speed);   // sai embalado para frente
+            }
+            Virar(dt);
+            Tocar(Escala.Ativa ? _escaladaAnim : AnimDeLocomocao());
         }
 
         /// <summary>TELEPORTE (Travessia, Danca): surge no POUSO SEGURO ate' `destino` e avisa o CharacterController. No ar

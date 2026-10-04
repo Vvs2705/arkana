@@ -228,6 +228,14 @@ namespace Arkana.Core
             public const float PuloGuardadoS = 0.12f;
             /// <summary>Graus de rampa que o corpo sobe (CharacterController.slopeLimit) e acompanha DESCENDO sem descolar.</summary>
             public const float InclinacaoMax = 50f;
+            /// <summary>KNOB (04/10, subir em obstaculo — Escalada): m do pe' ao topo. Abaixo de Min e' degrau (o CharacterController
+            /// sobe 0,4 sozinho); ate' Vault o mago PULA POR CIMA apoiando a mao (correndo de encontro ou tocando o SALTO); ate' Max
+            /// ESCALA a beirada (so' com o SALTO, de frente). Acima, parede.</summary>
+            public const float EscaladaMin = 0.5f, EscaladaVault = 1.2f, EscaladaMax = 2.2f;
+            /// <summary>m alem do raio do corpo em que a face ainda conta (encostar nao precisa ser perfeito no toque).</summary>
+            public const float EscaladaAlcance = 0.6f;
+            /// <summary>s do pulo por cima e da escalada (o clipe se ajusta a isto; o relogio e' do jogo).</summary>
+            public const float EscaladaVaultS = 0.45f, EscaladaSubirS = 0.75f;
         }
 
         /// <summary>ANIMACAO x VELOCIDADE (R20): speed_scale sai da velocidade real — fim da patinacao.</summary>
