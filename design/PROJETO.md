@@ -4,7 +4,7 @@
 > ler só este arquivo e entender: onde o projeto está, o que já foi feito, o que
 > falta e o que está bloqueado. Atualize-o ao fechar cada fase.
 >
-> **Atualizado em:** 04/10/2026, tarde (Mixamo nos 20 magos pelo Mecanim, subir em obstáculo — bloco 13). Antes, 04/10 manhã (missão de recuperação: portão de verdade com PlayMode, movimento, mira, Humanoid validado, HUD configurável, instrumentação; GATE não passou — ver o 1º bloco do CONTINUAR DAQUI). Antes: 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
+> **Atualizado em:** 29/10/2026 (corte das árvores: LOD1 + corte por tamanho na tela — bloco 14). Antes, 04/10/2026, tarde (Mixamo nos 20 magos pelo Mecanim, subir em obstáculo — bloco 13). Antes, 04/10 manhã (missão de recuperação: portão de verdade com PlayMode, movimento, mira, Humanoid validado, HUD configurável, instrumentação; GATE não passou — ver o 1º bloco do CONTINUAR DAQUI). Antes: 25/09/2026 (nova visão da ilha: Documento Mestre 4,8 km, trios, Unity primeiro; MCP for Unity instalado). Antes: 23/09/2026 (esteira do emulador: AVD + variante de build + `emulador.ps1` com partida inteira PASS; auditoria técnica; Blender sem MCP; push de `main` feito; bancada corrigida)
 >
 > **REGRA PERMANENTE (ordem do Diretor, 20/08):** ao finalizar QUALQUER fase,
 > atualize este documento com **o que foi feito, como e por que**, e reescreva
@@ -50,6 +50,27 @@ aparelho apareceu em `adb devices`.
 ---
 
 ## CONTINUAR DAQUI
+
+### >>> COMECE POR AQUI — 29/10/2026 (14): CORTE DAS ÁRVORES (LOD1 + corte por tamanho na tela)
+
+O achado do bloco 13 (~9,8 M tris e ~4.400 batches no chão) era quase todo árvore: até 9.000 instâncias do Terrain em
+malha inteira (2–3 K tris cada) até 1,2 km, com o LODGroup de nível único e limiar 0 (nunca cortava). **Feito e no `main`:**
+
+- `IlhaMestre.Molde`: LOD0 até 10% da altura da tela, **LOD1** (o `-lod1` do mesmo recurso, ~1/4 dos tris) até 1,2%,
+  depois **corta**. Com o lodBias da Média (0,7): árvore de 22 m troca a ~130 m e some a ~1,1 km; moita a ~110 m; tronco
+  caído a ~60 m. Knobs `LodLonge`/`LodCorte`. Sem `-lod1`, um nível só com o mesmo corte.
+- `tripo-009-arvore-comum-lod1.glb` (2.079 → 520 tris) pelo script novo `arte/tools/blender/lod1.py`. O `otimizar.py`
+  **não serve para isso**: aplica escala e "pé no chão" e, em nó do glTF com giro (a árvore do Tripo), o LOD1 saía deitado.
+- `BootTests.Treino_*` cobra LOD0+LOD1 e corte > 0 em toda árvore do Terrain. Portão: **569 passaram, 0 falharam**.
+
+**Medida no emulador (contagem vale; FPS do emulador não):** partida, na descida vendo a ilha: pico de **8–9,8 M tris /
+~4.400 batches → ≤ 2,3 M / ~2.000**. Treino, mesma vista (encosta), APK de 04/10 × o novo: **902 K → 641 K tris, 548 → 518
+batches**. Na partida desta rodada o mago caiu no mar, então não há leitura "no chão da floresta" comparável.
+
+**CONTINUAR DAQUI (14):** (1) Poco no USB → APK novo (`Builds/testes/arkana-emulador-2026-10-29_0954.apk`) → ler
+`ARKANA CUSTO`/FPS no chão e comparar com 27/09 (42–54 FPS); olhar se o salto do LOD1 a ~130 m aparece (se sim, baixar
+`LodLonge`). (2) Batches seguem altos de perto (~500 no treino, setpass sobe na descida com o material do LOD1): próximo
+corte é instancing das árvores ou impostor. (3) A fila do bloco 13 continua valendo.
 
 ### >>> COMECE POR AQUI — 04/10/2026, tarde (13): MIXAMO NOS 20 MAGOS + SUBIR EM OBSTÁCULO
 
