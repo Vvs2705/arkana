@@ -108,6 +108,20 @@ namespace Arkana.Tests
             Assert.AreEqual(0, main.Bots.Count, "treino nao tem bots");
             Assert.AreEqual(Main.Bonecos, main.Partida.Bonecos.Count, "bonecos registrados");
             Assert.IsNull(main.Partida.Zona, "treino nao tem tempestade");
+            // 29/10: ~9,8 M tris no chao — a arvore de malha inteira nunca saia de cena (LOD unico com limiar 0). Toda arvore
+            // do Terrain corta longe; as que tem "-lod1" em Resources (as 4 de hoje) trocam de malha antes.
+            IlhaMestre mestre = Object.FindFirstObjectByType<IlhaMestre>();
+            Assert.IsNotNull(mestre, "a partida monta a IlhaMestre");
+            UnityEngine.Terrain ter = mestre.GetComponentInChildren<UnityEngine.Terrain>(true);
+            Assert.IsNotNull(ter, "a IlhaMestre tem Terrain (filhos: " + mestre.transform.childCount + ")");
+            TreePrototype[] protos = ter.terrainData.treePrototypes;
+            Assert.Greater(protos.Length, 0, "a ilha tem arvores");
+            foreach (TreePrototype tp in protos)
+            {
+                LOD[] lods = tp.prefab.GetComponent<LODGroup>().GetLODs();
+                Assert.AreEqual(2, lods.Length, tp.prefab.name + ": LOD0 + LOD1");
+                Assert.Greater(lods[lods.Length - 1].screenRelativeTransitionHeight, 0f, tp.prefab.name + " corta longe");
+            }
             LogAssert.NoUnexpectedReceived();
         }
 
