@@ -4,6 +4,74 @@
 
 ---
 
+## 0. ESTADO REAL (placar do projeto — 29/10/2026)
+
+> **Para que serve:** é o placar do estúdio (prompt mestre V-STACK, §1). Cada linha é um desenho deste GDD
+> contra o que o código em `mobile-unity/` faz HOJE. O jogo só está pronto para a loja quando toda linha for
+> **feito** ou **pendente (externo)**. Estados: **feito** · **parcial** · **pendente** · **pendente (externo)** (depende
+> do Diretor, de conta, de aparelho ou de gente) · **fora da v1** (visão de futuro, não bloqueia a loja).
+> Fonte do estado: o código em `main` (b341b5b, 04/10) e o `design/PROJETO.md` (bloco 13). O detalhe e as
+> medições moram no PROJETO.md; aqui fica só a linha. **Atualize esta tabela a cada fase** junto com o CONTINUAR DAQUI.
+>
+> **Divergências que esta tabela já denuncia no próprio GDD:** os Pilares dizem "primeira pessoa" e o jogo é
+> terceira pessoa sobre o ombro (§9, decisão de 20/08); §9/§15/§19.4/§19.5 ainda falam de Godot/Roblox, e o
+> produto é **Unity 6, celular** desde 09/09 (CHANGELOG); §19.2 diz "20 jogadores" e a partida tem **18 corpos em
+> trios** (25/09); §19.6.3 pede "arena média" e a ilha é a do Documento Mestre, **4,8 × 4,4 km** (25/09).
+> Essas linhas do texto abaixo são histórico até serem reescritas; quem manda no estado é esta tabela.
+
+| § | Desenho | Estado | Como e onde | Divergência / o que falta |
+|---|---|---|---|---|
+| 1 | 5 classes com vantagem de classe | parcial | classe e papel na ficha de cada mago (`Core/Textos.cs`) | as vantagens (baú de guerra, baú celestial antecipado, Torres Arcanas, compartimento secreto, palpite da zona) não existem no jogo |
+| 1 | Olho Onisciente (item do Vidente) | pendente | — | nenhum código |
+| 2–3 | Elenco jogável | feito | **20 magos** com kit (`Gameplay/Habilidades/*.cs`, `Core/Kits.Grupo*.cs`), modelos do site + Mecanim Humanoid (`Characters/MagoMecanim.cs`) | o GDD descreve 10; o jogo tem 20 (elenco real de 12/09). **Lista dos 10 do lançamento = decisão do Diretor** (PROJETO.md, "Decisões que esperam") |
+| 3 | Passiva / tática / suprema com limitadores | feito | `KitRunner*.cs` + `VisualDosKits*.cs`, testes `GameplayKits*` | bots não usam kit (decisão do Diretor, 1 linha no `KitRunner`); "intangível" não muda colisão |
+| 4.1 | Tudo é projétil com tempo de viagem | feito | `Gameplay/Projetil.cs`; tiro converge no retículo e não atravessa alvo/rocha (04/10) | — |
+| 4.2 | Mana para ataque, cooldown para tática/suprema | feito | `Core/Vitalidade.cs`, `Pawn`; cobrança uma vez por tiro (`GameplayMotorTests.Atirar_*`) | — |
+| 4.3–4.4 | Suprema telegrafada; transformação troca poder | parcial | kits do Corvus/telegrafia nos visuais | não auditado kit a kit contra a regra |
+| 4.6 | Pedra-papel-tesoura elemental | feito | `Terrain/TerrenoReativo.cs`, `SintoniaEfeitos.cs` (counters) | — |
+| 5 | Escudo evolutivo 4 níveis + anti-farm | feito | `Core/Vitalidade.cs` (`Balance.Escudo.Niveis`), dano em aliado não evolui (`Combat.MesmoTime`) | perk do nível 4: conferir |
+| 6 | Lobby: grade de retratos + detalhe animado | parcial | `Menu/SelecaoPersonagem.cs`, `Menu/VitrineDoMenu.cs` (modelo 3D na vitrine) | sem retratos pintados nem animação de apresentação por mago |
+| 7 | Cosméticos, passe de batalha, loja | pendente | — | nada de monetização no código. **Modelo de receita = Diretor** (PROJETO.md). Guardrails do estúdio: sem caixa aleatória paga, anúncio não personalizado, IAP em 2 passos |
+| 9 | Público 10+, sem gore, sem caixa aleatória paga | feito (política) | GDD §9/§19.1 | IARC/ClassInd = pendente (externo), ato do Diretor |
+| 9 | Sintonia: 10 combos, janela 1,5 s, canalização 1 s, recarga cobrada no início e devolvida | feito | `Core/Sintonia.cs`, `SintoniaEfeitos.cs`, `VisualDaSintonia.cs`, testes `CoreSintoniaTests` | números = variante A do Roblox, **não validados com gente** (V1) |
+| 9 | Solo pareado com parceiro bot que entra na canalização | feito | modo TRIO/DUPLA/SOLO no menu, parceiros bot (`Gameplay/Bot.cs`) | — |
+| 10 | Logo Selo de Arkana, fontes OFL, paleta, cor+forma+ícone por elemento | feito | `Menu/Logo.cs`, `Menu/Selo.cs`, `UI/CarrosselElementos.cs`, `UI/FiltroDaltonismo.cs` | key art de loja: pendente |
+| 11 | Splash, carregamento com dica, título, menu, pausa | feito | `UI/TelaDeCarregamento.cs`, `Menu/Menu.cs` | boot: a ilha monta num quadro só (~11 s no Poco em 27/09) — fatiar atrás da tela de carregamento |
+| 12 | Configurações (vídeo, áudio, controles, jogo) | parcial | `Menu/Config.cs`: qualidade, FPS 30/60/120/ilimitado, volumes, daltonismo, layout espelhado e escala dos botões | **idioma só PT-BR** (`Textos.CfgIdiomaNota`); padrão do estúdio é PT-BR/EN/ES/ID; remapeamento de teclas não se aplica ao celular |
+| 13 | Áudio e música | parcial | `Audio/Sfx.cs` (síntese procedural, música, ambiente) | trilha reativa por elemento (§18.5) fora da v1; som por tipo de acerto: pendente |
+| 14 | Terreno reativo (fogo por orçamento, gelo, raio na água, muro 60 hp, lama, vento) | feito | `Terrain/TerrenoReativo.cs` + `VisualDoTerreno.cs`, testes `Terrain*` | — |
+| 16.2 | Varinha / cajado / manopla (2 elementos, só no Baú Celestial) | feito | `Gameplay/Arma.cs`, `Gameplay/BauCelestial.cs`, `Characters/LuvaVisual.cs` | hora do baú fixa 45 s vs sorteada: Diretor |
+| 16.3 | Runas encaixáveis (slots 1/2/3) | parcial | slots por arma em `Arma.cs` | conferir se as 5 runas existem como loot com efeito |
+| 16.4 | Química (vento sufoca/alimenta, vapor, fulgurito, hipotermia) | parcial | parte nas receitas do `SintoniaEfeitos` | não auditado regra a regra |
+| 16.5 | Mesa de Transmutação | pendente | — | nenhum código (só um visual de kit) |
+| 16.6 | Ressurreição | feito (regra nova) | reviver por canalização (`Partida.TickReviver`); regra do reviver de 25/09 | o "Círculo de Invocação com Essência" do texto foi trocado — reescrever o parágrafo |
+| 17 | Escolas ocultas / Ossaria | fora da v1 | — | roadmap de temporadas |
+| 18.1 | Folclore BR (Curupira no lançamento) | pendente | — | nenhum mago do folclore no elenco |
+| 18.2 | Castelo voador como lobby vivo | parcial | `World/Castelo.cs`: castelo com rota, salto, queda e planeio (`Gameplay/Queda.cs`) | andar livre no castelo antes da queda: fora da v1 (precisa multiplayer) |
+| 18.3 | Grimório de Descobertas | feito | `Gameplay/Grimorio.cs`, `Menu/TelaGrimorio.cs`, `UI/AvisoGrimorio.cs` | — |
+| 18.4 | Presságios | pendente | — | **escrever a spec aqui antes** (só há 3 exemplos e eles mexem em combate) |
+| 18.6 | Espírito Errante + Selo do Campeão | parcial | Selo: `UI/SeloDoCampeao.cs` (feito); espírito: só no kit do Gromm | o espírito pós-morte com "arrepio" e altar não existe |
+| 18.7 | Ping de Sintonia | feito | `Core/Textos.Ping.cs`, testes `GameplayPingTests` | fala só com o 1º parceiro do trio |
+| 19.1 | Juramento anti-P2W | feito (política) | GDD §19.1 | publicar na ficha da loja (com §7) |
+| 19.2 | 60 FPS em aparelho intermediário + Modo Névoa | parcial | `MedidorDeFps.cs` (linha `ARKANA CUSTO`), `BancadaDeCortes.cs`, perfis de qualidade | **último FPS medido 27/09: chão 42–54, treino 31.** Emulador 04/10: ~9,8 M triângulos e ~4.400 batches no chão — corte em andamento (árvores sem LOD/impostor). Medida no Poco = pendente (externo) |
+| 19.3 | Toque: mira e disparo em um gesto, ≥ 48 dp, layout editável e escalável | parcial | `UI/GestoDeDisparo.cs`, `UI/JoystickVirtual.cs`, `UI/Dp.cs`, layout espelhado/escala | editor de arrastar botões: pendente. Esquema Simples × Avançado: pendente |
+| 19.6.1 | Treino offline contra bots como modo do jogo | feito | partida contra 5 times de bots, sem rede | — |
+| — | Mapa | feito | ilha do Documento Mestre (`World/IlhaMestre*.cs`), 12 regiões, subterrâneo, zona, loot, minimapa | arte orgânica do Tripo em andamento; textura estica nas encostas íngremes |
+| — | Animação | feito | Mixamo (77 clipes) no Mecanim nos 20, strafe/recuo, pulo, subir em obstáculo (`Gameplay/Escalada.cs`) | nado à frente, mortes do pacote, levantar no reviver; remover o legado `Animation` depois do aparelho |
+| — | Multiplayer (G5) | pendente | prontidão lida em 04/10 (núcleo quase todo simulação pura) | **o gate de combate/movimento não passou** (performance no Poco); servidor e contas = decisão do Diretor |
+| — | Portão de qualidade | feito | `mobile-unity/portao.ps1` (EditMode + PlayMode): **569 passaram, 0 falharam** em 04/10; `emulador.ps1` PASS | sem CI no GitHub (o portão precisa do Unity do PC) |
+| — | Idiomas PT-BR / EN / ES / ID | pendente | `Core/Textos.cs` só PT-BR | padrão do estúdio `L(pt, en, es, id)` |
+| — | Tutorial guiado (FTUE) | pendente | — | a dica da Config ensina o combo; não há tour guiado |
+| — | Monetização (anúncio/IAP) dentro dos guardrails | pendente | — | depende do §7 (Diretor) |
+| — | Ícone, capturas, feature graphic, criativos, ficha da loja | pendente | — | — |
+| — | AAB assinado, chave de upload, backup | pendente | `Editor/Build.cs` gera APK de teste/emulador | chave de upload e backup no padrão do estúdio |
+| — | Conta da Play (organização V-STACK, D-U-N-S) | pendente (externo) | — | previsão do D-U-N-S: 25/11/2026 |
+| — | iOS, playtest com gente | pendente (externo) | — | — |
+
+**Placar (29/10):** 46 linhas · feito 21 (46 %) · parcial 11 · pendente 11 · pendente (externo) 2 · fora da v1 1. A limpeza do PC do prompt mestre (§9 dele) só começa com 90 % feito.
+
+---
+
 ## 1. As 5 Classes (com vantagem de classe, como no Apex)
 
 | Classe | Equivalente Apex | Papel | Vantagem de classe |
