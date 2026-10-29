@@ -436,6 +436,47 @@ namespace Arkana.World
         GameObject Molde(string recurso, out float altura)
         {
             altura = 0f;
+            Mesh mesh = MalhaDoMolde(recurso, out Material[] ms);
+            if (mesh == null) return null;
+            altura = mesh.bounds.max.y;
+            var go = new GameObject("molde_" + recurso) { hideFlags = HideFlags.HideAndDontSave };
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mrMolde = go.AddComponent<MeshRenderer>();
+            mrMolde.sharedMaterials = ms;
+            // O LODGroup tambem faz o Terrain tratar a peca como arvore de MALHA (sem ele exigia o shader Nature/Soft
+            // Occlusion e o aviso derrubava os 5 testes de cena, 04/10). Sem impostor (treeBillboardDistance 5 km).
+            // CORTE DE 29/10: o emulador contou ~9,8 M tris e ~4.400 batches no chao, quase tudo arvore de malha inteira ate'
+            // 1,2 km. Agora: LOD1 (o "-lod1" do mesmo nome, ~1/4 dos tris) abaixo de LodLonge da tela e corte abaixo de
+            // LodCorte. Sem o "-lod1", um nivel so' com o mesmo corte. O lodBias da qualidade multiplica (Media 0,7; Alta 2).
+            Mesh longe = MalhaDoMolde(recurso + "-lod1", out Material[] msLonge);
+            LOD[] lods;
+            if (longe != null)
+            {
+                var filho = new GameObject("lod1") { hideFlags = HideFlags.HideAndDontSave };
+                filho.transform.SetParent(go.transform, false);
+                filho.AddComponent<MeshFilter>().sharedMesh = longe;
+                var mrLonge = filho.AddComponent<MeshRenderer>();
+                mrLonge.sharedMaterials = msLonge;
+                lods = new[] { new LOD(LodLonge, new Renderer[] { mrMolde }), new LOD(LodCorte, new Renderer[] { mrLonge }) };
+            }
+            else lods = new[] { new LOD(LodCorte, new Renderer[] { mrMolde }) };
+            var lg = go.AddComponent<LODGroup>();
+            lg.SetLODs(lods);
+            lg.RecalculateBounds();
+            go.transform.SetParent(raiz, false);
+            go.transform.position = new Vector3(0, -10000, 0);
+            return go;
+        }
+
+        // KNOBs (fracao da altura da tela, x lodBias). Arvore de 22 m na Media (FOV 62): LOD1 a ~130 m, corte a ~1,1 km;
+        // moita de 2,2 m some a ~110 m, tronco caido a ~60 m.
+        // ponytail: medido so' em contagem (emulador); conferir no Poco se o salto do LOD1 aparece e mover LodLonge.
+        const float LodLonge = 0.10f, LodCorte = 0.012f;
+
+        /// <summary>O GLB inteiro numa malha so' (com os materiais na ordem das submalhas); null se o recurso nao existe.</summary>
+        static Mesh MalhaDoMolde(string recurso, out Material[] materiais)
+        {
+            materiais = null;
             var src = Resources.Load<GameObject>(recurso);
             if (src == null) return null;
             GameObject inst = Instantiate(src);
@@ -457,19 +498,8 @@ namespace Arkana.World
             var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, name = "molde_" + recurso };
             mesh.CombineMeshes(ci.ToArray(), false, true);
             mesh.RecalculateBounds();
-            altura = mesh.bounds.max.y;
-            var go = new GameObject("molde_" + recurso) { hideFlags = HideFlags.HideAndDontSave };
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mrMolde = go.AddComponent<MeshRenderer>();
-            mrMolde.sharedMaterials = ms.ToArray();
-            // UM nivel de LOD que nunca corta (0): o Terrain trata a peca como arvore de MALHA e para de exigir o shader
-            // Nature/Soft Occlusion — a arvore do Tripo (2 materiais) avisava a cada boot e o aviso derrubava os 5 testes
-            // de cena (04/10). Sem impostor (treeBillboardDistance 5 km), o desenho e' o mesmo de antes.
-            // ponytail: limiar 0 = sem corte por tamanho na tela; subir (~0,01) corta arvore miuda longe, medir no Poco antes.
-            go.AddComponent<LODGroup>().SetLODs(new[] { new LOD(0f, new Renderer[] { mrMolde }) });
-            go.transform.SetParent(raiz, false);
-            go.transform.position = new Vector3(0, -10000, 0);
-            return go;
+            materiais = ms.ToArray();
+            return mesh;
         }
 
         bool PertoDoRio(float x, float y, float margem)
