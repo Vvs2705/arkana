@@ -10,7 +10,7 @@
 > contra o que o código em `mobile-unity/` faz HOJE. O jogo só está pronto para a loja quando toda linha for
 > **feito** ou **pendente (externo)**. Estados: **feito** · **parcial** · **pendente** · **pendente (externo)** (depende
 > do Diretor, de conta, de aparelho ou de gente) · **fora da v1** (visão de futuro, não bloqueia a loja).
-> Fonte do estado: o código em `main` (b341b5b, 04/10) e o `design/PROJETO.md` (bloco 13). O detalhe e as
+> Fonte do estado: o código em `main` (2a3586e, 29/10) e o `design/PROJETO.md` (bloco 13). O detalhe e as
 > medições moram no PROJETO.md; aqui fica só a linha. **Atualize esta tabela a cada fase** junto com o CONTINUAR DAQUI.
 >
 > **Divergências que esta tabela já denuncia no próprio GDD:** os Pilares dizem "primeira pessoa" e o jogo é
@@ -53,7 +53,7 @@
 | 18.6 | Espírito Errante + Selo do Campeão | parcial | Selo: `UI/SeloDoCampeao.cs` (feito); espírito: só no kit do Gromm | o espírito pós-morte com "arrepio" e altar não existe |
 | 18.7 | Ping de Sintonia | feito | `Core/Textos.Ping.cs`, testes `GameplayPingTests` | fala só com o 1º parceiro do trio |
 | 19.1 | Juramento anti-P2W | feito (política) | GDD §19.1 | publicar na ficha da loja (com §7) |
-| 19.2 | 60 FPS em aparelho intermediário + Modo Névoa | parcial | `MedidorDeFps.cs` (linha `ARKANA CUSTO`), `BancadaDeCortes.cs`, perfis de qualidade | **último FPS medido 27/09: chão 42–54, treino 31.** Emulador 04/10: ~9,8 M triângulos e ~4.400 batches no chão — corte em andamento (árvores sem LOD/impostor). Medida no Poco = pendente (externo) |
+| 19.2 | 60 FPS em aparelho intermediário + Modo Névoa | parcial | `MedidorDeFps.cs` (linha `ARKANA CUSTO`), `BancadaDeCortes.cs`, perfis de qualidade | **último FPS medido 27/09: chão 42–54, treino 31.** Emulador 04/10: ~9,8 M triângulos e ~4.400 batches. **29/10:** árvores com LOD1 a ~130 m e corte por tamanho na tela → descida da partida ≤ 2,3 M e ~2.000 batches; treino 902 K → 641 K. Próximo: instancing/impostor (de perto ainda ~500 batches). Medida no Poco = pendente (externo) |
 | 19.3 | Toque: mira e disparo em um gesto, ≥ 48 dp, layout editável e escalável | parcial | `UI/GestoDeDisparo.cs`, `UI/JoystickVirtual.cs`, `UI/Dp.cs`, layout espelhado/escala | editor de arrastar botões: pendente. Esquema Simples × Avançado: pendente |
 | 19.6.1 | Treino offline contra bots como modo do jogo | feito | partida contra 5 times de bots, sem rede | — |
 | — | Mapa | feito | ilha do Documento Mestre (`World/IlhaMestre*.cs`), 12 regiões, subterrâneo, zona, loot, minimapa | arte orgânica do Tripo em andamento; textura estica nas encostas íngremes |
