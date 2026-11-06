@@ -71,21 +71,16 @@ namespace Arkana.EditorTools
 
             var arv = new StringBuilder();
             int na = 0;
-            UnityEngine.Terrain[] ters = g.GetComponentsInChildren<UnityEngine.Terrain>();
-            foreach (UnityEngine.Terrain ter in ters)
+            // 29/10: as arvores sairam do Terrain (instanciadas pela propria ilha, IlhaMestre.Arvores.cs)
+            for (int i = 0; i < ilha.ArvoresPlantadas; i++)
             {
-                TerrainData td = ter.terrainData;
-                TreePrototype[] protos = td.treePrototypes;
-                foreach (TreeInstance ti in td.treeInstances)
-                {
-                    Vector3 p = ter.transform.position + Vector3.Scale(ti.position, td.size);
-                    string nome = protos[ti.prototypeIndex].prefab.name.Replace("molde_", "");
-                    arv.Append(nome).Append('|').Append(p.x.ToString("0.##", inv)).Append('|').Append(p.y.ToString("0.##", inv))
-                       .Append('|').Append(p.z.ToString("0.##", inv)).Append('|').Append(ti.rotation.ToString("0.###", inv))
-                       .Append('|').Append(ti.heightScale.ToString("0.####", inv)).Append('\n');
-                    na++;
-                }
+                var (nome, p, giro, escala) = ilha.Arvore(i);
+                arv.Append(nome).Append('|').Append(p.x.ToString("0.##", inv)).Append('|').Append(p.y.ToString("0.##", inv))
+                   .Append('|').Append(p.z.ToString("0.##", inv)).Append('|').Append(giro.ToString("0.###", inv))
+                   .Append('|').Append(escala.ToString("0.####", inv)).Append('\n');
+                na++;
             }
+            UnityEngine.Terrain[] ters = g.GetComponentsInChildren<UnityEngine.Terrain>();
             File.WriteAllText(Path.Combine(dir, "arvores.txt"), arv.ToString());
 
             // chao: 4x4 blocos de 512 -> 2048 x 2048 (x oeste->leste, y sul->norte, como a textura do Unity)
