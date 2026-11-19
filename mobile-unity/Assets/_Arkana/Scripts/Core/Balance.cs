@@ -179,6 +179,9 @@ namespace Arkana.Core
             public const int GlassMax = 24;
             /// <summary>m da lamina mais alta: tapa um mago de pe'.</summary>
             public const float GlassHeight = 2.4f;
+            /// <summary>s em que o vidro esta' NASCENDO (a subida da casca): Raio nao o estilhaca (ADR-0001 adendo ciclo 2 — a suprema
+            /// do Fizz cai a cada 3 m no mesmo quadro e se autodestruia). Outro elemento estilhaca normalmente.</summary>
+            public const float GlassNascer = 0.25f;
         }
 
         public static class Dodge

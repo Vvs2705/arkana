@@ -67,8 +67,35 @@ namespace Arkana.Tests
             Assert.AreEqual(1, f.Estilhacados);
 
             Bus.EmitTerrainHit(Elemento.Raio, p, false);   // funde de novo
+            f.Tick(Balance.Terrain.GlassNascer + 0.01f);    // ja' nasceu (ciclo 2: vidro NASCENDO nao quebra com Raio)
             Bus.EmitTerrainHit(Elemento.Raio, p, false);   // o raio TAMBEM estilhaca — e nao refunde no mesmo impacto
-            Assert.IsFalse(f.TemVidro(p), "raio no vidro estilhaca em vez de renovar");
+            Assert.IsFalse(f.TemVidro(p), "raio no vidro ja' nascido estilhaca em vez de renovar");
+        }
+
+        /// <summary>Conselho Modo B ciclo 1, LP nº 1: a suprema do Fizz emite Raio FORTE a cada 3 m (1 celula) no MESMO quadro.
+        /// O 2º ponto caia no vidro recem-fundido e o estilhacava (vidro/buraco alternado). Agora o vidro NASCENDO ignora Raio
+        /// e o disco do ponto seguinte continua fundindo o que falta: uma faixa continua.</summary>
+        [Test]
+        public void RaioForteEmSequencia_NaoEstilhacaOProprioVidro()
+        {
+            Fulgurito f = Novo();
+            for (int i = 0; i < 3; i++) Bus.EmitTerrainHit(Elemento.Raio, Pos(f, 4 + i, 15), true);   // 3 m entre si, mesmo quadro
+            Assert.AreEqual(0, f.Estilhacados, "a propria rajada nao quebra o vidro que acabou de fundir");
+            Assert.AreEqual(15, f.Ativos, "faixa continua: disco 3x3 + 3 + 3 colunas novas");
+            for (int cx = 3; cx <= 7; cx++)
+                for (int cz = 14; cz <= 16; cz++)
+                    Assert.IsTrue(f.TemVidro(Pos(f, cx, cz)), "buraco na faixa em (" + cx + "," + cz + ")");
+        }
+
+        [Test]
+        public void VidroNascendo_OutroElementoAindaEstilhaca()
+        {
+            Fulgurito f = Novo();
+            Vector3 p = Pos(f, 5, 15);
+            Bus.EmitTerrainHit(Elemento.Raio, p, false);
+            Bus.EmitTerrainHit(Elemento.Fogo, p, false);   // mesmo quadro: o vidro ainda sobe, mas nao e' escudo
+            Assert.IsFalse(f.TemVidro(p), "so' o Raio poupa o vidro nascendo; qualquer outro impacto quebra (1 tiro destroi)");
+            Assert.AreEqual(1, f.Estilhacados);
         }
 
         [Test]

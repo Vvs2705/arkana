@@ -97,8 +97,14 @@ namespace Arkana.Terrain
         {
             int c = CelulaEm(pos);
             if (c < 0) return;
-            // 1 TIRO DESTROI: qualquer elemento no vidro o estilhaca — e o mesmo impacto nao funde outro ali
-            if (_vivos.ContainsKey(c)) { Estilhacar(c); return; }
+            // 1 TIRO DESTROI: qualquer elemento no vidro o estilhaca — e o mesmo impacto nao funde outro ali.
+            // EXCECAO (ADR-0001 adendo ciclo 2): vidro NASCENDO (< GlassNascer) ignora RAIO — a rajada que o fundiu (a suprema do
+            // Fizz cai a cada 3 m no mesmo quadro) nao o quebra; o disco forte segue fundindo o resto. Outro elemento quebra sempre.
+            if (_vivos.TryGetValue(c, out VidroVisivel atingido))
+            {
+                if (el != Elemento.Raio || !Nascendo(atingido)) { Estilhacar(c); return; }
+                if (!forte) return;   // raio fraco no proprio vidro nascendo: nada (nem renova)
+            }
             if (el != Elemento.Raio) return;
             if (!forte) { Fundir(c); return; }
             int cx = c % N, cz = c / N, r = Mathf.CeilToInt(TerrenoReativo.RaioForte);
@@ -111,6 +117,9 @@ namespace Arkana.Terrain
                     if (x >= 0 && z >= 0 && x < N && z < N) Fundir(z * N + x);
                 }
         }
+
+        /// <summary>Ainda subindo do chao (a mesma janela da animacao da casca).</summary>
+        public static bool Nascendo(VidroVisivel v) => Balance.Terrain.GlassDuration - v.Restante < Balance.Terrain.GlassNascer;
 
         private void Fundir(int idx)
         {
