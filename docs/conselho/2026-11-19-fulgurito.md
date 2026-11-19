@@ -95,3 +95,17 @@ Regra: máx. 3 subagentes por leva, 1 Unity por vez. **Nesta validação as raia
    Library travada/sem permissão — limpar `Library/Bee/Android` e rodar de novo; o build também deixou `mobile-unity/Assets/Resources/`
    com 4 arquivos `PerformanceTestRun*` não rastreados, a apagar).
 3. Dono: o repo `Vvs2705/arkana` está **público** (o time o trata como privado); decidir visibilidade (pesa: segredos de conta Unity sem 2FA no Actions, cota LFS).
+
+### Ciclo 3 (último) — CD e producer sobre os builds do commit `1109a92`
+
+> Mesmo rito: subagente separado por papel, lendo o próprio `.md`, somente leitura. Evidência: seção "Ciclo 3" de
+> `production/qa/evidence/2026-11-19-fulgurito.md`. LP (APPROVE) e TD (APROVA) mantidos do ciclo 2 (o ciclo 3 não muda código).
+
+| Papel | Evidência avaliada | Veredito | Ciclo (1–3) |
+|---|---|---|---|
+| creative-director | `2026-11-19-fulgurito-player-{praia-inimigo,praia-tiro,perto}.png` (player Win64 com janela, D3D12, do `1109a92`) × as 3 do Editor; controle `-player-controle-main-c37f778.png` (vistas) | **APROVA** — 1ª leitura VETA: no player o mago e o boneco saem brancos/sem textura e a areia sem relevo. Controle na `main` `c37f778` (sem Fulgurito): o mago também sai branco → defeito **pré-existente**, fora do escopo (defeito 9, ticket do dono). O vidro é idêntico entre player e Editor: opaco, sem ciano, boneco escondido antes e exposto depois do tiro → "vira APROVA sem mudança de arte". Ressalva: o controle não compara areia nem boneco de perto (fica no defeito 9) | 3 |
+| producer | escopo, DoD, APK, vereditos | **APROVA** — APK do `1109a92` gerado (raia 4: exit 0, 302,1 MB, SHA-256 `C9A67FB6…9CBE`, árvore limpa; defeito 8 fechado); CD APROVA; ciclo 3 só docs/evidência, sem extra de escopo; condições do TD são de release. Condições antes do merge: esta tabela registrada; ticket do defeito 9 linkado na evidência (dono); CI do HEAD novo verde | 3 |
+
+**Resultado do ciclo 3:** LP APPROVE · TD APROVA · CD APROVA · producer APROVA. **Merge: liberado para o dono** assim que o CI do HEAD novo
+ficar verde (ver PR #11). Ficam com o dono: ticket do defeito 9 (mago branco no player Standalone; conferir no APK no Poco F4), as
+condições de release do TD (p95 no Poco F4) e a visibilidade do repo.
