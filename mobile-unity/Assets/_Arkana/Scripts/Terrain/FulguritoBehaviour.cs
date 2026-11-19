@@ -10,7 +10,7 @@ namespace Arkana.Terrain
     /// A casca do FULGURITO (ADR-0001): liga a classe pura a Ilha.Atual (areia = Bioma Dunas/Praia na ilha procedural; faixa de praia seca
     /// na IlhaMestre), ticka e DESENHA os vidros vivos. Visual do ciclo 2 (veto do CD no Modo B ciclo 1: "le' como gelo e nao tapa"):
     /// feixe de TUBOS rugosos e retorcidos de areia fundida — verde-garrafa/oliva acinzentado e ambar-fume, base queimada escura subindo
-    /// pela peca, opacidade ~0,9 (tapa um mago de pe'), mais denso na altura do torso — e uma CROSTA irregular de areia vitrificada que
+    /// pela peca, opacidade ~0,95 (tapa um mago de pe'), mais denso na altura do torso — e uma CROSTA irregular de areia vitrificada que
     /// acompanha o declive e se dissolve na areia (borda com alfa 0, sem hexagono duro).
     /// Pool de GlassMax objetos criado 1x; zero alocacao por quadro (a crosta so' e' reassentada quando o vidro do slot muda).
     /// Sem ilha na cena: plano sem areia (nada acontece).
@@ -161,17 +161,17 @@ namespace Arkana.Terrain
         // ------------------------------------------------------------ malhas (1x)
 
         // paletas de areia fundida (fulgurito real: vidro de silica impura — verde-garrafa, oliva, ambar-fume; nunca ciano)
-        static readonly Color Queimado = new Color(0.16f, 0.12f, 0.08f);
+        static readonly Color Queimado = new Color(0.09f, 0.07f, 0.05f);
         static readonly Color[][] Paletas =
         {
-            new[] { new Color(0.30f, 0.38f, 0.20f), new Color(0.40f, 0.44f, 0.30f), new Color(0.50f, 0.38f, 0.17f) },   // oliva + ambar
-            new[] { new Color(0.24f, 0.33f, 0.18f), new Color(0.34f, 0.40f, 0.26f), new Color(0.28f, 0.30f, 0.22f) },   // verde-garrafa
-            new[] { new Color(0.52f, 0.37f, 0.16f), new Color(0.44f, 0.33f, 0.18f), new Color(0.38f, 0.42f, 0.26f) },   // ambar-fume
+            new[] { new Color(0.20f, 0.28f, 0.09f), new Color(0.27f, 0.31f, 0.15f), new Color(0.42f, 0.27f, 0.07f) },   // oliva + ambar
+            new[] { new Color(0.11f, 0.23f, 0.08f), new Color(0.19f, 0.27f, 0.11f), new Color(0.22f, 0.24f, 0.14f) },   // verde-garrafa
+            new[] { new Color(0.45f, 0.26f, 0.06f), new Color(0.36f, 0.22f, 0.08f), new Color(0.24f, 0.29f, 0.12f) },   // ambar-fume
         };
 
         /// <summary>Feixe de TUBOS rugosos (o fulgurito real e' um tubo de areia fundida): 9 pecas de 5 lados em 3 segmentos, raio que
         /// afina ate' uma ponta ROMBUDA (tampa, sem bico), eixo que entorta e gira, raio de cada anel com ruido. Mais largas e juntas
-        /// entre 0,6 e 1,7 m (o torso de um mago de pe'). Alfa 0,9 no corpo: tapa. ~35 tris por peca.</summary>
+        /// entre 0,6 e 1,7 m (o torso de um mago de pe'). Alfa 0,95 no corpo: tapa. ~35 tris por peca.</summary>
         static Mesh Feixe(int variante)
         {
             var rng = new System.Random(Fulgurito.Seed + 101 * variante);
@@ -198,9 +198,9 @@ namespace Arkana.Terrain
                     float f = n / (float)(niveis - 1);
                     Vector3 eixo = b + incl * f + torce * Mathf.Sin(f * Mathf.PI) + Vector3.up * (alt * f);
                     float raio = r0 * Mathf.Lerp(1f, 0.45f, f) * (n == 1 ? 1.15f : 1f);   // barriga no torso
-                    Color cn = Color.Lerp(Queimado, corpo, Mathf.SmoothStep(0f, 1f, f * 1.6f));
-                    cn = Color.Lerp(cn, Color.white, 0.08f * f);   // ponta um pouco mais clara (a luz atravessa a ponta)
-                    cn.a = n == 0 ? 1f : 0.9f;
+                    Color cn = Color.Lerp(Queimado, corpo, Mathf.SmoothStep(0f, 1f, f * 1.15f));
+                    cn = Color.Lerp(cn, Color.white, 0.05f * f);   // ponta um pouco mais clara (a luz atravessa a ponta)
+                    cn.a = n == 0 ? 1f : 0.95f;
                     for (int j = 0; j < lados; j++)
                     {
                         float aj = giro0 + f * 1.1f + j * Mathf.PI * 2f / lados;

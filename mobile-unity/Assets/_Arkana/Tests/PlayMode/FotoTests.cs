@@ -3938,6 +3938,28 @@ namespace Arkana.Tests
             return "quadros=" + o.Count + " fps-medio=" + (o.Count / soma).ToString("F1") + " p50=" + p50.ToString("F2") + "ms p95=" + p95.ToString("F2") + "ms";
         }
 
+        /// <summary>FPS COM render: em -batchmode a camera do jogo nao desenha por quadro (por isso ~1.300 fps no Medir). Aqui a camera do
+        /// jogador desenha a cena num alvo do tamanho da foto a cada quadro e o tempo do quadro inclui esse desenho (GPU do PC = proxy).</summary>
+        static IEnumerator MedirRender(Camera cam, System.Collections.Generic.List<float> dts, float segundos)
+        {
+            dts.Clear();
+            var rt = new RenderTexture(L, A, 24, RenderTextureFormat.ARGB32);
+            RenderTexture antes = cam.targetTexture;
+            float t = 0f;
+            try
+            {
+                while (t < segundos)
+                {
+                    cam.targetTexture = rt;
+                    cam.Render();
+                    cam.targetTexture = antes;
+                    yield return null;
+                    dts.Add(Time.unscaledDeltaTime); t += Time.unscaledDeltaTime;
+                }
+            }
+            finally { cam.targetTexture = antes; rt.Release(); Object.Destroy(rt); }
+        }
+
         static IEnumerator Medir(System.Collections.Generic.List<float> dts, float segundos)
         {
             dts.Clear();
@@ -4004,13 +4026,29 @@ namespace Arkana.Tests
                 main.Player.Camera.Logica.Yaw = Mathf.Atan2(fw.x, fw.z);
                 main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
                 var inimigo = (Gameplay.Pawn)main.Partida.Bonecos[0];
-                inimigo.Aterrar(praia + fw * 2f);
+                // teleporte como o LevarJogador (CharacterController desligado, transform direto): Aterrar de um corpo JA' pousado
+                // devolve a Queda.Pos antiga — o boneco voltava ao spawn do treino (visto: 1.004 m de distancia)
+                var ccInimigo = inimigo.GetComponent<CharacterController>();
+                if (ccInimigo != null) ccInimigo.enabled = false;
+                Vector3 posInimigo = praia + fw * 2f;
+                inimigo.transform.position = new Vector3(posInimigo.x, Arkana.World.Ilha.AlturaDoChao(posInimigo.x, posInimigo.z) + 0.05f, posInimigo.z);
+                if (ccInimigo != null) ccInimigo.enabled = true;
                 inimigo.EncararDir = dentro;   // de frente para o jogador: e' quem se esconde atras do vidro
+                string diagInimigo = inimigo.name + " n=" + main.Partida.Bonecos.Count + " aterrou=" + inimigo.Pos.ToString("F1");
+                yield return null;
+                diagInimigo += " +1q=" + inimigo.Pos.ToString("F1");
                 yield return Esperar(2f);
+                diagInimigo += " +2s=" + inimigo.Pos.ToString("F1") + " ativo=" + inimigo.gameObject.activeInHierarchy;
+                Debug.Log("ARKANA FULGURITO inimigo " + diagInimigo);
+                Vector3 pi = inimigo.Pos; pi.y = 0f;
+                Vector3 alvoInimigo = praia + fw * 2f; alvoInimigo.y = 0f;
+                Assert.Less(Vector3.Distance(pi, alvoInimigo), 1.5f, "o boneco nao ficou atras do vidro: " + diagInimigo);
 
                 var dts = new System.Collections.Generic.List<float>();
                 yield return Medir(dts, 4f);
                 string antes = Quadros(dts);
+                yield return MedirRender(main.Player.Camera.Cam, dts, 3f);
+                string antesRender = Quadros(dts);
 
                 Vector3 p = main.Player.Pawn.Pos;
                 int areia = 0;
@@ -4023,8 +4061,10 @@ namespace Arkana.Tests
                 yield return Esperar(0.4f);
                 int ativos = f.Ativos;
                 bool tapa = f.BloqueiaVisao(praia) && f.BloqueiaVisao(praia - fw * 3f);
-                yield return Medir(dts, 3f);
+                yield return Medir(dts, 2f);
                 string depois = Quadros(dts);
+                yield return MedirRender(main.Player.Camera.Cam, dts, 3f);
+                string depoisRender = Quadros(dts);
 
                 Foto(main.Player.Camera.Cam, "f62-fulgurito-praia-inimigo", true);
                 Vector3 olho = praia - fw * 5f + lado * 3.5f;
@@ -4048,7 +4088,9 @@ namespace Arkana.Tests
                     + "\n  jogador=" + p.ToString("F1") + " ilha=" + (ilha.Mestre != null ? "IlhaMestre" : "procedural") + " praia=" + praia.ToString("F1") + " alvos-na-areia=" + areia + "/3"
                     + " vidros-ativos=" + ativos + " (teto " + Balance.Terrain.GlassMax + ") inimigo=" + inimigo.Pos.ToString("F1") + " tapa-a-linha=" + tapa
                     + " estilhacados-pelo-tiro=" + quebrados
-                    + "\n  ANTES (sem vidro): " + antes + "\n  DEPOIS (com vidro): " + depois + "\n";
+                    + "\n  ANTES (sem vidro): " + antes + "\n  DEPOIS (com vidro): " + depois
+                    + "\n  RENDER FORCADO ANTES (Camera.Render da camera do jogador em 2400x1080 a cada quadro): " + antesRender
+                    + "\n  RENDER FORCADO DEPOIS: " + depoisRender + "\n";
                 Directory.CreateDirectory(Pasta);
                 File.WriteAllText(Path.Combine(Pasta, "fulgurito-fps.txt"), txt);
                 Debug.Log("ARKANA FULGURITO " + txt);
