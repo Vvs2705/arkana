@@ -3925,5 +3925,116 @@ namespace Arkana.Tests
             File.AppendAllText(Path.Combine(Pasta, "diag.txt"), diag);
         }
 
+        // ---- FULGURITO (ata docs/conselho/2026-11-19-fulgurito.md, ADR-0001). Rodar: .\foto.ps1 "Foto_Fulgurito"
+
+        static string Quadros(System.Collections.Generic.List<float> dts)
+        {
+            if (dts.Count == 0) return "sem quadros";
+            var o = new System.Collections.Generic.List<float>(dts);
+            o.Sort();
+            float soma = 0f;
+            for (int i = 0; i < o.Count; i++) soma += o[i];
+            float p50 = o[o.Count / 2] * 1000f, p95 = o[Mathf.Min(o.Count - 1, (int)(o.Count * 0.95f))] * 1000f;
+            return "quadros=" + o.Count + " fps-medio=" + (o.Count / soma).ToString("F1") + " p50=" + p50.ToString("F2") + "ms p95=" + p95.ToString("F2") + "ms";
+        }
+
+        static IEnumerator Medir(System.Collections.Generic.List<float> dts, float segundos)
+        {
+            dts.Clear();
+            float t = 0f;
+            while (t < segundos) { yield return null; dts.Add(Time.unscaledDeltaTime); t += Time.unscaledDeltaTime; }
+        }
+
+        /// <summary>
+        /// O VIDRO NA PRAIA: treino deterministico, jogador levado a 12 m de uma faixa de areia (achada por varredura), FPS de 4 s SEM vidro, tres raios FORTES
+        /// na areia (9 m entre si: discos sem sobrepor) da camera (ate' o teto GlassMax), FPS de 4 s COM vidro, foto da camera do jogador com HUD
+        /// (f62-fulgurito-duna) e uma de perto (f62-fulgurito-perto). Numeros em Logs/fotos/fulgurito-fps.txt.
+        /// Perfil: QualitySettings "Medium" (o nivel da qualidade Media do Config), vSync 0, sem teto de FPS — PC como proxy.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Foto_Fulgurito_DunaComFps()
+        {
+            ExigirGpu();
+            Main main = _go.AddComponent<Main>();
+            yield return null;
+            Arkana.Menu.Menu.PedidoDeTreino = true;
+            Bus.EmitGameStartRequested();
+            yield return Esperar(2.5f);
+            Assert.IsNotNull(main.Player, "treino sem jogador");
+            var ilha = Arkana.World.Ilha.Atual;
+            Assert.IsNotNull(ilha, "sem ilha");
+            Arkana.Terrain.FulguritoBehaviour fb = Arkana.Terrain.FulguritoBehaviour.Atual;
+            Assert.IsNotNull(fb, "o Main nao criou o FulguritoBehaviour no passo terreno");
+            Arkana.Terrain.Fulgurito f = fb.Logica;
+
+            int nivel = Mathf.Clamp((QualitySettings.names.Length - 1) / 2, 0, QualitySettings.names.Length - 1);
+            QualitySettings.SetQualityLevel(nivel, true);
+            QualitySettings.vSyncCount = 0;
+            int alvoAntes = Application.targetFrameRate;
+            Application.targetFrameRate = -1;
+
+            // a praia: de fora para dentro em 36 direcoes, a primeira celula de AREIA com as duas vizinhas a 9 m (na tangente) tambem
+            // de areia — vale para a ilha procedural (Dunas/Praia) e para a IlhaMestre (faixa de praia seca)
+            float raio = ilha.Mestre != null ? ilha.Mestre.RaioTerra : (ilha.Relevo != null ? ilha.Relevo.RaioTerra : 90f);
+            Vector3 praia = Vector3.zero, dentro = Vector3.forward, tang = Vector3.right;
+            bool achou = false;
+            for (int a = 0; a < 36 && !achou; a++)
+            {
+                float ang = a * 10f * Mathf.Deg2Rad;
+                var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                var tg = new Vector3(-dir.z, 0f, dir.x);
+                for (float m = raio; m > 20f && !achou; m -= 3f)
+                {
+                    Vector3 c = dir * m;
+                    if (f.EhAreia(f.CelulaEm(c)) && f.EhAreia(f.CelulaEm(c + tg * 9f)) && f.EhAreia(f.CelulaEm(c - tg * 9f))
+                        && Arkana.World.Ilha.SuperficieDaAgua((c - dir * 12f).x, (c - dir * 12f).z) == Arkana.World.Relevo.Seco)
+                    { praia = c; dentro = -dir; tang = tg; achou = true; }
+                }
+            }
+            Assert.IsTrue(achou, "nenhuma faixa de areia achada na ilha (mestre=" + (ilha.Mestre != null) + ")");
+            Vector3 lugar = praia + dentro * 12f;
+            LevarJogador(main, lugar);
+            main.Player.Camera.Logica.Yaw = Mathf.Atan2(-dentro.x, -dentro.z);
+            main.Player.Camera.Logica.Pitch = CameraLogica_PitchPadrao();
+            yield return Esperar(2f);
+
+            var dts = new System.Collections.Generic.List<float>();
+            yield return Medir(dts, 4f);
+            string antes = Quadros(dts);
+
+            Vector3 p = main.Player.Pawn.Pos;
+            Vector3 fw = -dentro, lado = tang;
+            int areia = 0;
+            foreach (float k in new[] { -9f, 0f, 9f })
+            {
+                Vector3 alvo = praia + lado * k;
+                if (f.EhAreia(f.CelulaEm(alvo))) areia++;
+                Bus.EmitTerrainHit(Elemento.Raio, alvo, true);
+            }
+            yield return Esperar(0.5f);
+            int ativos = f.Ativos;
+            yield return Medir(dts, 4f);
+            string depois = Quadros(dts);
+
+            Foto(main.Player.Camera.Cam, "f62-fulgurito-duna", true);
+            Vector3 meio = praia;
+            Vector3 olho = meio - fw * 5f + lado * 2.5f;
+            olho.y = Arkana.World.Ilha.AlturaDoChao(olho.x, olho.z) + 1.8f;
+            Camera perto = CameraTemporaria("CamFulgurito", olho, meio + Vector3.up * 1f, Color.gray);
+            yield return null;
+            Foto(perto, "f62-fulgurito-perto", false);
+            Object.Destroy(perto.gameObject);
+
+            string txt = "fulgurito " + System.DateTime.Now.ToString("s") + " qualidade=" + QualitySettings.names[nivel]
+                + " gpu=" + SystemInfo.graphicsDeviceName + " api=" + SystemInfo.graphicsDeviceType
+                + "\n  jogador=" + p.ToString("F1") + " ilha=" + (ilha.Mestre != null ? "IlhaMestre" : "procedural") + " praia=" + praia.ToString("F1") + " alvos-na-areia=" + areia + "/3"
+                + " vidros-ativos=" + ativos + " (teto " + Balance.Terrain.GlassMax + ")"
+                + "\n  ANTES (sem vidro): " + antes + "\n  DEPOIS (com vidro): " + depois + "\n";
+            Directory.CreateDirectory(Pasta);
+            File.WriteAllText(Path.Combine(Pasta, "fulgurito-fps.txt"), txt);
+            Debug.Log("ARKANA FULGURITO " + txt);
+            Application.targetFrameRate = alvoAntes;
+            Assert.Greater(ativos, 0, "nenhum vidro nasceu na duna: " + txt);
+        }
     }
 }

@@ -1,0 +1,4 @@
+fulgurito 2026-11-19T01:02:38 qualidade=Medium gpu=NVIDIA GeForce RTX 3050 6GB Laptop GPU api=Direct3D12
+  jogador=(1917.9, 2.2, 698.1) ilha=IlhaMestre praia=(1929.2, 0.0, 702.2) alvos-na-areia=3/3 vidros-ativos=23 (teto 24)
+  ANTES (sem vidro): quadros=5382 fps-medio=1345,3 p50=0,71ms p95=0,91ms
+  DEPOIS (com vidro): quadros=5520 fps-medio=1379,9 p50=0,70ms p95=0,89ms
