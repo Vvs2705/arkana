@@ -39,8 +39,12 @@ Leitura: com a câmera do jogador **desenhando a cena a cada quadro** (proxy de 
 orçamento do ADR: nenhuma piora > 5 % no p95). **Não é o aparelho:** player Windows com janela não foi gerado e o Poco F4 segue sem medida
 (sem cabo) → FPS no alvo mobile = **NÃO AVALIADO**.
 
-### Originalidade
-Ver §7 da ata (`ip-originality-reviewer`, ciclo 2).
+### Originalidade (`ip-originality-reviewer`, ciclo 2)
+Regra APROVADO · nome "Fulgurito" (uso descritivo no jogo) APROVADO · visual das 3 imagens APROVADO · nome como marca/produto NÃO AVALIADO
+(sem busca INPI/USPTO/WIPO/EUIPO; bloqueia só uso como skin/modo/loja/marketing). Detalhe na §7 da ata.
+
+### CI do HEAD
+Run `44580833654` (HEAD `3678dea`) **success**: EditMode 528 passaram · 0 falharam · 5 ignorados (veredito do XML).
 
 ## Ciclo 1 (histórico — commit `fcb95e3`)
 | Rodada | Árvore | total | passed | failed | skipped |
@@ -69,4 +73,5 @@ por decisão de minutos/disco; a mudança do ciclo 2 é código C# + malha proce
 | 4 | S3 | Suprema do Fizz estilhaçava o próprio vidro (vidro/buraco alternado). | Corrigido no ciclo 2 (`GlassNascer`) |
 | 5 | S4 | `Pawn.Aterrar` num corpo **já pousado** devolve a `Queda.Pos` antiga (o boneco voltava ao spawn). Só afetou a foto; contornado no teste. | Aberto — fora do escopo, reportar |
 | 6 | S4 | Vidro ainda não para projétil em voo (fora do escopo pela ata). | Aberto (próxima leva) |
+| 8 | S3 | `build_apk.ps1` do ciclo 2 falhou 2× com `AccessDeniedException` em `Library/Bee/Android/.../merged_native_libs/.../arm64-v8a` e deixou `mobile-unity/Assets/Resources/` (4 `PerformanceTestRun*` não rastreados). | Aberto — limpar `Library/Bee/Android` (dono) e regerar |
 | 7 | S4 | A crosta nova quase não aparece na foto (alfa baixo na borda + areia clara): sem borda dura, mas também sem leitura de "areia queimada". | Aberto — julgamento do CD |

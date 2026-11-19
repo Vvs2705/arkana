@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (technical-director, Conselho Modo B ciclo 2, 2026-11-19 — o dono delegou: "os diretores decidem")
 
 > Quem pode mover para `Accepted`: o dono (usuário), ou o `technical-director` com a confirmação explícita dele
 > (regra do template `templates/ADR.md`). O Conselho decidiu por consenso (ata abaixo), mas o dono ainda não

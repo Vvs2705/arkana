@@ -13,10 +13,7 @@
 # tj_merge_gate.py aceita "skipping", entao EditMode pulado com licenca verde mergearia sem teste nenhum).
 name: unity
 on:
-  pull_request:
-    paths:
-      - 'mobile-unity/**'
-      - '.github/workflows/unity.yml'
+  pull_request:   # sem filtro de paths: todo HEAD de PR precisa de check (commit so' de docs sem check = o gate nao tem o que ler)
   workflow_dispatch:   # rodar 1x na main depois do merge: o cache da Library criado na main serve a todos os PRs
 permissions:
   contents: read

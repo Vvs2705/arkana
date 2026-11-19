@@ -73,8 +73,25 @@ Regra: máx. 3 subagentes por leva, 1 Unity por vez. **Nesta validação as raia
 > Não houve.
 
 ## 7. Revisão pós-código (PR draft)
-| Diretor | Evidência avaliada | Veredito | Ciclo (1–3) |
+
+> Ciclo 1: revisão em `TIME DE JOGOS/time-jogos/docs/conselho/2026-11-19-arkana-pr11-modo-b.md` (rodadas inline, um executor).
+> **Ciclo 2 (esta tabela):** cada parecer foi dado por um **subagente separado** que leu e seguiu o próprio `.claude/agents/<papel>.md`
+> (somente leitura); a ordem foi LP → (TD, CD, producer em paralelo). O CD abriu e olhou as 3 PNGs novas. Código avaliado: `ec007c1`;
+> HEAD revisado: `3678dea` (só workflow/docs depois de `ec007c1`). CI do HEAD: run `44580833654` **success** (EditMode 528/0/5 no XML,
+> categoria `SoNoPC` excluída e coberta pelo XML local 573/0/1).
+
+| Papel | Evidência avaliada | Veredito | Ciclo (1–3) |
 |---|---|---|---|
-| technical-director | código, testes, perf | NÃO AVALIADO (não executado — Modo B fora do escopo desta validação; PR fica draft para o dono) | — |
-| creative-director | screenshot vs brief e ADR | NÃO AVALIADO (não executado) | — |
-| producer | escopo, critério de pronto | NÃO AVALIADO (não executado) | — |
+| lead-programmer (pré-condição) | diff, XMLs vermelho-a/b e verde | `LP-CODE-REVIEW: APPROVE` — bloqueantes 1–3 resolvidos, prova vermelha crível; achado 1 (CI aceitava `skipping` sem segredos) corrigido em `3678dea`; sugestões não bloqueantes: `AreiaMaxY` para `Balance`, slot estável por `Idx`, métodos > 40 linhas | 2 |
+| technical-director | código, testes, CI, FPS proxy, ADR | **APROVA** — itens 1–6 do ciclo 1 conferidos; FPS de render aceito como proxy (p95 6,85 → 6,86 ms, RTX 3050); **ADR-0001 → `Accepted`** (delegação do dono). Condições de **release** (não de merge): p95 no Poco F4 perfil Média com 24 vidros (cortar 9 → 5 tubos se piorar > 5 %) e APK do ciclo 2 | 2 |
+| creative-director | `2026-11-19-fulgurito-praia-inimigo.png`, `-praia-tiro.png`, `-perto.png` (vistas) | **NÃO AVALIADO (sem captura do build: as 3 fotos são do PlayMode do Editor via foto.ps1, não de APK nem de player Windows)** — no Editor a direção de arte está resolvida (sem ciano, opaco, boneco escondido e exposto depois do tiro); único pendente: os mesmos quadros num player Windows ou no APK do commit do PR → vira APROVA sem mudança de arte. Opcional: realce de borda "vidro" e crosta mais visível | 2 |
+| producer | escopo, DoD | **NÃO AVALIADO** — escopo aprovado (CI e `SoNoPC` dentro da raia 6; rename "Duna"→"Praia" a pedido do CD); faltam o APROVA do CD e o APK do ciclo 2 (raia 4). A condição "CI verde no HEAD" já fechou (`44580833654`) | 2 |
+| ip-originality-reviewer | GDD §16.4, código, 3 PNGs, 2 buscas web | regra **APROVADO**; nome "Fulgurito" para uso descritivo no jogo **APROVADO**; visual do ciclo 2 (3 imagens) **APROVADO**; nome como marca/produto (skin, modo, loja, marketing) **NÃO AVALIADO** (sem busca INPI/USPTO/WIPO/EUIPO — bloqueia só uso como produto) | 2 |
+
+**Merge: bloqueado** (não há três APROVA). Pendências para o ciclo 3 (último):
+1. Captura do build (CD): player Windows com janela ou APK no aparelho/emulador com os quadros "inimigo atrás" e "depois do tiro", hash na evidência.
+2. APK do ciclo 2 (producer, raia 4): `build_apk.ps1` falhou 2× em 2026-11-19 com `java.nio.file.AccessDeniedException` em
+   `mobile-unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/merged_native_libs/.../arm64-v8a` (pasta da
+   Library travada/sem permissão — limpar `Library/Bee/Android` e rodar de novo; o build também deixou `mobile-unity/Assets/Resources/`
+   com 4 arquivos `PerformanceTestRun*` não rastreados, a apagar).
+3. Dono: o repo `Vvs2705/arkana` está **público** (o time o trata como privado); decidir visibilidade (pesa: segredos de conta Unity sem 2FA no Actions, cota LFS).
