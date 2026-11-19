@@ -10,7 +10,7 @@ Ata `docs/conselho/2026-11-19-fulgurito.md` · ADR `docs/architecture/adr-0001-f
 | Build | Unity Editor 6000.3.23f1 — testes `-batchmode -nographics`; fotos `foto.ps1` (`-batchmode` **sem** `-nographics`: a GPU desenha) |
 | Dispositivo / perfil | PC Windows 10, RTX 3050 6 GB Laptop, D3D12, 7,7 GB RAM; QualitySettings "Medium", vSync 0, sem teto de FPS (restaurados no `finally`). **Poco F4: não medido.** |
 | EditMode local (XML `Logs/fulg-verde-final.xml`) | **573 passaram / 0 falharam / 1 ignorado de 574** (`CharactersCorpoMagoTests`: "todo o elenco já tem os takes novos"); Fulgurito **13/13** |
-| CI (GitHub Actions, GameCI) | run `44577599879` **verde**: 533 · 528 passaram · 0 falharam · 5 ignorados (`VisualPecasMeshyTests`: .glb é ponteiro LFS no CI). Categoria `SoNoPC` (41 testes que leem LFS + 1 teto de 60 ms) fica no `portao.ps1` |
+| CI (GitHub Actions, GameCI) | run `44577599879` (commit `9241f85`) **verde**: 533 · 528 passaram · 0 falharam · 5 ignorados (`VisualPecasMeshyTests`: .glb é ponteiro LFS no CI). Categoria `SoNoPC` (40 testes que leem LFS + 1 teto de 60 ms = 41) fica no `portao.ps1`. Run do HEAD final: ver §7 da ata |
 | Screenshots (1200×540, reduzidas de 2400×1080) | `2026-11-19-fulgurito-praia-inimigo.png` (câmera do jogador + HUD, **boneco 2 m atrás do vidro**), `2026-11-19-fulgurito-praia-tiro.png` (o mesmo quadro depois de 2 impactos de Fogo: o vão abre e o boneco aparece), `2026-11-19-fulgurito-perto.png` |
 | Observado por | `qa-lead` (executor) — 23 vidros em três feixes na praia seca da IlhaMestre; boneco só com a cabeça aparecendo entre as pontas antes do tiro, de corpo inteiro depois; HUD íntegra |
 | Originalidade | `ip-originality-reviewer` — ver §Originalidade |

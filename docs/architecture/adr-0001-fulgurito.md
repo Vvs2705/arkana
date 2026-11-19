@@ -75,7 +75,7 @@ Classe nova `Fulgurito` (grade com a mesma `Balance.Terrain.CellSize`), ligada a
 (uma linha), decide o que é areia pela ilha da cena — `Bioma.Dunas/Praia` na ilha procedural; na **IlhaMestre** (a ilha do
 jogo hoje, `Main.UsarIlhaMestre = true`, onde `Ilha.Relevo` é nulo) chão seco entre `Relevo.PraiaY` (1,4 m) e 3,75 m, a faixa
 onde a camada "areia" do splat pesa mais que metade — e pergunta **só na célula atingida** (pré-classificar 1.600×1.600
-células custaria segundos de carregamento). Monta um pool de 24 objetos (lâminas alfa verde-pálido + crosta âmbar), sem sombra, zero alocação por quadro.
+células custaria segundos de carregamento). Monta um pool de 24 objetos (ciclo 1: lâminas alfa verde-pálido + crosta âmbar; **ciclo 2: tubos oliva/verde-garrafa/âmbar-fumê — ver Adendo**), sem sombra, zero alocação por quadro.
 
 ### Key Interfaces
 ```csharp

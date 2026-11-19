@@ -9,8 +9,8 @@
 # portao.ps1 local, que tem os arquivos (idem o teto de 60 ms do WorldCostaTests: relogio do PC, o runner deu 63 ms). O veredito e' o XML (failed=0, passed>0), nunca o exit code.
 #
 # Segredos (Settings > Secrets and variables > Actions): UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD. Licenca Personal: o .ulf do PC e' preso
-# a maquina; o GameCI ativa pela conta (e-mail + senha, conta sem 2FA). Sem eles o job e' pulado com aviso (nao fica verde de mentira:
-# "skipped" nao conta como check aprovado no merge).
+# a maquina; o GameCI ativa pela conta (e-mail + senha, conta sem 2FA). Sem eles o job "licenca" FICA VERMELHO (LP ciclo 2: o
+# tj_merge_gate.py aceita "skipping", entao EditMode pulado com licenca verde mergearia sem teste nenhum).
 name: unity
 on:
   pull_request:
@@ -41,7 +41,7 @@ jobs:
       - id: v
         run: |
           if [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then echo ok=true >> "$GITHUB_OUTPUT"
-          else echo "::warning ::sem os segredos UNITY_EMAIL/UNITY_PASSWORD: EditMode nao rodou"; echo ok=false >> "$GITHUB_OUTPUT"; fi
+          else echo "::error ::sem os segredos UNITY_EMAIL/UNITY_PASSWORD: EditMode nao roda, e PR sem teste nao passa"; echo ok=false >> "$GITHUB_OUTPUT"; exit 1; fi
 
   editmode:
     name: EditMode (Unity)
