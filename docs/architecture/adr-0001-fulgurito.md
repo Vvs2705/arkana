@@ -139,6 +139,29 @@ Aditivo. **Rollback**: remover a linha do `Main.cs` (o vidro deixa de nascer) ou
 `TerrainFulguritoTests` 8/8 verde e vistos vermelhos; suíte EditMode sem regressão (XML); APK gerado; foto + FPS antes/depois
 em `production/qa/evidence/2026-11-19-fulgurito.md`; Poco F4 = pendente.
 
+## Adendo — ciclo 2 do Modo B (2026-11-19)
+
+Decidido para fechar os bloqueantes do Conselho Modo B ciclo 1 (LP nº 1–3, TD nº 1–3, CD nº 1–3):
+
+1. **Vidro nascendo ignora Raio** (LP nº 1, caminho mais simples proposto pelo LP e aceito pelo TD). A suprema do Fizz emite
+   `Raio` forte a cada 3 m (= 1 célula) **no mesmo quadro**; o 2º ponto caía no vidro recém-fundido e o estilhaçava (vidro/buraco
+   alternado, teto consumido por um padrão quebrado). Regra: vidro com vida < `Balance.Terrain.GlassNascer` (0,25 s — a mesma janela
+   da animação de subida da casca) **não** é estilhaçado por Raio (nem renovado); o disco forte do ponto seguinte continua fundindo
+   as células que faltam → faixa contínua. Qualquer **outro** elemento estilhaça vidro nascendo (1 tiro destrói continua valendo).
+   Alternativas descartadas: "mesma conjuração" exigiria um id de lançamento no `Bus.TerrainHit` (muda o contrato de 14 emissores);
+   cooldown por célula seria mais um número sem leitura para o jogador. **Teto:** a suprema pode consumir até 24 vidros numa faixa
+   longa; mantido o "cheio = recusa" da Rodada 2 (determinístico, o jogador aprende o limite) — revisar no playtest (risco do TD).
+2. **Areia da IlhaMestre em função pura**: `FulguritoBehaviour.AreiaDaMestre(float altura, float superficieDaAgua)` com EditMode
+   (`TerrainFulguritoAreiaTests`); a sobrecarga com `RelevoMestre` só amostra e delega.
+3. **Visual (veto do CD)**: feixe de 9 tubos rugosos de 5 lados × 3 segmentos com ponta rombuda, eixo que entorta e gira; cor de vértice
+   (shader `Universal Render Pipeline/Particles/Unlit`, já na lista `Build.ShadersDoCodigo`, via `MaterialVfx.CorDeVertice(Alfa)`) em 3
+   variantes pela `Semente` (oliva+âmbar, verde-garrafa, âmbar-fumê), base queimada escura, alfa 0,95; crosta irregular de 25 vértices,
+   **uma malha por slot do pool** cujo y segue o relevo (reassentada só quando o slot troca de vidro — zero alocação por quadro).
+4. **Correção de nível de código (LP nº 7):** não há grade `bool[N*N]`; o estado é o `Dictionary` dos vidros vivos (≤ 24).
+   **Orçamento real:** ~300 tris de feixe + 36 de crosta por vidro (≈ 8 K tris com 24), 2 renderers por vidro com o **mesmo** material
+   (≤ 48 draw calls, inalterado). Medida proxy (câmera do jogador desenhando 2400×1080 por quadro, RTX 3050): p95 6,85 → 6,86 ms com 23 vidros.
+   Poco F4: pendente.
+
 ## Related
 - Ata: `docs/conselho/2026-11-19-fulgurito.md`
 - Código: `mobile-unity/Assets/_Arkana/Scripts/Terrain/Fulgurito.cs`, `FulguritoBehaviour.cs`; testes `Tests/EditMode/TerrainFulguritoTests.cs`
