@@ -2,6 +2,17 @@
 
 Ata `docs/conselho/2026-11-19-fulgurito.md` · ADR `docs/architecture/adr-0001-fulgurito.md` · branch `feat/fulgurito` · PR #11.
 
+## Ciclo 3 — builds do commit `1109a92` (APK + player Windows) para o CD e o producer
+
+| Campo | Valor |
+|---|---|
+| Commit buildado | **`1109a92`** (HEAD de `feat/fulgurito`; código igual a `ec007c1`, só docs depois) |
+| APK (raia 4) | `build_apk.ps1` **exit 0** em 9 min 25 s, sem "BUILD SUJOU O REPO" (a falha `AccessDeniedException` do ciclo 2 não voltou depois da limpeza da `Library/Bee`) → `mobile-unity/Builds/testes/arkana-2026-11-19_1530.apk`, **302,1 MB** (316.749.145 B), SHA-256 `C9A67FB6170779E25F0E815F2132B239E59ECA1B4C5376E978334335B31E9CBE`. **Não instalado em aparelho** (sem cabo/emulador). |
+| Player Windows | Unity Test Framework no **player** (`-runTests -testPlatform StandaloneWindows64 -buildPlayerPath mobile-unity/Builds/win-fulgurito -testFilter Foto_Fulgurito`, editor em `-batchmode` só para buildar): o UTF builda `PlayerWithTests.exe` (Win64, Mono, Development, cena de teste + `Main` do jogo) e o **abre com janela** (D3D12, RTX 3050); o teste `Foto_Fulgurito_PraiaComFps` roda **dentro do player** — treino com seed 3103, 3 Raios fortes na praia, boneco atrás do vidro, 2 Fogos no vão — e grava os PNGs a partir da câmera do jogador. XML `Logs/win-fulgurito.xml`: **1/1 passou**. Nenhum código novo. |
+| Imagens (do player) | `2026-11-19-fulgurito-player-praia-inimigo.png`, `-player-praia-tiro.png`, `-player-perto.png` (2400×1080) + `-player-fps.txt` |
+| Números do player | IlhaMestre, alvos-na-areia 3/3, **vidros-ativos 23 (teto 24)**, tapa-a-linha True, estilhaçados-pelo-tiro 2. FPS do player com janela saiu travado em ~60 (vSync do monitor; p95 ~30 ms nos dois lados, sem diferença com/sem vidro) — **não serve de medida de custo**; a 1ª rodada (pasta temporária apagada pelo UTF, só o `Player.log` ficou) deu ANTES p95 9,25 ms. |
+| Limpeza | `mobile-unity/Builds/win-fulgurito` apagado; `ProjectSettings.asset` (o UTF acrescentou `m_BuildTarget: Standalone` em batching) restaurado com `git restore`; árvore limpa. |
+
 ## Ciclo 2 (correção do Modo B ciclo 1 — `TIME DE JOGOS/time-jogos/docs/conselho/2026-11-19-arkana-pr11-modo-b.md`)
 
 | Campo | Valor |
