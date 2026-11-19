@@ -1,0 +1,90 @@
+# Unity no CI (raia build-ci-engineer, Conselho Modo B do PR #11, TD item 4): testes EditMode do mobile-unity/ em todo PR, com GameCI
+# (docker unityci/editor 6000.3.23f1). Modelado no forge-street e no 09_TINY_AIRPORT_EMPIRE, que passaram.
+#
+# SO EditMode: build Android e PlayMode (fotos/FPS) continuam no PC (portao.ps1, foto.ps1, build_apk.ps1) — minutos e disco do runner.
+#
+# LFS: o checkout NAO baixa o LFS. O mobile-unity tem ~604 MB em LFS (Resources/magos ~453 MB) e a cota gratis do GitHub e' 1 GB de banda
+# por mes (.gitattributes): um pull por rodada estoura em 2 PRs. Mesma saida dos outros repos ("roda com as primitivas"): no CI os
+# binarios ficam como ponteiro e os testes que leem malha/textura de verdade (categoria "LFS") sao pulados aqui e cobrados no
+# portao.ps1 local, que tem os arquivos. O veredito e' o XML (result="Passed"), nunca o exit code.
+#
+# Segredos (Settings > Secrets and variables > Actions): UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD. Licenca Personal: o .ulf do PC e' preso
+# a maquina; o GameCI ativa pela conta (e-mail + senha, conta sem 2FA). Sem eles o job e' pulado com aviso (nao fica verde de mentira:
+# "skipped" nao conta como check aprovado no merge).
+name: unity
+on:
+  pull_request:
+    paths:
+      - 'mobile-unity/**'
+      - '.github/workflows/unity.yml'
+  workflow_dispatch:   # rodar 1x na main depois do merge: o cache da Library criado na main serve a todos os PRs
+permissions:
+  contents: read
+  checks: write   # o unity-test-runner publica o resumo do EditMode como check run
+concurrency:
+  group: unity-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  GITHUB_TOKEN: ${{ github.token }}   # o test-runner consulta a API do GitHub (game-ci/cli); sem token o limite de 60/h por IP da' 403
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+jobs:
+  licenca:
+    name: licenca do Unity configurada?
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      ok: ${{ steps.v.outputs.ok }}
+    steps:
+      - id: v
+        run: |
+          if [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then echo ok=true >> "$GITHUB_OUTPUT"
+          else echo "::warning ::sem os segredos UNITY_EMAIL/UNITY_PASSWORD: EditMode nao rodou"; echo ok=false >> "$GITHUB_OUTPUT"; fi
+
+  editmode:
+    name: EditMode (Unity)
+    needs: licenca
+    if: needs.licenca.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90   # 1a rodada importa o projeto inteiro sem Library
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: false
+      - uses: actions/cache@v6
+        with:
+          path: mobile-unity/Library
+          key: Library-editmode-${{ hashFiles('mobile-unity/Packages/**', 'mobile-unity/ProjectSettings/**') }}-${{ hashFiles('mobile-unity/Assets/**') }}
+          restore-keys: |
+            Library-editmode-${{ hashFiles('mobile-unity/Packages/**', 'mobile-unity/ProjectSettings/**') }}-
+            Library-editmode-
+      - uses: game-ci/unity-test-runner@v4
+        id: testes
+        with:
+          projectPath: mobile-unity
+          unityVersion: 6000.3.23f1
+          testMode: editmode
+          artifactsPath: editmode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: EditMode (resultado)
+          customParameters: -testCategory !LFS
+      - name: veredito do XML (nunca o exit code)
+        if: always()
+        shell: bash
+        run: |
+          x=$(ls ${{ steps.testes.outputs.artifactsPath || 'editmode' }}/*.xml 2>/dev/null | head -1)
+          [ -n "$x" ] || { echo "::error::EditMode sem XML de resultado"; exit 1; }
+          run=$(grep -m1 -o '<test-run [^>]*>' "$x")
+          echo "EditMode: $(echo "$run" | grep -oE '(total|passed|failed|skipped)="[0-9]+"' | paste -sd' ')" | tee -a "$GITHUB_STEP_SUMMARY"
+          [[ "$run" == *'result="Passed"'* ]] || { grep -oE '<test-case [^>]*result="Failed"[^>]*' "$x" | grep -oE 'fullname="[^"]*"' | head -40; exit 1; }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editmode-resultados
+          path: |
+            editmode
+            mobile-unity/Logs
+          retention-days: 14
+          if-no-files-found: ignore
