@@ -9,6 +9,7 @@ namespace Arkana.Tests
     /// shader na hora de vestir. A troca e' por NOME de propriedade — renomear _BaseMap no shader deixaria o elenco inteiro
     /// sem textura com o portao verde. E a tinta de bot, o cinza de morto e a piscada escrevem _BaseColor.
     /// </summary>
+    [Category("SoNoPC")]   // le' malha/textura do LFS: o CI baixa so' o ponteiro (.github/workflows/unity.yml); roda no portao.ps1
     public class CharactersMagoContornoTests
     {
         [Test]

@@ -5,8 +5,8 @@
 #
 # LFS: o checkout NAO baixa o LFS. O mobile-unity tem ~604 MB em LFS (Resources/magos ~453 MB) e a cota gratis do GitHub e' 1 GB de banda
 # por mes (.gitattributes): um pull por rodada estoura em 2 PRs. Mesma saida dos outros repos ("roda com as primitivas"): no CI os
-# binarios ficam como ponteiro e os testes que leem malha/textura de verdade (categoria "LFS") sao pulados aqui e cobrados no
-# portao.ps1 local, que tem os arquivos. O veredito e' o XML (result="Passed"), nunca o exit code.
+# binarios ficam como ponteiro e os testes que leem malha/textura de verdade (categoria "SoNoPC") sao pulados aqui e cobrados no
+# portao.ps1 local, que tem os arquivos (idem o teto de 60 ms do WorldCostaTests: relogio do PC, o runner deu 63 ms). O veredito e' o XML (failed=0, passed>0), nunca o exit code.
 #
 # Segredos (Settings > Secrets and variables > Actions): UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD. Licenca Personal: o .ulf do PC e' preso
 # a maquina; o GameCI ativa pela conta (e-mail + senha, conta sem 2FA). Sem eles o job e' pulado com aviso (nao fica verde de mentira:
@@ -69,7 +69,7 @@ jobs:
           artifactsPath: editmode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: EditMode (resultado)
-          customParameters: -testCategory !LFS
+          customParameters: -testCategory !SoNoPC
       - name: veredito do XML (nunca o exit code)
         if: always()
         shell: bash
@@ -78,7 +78,9 @@ jobs:
           [ -n "$x" ] || { echo "::error::EditMode sem XML de resultado"; exit 1; }
           run=$(grep -m1 -o '<test-run [^>]*>' "$x")
           echo "EditMode: $(echo "$run" | grep -oE '(total|passed|failed|skipped)="[0-9]+"' | paste -sd' ')" | tee -a "$GITHUB_STEP_SUMMARY"
-          [[ "$run" == *'result="Passed"'* ]] || { grep -oE '<test-case [^>]*result="Failed"[^>]*' "$x" | grep -oE 'fullname="[^"]*"' | head -40; exit 1; }
+          # result do test-run sai "Skipped:Ignored" quando ha' ignorado (o ARKANA tem 1); vale failed=0 com passed>0
+          falhas=$(echo "$run" | grep -oE ' failed="[0-9]+"' | grep -oE '[0-9]+'); passaram=$(echo "$run" | grep -oE ' passed="[0-9]+"' | grep -oE '[0-9]+')
+          [ "${falhas:-1}" = 0 ] && [ "${passaram:-0}" -gt 0 ] || { grep -oE '<test-case [^>]*result="Failed"[^>]*' "$x" | grep -oE 'fullname="[^"]*"' | head -40; exit 1; }
       - uses: actions/upload-artifact@v7
         if: always()
         with:

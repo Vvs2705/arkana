@@ -13,6 +13,7 @@ namespace Arkana.Tests
     /// mao, colada no osso, soquete na escala do corpo, dedos no eixo antebraco->mao, dorso no lado medido do osso.
     /// Esquecer a compensacao da escala poe a luva com ~32 m: cai aqui.
     /// </summary>
+    [Category("SoNoPC")]   // le' malha/textura do LFS: o CI baixa so' o ponteiro (.github/workflows/unity.yml); roda no portao.ps1
     public class CharactersLuvaTests
     {
         const string Procedural = "slug-que-nao-existe";

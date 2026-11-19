@@ -11,6 +11,7 @@ namespace Arkana.Tests
     /// FICHA, medida na malha deformada de verdade (BakeMesh), nao nos bounds que o proprio Mago usou para escalar.
     /// Existe porque a Pyra entrou minuscula — um ponto no chao — com o portao verde.
     /// </summary>
+    [Category("SoNoPC")]   // le' malha/textura do LFS: o CI baixa so' o ponteiro (.github/workflows/unity.yml); roda no portao.ps1
     public class CharactersMagoExternoTests
     {
         /// <summary>Todo slug do elenco que ja' tem FBX em Resources/magos (o elenco entra aos poucos).</summary>
