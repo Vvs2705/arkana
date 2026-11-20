@@ -566,6 +566,7 @@ namespace Arkana
             p.Add(new Passo("terreno", Textos.CarregaTerreno, () =>
             {
                 _arena.gameObject.AddComponent<TerrenoReativoBehaviour>();
+                _arena.gameObject.AddComponent<FulguritoBehaviour>();   // raio na areia vira vidro (GDD §16.4, ADR-0001)
                 VisualDoTerreno.Criar(_arena);        // fogo, carvao, gelo, eletrico, lama, muro
             }, true));
             p.Add(new Passo("kits", Textos.CarregaTerreno, () => VisualDosKits.Criar(_arena, Partida)));       // muralha, fio, poca, eco, tear + o aviso da suprema

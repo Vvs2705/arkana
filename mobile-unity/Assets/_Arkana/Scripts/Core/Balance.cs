@@ -173,6 +173,15 @@ namespace Arkana.Core
             public const float WallHp = 60f;
             public const float WallDuration = 12f;
             public const float WallHeight = 3.5f;
+            /// <summary>FULGURITO (GDD §16.4, ADR-0001): s que o vidro de areia fundida fica de pe' sem levar impacto.</summary>
+            public const float GlassDuration = 8f;
+            /// <summary>Teto de vidros vivos (orcamento mobile: 2 draw calls cada). Cheio = o raio nao funde (nunca troca o mais velho).</summary>
+            public const int GlassMax = 24;
+            /// <summary>m da lamina mais alta: tapa um mago de pe'.</summary>
+            public const float GlassHeight = 2.4f;
+            /// <summary>s em que o vidro esta' NASCENDO (a subida da casca): Raio nao o estilhaca (ADR-0001 adendo ciclo 2 — a suprema
+            /// do Fizz cai a cada 3 m no mesmo quadro e se autodestruia). Outro elemento estilhaca normalmente.</summary>
+            public const float GlassNascer = 0.25f;
         }
 
         public static class Dodge

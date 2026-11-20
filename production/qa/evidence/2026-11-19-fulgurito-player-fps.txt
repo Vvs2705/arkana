@@ -1,0 +1,6 @@
+fulgurito 2026-11-19T15:41:40 qualidade=Medium gpu=NVIDIA GeForce RTX 3050 6GB Laptop GPU api=Direct3D12
+  jogador=(1917.9, 2.2, 698.1) ilha=IlhaMestre praia=(1929.2, 0.0, 702.2) alvos-na-areia=3/3 vidros-ativos=23 (teto 24) inimigo=(1931.1, 1.7, 702.9) tapa-a-linha=True estilhacados-pelo-tiro=2
+  ANTES (sem vidro): quadros=240 fps-medio=59,8 p50=15,77ms p95=30,83ms
+  DEPOIS (com vidro): quadros=121 fps-medio=59,8 p50=15,92ms p95=30,67ms
+  RENDER FORCADO ANTES (Camera.Render da camera do jogador em 2400x1080 a cada quadro): quadros=178 fps-medio=59,1 p50=15,53ms p95=30,66ms
+  RENDER FORCADO DEPOIS: quadros=176 fps-medio=58,6 p50=15,90ms p95=30,09ms

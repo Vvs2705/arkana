@@ -10,6 +10,7 @@ namespace Arkana.Tests
     /// o deslocamento), o Mago mede as fases do pulo no proprio take, o cast correndo vai so' no tronco, e quem ainda nao
     /// tem os takes novos cai na reserva — nunca no Idle.
     /// </summary>
+    [Category("SoNoPC")]   // le' malha/textura do LFS: o CI baixa so' o ponteiro (.github/workflows/unity.yml); roda no portao.ps1
     public class CharactersCorpoMagoTests
     {
         const string Pasta = "Assets/_Arkana/Resources/magos/";
