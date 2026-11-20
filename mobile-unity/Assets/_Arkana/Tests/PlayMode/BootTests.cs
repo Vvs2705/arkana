@@ -108,20 +108,15 @@ namespace Arkana.Tests
             Assert.AreEqual(0, main.Bots.Count, "treino nao tem bots");
             Assert.AreEqual(Main.Bonecos, main.Partida.Bonecos.Count, "bonecos registrados");
             Assert.IsNull(main.Partida.Zona, "treino nao tem tempestade");
-            // 29/10: ~9,8 M tris no chao — a arvore de malha inteira nunca saia de cena (LOD unico com limiar 0). Toda arvore
-            // do Terrain corta longe; as que tem "-lod1" em Resources (as 4 de hoje) trocam de malha antes.
+            // 29/10: ~9,8 M tris e ~4.400 batches no chao — a arvore era instancia do Terrain, malha inteira, um draw cada, e
+            // nunca saia de cena. Agora a ilha planta e instancia as arvores ela mesma; as 4 especies de hoje tem "-lod1".
             IlhaMestre mestre = Object.FindFirstObjectByType<IlhaMestre>();
             Assert.IsNotNull(mestre, "a partida monta a IlhaMestre");
-            UnityEngine.Terrain ter = mestre.GetComponentInChildren<UnityEngine.Terrain>(true);
-            Assert.IsNotNull(ter, "a IlhaMestre tem Terrain (filhos: " + mestre.transform.childCount + ")");
-            TreePrototype[] protos = ter.terrainData.treePrototypes;
-            Assert.Greater(protos.Length, 0, "a ilha tem arvores");
-            foreach (TreePrototype tp in protos)
-            {
-                LOD[] lods = tp.prefab.GetComponent<LODGroup>().GetLODs();
-                Assert.AreEqual(2, lods.Length, tp.prefab.name + ": LOD0 + LOD1");
-                Assert.Greater(lods[lods.Length - 1].screenRelativeTransitionHeight, 0f, tp.prefab.name + " corta longe");
-            }
+            Assert.Greater(mestre.ArvoresPlantadas, 1000, "a ilha tem floresta");
+            Assert.AreEqual(4, mestre.EspeciesDeArvore, "copa, pinheiro, moita e tronco");
+            Assert.AreEqual(mestre.EspeciesDeArvore, mestre.EspeciesComLod1, "toda especie troca para o LOD1 longe");
+            foreach (UnityEngine.Terrain ter in mestre.GetComponentsInChildren<UnityEngine.Terrain>(true))
+                Assert.AreEqual(0, ter.terrainData.treeInstanceCount, ter.name + ": arvore no Terrain e' um draw por arvore");
             LogAssert.NoUnexpectedReceived();
         }
 

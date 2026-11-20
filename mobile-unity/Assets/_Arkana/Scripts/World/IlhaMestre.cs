@@ -9,8 +9,8 @@ namespace Arkana.World
     /// A ilha do Documento Mestre (4.800 x 4.400 m), montada a partir de Resources/ilha-mestre-altura.bytes e
     /// ilha-mestre.json — os dois gerados por arte/tools/ilha_mestre.py, que MEDE a ilha (doc §18) e falha fora da meta.
     /// 16 blocos de UnityEngine.Terrain nativo (o Unity simplifica o que esta' longe e poda por bloco), 5 camadas CC0 por altura e
-    /// declive, mar/lago/rio no shader de agua do jogo, sol da tarde vindo do SO (doc §8.2), arvores do kit como
-    /// instancias do UnityEngine.Terrain e as 12 regioes em BLOCKOUT (volumes + pecas que o jogo ja' tem).
+    /// declive, mar/lago/rio no shader de agua do jogo, sol da tarde vindo do SO (doc §8.2), arvores do kit
+    /// instanciadas por bloco (IlhaMestre.Arvores.cs) e as 12 regioes em BLOCKOUT (volumes + pecas que o jogo ja' tem).
     /// Tudo nasce sob "_gerado" com DontSave: a cena guarda so' este componente; abrir a cena reconstroi.
     /// Convencao do doc: +X leste, +Y norte, +Z cima -> Unity (x, z, y).
     /// </summary>
@@ -157,7 +157,8 @@ namespace Arkana.World
             var t = new UnityEngine.Terrain[Blocos, Blocos];
             PrepararPesos();
             var swa = System.Diagnostics.Stopwatch.StartNew();
-            var arvores = Arvores(out TreePrototype[] protos);
+            var arvores = Arvores(out string[] especies, out float[] alturaMolde);
+            PlantarArvores(arvores, especies, alturaMolde);
             msArvores = swa.ElapsedMilliseconds;
             DetailPrototype[] tufos = MoldeDoTufo();
             for (int bj = 0; bj < Blocos; bj++)
@@ -178,11 +179,6 @@ namespace Arkana.World
                 msSplat += sw.ElapsedMilliseconds; sw.Restart();
                 Tufos(td, splat, tufos);
                 msTufos += sw.ElapsedMilliseconds;
-                if (protos != null)
-                {
-                    td.treePrototypes = protos;
-                    td.SetTreeInstances(ArvoresDoBloco(arvores, D.x0 + bi * bx, D.y0 + bj * by, bx, by).ToArray(), true);
-                }
                 GameObject go = UnityEngine.Terrain.CreateTerrainGameObject(td);
                 go.name = $"TER_{bi}_{bj}";
                 go.hideFlags = HideFlags.DontSave;
@@ -195,8 +191,6 @@ namespace Arkana.World
                 ter.drawInstanced = false;
                 ter.heightmapPixelError = 4f;
                 ter.basemapDistance = 1200f;
-                ter.treeDistance = ArvoreNoChao;   // LateUpdate estica com a altura da camera
-                ter.treeBillboardDistance = 5000f;   // sem impostor: as pecas do kit nao usam o shader de arvore do Terrain
                 ter.detailObjectDistance = DistanciaDoTufo;
                 ter.detailObjectDensity = 1f;
                 t[bi, bj] = ter;
@@ -206,21 +200,6 @@ namespace Arkana.World
             for (int bi = 0; bi < Blocos; bi++)
                 t[bi, bj].SetNeighbors(bi > 0 ? t[bi - 1, bj] : null, bj < Blocos - 1 ? t[bi, bj + 1] : null,
                                        bi < Blocos - 1 ? t[bi + 1, bj] : null, bj > 0 ? t[bi, bj - 1] : null);
-        }
-
-        // ARVORE ATE' ONDE A CAMERA PRECISA (27/09): com 5 km o treino olhando a floresta rodava a 12 FPS no Poco (a arvore
-        // do kit e' malha inteira, sem impostor). KNOB: 1.200 m no chao; do alto (castelo, queda) +3 m por metro de altura.
-        const float ArvoreNoChao = 1200f;
-        float distArvore = -1f;
-
-        void LateUpdate()
-        {
-            Camera c = Camera.main;
-            if (c == null || terrenos == null) return;
-            float d = ArvoreNoChao + Mathf.Max(0f, c.transform.position.y - 150f) * 3f;
-            if (Mathf.Abs(d - distArvore) < 50f) return;
-            distArvore = d;
-            foreach (UnityEngine.Terrain t in terrenos) t.treeDistance = d;
         }
 
         // GRAMA DE VERDADE (Diretor, 27/09: "sem gramas"): o tufo da Grama da ilha antiga como DETALHE nativo do Terrain,
@@ -381,25 +360,30 @@ namespace Arkana.World
 
         struct Arv { public float x, y, esc; public int p; }
 
-        List<Arv> Arvores(out TreePrototype[] protos)
+        /// <summary>Os lugares das arvores (coordenadas do doc) e as especies que existem em Resources, com a altura do molde.</summary>
+        List<Arv> Arvores(out string[] especies, out float[] alturaMolde)
         {
             // TRIPO 009 (30/09): a arvore comum do catalogo pela MALHA SMART do site (2 mil tris, textura 512) — a HD reduzida
             // a 3 mil no Blender virava placas lisas; a Smart sai leve e com folha de verdade (teste em design/cenario/TRIPO-STUDIO.md)
             string copa = Resources.Load<GameObject>("tripo-009-arvore-comum") != null ? "tripo-009-arvore-comum" : "35-arvore-copa";
             string[] rec = { copa, "36-pinheiro", "37-moita", "51-tronco-musgo" };
             float[] altura = { 22f, 20f, 2.2f, 1.2f };   // alvo em metros (doc §9 R02: arvores comuns 12-35 m)
-            var lista = new List<TreePrototype>();
+            var lista = new List<string>();
+            var hs = new List<float>();
             var escala = new List<float>();
             foreach (string r in rec)
             {
-                GameObject m = Molde(r, out float hMolde);
+                Mesh m = MalhaDoMolde(r, out _);
                 if (m == null) continue;
-                lista.Add(new TreePrototype { prefab = m });
-                escala.Add(altura[Array.IndexOf(rec, r)] / Mathf.Max(hMolde, 0.01f));
+                float hMolde = Mathf.Max(m.bounds.max.y, 0.01f);
+                lista.Add(r);
+                hs.Add(hMolde);
+                escala.Add(altura[Array.IndexOf(rec, r)] / hMolde);
             }
-            protos = lista.Count > 0 ? lista.ToArray() : null;
+            especies = lista.ToArray();
+            alturaMolde = hs.ToArray();
             var arv = new List<Arv>();
-            if (protos == null) return arv;
+            if (especies.Length == 0) return arv;
             Regiao flo = Array.Find(D.regioes, r => r.id == "R02");
             for (int k = 0; k < 60000 && arv.Count < 9000; k++)
             {
@@ -410,64 +394,15 @@ namespace Arkana.World
                 float densidade = Mathf.Sqrt(fx * fx + fy * fy) < 1f ? 0.9f : Mathf.Clamp01(Mathf.PerlinNoise(x * 0.004f + 11f, y * 0.004f + 7f) * 2.2f - 1.1f);
                 if (rnd.NextDouble() > densidade) continue;
                 int p = h > 300f ? 1 : (rnd.NextDouble() < 0.25 ? 2 : (rnd.NextDouble() < 0.1 ? 3 : 0));
-                p = Mathf.Min(p, protos.Length - 1);
+                p = Mathf.Min(p, especies.Length - 1);
                 arv.Add(new Arv { x = x, y = y, p = p, esc = escala[p] * (float)(0.75 + rnd.NextDouble() * 0.6) });
             }
             return arv;
         }
 
-        List<TreeInstance> ArvoresDoBloco(List<Arv> arv, float ox, float oy, float sx, float sy)
-        {
-            var l = new List<TreeInstance>();
-            foreach (Arv a in arv)
-            {
-                if (a.x < ox || a.x >= ox + sx || a.y < oy || a.y >= oy + sy) continue;
-                l.Add(new TreeInstance
-                {
-                    position = new Vector3((a.x - ox) / sx, 0f, (a.y - oy) / sy),
-                    prototypeIndex = a.p, widthScale = a.esc, heightScale = a.esc,
-                    rotation = (float)(rnd.NextDouble() * Math.PI * 2), color = Color.white, lightmapColor = Color.white,
-                });
-            }
-            return l;
-        }
-
-        /// <summary>O GLB do kit vira UMA malha na raiz (o UnityEngine.Terrain so' desenha arvore com MeshRenderer na raiz).</summary>
-        GameObject Molde(string recurso, out float altura)
-        {
-            altura = 0f;
-            Mesh mesh = MalhaDoMolde(recurso, out Material[] ms);
-            if (mesh == null) return null;
-            altura = mesh.bounds.max.y;
-            var go = new GameObject("molde_" + recurso) { hideFlags = HideFlags.HideAndDontSave };
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var mrMolde = go.AddComponent<MeshRenderer>();
-            mrMolde.sharedMaterials = ms;
-            // O LODGroup tambem faz o Terrain tratar a peca como arvore de MALHA (sem ele exigia o shader Nature/Soft
-            // Occlusion e o aviso derrubava os 5 testes de cena, 04/10). Sem impostor (treeBillboardDistance 5 km).
-            // CORTE DE 29/10: o emulador contou ~9,8 M tris e ~4.400 batches no chao, quase tudo arvore de malha inteira ate'
-            // 1,2 km. Agora: LOD1 (o "-lod1" do mesmo nome, ~1/4 dos tris) abaixo de LodLonge da tela e corte abaixo de
-            // LodCorte. Sem o "-lod1", um nivel so' com o mesmo corte. O lodBias da qualidade multiplica (Media 0,7; Alta 2).
-            Mesh longe = MalhaDoMolde(recurso + "-lod1", out Material[] msLonge);
-            LOD[] lods;
-            if (longe != null)
-            {
-                var filho = new GameObject("lod1") { hideFlags = HideFlags.HideAndDontSave };
-                filho.transform.SetParent(go.transform, false);
-                filho.AddComponent<MeshFilter>().sharedMesh = longe;
-                var mrLonge = filho.AddComponent<MeshRenderer>();
-                mrLonge.sharedMaterials = msLonge;
-                lods = new[] { new LOD(LodLonge, new Renderer[] { mrMolde }), new LOD(LodCorte, new Renderer[] { mrLonge }) };
-            }
-            else lods = new[] { new LOD(LodCorte, new Renderer[] { mrMolde }) };
-            var lg = go.AddComponent<LODGroup>();
-            lg.SetLODs(lods);
-            lg.RecalculateBounds();
-            go.transform.SetParent(raiz, false);
-            go.transform.position = new Vector3(0, -10000, 0);
-            return go;
-        }
-
+        // CORTE DE 29/10: o emulador contou ~9,8 M tris e ~4.400 batches no chao, quase tudo arvore de malha inteira ate'
+        // 1,2 km. LOD1 (o "-lod1" do mesmo nome, ~1/4 dos tris) abaixo de LodLonge da tela e nada abaixo de LodCorte
+        // (IlhaMestre.Arvores.cs). O lodBias da qualidade multiplica (Media 0,7; Alta 2).
         // KNOBs (fracao da altura da tela, x lodBias). Arvore de 22 m na Media (FOV 62): LOD1 a ~130 m, corte a ~1,1 km;
         // moita de 2,2 m some a ~110 m, tronco caido a ~60 m.
         // ponytail: medido so' em contagem (emulador); conferir no Poco se o salto do LOD1 aparece e mover LodLonge.
